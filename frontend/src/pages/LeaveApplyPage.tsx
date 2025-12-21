@@ -1,0 +1,453 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import AppLayout from '../components/layout/AppLayout';
+import { useAuth } from '../contexts/AuthContext';
+import * as leaveService from '../services/leaveService';
+import { format } from 'date-fns';
+import './LeaveApplyPage.css';
+
+const LeaveApplyPage: React.FC = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({
+    leaveType: 'casual' as 'casual' | 'sick' | 'lop',
+    startDate: '',
+    startType: 'full' as 'full' | 'half',
+    endDate: '',
+    endType: 'full' as 'full' | 'half',
+    reason: '',
+    timeForPermission: { start: '', end: '' }
+  });
+
+  const { data: balances, isLoading: balancesLoading } = useQuery(
+    'leaveBalances',
+    leaveService.getLeaveBalances,
+    { retry: false, onError: (error: any) => {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        window.location.href = '/login';
+      }
+    }}
+  );
+  const { data: holidays = [], isLoading: holidaysLoading } = useQuery(
+    'holidays',
+    leaveService.getHolidays,
+    { retry: false }
+  );
+  const { data: rules = [], isLoading: rulesLoading } = useQuery(
+    'leaveRules',
+    leaveService.getLeaveRules,
+    { retry: false }
+  );
+  const { data: myRequests, isLoading: requestsLoading } = useQuery(
+    'myLeaveRequests',
+    () => leaveService.getMyLeaveRequests(1, 10),
+    { retry: false, onError: (error: any) => {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        window.location.href = '/login';
+      }
+    }}
+  );
+
+  const applyMutation = useMutation(
+    (data: { id?: number; data: any }) => 
+      data.id 
+        ? leaveService.updateLeaveRequest(data.id, data.data)
+        : leaveService.applyLeave(data.data),
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries('leaveBalances');
+        queryClient.invalidateQueries('myLeaveRequests');
+        alert(variables.id ? 'Leave updated successfully!' : 'Leave applied successfully!');
+        setFormData({
+          leaveType: 'casual',
+          startDate: '',
+          startType: 'full',
+          endDate: '',
+          endType: 'full',
+          reason: '',
+          timeForPermission: { start: '', end: '' }
+        });
+        setEditingId(null);
+      },
+      onError: (error: any) => {
+        console.error('Leave application error:', error);
+        const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to apply leave';
+        const errorDetails = error.response?.data?.error?.details;
+        
+        if (errorDetails && Array.isArray(errorDetails)) {
+          const detailMessages = errorDetails.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
+          alert(`${errorMessage}\n\n${detailMessages}`);
+        } else {
+          alert(errorMessage);
+        }
+      }
+    }
+  );
+
+  const deleteMutation = useMutation(leaveService.deleteLeaveRequest, {
+    onSuccess: () => {
+      queryClient.invalidateQueries('leaveBalances');
+      queryClient.invalidateQueries('myLeaveRequests');
+      alert('Leave deleted successfully!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error?.message || 'Failed to delete leave');
+    }
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Prepare the data for submission
+    // Date inputs already return YYYY-MM-DD format, so use directly to avoid timezone issues
+    const submitData: any = {
+      leaveType: formData.leaveType,
+      startDate: formData.startDate,
+      startType: formData.startType,
+      // For LOP, end date should be same as start date
+      endDate: formData.leaveType === 'lop' ? formData.startDate : formData.endDate,
+      endType: formData.leaveType === 'lop' ? 'full' : formData.endType,
+      reason: formData.reason
+    };
+    
+    // For LOP, timeForPermission is required
+    if (formData.leaveType === 'lop') {
+      if (!formData.timeForPermission.start || !formData.timeForPermission.end) {
+        alert('Please provide start and end timings for LOP leave');
+        return;
+      }
+      submitData.timeForPermission = {
+        start: formData.timeForPermission.start,
+        end: formData.timeForPermission.end
+      };
+    }
+    
+    if (editingId) {
+      applyMutation.mutate({ id: editingId, data: submitData });
+    } else {
+      applyMutation.mutate({ data: submitData });
+    }
+  };
+
+  const handleEdit = async (requestId: number) => {
+    try {
+      const request = await leaveService.getLeaveRequest(requestId);
+      setFormData({
+        leaveType: request.leaveType as 'casual' | 'sick' | 'lop',
+        startDate: request.startDate,
+        startType: request.startType as 'full' | 'half',
+        endDate: request.endDate,
+        endType: request.endType as 'full' | 'half',
+        reason: request.reason,
+        timeForPermission: request.timeForPermission || { start: '', end: '' }
+      });
+      setEditingId(requestId);
+      // Scroll to form
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error: any) {
+      alert(error.response?.data?.error?.message || 'Failed to load leave request');
+    }
+  };
+
+  const handleDelete = (requestId: number) => {
+    if (window.confirm('Are you sure you want to delete this leave request?')) {
+      deleteMutation.mutate(requestId);
+    }
+  };
+
+  const handleClear = () => {
+    setFormData({
+      leaveType: 'casual',
+      startDate: '',
+      startType: 'full',
+      endDate: '',
+      endType: 'full',
+      reason: '',
+      timeForPermission: { start: '', end: '' }
+    });
+    setEditingId(null);
+  };
+
+  if (balancesLoading || holidaysLoading || rulesLoading || requestsLoading) {
+    return (
+      <AppLayout>
+        <div className="leave-apply-page">
+          <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <div className="leave-apply-page">
+        <h1 className="page-title">Welcome, {user?.name}</h1>
+
+        {/* Top Row: Three Equal Sections */}
+        <div className="top-sections-row">
+          {/* Leave Balances - Top Left */}
+          <div className="leave-balances-section">
+            <h2>Leave Balances</h2>
+            <div className="balance-cards-container">
+              <div className="balance-card">
+                <div className="balance-label">Casual</div>
+                <div className="balance-value">{String(balances?.casual || 0).padStart(2, '0')}</div>
+              </div>
+              <div className="balance-separator"></div>
+              <div className="balance-card">
+                <div className="balance-label">Sick</div>
+                <div className="balance-value">{String(balances?.sick || 0).padStart(2, '0')}</div>
+              </div>
+              <div className="balance-separator"></div>
+              <div className="balance-card">
+                <div className="balance-label">LOP</div>
+                <div className="balance-value">{String(balances?.lop || 0).padStart(2, '0')}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Basic Rules - Top Center */}
+          <div className="rules-section">
+            <h2>Basic Rules To Apply Leave</h2>
+            <table className="rules-table">
+              <thead>
+                <tr>
+                  <th>Leave Required</th>
+                  <th>Prior Information</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rules.map((rule, idx) => (
+                  <tr key={idx}>
+                    <td>{rule.leaveRequired}</td>
+                    <td>{rule.priorInformation}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Holidays List - Top Right */}
+          <div className="holidays-section">
+            <h2>Holidays List</h2>
+            <div className="holidays-table-container">
+              <table className="holidays-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Holiday name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holidays.map((holiday, idx) => (
+                    <tr key={idx}>
+                      <td>{format(new Date(holiday.date + 'T00:00:00'), 'd-M-yyyy')}</td>
+                      <td>{holiday.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Apply Leave Form Section */}
+        <div className="apply-form-section">
+          <h2>{editingId ? 'Edit Leave / Permission' : 'Apply Leave / Permission'}</h2>
+          <form onSubmit={handleSubmit} className="leave-form">
+            <div className="form-row-6">
+              <div className="form-group">
+                <label>Leave Type</label>
+                <select
+                  value={formData.leaveType}
+                  onChange={(e) => {
+                    const newLeaveType = e.target.value as any;
+                    // For LOP, set end date same as start date and clear end type
+                    if (newLeaveType === 'lop') {
+                      setFormData({ 
+                        ...formData, 
+                        leaveType: newLeaveType,
+                        endDate: formData.startDate || '',
+                        endType: 'full'
+                      });
+                    } else {
+                      setFormData({ ...formData, leaveType: newLeaveType });
+                    }
+                  }}
+                  required
+                >
+                  <option value="casual">Casual</option>
+                  <option value="sick">Sick</option>
+                  <option value="lop">LOP</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Start Date</label>
+                <div className="date-input-wrapper">
+                  <input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      // For LOP, update end date to match start date
+                      if (formData.leaveType === 'lop') {
+                        setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
+                      } else {
+                        setFormData({ ...formData, startDate: newStartDate });
+                      }
+                    }}
+                    required
+                    className="date-input"
+                  />
+                  <span className="calendar-icon">📅</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Start Type</label>
+                <select
+                  value={formData.startType}
+                  onChange={(e) => setFormData({ ...formData, startType: e.target.value as any })}
+                  required
+                >
+                  <option value="full">Full day</option>
+                  <option value="half">Half day</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>End Date</label>
+                <div className="date-input-wrapper">
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    required={formData.leaveType !== 'lop'}
+                    disabled={formData.leaveType === 'lop'}
+                    className="date-input"
+                  />
+                  <span className="calendar-icon">📅</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>End Type</label>
+                <select
+                  value={formData.endType}
+                  onChange={(e) => setFormData({ ...formData, endType: e.target.value as any })}
+                  required={formData.leaveType !== 'lop'}
+                  disabled={formData.leaveType === 'lop'}
+                >
+                  <option value="full">Full day</option>
+                  <option value="half">Half day</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>{formData.leaveType === 'lop' ? 'Timings' : 'Time For Permission'}</label>
+                <div className="time-inputs">
+                  <input
+                    type="time"
+                    value={formData.timeForPermission.start}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeForPermission: { ...formData.timeForPermission, start: e.target.value }
+                    })}
+                    placeholder="Start time"
+                    disabled={formData.leaveType !== 'lop'}
+                    required={formData.leaveType === 'lop'}
+                  />
+                  <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
+                  <input
+                    type="time"
+                    value={formData.timeForPermission.end}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeForPermission: { ...formData.timeForPermission, end: e.target.value }
+                    })}
+                    placeholder="End time"
+                    disabled={formData.leaveType !== 'lop'}
+                    required={formData.leaveType === 'lop'}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="form-reason-row">
+              <div className="form-group reason-group">
+                <label>Reason</label>
+                <textarea
+                  value={formData.reason}
+                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  placeholder="Type reason..."
+                  required
+                  rows={4}
+                />
+              </div>
+              <div className="form-actions">
+                <button type="submit" className="submit-button">Submit</button>
+                <button type="button" onClick={handleClear} className="clear-button">Clear</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Recent Leave Requests Section */}
+        <div className="recent-requests-section">
+          <h2>Recent Leave Requests</h2>
+          <table className="requests-table">
+            <thead>
+              <tr>
+                <th>S No</th>
+                <th>Appiled Date</th>
+                <th>Leave Reason</th>
+                <th>Start date</th>
+                <th>End Date</th>
+                <th>No Of Days</th>
+                <th>Leave Type</th>
+                <th>Current Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {myRequests?.requests.map((request: any, idx: number) => (
+                <tr key={request.id}>
+                  <td>{idx + 1}</td>
+                  <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'd-M-yyyy')}</td>
+                  <td>
+                    <div className="reason-cell">
+                      {request.leaveReason}
+                    </div>
+                  </td>
+                  <td>{request.startDate}</td>
+                  <td>{request.endDate}</td>
+                  <td>{request.noOfDays}</td>
+                  <td>{request.leaveType}</td>
+                  <td>
+                    {request.currentStatus === 'pending' ? (
+                      <span className="status-badge status-applied">Applied</span>
+                    ) : request.currentStatus === 'approved' ? (
+                      <span className="status-badge status-approved">Approved</span>
+                    ) : request.currentStatus === 'rejected' ? (
+                      <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
+                        Rejected{request.rejectionReason ? `: ${request.rejectionReason}` : ''}
+                      </span>
+                    ) : (
+                      <span className="status-badge">{request.currentStatus}</span>
+                    )}
+                  </td>
+                  <td>
+                    {request.currentStatus === 'pending' && (
+                      <>
+                        <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>✏️</span>
+                        <span className="action-icon" title="Delete" onClick={() => handleDelete(request.id)}>🗑️</span>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AppLayout>
+  );
+};
+
+export default LeaveApplyPage;
