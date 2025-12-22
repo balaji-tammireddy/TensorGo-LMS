@@ -7,10 +7,10 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string | undefined;
-    const filter = req.query.filter as string | undefined;
+    const joiningDate = req.query.joiningDate as string | undefined;
     const status = req.query.status as string | undefined;
 
-    const result = await employeeService.getEmployees(page, limit, search, filter, status);
+    const result = await employeeService.getEmployees(page, limit, search, joiningDate, status);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({
