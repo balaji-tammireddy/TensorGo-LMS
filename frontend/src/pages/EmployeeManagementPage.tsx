@@ -59,7 +59,6 @@ const EmployeeManagementPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<string | undefined>(undefined);
-  const [joiningDateFilter, setJoiningDateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -70,13 +69,13 @@ const EmployeeManagementPage: React.FC = () => {
   const [newEmployee, setNewEmployee] = useState<any>(emptyEmployeeForm);
 
   const { data: employeesData, error } = useQuery(
-    ['employees', appliedSearch, joiningDateFilter, statusFilter],
+    ['employees', appliedSearch, statusFilter],
     () =>
       employeeService.getEmployees(
         1,
         20,
         appliedSearch,
-        joiningDateFilter || undefined,
+        undefined,
         statusFilter || undefined
       ),
     {
@@ -90,7 +89,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   );
 
-  const hasActiveFilters = Boolean(searchInput || joiningDateFilter || statusFilter);
+  const hasActiveFilters = Boolean(searchInput || statusFilter);
 
   const sortedEmployees = React.useMemo(() => {
     if (!employeesData?.employees) return [];
@@ -329,7 +328,6 @@ const EmployeeManagementPage: React.FC = () => {
   const handleResetFilters = () => {
     setSearchInput('');
     setAppliedSearch(undefined);
-    setJoiningDateFilter('');
     setStatusFilter('');
   };
 
@@ -338,7 +336,7 @@ const EmployeeManagementPage: React.FC = () => {
       case 'active':
         return '#4caf50';
       case 'resigned':
-        return '#f44336';
+        return '#ff9800';
       case 'terminated':
         return '#f44336';
       default:
@@ -397,11 +395,15 @@ const EmployeeManagementPage: React.FC = () => {
             )}
           </div>
           <div className="filter-box">
-            <input
-              type="date"
-              value={joiningDateFilter}
-              onChange={(e) => setJoiningDateFilter(e.target.value)}
-            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="resigned">Resigned</option>
+              <option value="terminated">Terminated</option>
+            </select>
           </div>
           {hasActiveFilters && (
             <button
@@ -452,7 +454,10 @@ const EmployeeManagementPage: React.FC = () => {
                     <td>
                       <span
                         className="status-badge"
-                        style={{ color: getStatusColor(employee.status) }}
+                        style={{
+                          backgroundColor: getStatusColor(employee.status),
+                          color: '#ffffff'
+                        }}
                       >
                         {employee.status === 'active'
                           ? 'Active'
@@ -1021,7 +1026,7 @@ const EmployeeManagementPage: React.FC = () => {
                         })
                       }
                       disabled={isEditMode || isViewMode}
-                    />
+                      />
                   </div>
                 </div>
               </div>

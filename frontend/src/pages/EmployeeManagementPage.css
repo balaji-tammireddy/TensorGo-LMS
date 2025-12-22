@@ -5,6 +5,11 @@
   background-color: #ffffff;
   border: 1px solid #e5e5e5;
   border-radius: 4px;
+  /* Fix the card height so the top/bottom gap (20px padding in main-content) stays consistent */
+  height: calc(100vh - 40px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Match the page title styling from the profile module */
@@ -74,7 +79,7 @@
   gap: 6px;
 }
 
-.filter-box input[type="date"] {
+.filter-box select {
   padding: 6px 10px;
   border: 1px solid #dcdcdc;
   border-radius: 2px;
@@ -113,6 +118,11 @@
 
 .employees-section {
   margin-top: 8px;
+  /* Take remaining space and scroll only when content exceeds page height */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .employees-table {
@@ -130,6 +140,9 @@
   font-weight: 500;
   color: #555;
   text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 /* Keep column widths consistent regardless of data */
@@ -161,6 +174,7 @@
 .employees-table th:nth-child(6),
 .employees-table td:nth-child(6) {
   width: 13%;
+  text-align: center;
 }
 
 .employees-table th:nth-child(7),
@@ -187,9 +201,13 @@
 }
 
 .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
   font-weight: 600;
   text-transform: capitalize;
   font-size: 12px;
+  border: 1px solid transparent;
 }
 
 .actions-cell {
