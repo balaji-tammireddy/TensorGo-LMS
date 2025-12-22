@@ -33,8 +33,12 @@ const LoginPage: React.FC = () => {
       const trimmedEmail = email.trim().toLowerCase();
       const trimmedPassword = password.trim();
       
-      await login(trimmedEmail, trimmedPassword);
-      navigate('/leave-apply');
+      const loggedInUser = await login(trimmedEmail, trimmedPassword);
+      if (loggedInUser.role === 'super_admin') {
+        navigate('/leave-approval');
+      } else {
+        navigate('/leave-apply');
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       const errorData = err.response?.data?.error;

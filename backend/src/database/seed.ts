@@ -68,7 +68,11 @@ async function seed() {
     // Initialize leave balances for all users
     await pool.query(
       `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance)
-       SELECT id, 12, 6, 10 FROM users
+       SELECT id,
+              CASE WHEN role = 'employee' THEN 0 ELSE 12 END AS casual_balance,
+              6,
+              10
+       FROM users
        WHERE id NOT IN (SELECT employee_id FROM leave_balances)
        ON CONFLICT (employee_id) DO NOTHING`
     );

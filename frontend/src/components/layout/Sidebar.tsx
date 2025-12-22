@@ -25,8 +25,10 @@ const Sidebar: React.FC = () => {
     
     const routes: Array<{ path: string; icon: React.ReactNode; label: string }> = [];
     
-    // All roles can access Leave Apply and Profile
-    routes.push({ path: '/leave-apply', icon: <FaFileAlt />, label: 'Leave Apply' });
+    // Leave Apply available to everyone except super_admin
+    if (user.role !== 'super_admin') {
+      routes.push({ path: '/leave-apply', icon: <FaFileAlt />, label: 'Leave Apply' });
+    }
     
     // Manager, HR, Super Admin can access Leave Approval
     if (['manager', 'hr', 'super_admin'].includes(user.role)) {

@@ -3,9 +3,8 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
 import * as leaveService from '../services/leaveService';
-import { format, addDays } from 'date-fns';
+import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { FaPencilAlt, FaTrash } from 'react-icons/fa';
-import { FaRegCalendarAlt, FaRegClock } from 'react-icons/fa';
 import './LeaveApplyPage.css';
 
 const LeaveApplyPage: React.FC = () => {
@@ -103,6 +102,17 @@ const LeaveApplyPage: React.FC = () => {
       queryClient.invalidateQueries('leaveBalances');
       queryClient.invalidateQueries('myLeaveRequests');
       alert('Leave deleted successfully!');
+      // Reset form after a delete (especially if we were editing)
+      setFormData({
+        leaveType: 'casual',
+        startDate: '',
+        startType: 'full',
+        endDate: '',
+        endType: 'full',
+        reason: '',
+        timeForPermission: { start: '', end: '' }
+      });
+      setEditingId(null);
     },
     onError: (error: any) => {
       alert(error.response?.data?.error?.message || 'Failed to delete leave');
@@ -111,7 +121,69 @@ const LeaveApplyPage: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const computeRequestedDays = () => {
+      if (!formData.startDate || !formData.endDate) return 0;
+      const start = new Date(`${formData.startDate}T00:00:00`);
+      const end = new Date(`${formData.endDate}T00:00:00`);
+      const daysArr = eachDayOfInterval({ start, end });
+      let total = 0;
+      const startHalf = formData.startType !== 'full';
+      const endHalf = formData.endType !== 'full';
+      daysArr.forEach((d, idx) => {
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        if (isWeekend) return;
+        const isFirst = idx === 0;
+        const isLast = idx === daysArr.length - 1;
+        if (isFirst && isLast) {
+          total += startHalf || endHalf ? 0.5 : 1;
+        } else if (isFirst) {
+          total += startHalf ? 0.5 : 1;
+        } else if (isLast) {
+          total += endHalf ? 0.5 : 1;
+        } else {
+          total += 1;
+        }
+      });
+      return total;
+    };
+
+    const requestedDays = computeRequestedDays();
+
+    // Client-side balance guard
+    if (balances) {
+      if (formData.leaveType === 'casual') {
+        if ((balances.casual || 0) <= 0) {
+          alert('Casual leave balance is zero. You cannot apply casual leave.');
+          return;
+        }
+        if (requestedDays > (balances.casual || 0)) {
+          alert(`Insufficient casual leave balance. Available: ${balances.casual || 0}, Required: ${requestedDays}`);
+          return;
+        }
+      }
+      if (formData.leaveType === 'sick') {
+        if ((balances.sick || 0) <= 0) {
+          alert('Sick leave balance is zero. You cannot apply sick leave.');
+          return;
+        }
+        if (requestedDays > (balances.sick || 0)) {
+          alert(`Insufficient sick leave balance. Available: ${balances.sick || 0}, Required: ${requestedDays}`);
+          return;
+        }
+      }
+      if (formData.leaveType === 'lop') {
+        if ((balances.lop || 0) <= 0) {
+          alert('LOP balance is zero. You cannot apply LOP leave.');
+          return;
+        }
+        if (requestedDays > (balances.lop || 0)) {
+          alert(`Insufficient LOP balance. Available: ${balances.lop || 0}, Required: ${requestedDays}`);
+          return;
+        }
+      }
+    }
+
     // Client-side guard: LOP only when casual balance is 0
     if (formData.leaveType === 'lop' && (balances?.casual ?? 0) > 0) {
       alert('LOP can be applied only when casual leave balance is 0');
@@ -325,9 +397,6 @@ const LeaveApplyPage: React.FC = () => {
                     required
                     className="date-input"
                   />
-                  <span className="calendar-icon" aria-hidden="true">
-                    <FaRegCalendarAlt />
-                  </span>
                 </div>
               </div>
               <div className="form-group">
@@ -355,9 +424,6 @@ const LeaveApplyPage: React.FC = () => {
                     min={formData.startDate || minStartDate}
                     className="date-input"
                   />
-                  <span className="calendar-icon" aria-hidden="true">
-                    <FaRegCalendarAlt />
-                  </span>
                 </div>
               </div>
               <div className="form-group">
@@ -391,9 +457,6 @@ const LeaveApplyPage: React.FC = () => {
                       disabled={formData.leaveType !== 'permission'}
                       required={formData.leaveType === 'permission'}
                     />
-                    <span className="time-icon" aria-hidden="true">
-                      <FaRegClock />
-                    </span>
                   </div>
                   <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
                   <div className="time-input-wrapper">
@@ -411,9 +474,6 @@ const LeaveApplyPage: React.FC = () => {
                       disabled={formData.leaveType !== 'permission'}
                       required={formData.leaveType === 'permission'}
                     />
-                    <span className="time-icon" aria-hidden="true">
-                      <FaRegClock />
-                    </span>
                   </div>
                 </div>
               </div>
@@ -478,7 +538,7 @@ const LeaveApplyPage: React.FC = () => {
                       {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
                     </td>
                     <td>{request.noOfDays}</td>
-                    <td>{request.leaveType}</td>
+                    <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType}</td>
                     <td>
                     {request.currentStatus === 'pending' ? (
                       <span className="status-badge status-applied">Applied</span>

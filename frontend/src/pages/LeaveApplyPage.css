@@ -266,27 +266,7 @@
 
 .date-input {
   flex: 1;
-  padding-right: 34px;
-}
-
-/* Hide native date picker icon and default appearance */
-.date-input::-webkit-calendar-picker-indicator {
-  display: none;
-}
-.date-input {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-}
-
-.calendar-icon {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 16px;
-  color: #3c6ff2;
-  pointer-events: none;
+  padding-right: 10px;
 }
 
 .form-group input:disabled,
@@ -328,24 +308,7 @@
   border: 1px solid #ddd;
   height: 44px;
   line-height: 1.2;
-  padding-right: 34px;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-}
-
-.time-input::-webkit-calendar-picker-indicator {
-  display: none;
-}
-
-.time-icon {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 16px;
-  color: #3c6ff2;
-  pointer-events: none;
+  padding-right: 10px;
 }
 .time-inputs input {
   flex: 1;

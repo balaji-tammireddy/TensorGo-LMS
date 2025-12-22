@@ -21,6 +21,11 @@ export interface LeaveBalance {
 }
 
 export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> => {
+  // Determine role to set defaults appropriately
+  const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+  const role = roleResult.rows[0]?.role || 'employee';
+  const defaultCasual = role === 'employee' ? 0 : 12;
+
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [userId]
@@ -29,10 +34,10 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
   if (result.rows.length === 0) {
     // Initialize balance if not exists
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 12, 6, 10)',
-      [userId]
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, 6, 10)',
+      [userId, defaultCasual]
     );
-    return { casual: 12, sick: 6, lop: 10 };
+    return { casual: defaultCasual, sick: 6, lop: 10 };
   }
 
   const balance = result.rows[0];
@@ -199,6 +204,23 @@ export const applyLeave = async (
         `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id)
          VALUES ($1, $2, $3, $4, $5)`,
         [leaveRequestId, leaveDayDateStr, leaveDay.type, leaveData.leaveType, userId]
+      );
+    }
+
+    // Deduct balance immediately on apply (all leave types except permission)
+    if (leaveData.leaveType !== 'permission') {
+      const balanceColumn =
+        leaveData.leaveType === 'casual'
+          ? 'casual_balance'
+          : leaveData.leaveType === 'sick'
+          ? 'sick_balance'
+          : 'lop_balance';
+
+      await pool.query(
+        `UPDATE leave_balances 
+         SET ${balanceColumn} = ${balanceColumn} - $1
+         WHERE employee_id = $2`,
+        [days, userId]
       );
     }
 
@@ -482,21 +504,30 @@ export const updateLeaveRequest = async (
   }
 
   // LOP requires zero casual balance
-  if (leaveData.leaveType === 'lop') {
-    const balance = await getLeaveBalances(userId);
-    if ((balance.casual || 0) > 0) {
-      throw new Error('LOP can be applied only when casual leave balance is 0');
+    let balance: LeaveBalance | null = null;
+
+    if (leaveData.leaveType === 'lop') {
+      balance = await getLeaveBalances(userId);
+      if ((balance.casual || 0) > 0) {
+        throw new Error('LOP can be applied only when casual leave balance is 0');
+      }
     }
-  } else if (leaveData.leaveType !== 'permission') {
-    // Check balance for other leave types (permission skips balance)
-    const balance = await getLeaveBalances(userId);
-    const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
-    const currentBalance = balance[balanceKey];
-    
-    if (currentBalance < days) {
-      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+
+    // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
+    if (leaveData.leaveType !== 'permission') {
+      if (!balance) {
+        balance = await getLeaveBalances(userId);
+      }
+      const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
+      const currentBalance = balance[balanceKey];
+      
+      if (currentBalance <= 0) {
+        throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+      }
+      if (currentBalance < days) {
+        throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+      }
     }
-  }
 
   // Start transaction
   const client = await pool.connect();
@@ -560,7 +591,7 @@ export const updateLeaveRequest = async (
 export const deleteLeaveRequest = async (requestId: number, userId: number) => {
   // Verify the request belongs to the user and is pending
   const checkResult = await pool.query(
-    'SELECT current_status, employee_id FROM leave_requests WHERE id = $1',
+    'SELECT current_status, employee_id, leave_type, no_of_days FROM leave_requests WHERE id = $1',
     [requestId]
   );
 
@@ -576,9 +607,28 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
     throw new Error('Only pending leave requests can be deleted');
   }
 
+  const { leave_type, no_of_days } = checkResult.rows[0];
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Restore balance on delete (except permission)
+    if (leave_type !== 'permission') {
+      const balanceColumn =
+        leave_type === 'casual'
+          ? 'casual_balance'
+          : leave_type === 'sick'
+          ? 'sick_balance'
+          : 'lop_balance';
+
+      await client.query(
+        `UPDATE leave_balances 
+         SET ${balanceColumn} = ${balanceColumn} + $1
+         WHERE employee_id = $2`,
+        [no_of_days, userId]
+      );
+    }
 
     // Delete leave days first (foreign key constraint)
     await client.query('DELETE FROM leave_days WHERE leave_request_id = $1', [requestId]);
@@ -813,26 +863,6 @@ export const approveLeave = async (
          WHERE id = $2`,
         [approverId, leaveRequestId]
       );
-
-      // Update leave balance (except for LOP/permission)
-      if (leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
-        // Map leave type to balance column name explicitly
-        let balanceColumn: string;
-        if (leave.leave_type === 'casual') {
-          balanceColumn = 'casual_balance';
-        } else if (leave.leave_type === 'sick') {
-          balanceColumn = 'sick_balance';
-        } else {
-          balanceColumn = 'lop_balance'; // Should not reach here due to check above
-        }
-        
-        await pool.query(
-          `UPDATE leave_balances 
-           SET ${balanceColumn} = ${balanceColumn} - $1
-           WHERE employee_id = $2`,
-          [leave.no_of_days, leave.employee_id]
-        );
-      }
     }
   } else if (approverRole === 'hr') {
     await pool.query(
@@ -854,26 +884,6 @@ export const approveLeave = async (
         `UPDATE leave_requests SET current_status = 'approved' WHERE id = $1`,
         [leaveRequestId]
       );
-
-      // Update leave balance (except for LOP/permission)
-      if (leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
-        // Map leave type to balance column name explicitly
-        let balanceColumn: string;
-        if (leave.leave_type === 'casual') {
-          balanceColumn = 'casual_balance';
-        } else if (leave.leave_type === 'sick') {
-          balanceColumn = 'sick_balance';
-        } else {
-          balanceColumn = 'lop_balance'; // Should not reach here due to check above
-        }
-        
-        await pool.query(
-          `UPDATE leave_balances 
-           SET ${balanceColumn} = ${balanceColumn} - $1
-           WHERE employee_id = $2`,
-          [leave.no_of_days, leave.employee_id]
-        );
-      }
     }
   } else if (approverRole === 'super_admin') {
     await pool.query(
@@ -887,16 +897,6 @@ export const approveLeave = async (
       [comment || null, approverId, leaveRequestId]
     );
 
-    // Update leave balance (except for LOP/permission)
-    if (leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
-      const balanceColumn = `${leave.leave_type}_balance`;
-      await pool.query(
-        `UPDATE leave_balances 
-         SET ${balanceColumn} = ${balanceColumn} - $1
-         WHERE employee_id = $2`,
-        [leave.no_of_days, leave.employee_id]
-      );
-    }
   }
 
   // Create notification for employee
@@ -1035,20 +1035,6 @@ const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
     newStatus = 'partially_approved';
   } else {
     newStatus = 'pending';
-  }
-
-  // Deduct delta when newly approved days appear
-  if (deltaApproved > 0 && leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
-    const balanceColumn =
-      leave.leave_type === 'casual'
-        ? 'casual_balance'
-        : leave.leave_type === 'sick'
-        ? 'sick_balance'
-        : 'lop_balance';
-    await pool.query(
-      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`,
-      [deltaApproved, leave.employee_id]
-    );
   }
 
   // Always keep header status and no_of_days in sync with day-level state
