@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
 import { errorHandler } from './middleware/error.middleware';
 import { logger } from './utils/logger';
 import authRoutes from './routes/auth.routes';
@@ -32,6 +33,10 @@ app.use('/api/', limiter);
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Static files for uploaded assets (e.g. profile photos)
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
+app.use('/uploads', express.static(uploadDir));
 
 // Health check
 app.get('/health', (req, res) => {

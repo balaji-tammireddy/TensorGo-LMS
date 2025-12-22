@@ -76,6 +76,7 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Map frontend field names to database column names
   const fieldMap: Record<string, string> = {
+    empId: 'emp_id',
     firstName: 'first_name',
     middleName: 'middle_name',
     lastName: 'last_name',
