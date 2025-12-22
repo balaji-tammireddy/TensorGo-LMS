@@ -98,6 +98,16 @@ export const rejectLeave = async (leaveId: number, comment: string) => {
   return response.data;
 };
 
+export const approveLeaveDay = async (leaveId: number, dayId: number, comment?: string) => {
+  const response = await api.post(`/leave/${leaveId}/day/${dayId}/approve`, { comment });
+  return response.data;
+};
+
+export const rejectLeaveDay = async (leaveId: number, dayId: number, comment: string) => {
+  const response = await api.post(`/leave/${leaveId}/day/${dayId}/reject`, { comment });
+  return response.data;
+};
+
 export const getApprovedLeaves = async (page: number = 1, limit: number = 10) => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   const response = await api.get(`/leave/approved?${params}`);

@@ -461,6 +461,8 @@ const LeaveApplyPage: React.FC = () => {
                       <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
                         Rejected{request.rejectionReason ? `: ${request.rejectionReason}` : ''}
                       </span>
+                    ) : request.currentStatus === 'partially_approved' ? (
+                      <span className="status-badge status-applied">Partially Approved</span>
                     ) : (
                       <span className="status-badge">{request.currentStatus}</span>
                     )}

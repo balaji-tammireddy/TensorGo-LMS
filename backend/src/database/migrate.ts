@@ -12,6 +12,22 @@ async function migrate() {
     await pool.query(migrationFile);
     console.log('Migration completed successfully');
 
+    // Ensure current_status supports partially_approved (idempotent)
+    await pool.query(`
+      ALTER TABLE leave_requests
+      DROP CONSTRAINT IF EXISTS leave_requests_current_status_check;
+      ALTER TABLE leave_requests
+      ADD CONSTRAINT leave_requests_current_status_check
+      CHECK (current_status IN ('pending','approved','rejected','cancelled','partially_approved'));
+    `);
+
+    // Add day_status to leave_days (idempotent)
+    await pool.query(`
+      ALTER TABLE leave_days
+      ADD COLUMN IF NOT EXISTS day_status VARCHAR(20) DEFAULT 'pending' CHECK (day_status IN ('pending','approved','rejected'));
+      UPDATE leave_days SET day_status = 'pending' WHERE day_status IS NULL;
+    `);
+
     // Ensure leave_type supports permission (idempotent)
     await pool.query(`
       ALTER TABLE leave_requests 

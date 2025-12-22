@@ -2,6 +2,18 @@ import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 
+// Local date formatter to avoid timezone shifts
+const formatDate = (date: Date | string): string => {
+  if (typeof date === 'string') {
+    return date;
+  }
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export interface LeaveBalance {
   casual: number;
   sick: number;
@@ -32,17 +44,6 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
 };
 
 export const getHolidays = async () => {
-  const formatDate = (date: Date | string): string => {
-    if (typeof date === 'string') {
-      return date;
-    }
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const result = await pool.query(
     'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true ORDER BY holiday_date'
   );
@@ -274,20 +275,55 @@ export const getMyLeaveRequests = async (
     return `${year}-${month}-${day}`;
   };
 
-  return {
-    requests: result.rows.map(row => ({
+  const requests = [];
+  for (const row of result.rows) {
+    const daysResult = await pool.query(
+      'SELECT leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
+      [row.id]
+    );
+    const days = daysResult.rows || [];
+    const totalDays = days.length || parseFloat(row.no_of_days) || 0;
+    const approvedDays = days.reduce((acc, d) => acc + (d.day_status === 'approved' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
+    const rejectedDays = days.reduce((acc, d) => acc + (d.day_status === 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
+    const pendingDays = days.reduce((acc, d) => acc + (d.day_status !== 'approved' && d.day_status !== 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
+
+    let displayStatus = row.current_status;
+    if (approvedDays > 0 && (rejectedDays > 0 || pendingDays > 0)) {
+      displayStatus = 'partially_approved';
+    } else if (approvedDays > 0 && rejectedDays === 0 && pendingDays === 0) {
+      displayStatus = 'approved';
+    } else if (rejectedDays > 0 && approvedDays === 0 && pendingDays === 0) {
+      displayStatus = 'rejected';
+    } else if (pendingDays > 0 && approvedDays === 0 && rejectedDays === 0) {
+      displayStatus = 'pending';
+    }
+
+    requests.push({
       id: row.id,
       appliedDate: formatDate(row.applied_date),
       leaveReason: row.leave_reason,
       startDate: formatDate(row.start_date),
       endDate: formatDate(row.end_date),
-      noOfDays: parseFloat(row.no_of_days),
+      noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
       leaveType: row.leave_type,
-      currentStatus: row.current_status,
+      currentStatus: displayStatus,
       rejectionReason: row.manager_rejection_comment || row.hr_rejection_comment || row.super_admin_rejection_comment || null,
       canEdit: row.current_status === 'pending',
-      canDelete: row.current_status === 'pending'
-    })),
+      canDelete: row.current_status === 'pending',
+      leaveDays: days.map(d => ({
+        date: formatDate(d.leave_date),
+        type: d.day_type,
+        status: d.day_status || 'pending'
+      })),
+      approvedDays,
+      rejectedDays,
+      pendingDays,
+      totalDays
+    });
+  }
+
+  return {
+    requests,
     pagination: {
       page,
       limit,
@@ -296,14 +332,20 @@ export const getMyLeaveRequests = async (
   };
 };
 
-export const getLeaveRequestById = async (requestId: number, userId: number) => {
+export const getLeaveRequestById = async (requestId: number, userId: number, userRole?: string) => {
   const result = await pool.query(
-    `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
-            reason, time_for_permission_start, time_for_permission_end,
-            current_status, employee_id
-     FROM leave_requests
-     WHERE id = $1 AND employee_id = $2`,
-    [requestId, userId]
+    userRole === 'super_admin'
+      ? `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
+                reason, time_for_permission_start, time_for_permission_end,
+                current_status, employee_id
+         FROM leave_requests
+         WHERE id = $1`
+      : `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
+                reason, time_for_permission_start, time_for_permission_end,
+                current_status, employee_id
+         FROM leave_requests
+         WHERE id = $1 AND employee_id = $2`,
+    userRole === 'super_admin' ? [requestId] : [requestId, userId]
   );
 
   if (result.rows.length === 0) {
@@ -312,7 +354,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number) => 
 
   const row = result.rows[0];
   
-  if (row.current_status !== 'pending') {
+  if (row.current_status !== 'pending' && userRole !== 'super_admin') {
     throw new Error('Only pending leave requests can be edited');
   }
 
@@ -347,6 +389,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number) => 
 export const updateLeaveRequest = async (
   requestId: number,
   userId: number,
+  userRole: string,
   leaveData: {
     leaveType: string;
     startDate: string;
@@ -357,7 +400,7 @@ export const updateLeaveRequest = async (
     timeForPermission?: { start?: string; end?: string };
   }
 ) => {
-  // Verify the request belongs to the user and is pending
+  // Verify the request and authorization
   const checkResult = await pool.query(
     'SELECT current_status, employee_id FROM leave_requests WHERE id = $1',
     [requestId]
@@ -367,12 +410,16 @@ export const updateLeaveRequest = async (
     throw new Error('Leave request not found');
   }
 
-  if (checkResult.rows[0].employee_id !== userId) {
-    throw new Error('You do not have permission to edit this leave request');
-  }
+  const belongsToUser = checkResult.rows[0].employee_id === userId;
+  const isPending = checkResult.rows[0].current_status === 'pending';
 
-  if (checkResult.rows[0].current_status !== 'pending') {
-    throw new Error('Only pending leave requests can be edited');
+  if (userRole !== 'super_admin') {
+    if (!belongsToUser) {
+      throw new Error('You do not have permission to edit this leave request');
+    }
+    if (!isPending) {
+      throw new Error('Only pending leave requests can be edited');
+    }
   }
 
   // Parse dates in local timezone to avoid timezone shift issues
@@ -568,7 +615,7 @@ export const getPendingLeaveRequests = async (
            u.reporting_manager_id
     FROM leave_requests lr
     JOIN users u ON lr.employee_id = u.id
-    WHERE lr.current_status = 'pending'
+    WHERE 1=1
   `;
 
   const params: any[] = [];
@@ -600,6 +647,16 @@ export const getPendingLeaveRequests = async (
     params.push(filter);
   }
 
+  // Include requests that are pending or partially approved, or have any pending day
+  query += ` AND (
+      lr.current_status IN ('pending','partially_approved')
+      OR EXISTS (
+        SELECT 1 FROM leave_days ld
+        WHERE ld.leave_request_id = lr.id
+          AND COALESCE(ld.day_status, 'pending') = 'pending'
+      )
+    )`;
+
   query += ' ORDER BY lr.applied_date DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
   params.push(limit, offset);
 
@@ -608,26 +665,33 @@ export const getPendingLeaveRequests = async (
   // Get day-wise breakdown for each request
   const requestsWithDays = await Promise.all(
     result.rows.map(async (row) => {
-      const daysResult = await pool.query(
-        'SELECT leave_date, day_type FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-        [row.id]
-      );
+      try {
+        const daysResult = await pool.query(
+          'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
+          [row.id]
+        );
 
-      return {
-        id: row.id,
-        empId: row.emp_id,
-        empName: row.emp_name,
-        appliedDate: row.applied_date.toISOString().split('T')[0],
-        leaveDate: `${row.start_date.toISOString().split('T')[0]} to ${row.end_date.toISOString().split('T')[0]}`,
-        leaveType: row.leave_type,
-        noOfDays: parseFloat(row.no_of_days),
-        leaveReason: row.leave_reason,
-        currentStatus: row.current_status,
-        leaveDays: daysResult.rows.map(d => ({
-          date: d.leave_date.toISOString().split('T')[0],
-          type: d.day_type
-        }))
-      };
+        return {
+          id: row.id,
+          empId: row.emp_id,
+          empName: row.emp_name,
+          appliedDate: formatDate(row.applied_date),
+          leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
+          leaveType: row.leave_type,
+          noOfDays: parseFloat(row.no_of_days),
+          leaveReason: row.leave_reason,
+          currentStatus: row.current_status,
+          leaveDays: daysResult.rows.map(d => ({
+            id: d.id,
+            date: formatDate(d.leave_date),
+            type: d.day_type,
+            status: d.day_status || 'pending'
+          }))
+        };
+      } catch (e) {
+        console.error('Pending leave days fetch failed', { leaveRequestId: row.id, error: e });
+        throw e;
+      }
     })
   );
 
@@ -636,7 +700,15 @@ export const getPendingLeaveRequests = async (
     SELECT COUNT(DISTINCT lr.id)
     FROM leave_requests lr
     JOIN users u ON lr.employee_id = u.id
-    WHERE lr.current_status = 'pending'
+    WHERE 1=1
+      AND (
+        lr.current_status IN ('pending','partially_approved')
+        OR EXISTS (
+          SELECT 1 FROM leave_days ld
+          WHERE ld.leave_request_id = lr.id
+            AND COALESCE(ld.day_status, 'pending') = 'pending'
+        )
+      )
   `;
   const countParams: any[] = [];
 
@@ -693,18 +765,20 @@ export const approveLeave = async (
 
   const leave = leaveResult.rows[0];
 
+  // Block approving an already approved request
+  if (leave.current_status === 'approved') {
+    throw new Error('Leave request is already approved');
+  }
+
   // Check authorization
   if (approverRole === 'manager') {
+    // Managers can approve only their direct reports
     if (leave.reporting_manager_id !== approverId) {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'hr') {
-    // HR can approve if manager is HR or if it's a manager's leave
-    const managerResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [leave.reporting_manager_id]
-    );
-    if (managerResult.rows[0]?.role !== 'hr' && leave.employee_role !== 'manager') {
+    // HR can approve employee and manager leaves
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole !== 'super_admin') {
@@ -919,6 +993,286 @@ export const rejectLeave = async (
   return { message: 'Leave rejected successfully' };
 };
 
+// Helper: recalc request status based on day_status values
+const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
+  const leaveResult = await pool.query(
+    'SELECT employee_id, leave_type, no_of_days, current_status FROM leave_requests WHERE id = $1',
+    [leaveRequestId]
+  );
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+  const leave = leaveResult.rows[0];
+
+  const daysResult = await pool.query(
+    'SELECT day_status, day_type FROM leave_days WHERE leave_request_id = $1',
+    [leaveRequestId]
+  );
+  if (daysResult.rows.length === 0) {
+    return;
+  }
+
+  const approvedDays = daysResult.rows
+    .filter((d) => d.day_status === 'approved')
+    .reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
+  const deltaApproved = approvedDays - parseFloat(leave.no_of_days || 0);
+  const rejectedDays = daysResult.rows
+    .filter((d) => d.day_status === 'rejected')
+    .reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
+  const pendingDays = daysResult.rows
+    .filter((d) => d.day_status !== 'approved' && d.day_status !== 'rejected')
+    .reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
+  const hasPending = pendingDays > 0;
+  const allApproved = pendingDays === 0 && rejectedDays === 0 && approvedDays > 0;
+  const allRejected = pendingDays === 0 && approvedDays === 0 && rejectedDays > 0;
+
+  let newStatus: string = leave.current_status;
+  if (allApproved) {
+    newStatus = 'approved';
+  } else if (allRejected && !hasPending) {
+    newStatus = 'rejected';
+  } else if (approvedDays > 0 && (rejectedDays > 0 || hasPending)) {
+    newStatus = 'partially_approved';
+  } else {
+    newStatus = 'pending';
+  }
+
+  // Deduct delta when newly approved days appear
+  if (deltaApproved > 0 && leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
+    const balanceColumn =
+      leave.leave_type === 'casual'
+        ? 'casual_balance'
+        : leave.leave_type === 'sick'
+        ? 'sick_balance'
+        : 'lop_balance';
+    await pool.query(
+      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`,
+      [deltaApproved, leave.employee_id]
+    );
+  }
+
+  // Always keep header status and no_of_days in sync with day-level state
+  await pool.query(
+    `UPDATE leave_requests SET current_status = $1, no_of_days = $2 WHERE id = $3`,
+    [newStatus, approvedDays || leave.no_of_days, leaveRequestId]
+  );
+};
+
+export const approveLeaveDay = async (
+  leaveRequestId: number,
+  dayId: number,
+  approverId: number,
+  approverRole: string,
+  comment?: string
+) => {
+  const leaveResult = await pool.query(
+    `SELECT lr.*, u.reporting_manager_id, u.role as employee_role
+     FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     WHERE lr.id = $1`,
+    [leaveRequestId]
+  );
+
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+
+  const leave = leaveResult.rows[0];
+
+  if (leave.current_status === 'approved') {
+    throw new Error('Leave request is already approved');
+  }
+
+  // Auth: manager -> direct reports; HR -> employee/manager; super_admin -> all
+  if (approverRole === 'manager') {
+    if (leave.reporting_manager_id !== approverId) {
+      throw new Error('Not authorized to approve this leave');
+    }
+  } else if (approverRole === 'hr') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+      throw new Error('Not authorized to approve this leave');
+    }
+  } else if (approverRole !== 'super_admin') {
+    throw new Error('Not authorized to approve leaves');
+  }
+
+  const dayResult = await pool.query(
+    'SELECT id, day_status, day_type FROM leave_days WHERE id = $1 AND leave_request_id = $2',
+    [dayId, leaveRequestId]
+  );
+  if (dayResult.rows.length === 0) {
+    throw new Error('Leave day not found');
+  }
+  const currentDayStatus = dayResult.rows[0].day_status || 'pending';
+
+  // Count approved days before update (for delta deduction)
+  const approvedBeforeResult = await pool.query(
+    `SELECT SUM(CASE WHEN day_status = 'approved' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END) AS approved_days
+     FROM leave_days WHERE leave_request_id = $1`,
+    [leaveRequestId]
+  );
+  const approvedBefore = parseFloat(approvedBeforeResult.rows[0]?.approved_days || 0);
+
+  // If already approved, no-op
+  if (currentDayStatus !== 'approved') {
+    await pool.query(
+      `UPDATE leave_days
+       SET day_status = 'approved'
+       WHERE id = $1`,
+      [dayId]
+    );
+  }
+
+  // mark role-specific approval fields
+  if (approverRole === 'manager') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET manager_approval_status = 'approved',
+           manager_approval_date = CURRENT_TIMESTAMP,
+           manager_approval_comment = $1,
+           manager_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  } else if (approverRole === 'hr') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET hr_approval_status = 'approved',
+           hr_approval_date = CURRENT_TIMESTAMP,
+           hr_approval_comment = $1,
+           hr_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  } else if (approverRole === 'super_admin') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET super_admin_approval_status = 'approved',
+           super_admin_approval_date = CURRENT_TIMESTAMP,
+           super_admin_approval_comment = $1,
+           super_admin_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  }
+
+  // Count approved days after update and deduct delta (only if status changed to approved)
+  const approvedAfterResult = await pool.query(
+    `SELECT SUM(CASE WHEN day_status = 'approved' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END) AS approved_days
+     FROM leave_days WHERE leave_request_id = $1`,
+    [leaveRequestId]
+  );
+  const approvedAfter = parseFloat(approvedAfterResult.rows[0]?.approved_days || 0);
+  const deltaApproved = approvedAfter - approvedBefore;
+
+  if (deltaApproved > 0 && leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
+    const balanceColumn =
+      leave.leave_type === 'casual'
+        ? 'casual_balance'
+        : leave.leave_type === 'sick'
+        ? 'sick_balance'
+        : 'lop_balance';
+    await pool.query(
+      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`,
+      [deltaApproved, leave.employee_id]
+    );
+  }
+
+  // Sync header no_of_days to approvedAfter
+  await pool.query(
+    `UPDATE leave_requests SET no_of_days = $1 WHERE id = $2`,
+    [approvedAfter || leave.no_of_days, leaveRequestId]
+  );
+
+  await recalcLeaveRequestStatus(leaveRequestId);
+  return { message: 'Leave day approved successfully' };
+};
+
+export const rejectLeaveDay = async (
+  leaveRequestId: number,
+  dayId: number,
+  approverId: number,
+  approverRole: string,
+  comment: string
+) => {
+  const leaveResult = await pool.query(
+    `SELECT lr.*, u.reporting_manager_id, u.role as employee_role
+     FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     WHERE lr.id = $1`,
+    [leaveRequestId]
+  );
+
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+
+  const leave = leaveResult.rows[0];
+
+  // Auth: manager -> direct reports; HR -> employee/manager; super_admin -> all
+  if (approverRole === 'manager') {
+    if (leave.reporting_manager_id !== approverId) {
+      throw new Error('Not authorized to reject this leave');
+    }
+  } else if (approverRole === 'hr') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+      throw new Error('Not authorized to reject this leave');
+    }
+  } else if (approverRole !== 'super_admin') {
+    throw new Error('Not authorized to reject leaves');
+  }
+
+  const dayResult = await pool.query(
+    'SELECT id FROM leave_days WHERE id = $1 AND leave_request_id = $2',
+    [dayId, leaveRequestId]
+  );
+  if (dayResult.rows.length === 0) {
+    throw new Error('Leave day not found');
+  }
+
+  await pool.query(
+    `UPDATE leave_days
+     SET day_status = 'rejected'
+     WHERE id = $1`,
+    [dayId]
+  );
+
+  if (approverRole === 'manager') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET manager_approval_status = 'rejected',
+           manager_approval_date = CURRENT_TIMESTAMP,
+           manager_approval_comment = $1,
+           manager_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  } else if (approverRole === 'hr') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET hr_approval_status = 'rejected',
+           hr_approval_date = CURRENT_TIMESTAMP,
+           hr_approval_comment = $1,
+           hr_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  } else if (approverRole === 'super_admin') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET super_admin_approval_status = 'rejected',
+           super_admin_approval_date = CURRENT_TIMESTAMP,
+           super_admin_approval_comment = $1,
+           super_admin_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  }
+
+  await recalcLeaveRequestStatus(leaveRequestId);
+  return { message: 'Leave day rejected successfully' };
+};
+
 export const getApprovedLeaves = async (
   page: number = 1,
   limit: number = 10
@@ -926,33 +1280,82 @@ export const getApprovedLeaves = async (
   const offset = (page - 1) * limit;
   
   const result = await pool.query(
-    `SELECT lr.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-            lr.applied_date, lr.start_date, lr.end_date, lr.leave_type,
-            lr.no_of_days, lr.current_status as leave_status
+    `SELECT
+        lr.id,
+        u.emp_id,
+        u.first_name || ' ' || COALESCE(u.last_name, '') AS emp_name,
+        lr.applied_date,
+        lr.start_date,
+        lr.end_date,
+        lr.leave_type,
+        lr.no_of_days,
+        lr.current_status AS leave_status,
+        COALESCE(SUM(CASE WHEN ld.day_status = 'approved' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS approved_days,
+        COALESCE(SUM(CASE WHEN ld.day_status = 'rejected' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS rejected_days,
+        COALESCE(SUM(CASE WHEN ld.day_status = 'pending' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS pending_days,
+        ARRAY_REMOVE(ARRAY_AGG(CASE WHEN ld.day_status = 'approved' THEN ld.leave_date END ORDER BY ld.leave_date), NULL) AS approved_dates
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN leave_days ld ON ld.leave_request_id = lr.id
      WHERE lr.current_status = 'approved'
+        OR EXISTS (
+          SELECT 1 FROM leave_days ld2
+          WHERE ld2.leave_request_id = lr.id AND ld2.day_status = 'approved'
+        )
+     GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status
      ORDER BY lr.applied_date DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
   );
 
   const countResult = await pool.query(
-    'SELECT COUNT(*) FROM leave_requests WHERE current_status = $1',
-    ['approved']
+    `SELECT COUNT(*)
+     FROM leave_requests lr
+     WHERE lr.current_status = 'approved'
+        OR EXISTS (
+          SELECT 1 FROM leave_days ld2
+          WHERE ld2.leave_request_id = lr.id AND ld2.day_status = 'approved'
+        )`
   );
 
   return {
-    requests: result.rows.map(row => ({
-      id: row.id,
-      empId: row.emp_id,
-      empName: row.emp_name,
-      appliedDate: row.applied_date.toISOString().split('T')[0],
-      leaveDate: `${row.start_date.toISOString().split('T')[0]} to ${row.end_date.toISOString().split('T')[0]}`,
-      leaveType: row.leave_type,
-      noOfDays: parseFloat(row.no_of_days),
-      leaveStatus: row.leave_status
-    })),
+    requests: result.rows.map(row => {
+      const approvedDates = Array.isArray(row.approved_dates) ? row.approved_dates.filter((d: any) => d) : [];
+      const approvedDays = parseFloat(row.approved_days) || 0;
+      const rejectedDays = parseFloat(row.rejected_days) || 0;
+      const pendingDays = parseFloat(row.pending_days) || 0;
+
+      let displayStatus = row.leave_status;
+      if (approvedDays > 0 && (rejectedDays > 0 || pendingDays > 0)) {
+        displayStatus = 'partially_approved';
+      } else if (approvedDays > 0 && rejectedDays === 0 && pendingDays === 0) {
+        displayStatus = 'approved';
+      } else if (rejectedDays > 0 && approvedDays === 0 && pendingDays === 0) {
+        displayStatus = 'rejected';
+      } else if (pendingDays > 0 && approvedDays === 0 && rejectedDays === 0) {
+        displayStatus = 'pending';
+      }
+
+      const leaveDate = approvedDates.length > 0
+        ? (() => {
+            const formatted = approvedDates.map((d: Date) => formatDate(d));
+            const first = formatted[0];
+            const last = formatted[formatted.length - 1];
+            return formatted.length === 1 ? first : `${first} to ${last}`;
+          })()
+        : `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`;
+
+      return {
+        id: row.id,
+        empId: row.emp_id,
+        empName: row.emp_name,
+        appliedDate: formatDate(row.applied_date),
+        leaveDate,
+        leaveType: row.leave_type,
+        noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
+        leaveStatus: displayStatus
+      };
+    }),
     pagination: {
       page,
       limit,

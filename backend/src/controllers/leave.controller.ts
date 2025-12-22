@@ -160,6 +160,54 @@ export const rejectLeave = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const approveLeaveDay = async (req: AuthRequest, res: Response) => {
+  try {
+    const leaveRequestId = parseInt(req.params.id);
+    const dayId = parseInt(req.params.dayId);
+    const { comment } = req.body;
+    
+    const result = await leaveService.approveLeaveDay(
+      leaveRequestId,
+      dayId,
+      req.user!.id,
+      req.user!.role,
+      comment
+    );
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'APPROVAL_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
+export const rejectLeaveDay = async (req: AuthRequest, res: Response) => {
+  try {
+    const leaveRequestId = parseInt(req.params.id);
+    const dayId = parseInt(req.params.dayId);
+    const { comment } = req.body;
+    
+    const result = await leaveService.rejectLeaveDay(
+      leaveRequestId,
+      dayId,
+      req.user!.id,
+      req.user!.role,
+      comment
+    );
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'REJECTION_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
 export const getApprovedLeaves = async (req: AuthRequest, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -180,7 +228,7 @@ export const getApprovedLeaves = async (req: AuthRequest, res: Response) => {
 export const getLeaveRequest = async (req: AuthRequest, res: Response) => {
   try {
     const requestId = parseInt(req.params.id);
-    const result = await leaveService.getLeaveRequestById(requestId, req.user!.id);
+    const result = await leaveService.getLeaveRequestById(requestId, req.user!.id, req.user!.role);
     res.json(result);
   } catch (error: any) {
     res.status(error.message.includes('not found') || error.message.includes('permission') ? 404 : 400).json({
@@ -195,7 +243,7 @@ export const getLeaveRequest = async (req: AuthRequest, res: Response) => {
 export const updateLeaveRequest = async (req: AuthRequest, res: Response) => {
   try {
     const requestId = parseInt(req.params.id);
-    const result = await leaveService.updateLeaveRequest(requestId, req.user!.id, req.body);
+    const result = await leaveService.updateLeaveRequest(requestId, req.user!.id, req.user!.role, req.body);
     res.json(result);
   } catch (error: any) {
     res.status(400).json({

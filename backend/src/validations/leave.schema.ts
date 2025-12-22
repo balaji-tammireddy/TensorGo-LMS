@@ -33,6 +33,26 @@ export const rejectLeaveSchema = z.object({
   })
 });
 
+export const approveLeaveDaySchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid leave request ID'),
+    dayId: z.string().regex(/^\d+$/, 'Invalid leave day ID')
+  }),
+  body: z.object({
+    comment: z.string().optional()
+  })
+});
+
+export const rejectLeaveDaySchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid leave request ID'),
+    dayId: z.string().regex(/^\d+$/, 'Invalid leave day ID')
+  }),
+  body: z.object({
+    comment: z.string().min(1, 'Comment is required for rejection')
+  })
+});
+
 export const updateLeaveSchema = z.object({
   params: z.object({
     id: z.string().regex(/^\d+$/, 'Invalid leave request ID')

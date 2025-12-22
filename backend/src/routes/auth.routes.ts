@@ -7,10 +7,17 @@ import rateLimit from 'express-rate-limit';
 const router = Router();
 
 // Stricter rate limiting for auth endpoints
-// In development, allow more requests; in production, keep it strict
+const parseEnvInt = (name: string, fallback: number) => {
+  const val = parseInt(process.env[name] || '', 10);
+  return Number.isFinite(val) && val > 0 ? val : fallback;
+};
+
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 50, // 50 requests in dev, 5 in production
+  windowMs: parseEnvInt('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000), // default 15 minutes
+  max: parseEnvInt(
+    'AUTH_RATE_LIMIT_MAX',
+    process.env.NODE_ENV === 'production' ? 20 : 300
+  ),
   message: {
     error: {
       code: 'RATE_LIMIT_EXCEEDED',

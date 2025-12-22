@@ -3,7 +3,7 @@ import * as leaveController from '../controllers/leave.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { authorizeRole } from '../middleware/authorize.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
-import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, updateLeaveSchema, deleteLeaveSchema } from '../validations/leave.schema';
+import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, updateLeaveSchema, deleteLeaveSchema, approveLeaveDaySchema, rejectLeaveDaySchema } from '../validations/leave.schema';
 
 const router = Router();
 
@@ -24,6 +24,8 @@ router.delete('/request/:id', validateRequest(deleteLeaveSchema), leaveControlle
 router.get('/pending', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getPendingRequests);
 router.post('/:id/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveSchema), leaveController.approveLeave);
 router.post('/:id/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveSchema), leaveController.rejectLeave);
+router.post('/:id/day/:dayId/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveDaySchema), leaveController.approveLeaveDay);
+router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveDaySchema), leaveController.rejectLeaveDay);
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 
 export default router;
