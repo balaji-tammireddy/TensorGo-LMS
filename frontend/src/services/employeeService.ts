@@ -18,10 +18,16 @@ export interface EmployeeListResponse {
   };
 }
 
-export const getEmployees = async (page: number = 1, limit: number = 20, search?: string, filter?: string, status?: string): Promise<EmployeeListResponse> => {
+export const getEmployees = async (
+  page: number = 1,
+  limit: number = 20,
+  search?: string,
+  joiningDate?: string,
+  status?: string
+): Promise<EmployeeListResponse> => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   if (search) params.append('search', search);
-  if (filter) params.append('filter', filter);
+  if (joiningDate) params.append('joiningDate', joiningDate);
   if (status) params.append('status', status);
   const response = await api.get(`/employees?${params}`);
   return response.data;

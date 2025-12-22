@@ -8,6 +8,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isInactive, setIsInactive] = useState(false);
   const { login, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -22,6 +23,7 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsInactive(false);
     setLoading(true);
 
     try {
@@ -34,7 +36,13 @@ const LoginPage: React.FC = () => {
     } catch (err: any) {
       console.error('Login error:', err);
       const errorData = err.response?.data?.error;
-      if (errorData?.details && Array.isArray(errorData.details)) {
+      const message = errorData?.message || err.message || 'Login failed';
+
+      if (message === 'Account is not active') {
+        // Show dedicated inactive account screen and block further access
+        setIsInactive(true);
+        setError('');
+      } else if (errorData?.details && Array.isArray(errorData.details)) {
         // Show validation details if available
         const detailMessages = errorData.details.map((d: any) => {
           const field = d.path?.join('.') || 'field';
@@ -42,7 +50,7 @@ const LoginPage: React.FC = () => {
         }).join(', ');
         setError(`${errorData.message || 'Validation failed'}: ${detailMessages}`);
       } else {
-        setError(errorData?.message || err.message || 'Login failed');
+        setError(message);
       }
     } finally {
       setLoading(false);
@@ -52,33 +60,56 @@ const LoginPage: React.FC = () => {
   return (
     <div className="login-page">
       <div className="login-container">
-        <h1>HR Leave Management System</h1>
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="Enter your email"
-            />
-          </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Enter your password"
-            />
-          </div>
-          {error && <div className="error-message">{error}</div>}
-          <button type="submit" disabled={loading} className="login-button">
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+        {isInactive ? (
+          <>
+            <h1>HR Leave Management System</h1>
+            <div className="error-message" style={{ marginTop: 16 }}>
+              You are no longer active employee of this organisation.
+            </div>
+            <button
+              type="button"
+              className="login-button"
+              style={{ marginTop: 16 }}
+              onClick={() => {
+                setIsInactive(false);
+                setError('');
+                setPassword('');
+              }}
+            >
+              Sign In as Different User
+            </button>
+          </>
+        ) : (
+          <>
+            <h1>HR Leave Management System</h1>
+            <form onSubmit={handleSubmit} className="login-form">
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="Enter your email"
+                />
+              </div>
+              <div className="form-group">
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="Enter your password"
+                />
+              </div>
+              {error && <div className="error-message">{error}</div>}
+              <button type="submit" disabled={loading} className="login-button">
+                {loading ? 'Logging in...' : 'Login'}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ export const getEmployees = async (
   page: number = 1,
   limit: number = 20,
   search?: string,
-  filter?: string,
+  joiningDate?: string,
   status?: string
 ) => {
   const offset = (page - 1) * limit;
@@ -18,7 +18,8 @@ export const getEmployees = async (
   const params: any[] = [];
 
   if (search) {
-    query += ` AND (emp_id ILIKE $${params.length + 1} OR first_name ILIKE $${params.length + 1} OR last_name ILIKE $${params.length + 1} OR email ILIKE $${params.length + 1})`;
+    // Search by employee ID or name (first or last name)
+    query += ` AND (emp_id ILIKE $${params.length + 1} OR first_name ILIKE $${params.length + 1} OR last_name ILIKE $${params.length + 1})`;
     params.push(`%${search}%`);
   }
 
@@ -27,13 +28,13 @@ export const getEmployees = async (
     params.push(status);
   }
 
-  if (filter) {
-    // Filter by department or designation
-    query += ` AND (department ILIKE $${params.length + 1} OR designation ILIKE $${params.length + 1})`;
-    params.push(`%${filter}%`);
+  if (joiningDate) {
+    // Filter by exact date of joining (YYYY-MM-DD)
+    query += ` AND date_of_joining::date = $${params.length + 1}`;
+    params.push(joiningDate);
   }
 
-  query += ` ORDER BY date_of_joining DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  query += ` ORDER BY date_of_joining ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
   const result = await pool.query(query, params);
@@ -43,7 +44,8 @@ export const getEmployees = async (
   const countParams: any[] = [];
 
   if (search) {
-    countQuery += ` AND (emp_id ILIKE $${countParams.length + 1} OR first_name ILIKE $${countParams.length + 1})`;
+    // Match count query with main query: search by emp_id or name
+    countQuery += ` AND (emp_id ILIKE $${countParams.length + 1} OR first_name ILIKE $${countParams.length + 1} OR last_name ILIKE $${countParams.length + 1})`;
     countParams.push(`%${search}%`);
   }
 
@@ -52,9 +54,9 @@ export const getEmployees = async (
     countParams.push(status);
   }
 
-  if (filter) {
-    countQuery += ` AND (department ILIKE $${countParams.length + 1} OR designation ILIKE $${countParams.length + 1})`;
-    countParams.push(`%${filter}%`);
+  if (joiningDate) {
+    countQuery += ` AND date_of_joining::date = $${countParams.length + 1}`;
+    countParams.push(joiningDate);
   }
 
   const countResult = await pool.query(countQuery, countParams);
@@ -106,6 +108,11 @@ export const getEmployeeById = async (employeeId: number) => {
 };
 
 export const createEmployee = async (employeeData: any) => {
+  // Enforce numeric-only employee ID pattern
+  if (!/^\d+$/.test(employeeData.empId)) {
+    throw new Error('Employee ID must contain digits only');
+  }
+
   // Check if emp_id or email already exists
   const existingResult = await pool.query(
     'SELECT id FROM users WHERE emp_id = $1 OR email = $2',

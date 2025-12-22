@@ -29,10 +29,10 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
   if (result.rows.length === 0) {
     // Initialize balance if not exists
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 4, 4, 4)',
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 12, 6, 10)',
       [userId]
     );
-    return { casual: 4, sick: 4, lop: 4 };
+    return { casual: 12, sick: 6, lop: 10 };
   }
 
   const balance = result.rows[0];
