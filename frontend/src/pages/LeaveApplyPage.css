@@ -225,7 +225,7 @@
   display: flex;
   flex-direction: row;
   gap: 15px;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
 }
 
@@ -385,6 +385,7 @@
   text-align: left;
   border-bottom: 1px solid #ddd;
   vertical-align: top;
+  font-size: 13px;
 }
 
 .requests-table td {
@@ -407,6 +408,10 @@
   white-space: nowrap;
 }
 
+.requests-table th:nth-child(8),
+.requests-table td:nth-child(8) {
+  text-align: center;
+}
 /* Ensure dates stay in single line */
 .requests-table td:nth-child(2),
 .requests-table td:nth-child(4),
@@ -424,7 +429,7 @@
 .requests-table th {
   background-color: #f8f9fa;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .requests-table tr:hover {

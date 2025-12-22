@@ -240,8 +240,8 @@ const LeaveApplyPage: React.FC = () => {
               <tbody>
                 {rules.map((rule, idx) => (
                   <tr key={idx}>
-                    <td>{rule.leaveRequired}</td>
-                    <td>{rule.priorInformation}</td>
+                    <td>{rule.leaveRequired.replace('4.0', '4').replace('10.0', '10')}</td>
+                    <td>{rule.priorInformation.replace(/30\\s*Month/i, '30 days').replace('Month', 'days')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -433,50 +433,56 @@ const LeaveApplyPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {myRequests?.requests.map((request: any, idx: number) => (
-                <tr key={request.id}>
-                  <td>{idx + 1}</td>
-                  <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                  <td>
-                    <div className="reason-cell">
-                      {request.leaveReason}
-                    </div>
-                  </td>
-                  <td>
-                    {format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}
-                    {request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
-                  </td>
-                  <td>
-                    {format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}
-                    {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
-                  </td>
-                  <td>{request.noOfDays}</td>
-                  <td>{request.leaveType}</td>
-                  <td>
-                    {request.currentStatus === 'pending' ? (
-                      <span className="status-badge status-applied">Applied</span>
-                    ) : request.currentStatus === 'approved' ? (
-                      <span className="status-badge status-approved">Approved</span>
-                    ) : request.currentStatus === 'rejected' ? (
-                      <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
-                        Rejected{request.rejectionReason ? `: ${request.rejectionReason}` : ''}
-                      </span>
-                    ) : request.currentStatus === 'partially_approved' ? (
-                      <span className="status-badge status-applied">Partially Approved</span>
-                    ) : (
-                      <span className="status-badge">{request.currentStatus}</span>
-                    )}
-                  </td>
-                  <td>
-                    {request.currentStatus === 'pending' && (
-                      <>
-                        <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>✏️</span>
-                        <span className="action-icon" title="Delete" onClick={() => handleDelete(request.id)}>🗑️</span>
-                      </>
-                    )}
-                  </td>
+              {!myRequests?.requests || myRequests.requests.length === 0 ? (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '16px' }}>No leaves applied</td>
                 </tr>
-              ))}
+              ) : (
+                myRequests.requests.map((request: any, idx: number) => (
+                  <tr key={request.id}>
+                    <td>{idx + 1}</td>
+                    <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                    <td>
+                      <div className="reason-cell">
+                        {request.leaveReason}
+                      </div>
+                    </td>
+                    <td>
+                      {format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                      {request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
+                    </td>
+                    <td>
+                      {format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                      {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
+                    </td>
+                    <td>{request.noOfDays}</td>
+                    <td>{request.leaveType}</td>
+                    <td>
+                      {request.currentStatus === 'pending' ? (
+                        <span className="status-badge status-applied">Applied</span>
+                      ) : request.currentStatus === 'approved' ? (
+                        <span className="status-badge status-approved">Approved</span>
+                      ) : request.currentStatus === 'rejected' ? (
+                        <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
+                          Rejected{request.rejectionReason ? `: ${request.rejectionReason}` : ''}
+                        </span>
+                      ) : request.currentStatus === 'partially_approved' ? (
+                        <span className="status-badge status-applied">Partially Approved</span>
+                      ) : (
+                        <span className="status-badge">{request.currentStatus}</span>
+                      )}
+                    </td>
+                    <td>
+                      {request.currentStatus === 'pending' && (
+                        <>
+                          <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>✏️</span>
+                          <span className="action-icon" title="Delete" onClick={() => handleDelete(request.id)}>🗑️</span>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

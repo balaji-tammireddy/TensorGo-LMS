@@ -31,15 +31,10 @@
   width: 300px;
 }
 
+/* Icons/buttons removed per request */
 .search-button,
 .filter-button {
-  padding: 10px 15px;
-  background-color: #1976d2;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
+  display: none;
 }
 
 .filter-box select {
@@ -68,6 +63,21 @@
 .requests-table {
   width: 100%;
   margin-top: 15px;
+}
+
+.requests-table th,
+.requests-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  vertical-align: top;
+}
+
+/* Status column center (both pending and approved tables share markup) */
+.requests-table th:nth-child(9),
+.requests-table td:nth-child(9),
+.requests-table th:nth-child(8),
+.requests-table td:nth-child(8) {
+  text-align: center;
 }
 
 .actions-cell {

@@ -10,7 +10,7 @@ const LeaveApprovalPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
 
-  const { data: pendingData, isLoading: pendingLoading, error: pendingError, refetch: refetchPending } = useQuery(
+  const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
     () => leaveService.getPendingLeaveRequests(1, 10, search || undefined, filter || undefined),
     {
@@ -109,31 +109,6 @@ const LeaveApprovalPage: React.FC = () => {
     }
   };
 
-  const formatHalfLabel = (val?: string) => {
-    if (!val) return '';
-    if (val === 'first_half') return ' (First half)';
-    if (val === 'second_half') return ' (Second half)';
-    if (val === 'half') return ' (Half day)';
-    return '';
-  };
-
-  const buildLeaveDisplay = (request: any) => {
-    if (request.leaveDate) {
-      const parts = request.leaveDate.split(/\s+to\s+/i);
-      if (parts.length === 2) {
-        const start = formatDateSafe(parts[0].trim());
-        const end = formatDateSafe(parts[1].trim());
-        if (start && end) return `${start} to ${end}`;
-      } else {
-        const single = formatDateSafe(request.leaveDate);
-        if (single) return single;
-      }
-    }
-    const start = formatDateSafe(request.startDate);
-    const end = formatDateSafe(request.endDate);
-    return `${start}${formatHalfLabel(request.startType)}${end ? ` to ${end}${formatHalfLabel(request.endType)}` : ''}`;
-  };
-
   const pendingRequests = pendingData?.requests || [];
 
   // Expand into day-wise rows for display (duplicate other columns per row) and show only pending days
@@ -221,7 +196,14 @@ const LeaveApprovalPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {expandedPendingRequests.map((request: any, idx: number) => (
+            {expandedPendingRequests.length === 0 ? (
+              <tr>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>
+                  No leaves applied
+                </td>
+              </tr>
+            ) : (
+              expandedPendingRequests.map((request: any, idx: number) => (
                 <tr key={`${request.id}-${idx}`}>
                   <td>{idx + 1}</td>
                   <td>{request.empId}</td>
@@ -234,7 +216,19 @@ const LeaveApprovalPage: React.FC = () => {
                   <td>{request.leaveType}</td>
                   <td>{request.noOfDays}</td>
                   <td>{request.leaveReason}</td>
-                  <td>{request.currentStatus}</td>
+                  <td>
+                    {request.currentStatus === 'pending' ? (
+                      <span className="status-badge status-applied">Applied</span>
+                    ) : request.currentStatus === 'approved' ? (
+                      <span className="status-badge status-approved">Approved</span>
+                    ) : request.currentStatus === 'rejected' ? (
+                      <span className="status-badge status-rejected">Rejected</span>
+                    ) : request.currentStatus === 'partially_approved' ? (
+                      <span className="status-badge status-applied">Partially Approved</span>
+                    ) : (
+                      <span className="status-badge">{request.currentStatus}</span>
+                    )}
+                  </td>
                   <td className="actions-cell">
                     <button
                       className="approve-btn"
@@ -252,7 +246,8 @@ const LeaveApprovalPage: React.FC = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+              ))
+            )}
             </tbody>
           </table>
         </div>
@@ -273,18 +268,38 @@ const LeaveApprovalPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {approvedData?.requests.map((request: any, idx) => (
-                <tr key={request.id}>
-                  <td>{idx + 1}</td>
-                  <td>{request.empId}</td>
-                  <td>{request.empName}</td>
-                  <td>{formatDateSafe(request.appliedDate)}</td>
-                  <td>{request.leaveDate || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
-                  <td>{request.leaveType}</td>
-                  <td>{request.noOfDays}</td>
-                  <td>{request.leaveStatus}</td>
+              {!approvedData?.requests || approvedData.requests.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                    No leaves applied
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                approvedData.requests.map((request: any, idx: number) => (
+                  <tr key={request.id}>
+                    <td>{idx + 1}</td>
+                    <td>{request.empId}</td>
+                    <td>{request.empName}</td>
+                    <td>{formatDateSafe(request.appliedDate)}</td>
+                    <td>{request.leaveDate || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
+                    <td>{request.leaveType}</td>
+                    <td>{request.noOfDays}</td>
+                    <td>
+                      {request.leaveStatus === 'pending' ? (
+                        <span className="status-badge status-applied">Applied</span>
+                      ) : request.leaveStatus === 'approved' ? (
+                        <span className="status-badge status-approved">Approved</span>
+                      ) : request.leaveStatus === 'rejected' ? (
+                        <span className="status-badge status-rejected">Rejected</span>
+                      ) : request.leaveStatus === 'partially_approved' ? (
+                        <span className="status-badge status-applied">Partially Approved</span>
+                      ) : (
+                        <span className="status-badge">{request.leaveStatus}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

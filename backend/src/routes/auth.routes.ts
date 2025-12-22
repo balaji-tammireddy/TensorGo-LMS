@@ -14,10 +14,7 @@ const parseEnvInt = (name: string, fallback: number) => {
 
 const authLimiter = rateLimit({
   windowMs: parseEnvInt('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000), // default 15 minutes
-  max: parseEnvInt(
-    'AUTH_RATE_LIMIT_MAX',
-    process.env.NODE_ENV === 'production' ? 20 : 300
-  ),
+  max: parseEnvInt('AUTH_RATE_LIMIT_MAX', 10000), // very high by default to avoid 429s in dev
   message: {
     error: {
       code: 'RATE_LIMIT_EXCEEDED',
