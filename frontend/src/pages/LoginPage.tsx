@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
@@ -9,6 +10,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isInactive, setIsInactive] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -82,6 +84,7 @@ const LoginPage: React.FC = () => {
         ) : (
           <>
             <h1>HR Leave Management System</h1>
+            <p className="login-subtitle">Sign in to continue</p>
             <form onSubmit={handleSubmit} className="login-form">
               <div className="form-group">
                 <label>Email</label>
@@ -95,13 +98,23 @@ const LoginPage: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="Enter your password"
-                />
+                <div className="password-field">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                </div>
               </div>
               {error && <div className="error-message">{error}</div>}
               <button type="submit" disabled={loading} className="login-button">

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import * as employeeService from '../services/employeeService';
 import { format } from 'date-fns';
+import { FaEye, FaPencilAlt } from 'react-icons/fa';
 import './EmployeeManagementPage.css';
 
 const sanitizeName = (value: string) => {
@@ -384,13 +385,14 @@ const EmployeeManagementPage: React.FC = () => {
             {searchInput && (
               <button
                 type="button"
-                className="clear-search-button"
+                className="search-clear"
                 onClick={() => {
                   setSearchInput('');
                   setAppliedSearch(undefined);
                 }}
+                aria-label="Clear search"
               >
-                ✕
+                ×
               </button>
             )}
           </div>
@@ -405,15 +407,6 @@ const EmployeeManagementPage: React.FC = () => {
               <option value="terminated">Terminated</option>
             </select>
           </div>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="reset-filters-button"
-              onClick={handleResetFilters}
-            >
-              Reset
-            </button>
-          )}
           <button
             type="button"
             className="add-employee-button"
@@ -472,14 +465,14 @@ const EmployeeManagementPage: React.FC = () => {
                         title="View"
                         onClick={() => handleViewEmployee(employee.id)}
                       >
-                        👁️
+                      <FaEye />
                       </span>
                       <span
                         className="action-icon"
                         title="Edit"
                         onClick={() => handleEditEmployee(employee.id)}
                       >
-                        ✏️
+                      <FaPencilAlt />
                       </span>
                     </td>
                   </tr>

@@ -4,6 +4,8 @@ import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
 import * as leaveService from '../services/leaveService';
 import { format, addDays } from 'date-fns';
+import { FaPencilAlt, FaTrash } from 'react-icons/fa';
+import { FaRegCalendarAlt, FaRegClock } from 'react-icons/fa';
 import './LeaveApplyPage.css';
 
 const LeaveApplyPage: React.FC = () => {
@@ -313,8 +315,8 @@ const LeaveApplyPage: React.FC = () => {
                     min={minStartDate}
                     onChange={(e) => {
                       const newStartDate = e.target.value;
-                    // For permission, update end date to match start date
-                    if (formData.leaveType === 'permission') {
+                      // For permission, update end date to match start date
+                      if (formData.leaveType === 'permission') {
                         setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
                       } else {
                         setFormData({ ...formData, startDate: newStartDate });
@@ -323,7 +325,9 @@ const LeaveApplyPage: React.FC = () => {
                     required
                     className="date-input"
                   />
-                  <span className="calendar-icon">📅</span>
+                  <span className="calendar-icon" aria-hidden="true">
+                    <FaRegCalendarAlt />
+                  </span>
                 </div>
               </div>
               <div className="form-group">
@@ -346,12 +350,14 @@ const LeaveApplyPage: React.FC = () => {
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  required={formData.leaveType !== 'permission'}
-                  disabled={formData.leaveType === 'permission'}
+                    required={formData.leaveType !== 'permission'}
+                    disabled={formData.leaveType === 'permission'}
                     min={formData.startDate || minStartDate}
                     className="date-input"
                   />
-                  <span className="calendar-icon">📅</span>
+                  <span className="calendar-icon" aria-hidden="true">
+                    <FaRegCalendarAlt />
+                  </span>
                 </div>
               </div>
               <div className="form-group">
@@ -370,29 +376,45 @@ const LeaveApplyPage: React.FC = () => {
               <div className="form-group">
                 <label>{formData.leaveType === 'permission' ? 'Timings' : 'Time For Permission'}</label>
                 <div className="time-inputs">
-                  <input
-                    type="time"
-                    value={formData.timeForPermission.start}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      timeForPermission: { ...formData.timeForPermission, start: e.target.value }
-                    })}
-                    placeholder="Start time"
-                    disabled={formData.leaveType !== 'permission'}
-                    required={formData.leaveType === 'permission'}
-                  />
+                  <div className="time-input-wrapper">
+                    <input
+                      className="time-input"
+                      type="time"
+                      value={formData.timeForPermission.start}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          timeForPermission: { ...formData.timeForPermission, start: e.target.value }
+                        })
+                      }
+                      placeholder="Start time"
+                      disabled={formData.leaveType !== 'permission'}
+                      required={formData.leaveType === 'permission'}
+                    />
+                    <span className="time-icon" aria-hidden="true">
+                      <FaRegClock />
+                    </span>
+                  </div>
                   <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
-                  <input
-                    type="time"
-                    value={formData.timeForPermission.end}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      timeForPermission: { ...formData.timeForPermission, end: e.target.value }
-                    })}
-                    placeholder="End time"
-                    disabled={formData.leaveType !== 'permission'}
-                    required={formData.leaveType === 'permission'}
-                  />
+                  <div className="time-input-wrapper">
+                    <input
+                      className="time-input"
+                      type="time"
+                      value={formData.timeForPermission.end}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          timeForPermission: { ...formData.timeForPermission, end: e.target.value }
+                        })
+                      }
+                      placeholder="End time"
+                      disabled={formData.leaveType !== 'permission'}
+                      required={formData.leaveType === 'permission'}
+                    />
+                    <span className="time-icon" aria-hidden="true">
+                      <FaRegClock />
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -458,16 +480,16 @@ const LeaveApplyPage: React.FC = () => {
                     <td>{request.noOfDays}</td>
                     <td>{request.leaveType}</td>
                     <td>
-                      {request.currentStatus === 'pending' ? (
-                        <span className="status-badge status-applied">Applied</span>
-                      ) : request.currentStatus === 'approved' ? (
+                    {request.currentStatus === 'pending' ? (
+                      <span className="status-badge status-applied">Applied</span>
+                    ) : request.currentStatus === 'approved' ? (
                         <span className="status-badge status-approved">Approved</span>
                       ) : request.currentStatus === 'rejected' ? (
                         <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
                           Rejected{request.rejectionReason ? `: ${request.rejectionReason}` : ''}
                         </span>
-                      ) : request.currentStatus === 'partially_approved' ? (
-                        <span className="status-badge status-applied">Partially Approved</span>
+                    ) : request.currentStatus === 'partially_approved' ? (
+                      <span className="status-badge status-partial">Partially Approved</span>
                       ) : (
                         <span className="status-badge">{request.currentStatus}</span>
                       )}
@@ -475,8 +497,12 @@ const LeaveApplyPage: React.FC = () => {
                     <td>
                       {request.currentStatus === 'pending' && (
                         <>
-                          <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>✏️</span>
-                          <span className="action-icon" title="Delete" onClick={() => handleDelete(request.id)}>🗑️</span>
+                          <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>
+                            <FaPencilAlt />
+                          </span>
+                          <span className="action-icon" title="Delete" onClick={() => handleDelete(request.id)}>
+                            <FaTrash />
+                          </span>
                         </>
                       )}
                     </td>

@@ -266,14 +266,27 @@
 
 .date-input {
   flex: 1;
-  padding-right: 28px;
+  padding-right: 34px;
+}
+
+/* Hide native date picker icon and default appearance */
+.date-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.date-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
 .calendar-icon {
   position: absolute;
-  right: 8px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  color: #3c6ff2;
   pointer-events: none;
-  font-size: 14px;
 }
 
 .form-group input:disabled,
@@ -285,12 +298,12 @@
 
 .form-group textarea {
   resize: none;
-  height: 36px;
-  padding: 8px;
+  height: 44px;
+  padding: 10px 12px;
   font-size: 12px;
   width: 100%;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: 'Poppins', sans-serif;
   box-sizing: border-box;
   line-height: 1.4;
@@ -302,10 +315,45 @@
   align-items: center;
 }
 
+.time-input-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.time-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  height: 44px;
+  line-height: 1.2;
+  padding-right: 34px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.time-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.time-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  color: #3c6ff2;
+  pointer-events: none;
+}
 .time-inputs input {
   flex: 1;
-  padding: 6px 8px;
+  padding: 10px 12px;
   font-size: 12px;
+  border-radius: 6px;
+  height: 44px;
+  line-height: 1.2;
 }
 
 .time-inputs span {
@@ -325,38 +373,44 @@
 
 .submit-button {
   padding: 10px 24px;
-  background-color: #9c27b0;
+  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: white;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid #2951c8;
+  border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
   font-size: 12px;
   white-space: nowrap;
-  width: 100px;
+  width: 110px;
+  box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .submit-button:hover {
-  background-color: #7b1fa2;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
 }
 
 .clear-button {
   padding: 10px 24px;
-  background-color: white;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
+  color: #3a4a6b;
+  border: 1px solid #c3ccdd;
+  border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
   font-size: 12px;
   white-space: nowrap;
-  width: 100px;
+  width: 110px;
+  box-shadow: 0 6px 14px rgba(63, 81, 181, 0.12);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .clear-button:hover {
-  background-color: #f5f5f5;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(63, 81, 181, 0.16);
 }
 
 /* Recent Requests Section */
@@ -474,10 +528,14 @@
 }
 
 .action-icon {
-  margin: 0 5px;
+  margin-right: 12px;
   cursor: pointer;
   font-size: 18px;
   display: inline-block;
+}
+
+.action-icon:last-child {
+  margin-right: 0;
 }
 
 .action-icon:hover {
@@ -498,6 +556,11 @@
 .status-applied {
   background-color: #ffc107; /* Yellow */
   color: #000;
+}
+
+.status-partial {
+  background-color: #ff9800; /* Orange */
+  color: #fff;
 }
 
 .status-approved {

@@ -29,12 +29,29 @@
   border-radius: 4px;
   font-size: 14px;
   width: 300px;
+  padding-right: 32px;
 }
 
-/* Icons/buttons removed per request */
-.search-button,
-.filter-button {
-  display: none;
+.search-box {
+  position: relative;
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.search-clear:hover {
+  color: #3c6ff2;
 }
 
 .filter-box select {
@@ -42,6 +59,7 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  min-width: 180px;
 }
 
 .pending-requests-section,
@@ -84,6 +102,16 @@
   display: flex;
   gap: 10px;
   justify-content: center;
+}
+
+.status-applied {
+  background-color: #ffc107; /* Yellow */
+  color: #000;
+}
+
+.status-partial {
+  background-color: #ff9800; /* Orange */
+  color: #fff;
 }
 
 .approve-btn,

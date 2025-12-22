@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt } from 'react-icons/fa';
@@ -8,6 +8,7 @@ const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
@@ -43,6 +44,12 @@ const Sidebar: React.FC = () => {
     return routes;
   };
 
+  const userInitial = useMemo(() => {
+    if (!user) return '';
+    const source = (user as any).name || user.email || '';
+    return source.trim().charAt(0).toUpperCase() || '';
+  }, [user]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -50,10 +57,6 @@ const Sidebar: React.FC = () => {
 
   return (
     <div className="sidebar">
-      <div className="sidebar-role">
-        {user && <div className="role-badge">{getRoleDisplayName(user.role)}</div>}
-      </div>
-      
       <div className="sidebar-nav">
         {getAvailableRoutes().map((route) => (
           <div
@@ -66,11 +69,21 @@ const Sidebar: React.FC = () => {
           </div>
         ))}
       </div>
-      
-      <div className="sidebar-bottom">
-        <div className="nav-item" onClick={handleLogout} title="Logout">
-          <span className="nav-icon"><FaSignOutAlt /></span>
-        </div>
+
+      <div className="sidebar-user">
+        {user && (
+          <div className="user-toggle" onClick={() => setShowUserMenu((prev) => !prev)}>
+            <div className="user-avatar">{userInitial || 'U'}</div>
+          </div>
+        )}
+        {showUserMenu && (
+          <div className="user-menu">
+            <div className="role-text">{user ? getRoleDisplayName(user.role) : ''}</div>
+            <button className="logout-button" onClick={handleLogout}>
+              <FaSignOutAlt /> Logout
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

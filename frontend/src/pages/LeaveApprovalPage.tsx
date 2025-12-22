@@ -7,6 +7,7 @@ import './LeaveApprovalPage.css';
 
 const LeaveApprovalPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
 
@@ -92,6 +93,27 @@ const LeaveApprovalPage: React.FC = () => {
     }
   };
 
+  const triggerSearch = () => {
+    const term = searchInput.trim();
+    if (term.length >= 3) {
+      setSearch(term);
+    } else {
+      setSearch('');
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearch('');
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      triggerSearch();
+    }
+  };
+
   const formatDateSafe = (value: Date | string | null | undefined) => {
     if (!value) return '';
     try {
@@ -162,11 +184,16 @@ const LeaveApprovalPage: React.FC = () => {
           <div className="search-box">
             <input
               type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by Name or Emp ID..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
             />
-            <button className="search-button">🔍</button>
+            {searchInput && (
+              <button type="button" className="search-clear" onClick={clearSearch} aria-label="Clear search">
+                ×
+              </button>
+            )}
           </div>
           <div className="filter-box">
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
@@ -175,7 +202,6 @@ const LeaveApprovalPage: React.FC = () => {
               <option value="sick">Sick</option>
               <option value="lop">LOP</option>
             </select>
-            <button className="filter-button">▼</button>
           </div>
         </div>
 
@@ -224,7 +250,7 @@ const LeaveApprovalPage: React.FC = () => {
                     ) : request.currentStatus === 'rejected' ? (
                       <span className="status-badge status-rejected">Rejected</span>
                     ) : request.currentStatus === 'partially_approved' ? (
-                      <span className="status-badge status-applied">Partially Approved</span>
+                      <span className="status-badge status-partial">Partially Approved</span>
                     ) : (
                       <span className="status-badge">{request.currentStatus}</span>
                     )}
@@ -285,14 +311,14 @@ const LeaveApprovalPage: React.FC = () => {
                     <td>{request.leaveType}</td>
                     <td>{request.noOfDays}</td>
                     <td>
-                      {request.leaveStatus === 'pending' ? (
-                        <span className="status-badge status-applied">Applied</span>
-                      ) : request.leaveStatus === 'approved' ? (
+                    {request.leaveStatus === 'pending' ? (
+                      <span className="status-badge status-applied">Applied</span>
+                    ) : request.leaveStatus === 'approved' ? (
                         <span className="status-badge status-approved">Approved</span>
                       ) : request.leaveStatus === 'rejected' ? (
                         <span className="status-badge status-rejected">Rejected</span>
-                      ) : request.leaveStatus === 'partially_approved' ? (
-                        <span className="status-badge status-applied">Partially Approved</span>
+                    ) : request.leaveStatus === 'partially_approved' ? (
+                      <span className="status-badge status-partial">Partially Approved</span>
                       ) : (
                         <span className="status-badge">{request.leaveStatus}</span>
                       )}

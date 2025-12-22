@@ -860,7 +860,6 @@ const ProfilePage: React.FC = () => {
               type="text"
               value={profile?.reportingManager?.name || ''}
               disabled
-              placeholder="Search Manager Name..."
             />
           </div>
         </div>

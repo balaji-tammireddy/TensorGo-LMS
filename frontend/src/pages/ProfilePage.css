@@ -27,12 +27,19 @@
 
 .edit-button {
   padding: 8px 18px;
-  background-color: white;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
+  color: #fff;
+  border: 1px solid #2951c8;
+  border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.edit-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
 }
 
 .save-button {
@@ -92,23 +99,39 @@
 }
 
 .change-photo-button {
-  padding: 6px 14px;
-  background-color: #1976d2;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: #ffffff;
-  border: 1px solid #1565c0;
-  border-radius: 2px;
+  border: 1px solid #2951c8;
+  border-radius: 6px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 6px 14px rgba(60, 111, 242, 0.22);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.change-photo-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
 }
 
 .delete-photo-button {
-  padding: 6px 14px;
-  background-color: #e53935;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
   color: #ffffff;
-  border: 1px solid #d32f2f;
-  border-radius: 2px;
+  border: 1px solid #c62828;
+  border-radius: 6px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 6px 14px rgba(229, 57, 53, 0.22);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.delete-photo-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(229, 57, 53, 0.28);
 }
 
 .profile-section {
