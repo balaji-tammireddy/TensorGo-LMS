@@ -38,7 +38,8 @@ export const getProfile = async (userId: number) => {
       bloodGroup: user.blood_group,
       maritalStatus: user.marital_status,
       emergencyContactName: user.emergency_contact_name,
-      emergencyContactNo: user.emergency_contact_no
+      emergencyContactNo: user.emergency_contact_no,
+      emergencyContactRelation: user.emergency_contact_relation
     },
     employmentInfo: {
       designation: user.designation,
@@ -88,6 +89,7 @@ export const updateProfile = async (userId: number, profileData: any) => {
     maritalStatus: 'marital_status',
     emergencyContactName: 'emergency_contact_name',
     emergencyContactNo: 'emergency_contact_no',
+    emergencyContactRelation: 'emergency_contact_relation',
     designation: 'designation',
     department: 'department',
     dateOfJoining: 'date_of_joining',

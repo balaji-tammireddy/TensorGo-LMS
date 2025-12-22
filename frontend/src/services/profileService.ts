@@ -15,6 +15,7 @@ export interface Profile {
     maritalStatus?: string;
     emergencyContactName?: string;
     emergencyContactNo?: string;
+    emergencyContactRelation?: string;
   };
   employmentInfo: {
     designation?: string;

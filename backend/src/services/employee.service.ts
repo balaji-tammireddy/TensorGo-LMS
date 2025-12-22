@@ -24,8 +24,13 @@ export const getEmployees = async (
   }
 
   if (status) {
-    query += ` AND status = $${params.length + 1}`;
-    params.push(status);
+    if (status === 'inactive') {
+      // Treat "inactive" as any non-active status
+      query += ` AND status <> 'active'`;
+    } else {
+      query += ` AND status = $${params.length + 1}`;
+      params.push(status);
+    }
   }
 
   if (joiningDate) {
@@ -50,8 +55,12 @@ export const getEmployees = async (
   }
 
   if (status) {
-    countQuery += ` AND status = $${countParams.length + 1}`;
-    countParams.push(status);
+    if (status === 'inactive') {
+      countQuery += ` AND status <> 'active'`;
+    } else {
+      countQuery += ` AND status = $${countParams.length + 1}`;
+      countParams.push(status);
+    }
   }
 
   if (joiningDate) {
@@ -129,11 +138,11 @@ export const createEmployee = async (employeeData: any) => {
     `INSERT INTO users (
       emp_id, email, password_hash, role, first_name, middle_name, last_name,
       contact_number, alt_contact, date_of_birth, gender, blood_group,
-      marital_status, emergency_contact_name, emergency_contact_no,
+      marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
       current_address, permanent_address, reporting_manager_id, status
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
     ) RETURNING id`,
     [
       employeeData.empId,
@@ -151,6 +160,7 @@ export const createEmployee = async (employeeData: any) => {
       employeeData.maritalStatus || null,
       employeeData.emergencyContactName || null,
       employeeData.emergencyContactNo || null,
+      employeeData.emergencyContactRelation || null,
       employeeData.designation || null,
       employeeData.department || null,
       employeeData.dateOfJoining,
@@ -208,7 +218,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any) => {
   const allowedFields = [
     'first_name', 'middle_name', 'last_name', 'contact_number', 'alt_contact',
     'date_of_birth', 'gender', 'blood_group', 'marital_status',
-    'emergency_contact_name', 'emergency_contact_no', 'designation', 'department',
+    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation',
+    'designation', 'department',
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
     'reporting_manager_id', 'status'
   ];

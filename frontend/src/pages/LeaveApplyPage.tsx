@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +25,10 @@ const LeaveApplyPage: React.FC = () => {
   const minStartDate = (formData.leaveType === 'casual' || formData.leaveType === 'lop')
     ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days
     : todayStr;
+
+  const sanitizeLettersOnly = (value: string) => {
+    return value.replace(/[^a-zA-Z\s]/g, '');
+  };
   const formatHalfLabel = (val?: string) => {
     if (!val) return '';
     if (val === 'first_half') return ' (First half)';
@@ -32,6 +36,29 @@ const LeaveApplyPage: React.FC = () => {
     if (val === 'half') return ' (Half day)';
     return '';
   };
+
+  // When casual + half-day start + same start/end date, force endType to match startType
+  useEffect(() => {
+    if (
+      formData.leaveType === 'casual' &&
+      (formData.startType === 'first_half' || formData.startType === 'second_half') &&
+      formData.startDate &&
+      formData.endDate &&
+      formData.startDate === formData.endDate &&
+      formData.endType !== formData.startType
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        endType: prev.startType
+      }));
+    }
+  }, [
+    formData.leaveType,
+    formData.startType,
+    formData.startDate,
+    formData.endDate,
+    formData.endType
+  ]);
 
   const { data: balances, isLoading: balancesLoading } = useQuery(
     'leaveBalances',
@@ -366,7 +393,14 @@ const LeaveApplyPage: React.FC = () => {
                   value={formData.endType}
                   onChange={(e) => setFormData({ ...formData, endType: e.target.value as any })}
                   required={formData.leaveType !== 'permission'}
-                  disabled={formData.leaveType === 'permission'}
+                  disabled={
+                    formData.leaveType === 'permission' ||
+                    (formData.leaveType === 'casual' &&
+                      (formData.startType === 'first_half' || formData.startType === 'second_half') &&
+                      formData.startDate &&
+                      formData.endDate &&
+                      formData.startDate === formData.endDate)
+                  }
                 >
                   <option value="full">Full day</option>
                   <option value="first_half">First half</option>
@@ -423,7 +457,12 @@ const LeaveApplyPage: React.FC = () => {
                 <label>Reason</label>
                 <textarea
                   value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      reason: sanitizeLettersOnly(e.target.value)
+                    })
+                  }
                   placeholder="Type reason..."
                   required
                   rows={4}
