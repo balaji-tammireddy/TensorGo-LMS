@@ -136,6 +136,7 @@ const ProfilePage: React.FC = () => {
     if (isEmpty(formData.personalInfo?.maritalStatus)) missingFields.push('Marital Status');
     if (isEmpty(formData.personalInfo?.emergencyContactName)) missingFields.push('Emergency Contact Name');
     if (isEmpty(formData.personalInfo?.emergencyContactNo)) missingFields.push('Emergency Contact No');
+    if (isEmpty(formData.personalInfo?.emergencyContactRelation)) missingFields.push('Emergency Contact Relation');
 
     // Employment information
     if (isEmpty(formData.employmentInfo?.designation)) missingFields.push('Designation');
@@ -572,6 +573,25 @@ const ProfilePage: React.FC = () => {
                   setFormData({
                     ...formData,
                     personalInfo: { ...formData.personalInfo, emergencyContactNo: value }
+                  });
+                }}
+                disabled={!isEditMode}
+              />
+            </div>
+            <div className="form-group">
+              <label>
+                Emergency Contact Relation
+                {isEditMode && <span className="required-indicator">*</span>}
+              </label>
+              <input
+                type="text"
+                value={formData.personalInfo?.emergencyContactRelation || ''}
+                maxLength={25}
+                onChange={(e) => {
+                  const value = sanitizeLettersOnly(e.target.value);
+                  setFormData({
+                    ...formData,
+                    personalInfo: { ...formData.personalInfo, emergencyContactRelation: value }
                   });
                 }}
                 disabled={!isEditMode}

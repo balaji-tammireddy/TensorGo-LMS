@@ -38,6 +38,7 @@ const emptyEmployeeForm = {
   maritalStatus: '',
   emergencyContactName: '',
   emergencyContactNo: '',
+  emergencyContactRelation: '',
   designation: '',
   department: '',
   dateOfJoining: '',
@@ -181,6 +182,8 @@ const EmployeeManagementPage: React.FC = () => {
       missingFields.push('Emergency Contact Name');
     if (isEmpty(newEmployee.emergencyContactNo))
       missingFields.push('Emergency Contact No');
+    if (isEmpty(newEmployee.emergencyContactRelation))
+      missingFields.push('Emergency Contact Relation');
 
     // Employment information
     if (isEmpty(newEmployee.designation)) missingFields.push('Designation');
@@ -297,6 +300,7 @@ const EmployeeManagementPage: React.FC = () => {
         maritalStatus: data.marital_status || '',
         emergencyContactName: data.emergency_contact_name || '',
         emergencyContactNo: data.emergency_contact_no || '',
+        emergencyContactRelation: data.emergency_contact_relation || '',
         designation: data.designation || '',
         department: data.department || '',
         dateOfJoining: data.date_of_joining
@@ -333,16 +337,7 @@ const EmployeeManagementPage: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return '#4caf50';
-      case 'resigned':
-        return '#ff9800';
-      case 'terminated':
-        return '#f44336';
-      default:
-        return '#666';
-    }
+    return status === 'active' ? '#4caf50' : '#f44336';
   };
 
   if (error) {
@@ -403,8 +398,7 @@ const EmployeeManagementPage: React.FC = () => {
             >
               <option value="">All Status</option>
               <option value="active">Active</option>
-              <option value="resigned">Resigned</option>
-              <option value="terminated">Terminated</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
           <button
@@ -452,11 +446,7 @@ const EmployeeManagementPage: React.FC = () => {
                           color: '#ffffff'
                         }}
                       >
-                        {employee.status === 'active'
-                          ? 'Active'
-                          : employee.status === 'resigned'
-                          ? 'Resigned'
-                          : 'Terminated'}
+                        {employee.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="actions-cell">
@@ -721,6 +711,22 @@ const EmployeeManagementPage: React.FC = () => {
                         disabled={isViewMode}
                       />
                     </div>
+                    <div className="employee-modal-field">
+                      <label>
+                        Emergency Contact Relation<span className="required-indicator">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newEmployee.emergencyContactRelation}
+                        onChange={(e) =>
+                          setNewEmployee({
+                            ...newEmployee,
+                            emergencyContactRelation: sanitizeLettersOnly(e.target.value)
+                          })
+                        }
+                        disabled={isViewMode}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -779,21 +785,16 @@ const EmployeeManagementPage: React.FC = () => {
                       <div className="employee-modal-field">
                         <label>Status</label>
                         <select
-                          value={newEmployee.status}
+                          value={newEmployee.status === 'active' ? 'active' : 'inactive'}
                           onChange={(e) =>
                             setNewEmployee({
                               ...newEmployee,
-                              status: e.target.value as
-                                | 'active'
-                                | 'on_leave'
-                                | 'resigned'
-                                | 'terminated'
+                              status: e.target.value === 'active' ? 'active' : 'resigned'
                             })
                           }
                         >
                           <option value="active">Active</option>
-                          <option value="resigned">Resigned</option>
-                          <option value="terminated">Terminated</option>
+                          <option value="inactive">Inactive</option>
                         </select>
                       </div>
                     )}

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   marital_status VARCHAR(20),
   emergency_contact_name VARCHAR(100),
   emergency_contact_no VARCHAR(15),
+  emergency_contact_relation VARCHAR(50),
   profile_photo_url VARCHAR(500),
   reporting_manager_id INTEGER REFERENCES users(id),
   designation VARCHAR(100),
@@ -31,6 +32,9 @@ CREATE TABLE IF NOT EXISTS users (
   created_by INTEGER REFERENCES users(id),
   updated_by INTEGER REFERENCES users(id)
 );
+
+-- Ensure column exists for existing databases
+ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_relation VARCHAR(50);
 
 CREATE INDEX IF NOT EXISTS idx_users_emp_id ON users(emp_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -177,9 +181,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Make trigger creation idempotent
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+DROP TRIGGER IF EXISTS update_leave_requests_updated_at ON leave_requests;
 
-CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON leave_requests
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_leave_requests_updated_at
+    BEFORE UPDATE ON leave_requests
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
