@@ -78,21 +78,25 @@ const LeaveApprovalPage: React.FC = () => {
     }
   };
 
-  // Expand multi-day leaves into day-wise rows
-  const expandLeaveDays = (request: any) => {
-    if (!request.leaveDays || request.leaveDays.length === 0) {
-      return [request];
+  const formatDateSafe = (value: Date | string | null | undefined) => {
+    if (!value) return '';
+    if (value instanceof Date) {
+      return format(value, 'dd/MM/yyyy');
     }
-    return request.leaveDays.map((day: any, idx: number) => ({
-      ...request,
-      leaveDate: format(new Date(day.date), 'yyyy-MM-dd'),
-      dayType: day.type,
-      isFirstRow: idx === 0,
-      rowSpan: idx === 0 ? request.leaveDays.length : 0
-    }));
+    const str = value.toString();
+    const hasTime = str.includes('T');
+    return format(new Date(hasTime ? str : `${str}T12:00:00`), 'dd/MM/yyyy');
   };
 
-  const expandedPendingRequests = pendingData?.requests.flatMap(expandLeaveDays) || [];
+  const formatHalfLabel = (val?: string) => {
+    if (!val) return '';
+    if (val === 'first_half') return ' (First half)';
+    if (val === 'second_half') return ' (Second half)';
+    if (val === 'half') return ' (Half day)';
+    return '';
+  };
+
+  const pendingRequests = pendingData?.requests || [];
 
   if (pendingLoading || approvedLoading) {
     return (
@@ -161,43 +165,40 @@ const LeaveApprovalPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {expandedPendingRequests.map((request: any, idx: number) => (
-                <tr key={`${request.id}-${idx}`}>
-                  {request.isFirstRow && (
-                    <>
-                      <td rowSpan={request.rowSpan}>{idx + 1}</td>
-                      <td rowSpan={request.rowSpan}>{request.empId}</td>
-                      <td rowSpan={request.rowSpan}>{request.empName}</td>
-                      <td rowSpan={request.rowSpan}>{format(new Date(request.appliedDate + 'T00:00:00'), 'd/M/yyyy')}</td>
-                    </>
-                  )}
-                  <td>{request.leaveDate}</td>
-                  {request.isFirstRow && (
-                    <>
-                      <td rowSpan={request.rowSpan}>{request.leaveType}</td>
-                      <td rowSpan={request.rowSpan}>{request.noOfDays}</td>
-                      <td rowSpan={request.rowSpan}>{request.leaveReason}</td>
-                      <td rowSpan={request.rowSpan}>{request.currentStatus}</td>
-                      <td rowSpan={request.rowSpan} className="actions-cell">
-                        <button
-                          className="approve-btn"
-                          onClick={() => handleApprove(request.id)}
-                          title="Approve"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          className="reject-btn"
-                          onClick={() => handleReject(request.id)}
-                          title="Reject"
-                        >
-                          ✗
-                        </button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
+              {pendingRequests.map((request: any, idx: number) => {
+                const leaveDisplay = request.leaveDate
+                  ? formatDateSafe(request.leaveDate)
+                  : `${formatDateSafe(request.startDate)}${formatHalfLabel(request.startType)} to ${formatDateSafe(request.endDate)}${formatHalfLabel(request.endType)}`;
+                return (
+                  <tr key={`${request.id}-${idx}`}>
+                    <td>{idx + 1}</td>
+                    <td>{request.empId}</td>
+                    <td>{request.empName}</td>
+                    <td>{formatDateSafe(request.appliedDate)}</td>
+                    <td>{leaveDisplay}</td>
+                    <td>{request.leaveType}</td>
+                    <td>{request.noOfDays}</td>
+                    <td>{request.leaveReason}</td>
+                    <td>{request.currentStatus}</td>
+                    <td className="actions-cell">
+                      <button
+                        className="approve-btn"
+                        onClick={() => handleApprove(request.id)}
+                        title="Approve"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        className="reject-btn"
+                        onClick={() => handleReject(request.id)}
+                        title="Reject"
+                      >
+                        ✗
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -223,8 +224,8 @@ const LeaveApprovalPage: React.FC = () => {
                   <td>{idx + 1}</td>
                   <td>{request.empId}</td>
                   <td>{request.empName}</td>
-                  <td>{format(new Date(request.appliedDate + 'T00:00:00'), 'd/M/yyyy')}</td>
-                  <td>{request.leaveDate || `${format(new Date(request.startDate + 'T00:00:00'), 'yyyy-MM-dd')} to ${format(new Date(request.endDate + 'T00:00:00'), 'yyyy-MM-dd')}`}</td>
+                  <td>{formatDateSafe(request.appliedDate)}</td>
+                  <td>{request.leaveDate || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
                   <td>{request.leaveType}</td>
                   <td>{request.noOfDays}</td>
                   <td>{request.leaveStatus}</td>

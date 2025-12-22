@@ -160,7 +160,7 @@ export const createEmployee = async (employeeData: any) => {
 
   // Initialize leave balance
   await pool.query(
-    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 4, 4, 4)',
+    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 12, 6, 10)',
     [userId]
   );
 

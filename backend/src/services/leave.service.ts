@@ -1,5 +1,5 @@
 import { pool } from '../database/db';
-import { calculateLeaveDays, checkPriorInformation } from '../utils/dateCalculator';
+import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export interface LeaveBalance {
@@ -32,11 +32,22 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
 };
 
 export const getHolidays = async () => {
+  const formatDate = (date: Date | string): string => {
+    if (typeof date === 'string') {
+      return date;
+    }
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const result = await pool.query(
     'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true ORDER BY holiday_date'
   );
   return result.rows.map(row => ({
-    date: row.holiday_date.toISOString().split('T')[0],
+    date: formatDate(row.holiday_date),
     name: row.holiday_name
   }));
 };
@@ -88,9 +99,22 @@ export const applyLeave = async (
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
 
-    // Validation: Cannot apply for past dates or today
-    if (startDate <= today) {
-      throw new Error('Cannot apply for past dates or today. Leave can be applied from 3 days after the current date.');
+    // Validation: Cannot apply for past dates; today is allowed only for sick
+    if (leaveData.leaveType === 'sick') {
+      if (startDate < today) {
+        throw new Error('Cannot apply for past dates.');
+      }
+    } else {
+      if (startDate <= today) {
+        throw new Error('Cannot apply for past dates or today.');
+      }
+    }
+
+    // Validation: casual/LOP need at least 3 days notice (block today + next two days)
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+    if ((leaveData.leaveType === 'casual' || leaveData.leaveType === 'lop') && daysUntilStart < 3) {
+      throw new Error('Casual and LOP leaves must be applied at least 3 days in advance.');
     }
 
     // Validation: End date must be >= start date
@@ -106,14 +130,20 @@ export const applyLeave = async (
       leaveData.endType as 'full' | 'half'
     );
 
-    // Check prior information rules (minimum 3 days notice)
-    const priorInfo = checkPriorInformation(startDate, days);
-    if (!priorInfo.valid) {
-      throw new Error(`Leave can be applied from 3 days after the current date. You have ${priorInfo.actualDays} day(s) until the start date, but ${priorInfo.requiredDays} days are required.`);
+    // Require timings for permission
+    if (leaveData.leaveType === 'permission' && 
+        (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
+      throw new Error('Start and end timings are required for permission requests');
     }
 
-    // Check balance (except for LOP)
-    if (leaveData.leaveType !== 'lop') {
+    // LOP requires zero casual balance
+    if (leaveData.leaveType === 'lop') {
+      const balance = await getLeaveBalances(userId);
+      if ((balance.casual || 0) > 0) {
+        throw new Error('LOP can be applied only when casual leave balance is 0');
+      }
+    } else if (leaveData.leaveType !== 'permission') {
+      // Check balance for other leave types (permission skips balance)
       const balance = await getLeaveBalances(userId);
       const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
       if (balance[balanceKey] < days) {
@@ -367,9 +397,22 @@ export const updateLeaveRequest = async (
   startDate.setHours(0, 0, 0, 0);
   endDate.setHours(0, 0, 0, 0);
 
-  // Validation: Cannot apply for past dates or today
-  if (startDate <= today) {
-    throw new Error('Cannot apply for past dates or today. Leave can be applied from 3 days after the current date.');
+  // Validation: Cannot apply for past dates; today is allowed only for sick
+  if (leaveData.leaveType === 'sick') {
+    if (startDate < today) {
+      throw new Error('Cannot apply for past dates.');
+    }
+  } else {
+    if (startDate <= today) {
+      throw new Error('Cannot apply for past dates or today.');
+    }
+  }
+
+  // Validation: casual/LOP need at least 3 days notice (block today + next two days)
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+  if ((leaveData.leaveType === 'casual' || leaveData.leaveType === 'lop') && daysUntilStart < 3) {
+    throw new Error('Casual and LOP leaves must be applied at least 3 days in advance.');
   }
 
   // Validation: End date must be >= start date
@@ -385,14 +428,20 @@ export const updateLeaveRequest = async (
     leaveData.endType as 'full' | 'half'
   );
 
-  // Check prior information rules (minimum 3 days notice)
-  const priorInfo = checkPriorInformation(startDate, days);
-  if (!priorInfo.valid) {
-    throw new Error(`Leave can be applied from 3 days after the current date. You have ${priorInfo.actualDays} day(s) until the start date, but ${priorInfo.requiredDays} days are required.`);
+  // Require timings for permission
+  if (leaveData.leaveType === 'permission' && 
+      (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
+    throw new Error('Start and end timings are required for permission requests');
   }
 
-  // Check balance (except for LOP)
-  if (leaveData.leaveType !== 'lop') {
+  // LOP requires zero casual balance
+  if (leaveData.leaveType === 'lop') {
+    const balance = await getLeaveBalances(userId);
+    if ((balance.casual || 0) > 0) {
+      throw new Error('LOP can be applied only when casual leave balance is 0');
+    }
+  } else if (leaveData.leaveType !== 'permission') {
+    // Check balance for other leave types (permission skips balance)
     const balance = await getLeaveBalances(userId);
     const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
     const currentBalance = balance[balanceKey];
@@ -691,8 +740,8 @@ export const approveLeave = async (
         [approverId, leaveRequestId]
       );
 
-      // Update leave balance (except for LOP)
-      if (leave.leave_type !== 'lop') {
+      // Update leave balance (except for LOP/permission)
+      if (leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
         // Map leave type to balance column name explicitly
         let balanceColumn: string;
         if (leave.leave_type === 'casual') {
@@ -732,8 +781,8 @@ export const approveLeave = async (
         [leaveRequestId]
       );
 
-      // Update leave balance (except for LOP)
-      if (leave.leave_type !== 'lop') {
+      // Update leave balance (except for LOP/permission)
+      if (leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
         // Map leave type to balance column name explicitly
         let balanceColumn: string;
         if (leave.leave_type === 'casual') {
@@ -764,8 +813,8 @@ export const approveLeave = async (
       [comment || null, approverId, leaveRequestId]
     );
 
-    // Update leave balance (except for LOP)
-    if (leave.leave_type !== 'lop') {
+    // Update leave balance (except for LOP/permission)
+    if (leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
       const balanceColumn = `${leave.leave_type}_balance`;
       await pool.query(
         `UPDATE leave_balances 

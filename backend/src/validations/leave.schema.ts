@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 export const applyLeaveSchema = z.object({
   body: z.object({
-    leaveType: z.enum(['casual', 'sick', 'lop']),
+    leaveType: z.enum(['casual', 'sick', 'lop', 'permission']),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
     startType: z.enum(['full', 'half']),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
     endType: z.enum(['full', 'half']),
-    reason: z.string().min(10, 'Reason must be at least 10 characters'),
+    reason: z.string().min(5, 'Reason must be at least 5 characters'),
     timeForPermission: z.object({
       start: z.string().optional(),
       end: z.string().optional()
@@ -38,12 +38,12 @@ export const updateLeaveSchema = z.object({
     id: z.string().regex(/^\d+$/, 'Invalid leave request ID')
   }),
   body: z.object({
-    leaveType: z.enum(['casual', 'sick', 'lop']),
+    leaveType: z.enum(['casual', 'sick', 'lop', 'permission']),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
     startType: z.enum(['full', 'half']),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
     endType: z.enum(['full', 'half']),
-    reason: z.string().min(10, 'Reason must be at least 10 characters'),
+    reason: z.string().min(5, 'Reason must be at least 5 characters'),
     timeForPermission: z.object({
       start: z.string().optional(),
       end: z.string().optional()

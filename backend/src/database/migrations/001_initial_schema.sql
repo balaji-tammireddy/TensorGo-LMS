@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE TABLE IF NOT EXISTS leave_requests (
   id SERIAL PRIMARY KEY,
   employee_id INTEGER NOT NULL REFERENCES users(id),
-  leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('casual', 'sick', 'lop')),
+  leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('casual', 'sick', 'lop', 'permission')),
   start_date DATE NOT NULL,
   start_type VARCHAR(10) NOT NULL CHECK (start_type IN ('full', 'half')),
   end_date DATE NOT NULL,

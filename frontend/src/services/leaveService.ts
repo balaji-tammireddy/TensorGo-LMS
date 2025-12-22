@@ -44,7 +44,7 @@ export interface PendingLeaveRequest {
 }
 
 export interface ApplyLeaveData {
-  leaveType: 'casual' | 'sick' | 'lop';
+  leaveType: 'casual' | 'sick' | 'lop' | 'permission';
   startDate: string;
   startType: 'full' | 'half';
   endDate: string;

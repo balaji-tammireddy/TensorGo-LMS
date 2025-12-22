@@ -115,6 +115,12 @@
   border-bottom: 1px solid #ddd;
 }
 
+/* Vertical separator between first and second columns in rules */
+.rules-table th:first-child,
+.rules-table td:first-child {
+  border-right: 1px solid #e0e0e0;
+}
+
 .rules-table th {
   background-color: #f8f9fa;
   font-weight: 600;
@@ -164,6 +170,12 @@
   padding: 8px 6px;
   text-align: left;
   border-bottom: 1px solid #ddd;
+}
+
+/* Vertical separator between date and name columns */
+.holidays-table th:first-child,
+.holidays-table td:first-child {
+  border-right: 1px solid #e0e0e0;
 }
 
 .holidays-table tbody tr:last-child td {

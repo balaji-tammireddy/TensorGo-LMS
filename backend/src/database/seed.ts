@@ -68,13 +68,32 @@ async function seed() {
     // Initialize leave balances for all users
     await pool.query(
       `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance)
-       SELECT id, 4, 4, 4 FROM users
+       SELECT id, 12, 6, 10 FROM users
        WHERE id NOT IN (SELECT employee_id FROM leave_balances)
        ON CONFLICT (employee_id) DO NOTHING`
     );
 
+    // Refresh 2025 holidays to match the latest calendar
+    await pool.query('BEGIN');
+    await pool.query('DELETE FROM holidays');
+    await pool.query(
+      `INSERT INTO holidays (holiday_date, holiday_name, is_active) VALUES
+        ('2025-01-01', 'New Year Day', true),
+        ('2025-01-14', 'Sankranti', true),
+        ('2025-02-26', 'Maha Shivaratri', true),
+        ('2025-03-14', 'Holi', true),
+        ('2025-08-15', 'Independence Day', true),
+        ('2025-08-27', 'Ganesh Chaturthi', true),
+        ('2025-10-02', 'Dussera', true),
+        ('2025-10-20', 'Deepavali', true),
+        ('2025-10-21', 'Govardhan Puja', true),
+        ('2025-12-25', 'Christmas', true)`
+    );
+    await pool.query('COMMIT');
+
     console.log('Seed data created successfully');
   } catch (error) {
+    await pool.query('ROLLBACK');
     console.error('Seed failed:', error);
     process.exit(1);
   } finally {

@@ -124,7 +124,7 @@ const EmployeeManagementPage: React.FC = () => {
                   <td>{employee.empId}</td>
                   <td>{employee.name}</td>
                   <td>{employee.position}</td>
-                  <td>{format(new Date(employee.joiningDate), 'yyyy-MM-dd')}</td>
+                  <td>{format(new Date(employee.joiningDate), 'dd/MM/yyyy')}</td>
                   <td>
                     <span
                       className="status-badge"

@@ -3,22 +3,33 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
 import * as leaveService from '../services/leaveService';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import './LeaveApplyPage.css';
 
 const LeaveApplyPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<number | null>(null);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [formData, setFormData] = useState({
-    leaveType: 'casual' as 'casual' | 'sick' | 'lop',
+    leaveType: 'casual' as 'casual' | 'sick' | 'lop' | 'permission',
     startDate: '',
-    startType: 'full' as 'full' | 'half',
+    startType: 'full' as 'full' | 'first_half' | 'second_half',
     endDate: '',
-    endType: 'full' as 'full' | 'half',
+    endType: 'full' as 'full' | 'first_half' | 'second_half',
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
+  const minStartDate = (formData.leaveType === 'casual' || formData.leaveType === 'lop')
+    ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days
+    : todayStr;
+  const formatHalfLabel = (val?: string) => {
+    if (!val) return '';
+    if (val === 'first_half') return ' (First half)';
+    if (val === 'second_half') return ' (Second half)';
+    if (val === 'half') return ' (Half day)';
+    return '';
+  };
 
   const { data: balances, isLoading: balancesLoading } = useQuery(
     'leaveBalances',
@@ -99,22 +110,29 @@ const LeaveApplyPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Client-side guard: LOP only when casual balance is 0
+    if (formData.leaveType === 'lop' && (balances?.casual ?? 0) > 0) {
+      alert('LOP can be applied only when casual leave balance is 0');
+      return;
+    }
+
     // Prepare the data for submission
     // Date inputs already return YYYY-MM-DD format, so use directly to avoid timezone issues
+    const normalizeHalf = (val: string) => (val === 'first_half' || val === 'second_half' ? 'half' : val);
     const submitData: any = {
       leaveType: formData.leaveType,
       startDate: formData.startDate,
-      startType: formData.startType,
-      // For LOP, end date should be same as start date
-      endDate: formData.leaveType === 'lop' ? formData.startDate : formData.endDate,
-      endType: formData.leaveType === 'lop' ? 'full' : formData.endType,
+      startType: formData.leaveType === 'permission' ? 'full' : normalizeHalf(formData.startType),
+      // For permission, end date should be same as start date
+      endDate: formData.leaveType === 'permission' ? formData.startDate : formData.endDate,
+      endType: formData.leaveType === 'permission' ? 'full' : normalizeHalf(formData.endType),
       reason: formData.reason
     };
     
-    // For LOP, timeForPermission is required
-    if (formData.leaveType === 'lop') {
+    // For permission, timeForPermission is required
+    if (formData.leaveType === 'permission') {
       if (!formData.timeForPermission.start || !formData.timeForPermission.end) {
-        alert('Please provide start and end timings for LOP leave');
+        alert('Please provide start and end timings for permission');
         return;
       }
       submitData.timeForPermission = {
@@ -134,11 +152,13 @@ const LeaveApplyPage: React.FC = () => {
     try {
       const request = await leaveService.getLeaveRequest(requestId);
       setFormData({
-        leaveType: request.leaveType as 'casual' | 'sick' | 'lop',
+        leaveType: request.leaveType as 'casual' | 'sick' | 'lop' | 'permission',
         startDate: request.startDate,
-        startType: request.startType as 'full' | 'half',
+        startType: request.leaveType === 'permission'
+          ? 'full'
+          : (request.startType === 'half' ? 'first_half' : request.startType) as 'full' | 'first_half' | 'second_half',
         endDate: request.endDate,
-        endType: request.endType as 'full' | 'half',
+        endType: (request.endType === 'half' ? 'first_half' : request.endType) as 'full' | 'first_half' | 'second_half',
         reason: request.reason,
         timeForPermission: request.timeForPermission || { start: '', end: '' }
       });
@@ -242,7 +262,7 @@ const LeaveApplyPage: React.FC = () => {
                 <tbody>
                   {holidays.map((holiday, idx) => (
                     <tr key={idx}>
-                      <td>{format(new Date(holiday.date + 'T00:00:00'), 'd-M-yyyy')}</td>
+                    <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
                       <td>{holiday.name}</td>
                     </tr>
                   ))}
@@ -263,11 +283,12 @@ const LeaveApplyPage: React.FC = () => {
                   value={formData.leaveType}
                   onChange={(e) => {
                     const newLeaveType = e.target.value as any;
-                    // For LOP, set end date same as start date and clear end type
-                    if (newLeaveType === 'lop') {
+                    // For permission, set end date same as start date and force full day
+                    if (newLeaveType === 'permission') {
                       setFormData({ 
                         ...formData, 
                         leaveType: newLeaveType,
+                        startType: 'full',
                         endDate: formData.startDate || '',
                         endType: 'full'
                       });
@@ -280,6 +301,7 @@ const LeaveApplyPage: React.FC = () => {
                   <option value="casual">Casual</option>
                   <option value="sick">Sick</option>
                   <option value="lop">LOP</option>
+                  <option value="permission">Permission</option>
                 </select>
               </div>
               <div className="form-group">
@@ -288,10 +310,11 @@ const LeaveApplyPage: React.FC = () => {
                   <input
                     type="date"
                     value={formData.startDate}
+                    min={minStartDate}
                     onChange={(e) => {
                       const newStartDate = e.target.value;
-                      // For LOP, update end date to match start date
-                      if (formData.leaveType === 'lop') {
+                    // For permission, update end date to match start date
+                    if (formData.leaveType === 'permission') {
                         setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
                       } else {
                         setFormData({ ...formData, startDate: newStartDate });
@@ -309,9 +332,11 @@ const LeaveApplyPage: React.FC = () => {
                   value={formData.startType}
                   onChange={(e) => setFormData({ ...formData, startType: e.target.value as any })}
                   required
+                  disabled={formData.leaveType === 'permission'}
                 >
                   <option value="full">Full day</option>
-                  <option value="half">Half day</option>
+                  <option value="first_half">First half</option>
+                  <option value="second_half">Second half</option>
                 </select>
               </div>
               <div className="form-group">
@@ -321,8 +346,9 @@ const LeaveApplyPage: React.FC = () => {
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    required={formData.leaveType !== 'lop'}
-                    disabled={formData.leaveType === 'lop'}
+                  required={formData.leaveType !== 'permission'}
+                  disabled={formData.leaveType === 'permission'}
+                    min={formData.startDate || minStartDate}
                     className="date-input"
                   />
                   <span className="calendar-icon">📅</span>
@@ -333,15 +359,16 @@ const LeaveApplyPage: React.FC = () => {
                 <select
                   value={formData.endType}
                   onChange={(e) => setFormData({ ...formData, endType: e.target.value as any })}
-                  required={formData.leaveType !== 'lop'}
-                  disabled={formData.leaveType === 'lop'}
+                  required={formData.leaveType !== 'permission'}
+                  disabled={formData.leaveType === 'permission'}
                 >
                   <option value="full">Full day</option>
-                  <option value="half">Half day</option>
+                  <option value="first_half">First half</option>
+                  <option value="second_half">Second half</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>{formData.leaveType === 'lop' ? 'Timings' : 'Time For Permission'}</label>
+                <label>{formData.leaveType === 'permission' ? 'Timings' : 'Time For Permission'}</label>
                 <div className="time-inputs">
                   <input
                     type="time"
@@ -351,8 +378,8 @@ const LeaveApplyPage: React.FC = () => {
                       timeForPermission: { ...formData.timeForPermission, start: e.target.value }
                     })}
                     placeholder="Start time"
-                    disabled={formData.leaveType !== 'lop'}
-                    required={formData.leaveType === 'lop'}
+                    disabled={formData.leaveType !== 'permission'}
+                    required={formData.leaveType === 'permission'}
                   />
                   <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
                   <input
@@ -363,8 +390,8 @@ const LeaveApplyPage: React.FC = () => {
                       timeForPermission: { ...formData.timeForPermission, end: e.target.value }
                     })}
                     placeholder="End time"
-                    disabled={formData.leaveType !== 'lop'}
-                    required={formData.leaveType === 'lop'}
+                    disabled={formData.leaveType !== 'permission'}
+                    required={formData.leaveType === 'permission'}
                   />
                 </div>
               </div>
@@ -409,14 +436,20 @@ const LeaveApplyPage: React.FC = () => {
               {myRequests?.requests.map((request: any, idx: number) => (
                 <tr key={request.id}>
                   <td>{idx + 1}</td>
-                  <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'd-M-yyyy')}</td>
+                  <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
                   <td>
                     <div className="reason-cell">
                       {request.leaveReason}
                     </div>
                   </td>
-                  <td>{request.startDate}</td>
-                  <td>{request.endDate}</td>
+                  <td>
+                    {format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                    {request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
+                  </td>
+                  <td>
+                    {format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                    {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
+                  </td>
                   <td>{request.noOfDays}</td>
                   <td>{request.leaveType}</td>
                   <td>
