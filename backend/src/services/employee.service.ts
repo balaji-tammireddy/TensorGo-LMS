@@ -87,6 +87,27 @@ export const getEmployees = async (
   };
 };
 
+export const getNextEmployeeId = async (): Promise<string> => {
+  // Get all employee IDs that are numeric and find the maximum
+  const result = await pool.query(
+    `SELECT emp_id FROM users 
+     WHERE emp_id ~ '^[0-9]+$' 
+     ORDER BY CAST(emp_id AS INTEGER) DESC 
+     LIMIT 1`
+  );
+
+  if (result.rows.length === 0) {
+    // No existing numeric employee IDs, start with 001
+    return '001';
+  }
+
+  const maxId = parseInt(result.rows[0].emp_id, 10);
+  const nextId = maxId + 1;
+  
+  // Format as 3-digit string (001, 002, etc.)
+  return String(nextId).padStart(3, '0');
+};
+
 export const getEmployeeById = async (employeeId: number) => {
   const result = await pool.query(
     `SELECT u.*, 
@@ -117,15 +138,13 @@ export const getEmployeeById = async (employeeId: number) => {
 };
 
 export const createEmployee = async (employeeData: any) => {
-  // Enforce numeric-only employee ID pattern
-  if (!/^\d+$/.test(employeeData.empId)) {
-    throw new Error('Employee ID must contain digits only');
-  }
+  // Always auto-generate employee ID (ignore any provided value)
+  const empId = await getNextEmployeeId();
 
   // Check if emp_id or email already exists
   const existingResult = await pool.query(
     'SELECT id FROM users WHERE emp_id = $1 OR email = $2',
-    [employeeData.empId, employeeData.email]
+    [empId, employeeData.email]
   );
 
   if (existingResult.rows.length > 0) {
@@ -146,7 +165,7 @@ export const createEmployee = async (employeeData: any) => {
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
     ) RETURNING id`,
     [
-      employeeData.empId,
+      empId,
       employeeData.email,
       passwordHash,
       employeeData.role || 'employee',

@@ -188,9 +188,17 @@ const EmployeeManagementPage: React.FC = () => {
     }
   );
 
-  const handleOpenAddEmployee = () => {
+  const handleOpenAddEmployee = async () => {
     const today = new Date().toISOString().split('T')[0];
-    setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
+    try {
+      // Fetch next employee ID
+      const nextId = await employeeService.getNextEmployeeId();
+      setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today, empId: nextId });
+    } catch (error: any) {
+      // If fetching fails, still open modal with empty form
+      console.error('Failed to fetch next employee ID:', error);
+      setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
+    }
     setIsSameAddress(false);
     setIsEditMode(false);
     setIsViewMode(false);
@@ -596,14 +604,11 @@ const EmployeeManagementPage: React.FC = () => {
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={newEmployee.empId}
-                        onChange={(e) =>
-                          setNewEmployee({
-                            ...newEmployee,
-                            empId: sanitizeEmpId(e.target.value)
-                          })
-                        }
-                        disabled={isEditMode || isViewMode}
+                        value={newEmployee.empId || ''}
+                        disabled={true}
+                        readOnly
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                        placeholder="Auto-generated"
                       />
                     </div>
                     <div className="employee-modal-field employee-role-field">

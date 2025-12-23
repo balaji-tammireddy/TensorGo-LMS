@@ -37,6 +37,20 @@ export const getEmployeeById = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getNextEmployeeId = async (req: AuthRequest, res: Response) => {
+  try {
+    const nextId = await employeeService.getNextEmployeeId();
+    res.json({ nextEmployeeId: nextId });
+  } catch (error: any) {
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
 export const createEmployee = async (req: AuthRequest, res: Response) => {
   try {
     const result = await employeeService.createEmployee(req.body);

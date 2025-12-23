@@ -10,6 +10,7 @@ router.use(authenticateToken);
 router.use(authorizeRole('hr', 'super_admin'));
 
 router.get('/', employeeController.getEmployees);
+router.get('/next-id', employeeController.getNextEmployeeId);
 router.get('/:id', employeeController.getEmployeeById);
 router.post('/', employeeController.createEmployee);
 router.put('/:id', employeeController.updateEmployee);
