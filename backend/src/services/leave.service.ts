@@ -435,13 +435,11 @@ export const updateLeaveRequest = async (
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const isPending = checkResult.rows[0].current_status === 'pending';
 
-  if (userRole !== 'super_admin') {
-    if (!belongsToUser) {
-      throw new Error('You do not have permission to edit this leave request');
-    }
-    if (!isPending) {
-      throw new Error('Only pending leave requests can be edited');
-    }
+  if (!isPending) {
+    throw new Error('Only pending leave requests can be edited');
+  }
+  if (userRole !== 'super_admin' && !belongsToUser) {
+    throw new Error('You do not have permission to edit this leave request');
   }
 
   // Parse dates in local timezone to avoid timezone shift issues
@@ -930,6 +928,24 @@ export const rejectLeave = async (
 
   const leave = leaveResult.rows[0];
 
+  // Collect day-level info to mark rejection and compute precise refund
+  const leaveDaysResult = await pool.query(
+    'SELECT id, day_status, day_type FROM leave_days WHERE leave_request_id = $1',
+    [leaveRequestId]
+  );
+  const leaveDays = leaveDaysResult.rows || [];
+  const refundDays = leaveDays
+    .filter((d) => d.day_status !== 'rejected')
+    .reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
+
+  // Mark all days as rejected
+  await pool.query(
+    `UPDATE leave_days
+     SET day_status = 'rejected'
+     WHERE leave_request_id = $1`,
+    [leaveRequestId]
+  );
+
   // Check authorization (same as approve)
   if (approverRole === 'manager') {
     if (leave.reporting_manager_id !== approverId) {
@@ -983,6 +999,20 @@ export const rejectLeave = async (
     );
   }
 
+  // Refund only the days rejected in this action (except permission)
+  if (leave.leave_type !== 'permission' && refundDays > 0) {
+    const balanceColumn =
+      leave.leave_type === 'casual'
+        ? 'casual_balance'
+        : leave.leave_type === 'sick'
+        ? 'sick_balance'
+        : 'lop_balance';
+    await pool.query(
+      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+      [refundDays, leave.employee_id]
+    );
+  }
+
   // Create notification for employee
   await pool.query(
     `INSERT INTO notifications (user_id, title, message, type)
@@ -990,6 +1020,7 @@ export const rejectLeave = async (
     [leave.employee_id, `Your leave request has been rejected. Reason: ${comment}`]
   );
 
+  await recalcLeaveRequestStatus(leaveRequestId);
   return { message: 'Leave rejected successfully' };
 };
 
@@ -1015,7 +1046,6 @@ const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
   const approvedDays = daysResult.rows
     .filter((d) => d.day_status === 'approved')
     .reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
-  const deltaApproved = approvedDays - parseFloat(leave.no_of_days || 0);
   const rejectedDays = daysResult.rows
     .filter((d) => d.day_status === 'rejected')
     .reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
@@ -1037,10 +1067,10 @@ const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
     newStatus = 'pending';
   }
 
-  // Always keep header status and no_of_days in sync with day-level state
+  // Update header status only; keep original no_of_days for balance refunds
   await pool.query(
-    `UPDATE leave_requests SET current_status = $1, no_of_days = $2 WHERE id = $3`,
-    [newStatus, approvedDays || leave.no_of_days, leaveRequestId]
+    `UPDATE leave_requests SET current_status = $1 WHERE id = $2`,
+    [newStatus, leaveRequestId]
   );
 };
 
@@ -1091,14 +1121,6 @@ export const approveLeaveDay = async (
   }
   const currentDayStatus = dayResult.rows[0].day_status || 'pending';
 
-  // Count approved days before update (for delta deduction)
-  const approvedBeforeResult = await pool.query(
-    `SELECT SUM(CASE WHEN day_status = 'approved' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END) AS approved_days
-     FROM leave_days WHERE leave_request_id = $1`,
-    [leaveRequestId]
-  );
-  const approvedBefore = parseFloat(approvedBeforeResult.rows[0]?.approved_days || 0);
-
   // If already approved, no-op
   if (currentDayStatus !== 'approved') {
     await pool.query(
@@ -1142,34 +1164,7 @@ export const approveLeaveDay = async (
     );
   }
 
-  // Count approved days after update and deduct delta (only if status changed to approved)
-  const approvedAfterResult = await pool.query(
-    `SELECT SUM(CASE WHEN day_status = 'approved' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END) AS approved_days
-     FROM leave_days WHERE leave_request_id = $1`,
-    [leaveRequestId]
-  );
-  const approvedAfter = parseFloat(approvedAfterResult.rows[0]?.approved_days || 0);
-  const deltaApproved = approvedAfter - approvedBefore;
-
-  if (deltaApproved > 0 && leave.leave_type !== 'lop' && leave.leave_type !== 'permission') {
-    const balanceColumn =
-      leave.leave_type === 'casual'
-        ? 'casual_balance'
-        : leave.leave_type === 'sick'
-        ? 'sick_balance'
-        : 'lop_balance';
-    await pool.query(
-      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`,
-      [deltaApproved, leave.employee_id]
-    );
-  }
-
-  // Sync header no_of_days to approvedAfter
-  await pool.query(
-    `UPDATE leave_requests SET no_of_days = $1 WHERE id = $2`,
-    [approvedAfter || leave.no_of_days, leaveRequestId]
-  );
-
+  // Recalculate status only (no balance changes)
   await recalcLeaveRequestStatus(leaveRequestId);
   return { message: 'Leave day approved successfully' };
 };
@@ -1209,19 +1204,38 @@ export const rejectLeaveDay = async (
   }
 
   const dayResult = await pool.query(
-    'SELECT id FROM leave_days WHERE id = $1 AND leave_request_id = $2',
+    'SELECT id, day_status, day_type FROM leave_days WHERE id = $1 AND leave_request_id = $2',
     [dayId, leaveRequestId]
   );
   if (dayResult.rows.length === 0) {
     throw new Error('Leave day not found');
   }
+  const existingStatus = dayResult.rows[0].day_status || 'pending';
+  const dayType = dayResult.rows[0].day_type || 'full';
 
-  await pool.query(
-    `UPDATE leave_days
-     SET day_status = 'rejected'
-     WHERE id = $1`,
-    [dayId]
-  );
+  if (existingStatus !== 'rejected') {
+    await pool.query(
+      `UPDATE leave_days
+       SET day_status = 'rejected'
+       WHERE id = $1`,
+      [dayId]
+    );
+
+    // Refund balance for this rejected day (except permission)
+    if (leave.leave_type !== 'permission') {
+      const refund = dayType === 'half' ? 0.5 : 1;
+      const balanceColumn =
+        leave.leave_type === 'casual'
+          ? 'casual_balance'
+          : leave.leave_type === 'sick'
+          ? 'sick_balance'
+          : 'lop_balance';
+      await pool.query(
+        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+        [refund, leave.employee_id]
+      );
+    }
+  }
 
   if (approverRole === 'manager') {
     await pool.query(
@@ -1254,6 +1268,10 @@ export const rejectLeaveDay = async (
       [comment || null, approverId, leaveRequestId]
     );
   }
+
+  // Refund only the days actually rejected in this action (except permission).
+  // Since this is a day-level rejection, a single day's refund has already been applied above.
+  // No additional bulk refund needed here.
 
   await recalcLeaveRequestStatus(leaveRequestId);
   return { message: 'Leave day rejected successfully' };

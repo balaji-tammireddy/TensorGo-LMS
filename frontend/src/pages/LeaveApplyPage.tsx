@@ -601,6 +601,7 @@ const LeaveApplyPage: React.FC = () => {
                 <th>End Date</th>
                 <th>No Of Days</th>
                 <th>Leave Type</th>
+                <th>Approved Dates</th>
                 <th>Current Status</th>
                 <th>Action</th>
               </tr>
@@ -630,6 +631,21 @@ const LeaveApplyPage: React.FC = () => {
                     </td>
                     <td>{request.noOfDays}</td>
                     <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType}</td>
+                    <td>
+                      {(() => {
+                        const approvedDates = (request.leaveDays || [])
+                          .filter((d: any) => d.status === 'approved')
+                          .map((d: any) => new Date(d.date + 'T12:00:00'))
+                          .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+                        if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
+                          return '-';
+                        }
+                        if (!approvedDates.length) return '-';
+                        if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
+                        return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
+                      })()}
+                    </td>
                     <td>
                     {request.currentStatus === 'pending' ? (
                       <span className="status-badge status-applied">Applied</span>
