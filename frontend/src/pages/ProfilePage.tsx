@@ -7,6 +7,14 @@ import ConfirmationDialog from '../components/ConfirmationDialog';
 import * as profileService from '../services/profileService';
 import './ProfilePage.css';
 
+// Helper function to format education level display
+const formatEducationLevel = (level: string): React.ReactNode => {
+  if (level === '12th') {
+    return <>12<sup>th</sup></>;
+  }
+  return level;
+};
+
 const ProfilePage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -793,7 +801,7 @@ const ProfilePage: React.FC = () => {
               {formData.education?.map((edu: any, idx: number) => (
                 <tr key={edu.level}>
                   <td className="education-level-cell">
-                    {edu.level}
+                    {formatEducationLevel(edu.level)}
                     {(edu.level === 'UG' || edu.level === '12th') && (
                       <span className="required-indicator">*</span>
                     )}

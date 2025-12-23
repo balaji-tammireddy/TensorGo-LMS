@@ -450,6 +450,36 @@
   color: #333;
 }
 
+/* Table container with scrollbar when more than 5 records */
+.requests-table-container {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.requests-table-container.scrollable {
+  max-height: calc(60px * 5 + 48px); /* 5 rows * 60px row height + header height */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.requests-table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.requests-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.requests-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.requests-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
 .requests-table {
   width: 100%;
   border-collapse: collapse;
@@ -506,6 +536,9 @@
   background-color: #f8f9fa;
   font-weight: 600;
   font-size: 13px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .requests-table tr:hover {

@@ -736,28 +736,36 @@ const LeaveApplyPage: React.FC = () => {
         {/* Recent Leave Requests Section */}
         <div className="recent-requests-section">
           <h2>Recent Leave Requests</h2>
-          <table className="requests-table">
-            <thead>
-              <tr>
-                <th>S No</th>
-                <th>Appiled Date</th>
-                <th>Leave Reason</th>
-                <th>Start date</th>
-                <th>End Date</th>
-                <th>No Of Days</th>
-                <th>Leave Type</th>
-                <th>Approved Dates</th>
-                <th>Current Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 5 ? 'scrollable' : ''}`}>
+            <table className="requests-table">
+              <thead>
+                <tr>
+                  <th>S No</th>
+                  <th>Appiled Date</th>
+                  <th>Leave Reason</th>
+                  <th>Start date</th>
+                  <th>End Date</th>
+                  <th>No Of Days</th>
+                  <th>Leave Type</th>
+                  <th>Approved Dates</th>
+                  <th>Current Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
               {!myRequests?.requests || myRequests.requests.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '16px' }}>No leaves applied</td>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>No leaves applied</td>
                 </tr>
               ) : (
-                myRequests.requests.map((request: any, idx: number) => (
+                [...(myRequests.requests || [])]
+                  .sort((a: any, b: any) => {
+                    // Sort by start date in ascending order (earliest/upcoming dates first)
+                    const dateA = new Date(a.startDate + 'T12:00:00').getTime();
+                    const dateB = new Date(b.startDate + 'T12:00:00').getTime();
+                    return dateA - dateB; // Ascending order (earliest dates first)
+                  })
+                  .map((request: any, idx: number) => (
                   <tr key={request.id}>
                     <td>{idx + 1}</td>
                     <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
@@ -823,6 +831,7 @@ const LeaveApplyPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
       <ConfirmationDialog

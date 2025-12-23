@@ -236,22 +236,23 @@ const LeaveApprovalPage: React.FC = () => {
         </div>
 
         <div className="pending-requests-section">
-          <table className="requests-table">
-            <thead>
-              <tr>
-                <th>S NO</th>
-                <th>EMP ID</th>
-                <th>EMP NAME</th>
-                <th>APPLIED DATE</th>
-                <th>LEAVE DATE</th>
-                <th>LEAVE TYPE</th>
-                <th>NO OF DAYS</th>
-                <th>LEAVE REASON</th>
-                <th>CURRENT STATUS</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className={`requests-table-container ${expandedPendingRequests.length > 3 ? 'scrollable' : ''}`}>
+            <table className="requests-table">
+              <thead>
+                <tr>
+                  <th>S NO</th>
+                  <th>EMP ID</th>
+                  <th>EMP NAME</th>
+                  <th>APPLIED DATE</th>
+                  <th>LEAVE DATE</th>
+                  <th>LEAVE TYPE</th>
+                  <th>NO OF DAYS</th>
+                  <th>LEAVE REASON</th>
+                  <th>CURRENT STATUS</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
             {expandedPendingRequests.length === 0 ? (
               <tr>
                 <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>
@@ -306,24 +307,26 @@ const LeaveApprovalPage: React.FC = () => {
             )}
             </tbody>
           </table>
+          </div>
         </div>
 
         <div className="approved-requests-section">
           <h2>Recent Approved Requests</h2>
-          <table className="requests-table">
-            <thead>
-              <tr>
-                <th>S NO</th>
-                <th>EMP ID</th>
-                <th>EMP NAME</th>
-                <th>APPLIED DATE</th>
-                <th>LEAVE DATE</th>
-                <th>LEAVE TYPE</th>
-                <th>NO OF DAYS</th>
-                <th>LEAVE STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''}`}>
+            <table className="requests-table">
+              <thead>
+                <tr>
+                  <th>S NO</th>
+                  <th>EMP ID</th>
+                  <th>EMP NAME</th>
+                  <th>APPLIED DATE</th>
+                  <th>LEAVE DATE</th>
+                  <th>LEAVE TYPE</th>
+                  <th>NO OF DAYS</th>
+                  <th>LEAVE STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
               {!approvedData?.requests || approvedData.requests.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
@@ -358,6 +361,7 @@ const LeaveApprovalPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </AppLayout>

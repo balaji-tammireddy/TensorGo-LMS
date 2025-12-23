@@ -39,6 +39,14 @@ const sanitizeLettersOnly = (value: string) => {
 
 const baseEducationLevels = ['PG', 'UG', '12th'];
 
+// Helper function to format education level display
+const formatEducationLevel = (level: string): React.ReactNode => {
+  if (level === '12th') {
+    return <>12<sup>th</sup></>;
+  }
+  return level;
+};
+
 const emptyEmployeeForm = {
   empId: '',
   role: '',
@@ -980,7 +988,7 @@ const EmployeeManagementPage: React.FC = () => {
                       {newEmployee.education?.map((edu: any, idx: number) => (
                         <tr key={edu.level}>
                           <td className="education-level-cell">
-                            {edu.level}
+                            {formatEducationLevel(edu.level)}
                             {(edu.level === 'UG' || edu.level === '12th') && (
                               <span className="required-indicator">*</span>
                             )}

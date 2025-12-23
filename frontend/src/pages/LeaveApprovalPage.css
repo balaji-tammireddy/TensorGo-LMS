@@ -78,9 +78,40 @@
   color: #333;
 }
 
+/* Table container with scrollbar when more than 3 records */
+.requests-table-container {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.requests-table-container.scrollable {
+  max-height: calc(60px * 3 + 48px); /* 3 rows * 60px row height + header height */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.requests-table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.requests-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.requests-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.requests-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
 .requests-table {
   width: 100%;
   margin-top: 15px;
+  border-collapse: collapse;
 }
 
 .requests-table th,
@@ -88,6 +119,14 @@
   padding: 12px;
   border-bottom: 1px solid #ddd;
   vertical-align: top;
+}
+
+.requests-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 /* Status column center (both pending and approved tables share markup) */
