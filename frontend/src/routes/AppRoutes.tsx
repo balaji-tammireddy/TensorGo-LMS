@@ -7,6 +7,7 @@ import LeaveApprovalPage from '../pages/LeaveApprovalPage';
 import EmployeeManagementPage from '../pages/EmployeeManagementPage';
 import ProfilePage from '../pages/ProfilePage';
 import { useAuth } from '../contexts/AuthContext';
+import ChangePasswordPage from '../pages/ChangePasswordPage';
 
 const AppRoutes: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -16,6 +17,14 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/login"
         element={<LoginPage />}
+      />
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
       />
       <Route
         path="/leave-apply"

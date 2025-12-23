@@ -4,6 +4,7 @@ import AppLayout from '../components/layout/AppLayout';
 import * as employeeService from '../services/employeeService';
 import { format } from 'date-fns';
 import { FaEye, FaPencilAlt } from 'react-icons/fa';
+import { useAuth } from '../contexts/AuthContext';
 import './EmployeeManagementPage.css';
 
 const sanitizeName = (value: string) => {
@@ -14,10 +15,22 @@ const sanitizePhone = (value: string) => {
   return value.replace(/[^0-9]/g, '').slice(0, 10);
 };
 
+const sanitizeEmpId = (value: string) => {
+  return value.replace(/[^0-9]/g, '');
+};
+
 const sanitizeAadhaar = (value: string) => {
   return value.replace(/[^0-9]/g, '').slice(0, 12);
 };
 
+const formatAadhaar = (value: string) => {
+  const digits = sanitizeAadhaar(value);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+};
+
+const sanitizePan = (value: string) => {
+  return value.toUpperCase().replace(/\s+/g, '').slice(0, 10);
+};
 const sanitizeLettersOnly = (value: string) => {
   return value.replace(/[^a-zA-Z\s]/g, '');
 };
@@ -26,6 +39,7 @@ const baseEducationLevels = ['PG', 'UG', '12th'];
 
 const emptyEmployeeForm = {
   empId: '',
+  role: '',
   email: '',
   firstName: '',
   middleName: '',
@@ -59,6 +73,7 @@ const emptyEmployeeForm = {
 
 const EmployeeManagementPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState('');
@@ -149,12 +164,12 @@ const EmployeeManagementPage: React.FC = () => {
     if (checked) {
       setNewEmployee((prev: any) => ({
         ...prev,
-        permanentAddress: prev.currentAddress
+        currentAddress: prev.permanentAddress
       }));
     } else {
       setNewEmployee((prev: any) => ({
         ...prev,
-        permanentAddress: ''
+        currentAddress: ''
       }));
     }
   };
@@ -168,6 +183,7 @@ const EmployeeManagementPage: React.FC = () => {
       (typeof value === 'string' && value.trim() === '');
 
     // Personal information (except Middle Name)
+    if (isEmpty(newEmployee.role)) missingFields.push('Role');
     if (isEmpty(newEmployee.firstName)) missingFields.push('First Name');
     if (isEmpty(newEmployee.lastName)) missingFields.push('Last Name');
     if (isEmpty(newEmployee.empId)) missingFields.push('Employee ID');
@@ -201,10 +217,14 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.permanentAddress))
       missingFields.push('Permanent Address');
 
-    // Education information
+    // Education information (PG optional, UG and 12th mandatory)
     if (newEmployee.education && Array.isArray(newEmployee.education)) {
       newEmployee.education.forEach((edu: any) => {
         const levelLabel = edu.level || 'Education';
+        if (levelLabel === 'PG') {
+          // PG row is optional
+          return;
+        }
         if (isEmpty(edu.groupStream))
           missingFields.push(`${levelLabel} - Group/Stream`);
         if (isEmpty(edu.collegeUniversity))
@@ -216,7 +236,12 @@ const EmployeeManagementPage: React.FC = () => {
     }
 
     if (missingFields.length > 0) {
-      alert(`Please fill all mandatory fields:\n- ${missingFields.join('\n- ')}`);
+      alert('Please fill all the mandatory fields.');
+      return;
+    }
+
+    if (newEmployee.aadharNumber && newEmployee.aadharNumber.length !== 12) {
+      alert('Aadhar Number must be exactly 12 digits.');
       return;
     }
 
@@ -243,11 +268,9 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
 
-    const { reportingManagerName, ...rest } = newEmployee as any;
-
     const payload = {
-      ...rest,
-      role: 'employee'
+      ...newEmployee,
+      role: newEmployee.role || 'employee'
     };
 
     if (isEditMode && editingEmployeeId) {
@@ -288,6 +311,7 @@ const EmployeeManagementPage: React.FC = () => {
       setNewEmployee({
         ...emptyEmployeeForm,
         empId: data.emp_id || '',
+        role: data.role || '',
         email: data.email || '',
         firstName: data.first_name || '',
         middleName: data.middle_name || '',
@@ -308,11 +332,13 @@ const EmployeeManagementPage: React.FC = () => {
           : today,
         aadharNumber: data.aadhar_number || '',
         panNumber: data.pan_number || '',
-        currentAddress,
-        permanentAddress: same ? currentAddress : permanentAddress,
+        currentAddress: same ? permanentAddress : currentAddress,
+        permanentAddress,
         status: data.status || 'active',
         education,
-        reportingManagerName: data.reporting_manager_name || ''
+        // Prefer explicitly stored reporting_manager_name; fall back to joined full name
+        reportingManagerName:
+          data.reporting_manager_name || data.reporting_manager_full_name || ''
       });
 
       setIsSameAddress(same);
@@ -483,14 +509,11 @@ const EmployeeManagementPage: React.FC = () => {
                   type="button"
                   className="modal-close-button"
                   onClick={() => {
-                    if (createMutation.isLoading || updateEmployeeMutation.isLoading) {
-                      return;
-                    }
                     setIsModalOpen(false);
                     setIsEditMode(false);
+                    setIsViewMode(false);
                     setEditingEmployeeId(null);
                   }}
-                  disabled={createMutation.isLoading || updateEmployeeMutation.isLoading}
                 >
                   ✕
                 </button>
@@ -511,12 +534,44 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
                         value={newEmployee.empId}
                         onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, empId: e.target.value })
+                          setNewEmployee({
+                            ...newEmployee,
+                            empId: sanitizeEmpId(e.target.value)
+                          })
                         }
                         disabled={isEditMode || isViewMode}
                       />
+                    </div>
+                    <div className="employee-modal-field employee-role-field">
+                      <label>
+                        Role<span className="required-indicator">*</span>
+                      </label>
+                      <select
+                        value={newEmployee.role}
+                        onChange={(e) =>
+                          setNewEmployee({ ...newEmployee, role: e.target.value })
+                        }
+                        disabled={isEditMode || isViewMode}
+                      >
+                        <option value="">Select role</option>
+                        {(user?.role === 'super_admin'
+                          ? ['employee', 'manager', 'hr', 'super_admin']
+                          : user?.role === 'hr'
+                          ? ['employee', 'manager', 'hr']
+                          : ['employee']
+                        ).map((role) => (
+                          <option key={role} value={role}>
+                            {role === 'super_admin'
+                              ? 'Super Admin'
+                              : role === 'hr'
+                              ? 'HR'
+                              : role.charAt(0).toUpperCase() + role.slice(1)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="employee-modal-field">
                       <label>
@@ -812,7 +867,7 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        value={newEmployee.aadharNumber}
+                        value={formatAadhaar(newEmployee.aadharNumber || '')}
                         onChange={(e) =>
                           setNewEmployee({
                             ...newEmployee,
@@ -830,7 +885,10 @@ const EmployeeManagementPage: React.FC = () => {
                         type="text"
                         value={newEmployee.panNumber}
                         onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, panNumber: e.target.value })
+                          setNewEmployee({
+                            ...newEmployee,
+                            panNumber: sanitizePan(e.target.value)
+                          })
                         }
                         disabled={isViewMode}
                       />
@@ -842,18 +900,18 @@ const EmployeeManagementPage: React.FC = () => {
                   <h3>Address Details</h3>
                   <div className="employee-modal-field full-width">
                     <label>
-                      Current Address<span className="required-indicator">*</span>
+                      Permanent Address<span className="required-indicator">*</span>
                     </label>
                     <textarea
                       rows={3}
-                      value={newEmployee.currentAddress}
+                      value={newEmployee.permanentAddress}
                       onChange={(e) =>
                         setNewEmployee((prev: any) => ({
                           ...prev,
-                          currentAddress: e.target.value,
-                          permanentAddress: isSameAddress
+                          permanentAddress: e.target.value,
+                          currentAddress: isSameAddress
                             ? e.target.value
-                            : prev.permanentAddress
+                            : prev.currentAddress
                         }))
                       }
                       disabled={isViewMode}
@@ -861,15 +919,15 @@ const EmployeeManagementPage: React.FC = () => {
                   </div>
                   <div className="employee-modal-field full-width">
                     <label>
-                      Permanent Address<span className="required-indicator">*</span>
+                      Current Address<span className="required-indicator">*</span>
                     </label>
                     <textarea
                       rows={3}
-                      value={newEmployee.permanentAddress}
+                      value={newEmployee.currentAddress}
                       onChange={(e) =>
                         setNewEmployee({
                           ...newEmployee,
-                          permanentAddress: e.target.value
+                          currentAddress: e.target.value
                         })
                       }
                       disabled={isSameAddress || isViewMode}
@@ -881,7 +939,7 @@ const EmployeeManagementPage: React.FC = () => {
                         onChange={(e) => handleSameAsCurrentAddress(e.target.checked)}
                         disabled={isViewMode}
                       />
-                      Same as Current Address
+                      Same as Permanent Address
                     </label>
                   </div>
                 </div>
@@ -1014,14 +1072,15 @@ const EmployeeManagementPage: React.FC = () => {
                     </label>
                     <input
                       type="text"
+                      maxLength={50}
                       value={newEmployee.reportingManagerName || ''}
                       onChange={(e) =>
                         setNewEmployee({
                           ...newEmployee,
-                          reportingManagerName: e.target.value
+                          reportingManagerName: sanitizeLettersOnly(e.target.value)
                         })
                       }
-                      disabled={isEditMode || isViewMode}
+                      disabled={isViewMode}
                       />
                   </div>
                 </div>
@@ -1033,9 +1092,6 @@ const EmployeeManagementPage: React.FC = () => {
                     type="button"
                     className="modal-cancel-button"
                     onClick={() => {
-                      if (createMutation.isLoading || updateEmployeeMutation.isLoading) {
-                        return;
-                      }
                       setIsModalOpen(false);
                       setIsEditMode(false);
                       setIsViewMode(false);
@@ -1050,20 +1106,11 @@ const EmployeeManagementPage: React.FC = () => {
                       type="button"
                       className="modal-cancel-button"
                       onClick={() => {
-                        if (
-                          createMutation.isLoading ||
-                          updateEmployeeMutation.isLoading
-                        ) {
-                          return;
-                        }
                         setIsModalOpen(false);
                         setIsEditMode(false);
                         setIsViewMode(false);
                         setEditingEmployeeId(null);
                       }}
-                      disabled={
-                        createMutation.isLoading || updateEmployeeMutation.isLoading
-                      }
                     >
                       Cancel
                     </button>
@@ -1071,9 +1118,6 @@ const EmployeeManagementPage: React.FC = () => {
                       type="button"
                       className="modal-save-button"
                       onClick={handleCreateEmployee}
-                      disabled={
-                        createMutation.isLoading || updateEmployeeMutation.isLoading
-                      }
                     >
                       {isEditMode ? 'Save Changes' : 'Save'}
                     </button>

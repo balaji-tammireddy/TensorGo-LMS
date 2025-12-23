@@ -118,6 +118,14 @@
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
 }
 
+.inactive-login-button {
+  display: block;
+  margin: 24px auto 0;
+  width: auto;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
 .login-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);

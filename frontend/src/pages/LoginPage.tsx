@@ -78,8 +78,7 @@ const LoginPage: React.FC = () => {
             </div>
             <button
               type="button"
-              className="login-button"
-              style={{ marginTop: 16 }}
+              className="login-button inactive-login-button"
               onClick={() => {
                 setIsInactive(false);
                 setError('');

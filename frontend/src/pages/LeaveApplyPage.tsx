@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,6 +13,7 @@ const LeaveApplyPage: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [doctorNoteFile, setDoctorNoteFile] = useState<File | null>(null);
+  const doctorNoteInputRef = useRef<HTMLInputElement | null>(null);
   const [formData, setFormData] = useState({
     leaveType: 'casual' as 'casual' | 'sick' | 'lop' | 'permission',
     startDate: '',
@@ -524,22 +525,40 @@ const LeaveApplyPage: React.FC = () => {
                     </select>
                   </div>
                 </>
-              )}
+            )}
               {formData.leaveType === 'sick' && (
-                <div className="form-group">
-                  <label>Doctor Prescription (image){isSickLongLeave ? ' *' : ''}</label>
+                <div className="form-group doctor-note-group">
+                  <label>Doctor Prescription{isSickLongLeave ? ' *' : ''}</label>
                   <input
+                    ref={doctorNoteInputRef}
+                    id="doctor-note-input"
+                    className="doctor-note-input"
                     type="file"
                     accept="image/*"
                     onChange={(e) => setDoctorNoteFile(e.target.files?.[0] || null)}
                     required={isSickLongLeave}
                     disabled={!isSickLongLeave}
                   />
-                  {isSickLongLeave && (
-                    <small style={{ color: '#666' }}>
-                      Required for sick leave longer than 3 days.
-                    </small>
-                  )}
+                  <button
+                    type="button"
+                    className={`doctor-note-button${!isSickLongLeave ? ' doctor-note-button--disabled' : ''}`}
+                    onClick={() => {
+                      if (!isSickLongLeave) return;
+                      doctorNoteInputRef.current?.click();
+                    }}
+                  >
+                    {doctorNoteFile ? 'Change prescription file' : 'Upload prescription'}
+                  </button>
+                  <div className="doctor-note-meta">
+                    {doctorNoteFile && (
+                      <span className="doctor-note-filename">{doctorNoteFile.name}</span>
+                    )}
+                    {isSickLongLeave && (
+                      <span className="doctor-note-helper">
+                        Required for sick leave longer than 3 days. Only image files are supported.
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
               {formData.leaveType === 'permission' && (

@@ -4,7 +4,7 @@ export const getProfile = async (userId: number) => {
   const result = await pool.query(
     `SELECT u.*, 
             rm.id as reporting_manager_id, 
-            rm.first_name || ' ' || COALESCE(rm.last_name, '') as reporting_manager_name,
+            rm.first_name || ' ' || COALESCE(rm.last_name, '') as reporting_manager_full_name,
             rm.emp_id as reporting_manager_emp_id
      FROM users u
      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
@@ -61,11 +61,14 @@ export const getProfile = async (userId: number) => {
       year: edu.year,
       scorePercentage: edu.score_percentage ? parseFloat(edu.score_percentage) : null
     })),
-    reportingManager: user.reporting_manager_id ? {
-      id: user.reporting_manager_id,
-      name: user.reporting_manager_name,
-      empId: user.reporting_manager_emp_id
-    } : null,
+    reportingManager:
+      user.reporting_manager_name || user.reporting_manager_id
+        ? {
+            id: user.reporting_manager_id || null,
+            name: user.reporting_manager_name || user.reporting_manager_full_name,
+            empId: user.reporting_manager_emp_id || null
+          }
+        : null,
     profilePhotoUrl: user.profile_photo_url
   };
 };
@@ -130,7 +133,11 @@ export const updateProfile = async (userId: number, profileData: any) => {
       const dbKey = fieldMap[key] || key;
       if (value !== undefined && value !== null) {
         updates.push(`${dbKey} = $${paramCount}`);
-        values.push(value);
+        if (dbKey === 'pan_number' && typeof value === 'string') {
+          values.push(value.slice(0, 10));
+        } else {
+          values.push(value);
+        }
         paramCount++;
       }
     }

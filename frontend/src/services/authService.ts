@@ -11,6 +11,7 @@ export interface User {
   name: string;
   role: string;
   email: string;
+  mustChangePassword?: boolean;
 }
 
 export interface LoginResponse {

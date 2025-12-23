@@ -13,7 +13,7 @@ export const getEmployees = async (
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
            designation as position, date_of_joining as joining_date, status
     FROM users
-    WHERE role != 'super_admin'
+    WHERE 1=1
   `;
   const params: any[] = [];
 
@@ -45,7 +45,7 @@ export const getEmployees = async (
   const result = await pool.query(query, params);
 
   // Count total
-  let countQuery = 'SELECT COUNT(*) FROM users WHERE role != \'super_admin\'';
+  let countQuery = 'SELECT COUNT(*) FROM users WHERE 1=1';
   const countParams: any[] = [];
 
   if (search) {
@@ -91,7 +91,7 @@ export const getEmployeeById = async (employeeId: number) => {
   const result = await pool.query(
     `SELECT u.*, 
             rm.id as reporting_manager_id, 
-            rm.first_name || ' ' || COALESCE(rm.last_name, '') as reporting_manager_name
+            rm.first_name || ' ' || COALESCE(rm.last_name, '') as reporting_manager_full_name
      FROM users u
      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
      WHERE u.id = $1`,
@@ -132,7 +132,8 @@ export const createEmployee = async (employeeData: any) => {
     throw new Error('Employee ID or email already exists');
   }
 
-  const passwordHash = await hashPassword(employeeData.password || 'Password123!');
+  // Default password for newly created employees (if none explicitly provided)
+  const passwordHash = await hashPassword(employeeData.password || 'tensorgo@2023');
 
   const result = await pool.query(
     `INSERT INTO users (
@@ -140,9 +141,9 @@ export const createEmployee = async (employeeData: any) => {
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, status
+      current_address, permanent_address, reporting_manager_id, reporting_manager_name, status
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
     ) RETURNING id`,
     [
       employeeData.empId,
@@ -165,10 +166,11 @@ export const createEmployee = async (employeeData: any) => {
       employeeData.department || null,
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
-      employeeData.panNumber || null,
+      employeeData.panNumber ? String(employeeData.panNumber).slice(0, 10) : null,
       employeeData.currentAddress || null,
       employeeData.permanentAddress || null,
       employeeData.reportingManagerId || null,
+      employeeData.reportingManagerName || null,
       employeeData.status || 'active'
     ]
   );
@@ -222,14 +224,18 @@ export const updateEmployee = async (employeeId: number, employeeData: any) => {
     'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation',
     'designation', 'department',
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
-    'reporting_manager_id', 'status'
+    'reporting_manager_id', 'reporting_manager_name', 'status'
   ];
 
   for (const [key, value] of Object.entries(employeeData)) {
     const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
     if (allowedFields.includes(dbKey) && value !== undefined) {
       updates.push(`${dbKey} = $${paramCount}`);
-      values.push(value);
+      if (dbKey === 'pan_number' && typeof value === 'string') {
+        values.push(value.slice(0, 10));
+      } else {
+        values.push(value);
+      }
       paramCount++;
     }
   }

@@ -57,3 +57,28 @@ export const logout = async (req: AuthRequest, res: Response) => {
   res.json({ message: 'Logged out successfully' });
 };
 
+export const changePassword = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'User not authenticated'
+        }
+      });
+    }
+
+    const { oldPassword, newPassword } = req.body;
+    await authService.changePassword(req.user.id, oldPassword, newPassword);
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'CHANGE_PASSWORD_FAILED',
+        message: error.message || 'Failed to change password'
+      }
+    });
+  }
+};
+

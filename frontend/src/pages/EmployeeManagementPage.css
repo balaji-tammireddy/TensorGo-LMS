@@ -117,7 +117,53 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  table-layout: auto;
+  table-layout: fixed;
+}
+
+/* Fix column widths so alignment stays constant when filtering */
+.employees-table th:nth-child(1),
+.employees-table td:nth-child(1) {
+  width: 60px; /* SNo */
+}
+
+.employees-table th:nth-child(2),
+.employees-table td:nth-child(2) {
+  width: 100px; /* Emp ID */
+}
+
+.employees-table th:nth-child(3),
+.employees-table td:nth-child(3) {
+  width: 220px; /* Emp Name */
+}
+
+.employees-table th:nth-child(4),
+.employees-table td:nth-child(4) {
+  width: 180px; /* Position */
+}
+
+.employees-table th:nth-child(5),
+.employees-table td:nth-child(5) {
+  width: 130px; /* Joining Date */
+}
+
+.employees-table th:nth-child(6),
+.employees-table td:nth-child(6) {
+  width: 120px; /* Status */
+}
+
+.employees-table th:nth-child(7),
+.employees-table td:nth-child(7) {
+  width: 80px; /* Actions */
+}
+
+/* Prevent content from shifting column widths */
+.employees-table td:nth-child(2),
+.employees-table td:nth-child(3),
+.employees-table td:nth-child(4),
+.employees-table td:nth-child(5) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .employees-table thead th {
@@ -257,11 +303,15 @@
 }
 
 .employee-id-field {
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 
 .employee-id-field input {
-  width: 33%;
+  width: 100%;
+}
+
+.employee-role-field {
+  grid-column: 3 / span 1;
 }
 
 .employee-modal-field label {

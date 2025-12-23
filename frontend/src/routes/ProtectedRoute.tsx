@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, user, loading, mustChangePassword } = useAuth();
 
   // While auth state is being initialized from storage, don't redirect yet
   if (loading) {
@@ -17,6 +17,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Force first-time users to change password before accessing other pages
+  if (mustChangePassword && window.location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {

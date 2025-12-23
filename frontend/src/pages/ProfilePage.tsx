@@ -31,6 +31,9 @@ const ProfilePage: React.FC = () => {
     return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
   };
 
+  const sanitizePan = (value: string) => {
+    return value.toUpperCase().replace(/\s+/g, '').slice(0, 10);
+  };
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
   };
@@ -151,10 +154,14 @@ const ProfilePage: React.FC = () => {
     if (isEmpty(formData.address?.currentAddress)) missingFields.push('Current Address');
     if (isEmpty(formData.address?.permanentAddress)) missingFields.push('Permanent Address');
 
-    // Education information
+    // Education information (PG optional, UG and 12th mandatory)
     if (formData.education && Array.isArray(formData.education)) {
       formData.education.forEach((edu: any) => {
         const levelLabel = edu.level || 'Education';
+        if (levelLabel === 'PG') {
+          // PG row is optional
+          return;
+        }
         if (isEmpty(edu.groupStream)) missingFields.push(`${levelLabel} - Group/Stream`);
         if (isEmpty(edu.collegeUniversity)) missingFields.push(`${levelLabel} - College/University`);
         if (isEmpty(edu.year)) missingFields.push(`${levelLabel} - Graduation Year`);
@@ -163,7 +170,13 @@ const ProfilePage: React.FC = () => {
     }
 
     if (missingFields.length > 0) {
-      alert(`Please fill all mandatory fields:\n- ${missingFields.join('\n- ')}`);
+      alert('Please fill all the mandatory fields.');
+      return;
+    }
+
+    const aadhar = formData.documents?.aadharNumber as string | undefined;
+    if (aadhar && aadhar.length !== 12) {
+      alert('Aadhar Number must be exactly 12 digits.');
       return;
     }
 
@@ -244,7 +257,7 @@ const ProfilePage: React.FC = () => {
         ...prev,
         address: {
           ...prev.address,
-          permanentAddress: prev.address?.currentAddress
+          currentAddress: prev.address?.permanentAddress
         }
       }));
     } else {
@@ -252,7 +265,7 @@ const ProfilePage: React.FC = () => {
         ...prev,
         address: {
           ...prev.address,
-          permanentAddress: ''
+          currentAddress: ''
         }
       }));
     }
@@ -690,11 +703,11 @@ const ProfilePage: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={formData.documents?.panNumber || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  documents: { ...formData.documents, panNumber: e.target.value }
-                })}
+              value={formData.documents?.panNumber || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                documents: { ...formData.documents, panNumber: sanitizePan(e.target.value) }
+              })}
                 disabled={!isEditMode}
               />
             </div>
@@ -705,28 +718,6 @@ const ProfilePage: React.FC = () => {
           <h2>Address Details</h2>
           <div className="form-group address-current">
             <label>
-              Current Address
-              {isEditMode && <span className="required-indicator">*</span>}
-            </label>
-            <textarea
-              value={formData.address?.currentAddress || ''}
-              onChange={(e) => {
-                const value = e.target.value;
-                setFormData((prev: any) => ({
-                  ...prev,
-                  address: {
-                    ...prev.address,
-                    currentAddress: value,
-                    permanentAddress: isSameAddress ? value : prev.address?.permanentAddress
-                  }
-                }));
-              }}
-              disabled={!isEditMode}
-              rows={4}
-            />
-          </div>
-          <div className="form-group">
-            <label>
               Permanent Address
               {isEditMode && <span className="required-indicator">*</span>}
             </label>
@@ -736,7 +727,29 @@ const ProfilePage: React.FC = () => {
                 const value = e.target.value;
                 setFormData((prev: any) => ({
                   ...prev,
-                  address: { ...prev.address, permanentAddress: value }
+                  address: {
+                    ...prev.address,
+                    permanentAddress: value,
+                    currentAddress: isSameAddress ? value : prev.address?.currentAddress
+                  }
+                }));
+              }}
+              disabled={!isEditMode}
+              rows={4}
+            />
+          </div>
+          <div className="form-group">
+            <label>
+              Current Address
+              {isEditMode && <span className="required-indicator">*</span>}
+            </label>
+            <textarea
+              value={formData.address?.currentAddress || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData((prev: any) => ({
+                  ...prev,
+                  address: { ...prev.address, currentAddress: value }
                 }));
               }}
               disabled={!isEditMode || isSameAddress}
@@ -750,7 +763,7 @@ const ProfilePage: React.FC = () => {
                 onChange={(e) => handleSameAsCurrentAddress(e.target.checked)}
                 disabled={!isEditMode}
               />
-              <label htmlFor="same-address">Same as Current Address</label>
+              <label htmlFor="same-address">Same as Permanent Address</label>
             </div>
           </div>
         </div>

@@ -325,6 +325,65 @@
   white-space: nowrap;
 }
 
+/* Doctor note upload */
+.doctor-note-group {
+  gap: 6px;
+}
+
+.doctor-note-input {
+  display: none;
+}
+
+.doctor-note-button {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
+  color: #3a4a6b;
+  border: 1px solid #c3ccdd;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  width: fit-content;
+  min-width: 160px;
+  box-shadow: 0 4px 10px rgba(63, 81, 181, 0.12);
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.doctor-note-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(63, 81, 181, 0.18);
+}
+
+.doctor-note-button--disabled {
+  background: #f5f5f5;
+  color: #999;
+  border-color: #e0e0e0;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.doctor-note-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doctor-note-filename {
+  font-size: 11px;
+  color: #333;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doctor-note-helper {
+  font-size: 11px;
+  color: #666;
+}
+
 .form-actions {
   display: flex;
   flex-direction: row;
