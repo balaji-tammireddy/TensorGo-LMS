@@ -177,8 +177,8 @@ export const createEmployee = async (employeeData: any) => {
 
   const userId = result.rows[0].id;
 
-  // Initialize leave balance (casual = 0 for employees)
-  const initialCasual = employeeData.role === 'employee' ? 0 : 12;
+  // Initialize leave balance (casual = 12 for all roles)
+  const initialCasual = 12;
   await pool.query(
     'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, 6, 10)',
     [userId, initialCasual]
@@ -213,7 +213,7 @@ export const createEmployee = async (employeeData: any) => {
   return { employeeId: userId, message: 'Employee created successfully' };
 };
 
-export const updateEmployee = async (employeeId: number, employeeData: any) => {
+export const updateEmployee = async (employeeId: number, employeeData: any, requesterRole?: string) => {
   // Build update query dynamically
   const updates: string[] = [];
   const values: any[] = [];
@@ -227,6 +227,22 @@ export const updateEmployee = async (employeeId: number, employeeData: any) => {
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
     'reporting_manager_id', 'reporting_manager_name', 'status'
   ];
+
+  // Only super_admin can update email
+  if (requesterRole === 'super_admin') {
+    allowedFields.push('email');
+  }
+
+  // Check if email is being updated and validate uniqueness
+  if (employeeData.email && requesterRole === 'super_admin') {
+    const emailCheck = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND id != $2',
+      [employeeData.email, employeeId]
+    );
+    if (emailCheck.rows.length > 0) {
+      throw new Error('Email already exists');
+    }
+  }
 
   for (const [key, value] of Object.entries(employeeData)) {
     const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();

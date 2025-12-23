@@ -112,7 +112,8 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 export const getReportingManagers = async (req: AuthRequest, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
-    const result = await profileService.getReportingManagers(search);
+    const employeeRole = req.query.employeeRole as string | undefined;
+    const result = await profileService.getReportingManagers(search, employeeRole);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({

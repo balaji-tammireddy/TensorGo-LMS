@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
 import * as employeeService from '../services/employeeService';
+import { getReportingManagers } from '../services/profileService';
 import { format } from 'date-fns';
 import { FaEye, FaPencilAlt } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,7 +70,8 @@ const emptyEmployeeForm = {
     year: '',
     scorePercentage: ''
   })),
-  reportingManagerName: ''
+  reportingManagerName: '',
+  reportingManagerId: null as number | null
 };
 
 const EmployeeManagementPage: React.FC = () => {
@@ -86,6 +88,15 @@ const EmployeeManagementPage: React.FC = () => {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [newEmployee, setNewEmployee] = useState<any>(emptyEmployeeForm);
+
+  const { data: managersData } = useQuery(
+    ['reporting-managers', newEmployee.role],
+    () => getReportingManagers(undefined, newEmployee.role),
+    {
+      retry: false,
+      enabled: isModalOpen && !!newEmployee.role
+    }
+  );
 
   const { data: employeesData, error } = useQuery(
     ['employees', appliedSearch, statusFilter],
@@ -207,7 +218,7 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.designation)) missingFields.push('Designation');
     if (isEmpty(newEmployee.department)) missingFields.push('Department');
     if (isEmpty(newEmployee.dateOfJoining)) missingFields.push('Date of Joining');
-    if (isEmpty(newEmployee.reportingManagerName))
+    if (!newEmployee.reportingManagerId)
       missingFields.push('Reporting Manager');
 
     // Document information
@@ -340,7 +351,8 @@ const EmployeeManagementPage: React.FC = () => {
         education,
         // Prefer explicitly stored reporting_manager_name; fall back to joined full name
         reportingManagerName:
-          data.reporting_manager_name || data.reporting_manager_full_name || ''
+          data.reporting_manager_name || data.reporting_manager_full_name || '',
+        reportingManagerId: data.reporting_manager_id || null
       });
 
       setIsSameAddress(same);
@@ -553,9 +565,15 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <select
                         value={newEmployee.role}
-                        onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, role: e.target.value })
-                        }
+                        onChange={(e) => {
+                          // When role changes, reset reporting manager since it depends on role
+                          setNewEmployee({ 
+                            ...newEmployee, 
+                            role: e.target.value,
+                            reportingManagerId: null,
+                            reportingManagerName: ''
+                          });
+                        }}
                         disabled={isEditMode || isViewMode}
                       >
                         <option value="">Select role</option>
@@ -631,7 +649,7 @@ const EmployeeManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setNewEmployee({ ...newEmployee, email: e.target.value })
                         }
-                        disabled={isEditMode || isViewMode}
+                        disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
                       />
                     </div>
                     <div className="employee-modal-field">
@@ -1069,18 +1087,32 @@ const EmployeeManagementPage: React.FC = () => {
                     <label>
                       Reporting Manager<span className="required-indicator">*</span>
                     </label>
-                    <input
-                      type="text"
-                      maxLength={50}
-                      value={newEmployee.reportingManagerName || ''}
-                      onChange={(e) =>
-                        setNewEmployee({
-                          ...newEmployee,
-                          reportingManagerName: sanitizeLettersOnly(e.target.value)
-                        })
-                      }
-                      disabled={isViewMode}
-                      />
+                    {!newEmployee.role ? (
+                      <select disabled>
+                        <option value="">Please select role first</option>
+                      </select>
+                    ) : (
+                      <select
+                        value={newEmployee.reportingManagerId || ''}
+                        onChange={(e) => {
+                          const managerId = e.target.value ? parseInt(e.target.value) : null;
+                          const selectedManager = managersData?.find((m: any) => m.id === managerId);
+                          setNewEmployee({
+                            ...newEmployee,
+                            reportingManagerId: managerId,
+                            reportingManagerName: selectedManager?.name || ''
+                          });
+                        }}
+                        disabled={isViewMode}
+                      >
+                        <option value="">Select Reporting Manager</option>
+                        {managersData?.map((manager: any) => (
+                          <option key={manager.id} value={manager.id}>
+                            {manager.name} ({manager.empId})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
               </div>
