@@ -21,10 +21,8 @@ export interface LeaveBalance {
 }
 
 export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> => {
-  // Determine role to set defaults appropriately
-  const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
-  const role = roleResult.rows[0]?.role || 'employee';
-  const defaultCasual = role === 'employee' ? 0 : 12;
+  // Default casual leave balance is 12 for all roles
+  const defaultCasual = 12;
 
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',

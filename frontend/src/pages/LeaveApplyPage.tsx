@@ -116,6 +116,14 @@ const LeaveApplyPage: React.FC = () => {
       }
     }}
   );
+
+  // Reset leave type to casual if LOP is selected but casual balance is not zero (unless editing existing LOP)
+  useEffect(() => {
+    if (formData.leaveType === 'lop' && balances && (balances.casual ?? 0) > 0 && !editingId) {
+      setFormData((prev) => ({ ...prev, leaveType: 'casual' }));
+    }
+  }, [balances, editingId, formData.leaveType]);
+
   const { data: holidays = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
     'holidays',
     leaveService.getHolidays,
@@ -467,7 +475,7 @@ const LeaveApplyPage: React.FC = () => {
                 >
                   <option value="casual">Casual</option>
                   <option value="sick">Sick</option>
-                  <option value="lop">LOP</option>
+                  {((balances?.casual ?? 0) === 0 || formData.leaveType === 'lop') && <option value="lop">LOP</option>}
                   <option value="permission">Permission</option>
                 </select>
               </div>

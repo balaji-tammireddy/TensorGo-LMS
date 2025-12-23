@@ -649,7 +649,7 @@ const EmployeeManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setNewEmployee({ ...newEmployee, email: e.target.value })
                         }
-                        disabled={isEditMode || isViewMode}
+                        disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
                       />
                     </div>
                     <div className="employee-modal-field">
