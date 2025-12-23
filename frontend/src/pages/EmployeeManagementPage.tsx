@@ -347,6 +347,8 @@ const EmployeeManagementPage: React.FC = () => {
           <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
             {error?.response?.status === 403
               ? 'You do not have permission to view this page. HR access required.'
+              : error?.response?.status === 429
+              ? 'Too many requests. Please try again later.'
               : 'Error loading data. Please try again.'}
           </div>
         </div>

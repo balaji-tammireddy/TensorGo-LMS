@@ -101,7 +101,7 @@ const LeaveApplyPage: React.FC = () => {
     }
   }, [formData.leaveType, formData.startType, formData.startDate, formData.endDate, formData.endType]);
 
-  const { data: balances, isLoading: balancesLoading } = useQuery(
+  const { data: balances, isLoading: balancesLoading, error: balancesError } = useQuery(
     'leaveBalances',
     leaveService.getLeaveBalances,
     { retry: false, onError: (error: any) => {
@@ -110,17 +110,17 @@ const LeaveApplyPage: React.FC = () => {
       }
     }}
   );
-  const { data: holidays = [], isLoading: holidaysLoading } = useQuery(
+  const { data: holidays = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
     'holidays',
     leaveService.getHolidays,
     { retry: false }
   );
-  const { data: rules = [], isLoading: rulesLoading } = useQuery(
+  const { data: rules = [], isLoading: rulesLoading, error: rulesError } = useQuery(
     'leaveRules',
     leaveService.getLeaveRules,
     { retry: false }
   );
-  const { data: myRequests, isLoading: requestsLoading } = useQuery(
+  const { data: myRequests, isLoading: requestsLoading, error: requestsError } = useQuery(
     'myLeaveRequests',
     () => leaveService.getMyLeaveRequests(1, 10),
     { retry: false, onError: (error: any) => {
@@ -329,6 +329,23 @@ const LeaveApplyPage: React.FC = () => {
       <AppLayout>
         <div className="leave-apply-page">
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (balancesError || holidaysError || rulesError || requestsError) {
+    const anyError: any =
+      balancesError || holidaysError || rulesError || requestsError;
+
+    return (
+      <AppLayout>
+        <div className="leave-apply-page">
+          <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
+            {anyError?.response?.status === 429
+              ? 'Too many requests. Please try again later.'
+              : 'Error loading data. Please try again.'}
+          </div>
         </div>
       </AppLayout>
     );

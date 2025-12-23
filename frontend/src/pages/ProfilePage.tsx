@@ -273,7 +273,9 @@ const ProfilePage: React.FC = () => {
       <AppLayout>
         <div className="profile-page">
           <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
-            Error loading profile. Please try again.
+            {error?.response?.status === 429
+              ? 'Too many requests. Please try again later.'
+              : 'Error loading profile. Please try again.'}
           </div>
         </div>
       </AppLayout>

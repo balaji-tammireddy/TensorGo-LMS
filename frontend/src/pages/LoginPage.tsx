@@ -41,6 +41,7 @@ const LoginPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Login error:', err);
+      const status = err.response?.status;
       const errorData = err.response?.data?.error;
       const message = errorData?.message || err.message || 'Login failed';
 
@@ -48,6 +49,9 @@ const LoginPage: React.FC = () => {
         // Show dedicated inactive account screen and block further access
         setIsInactive(true);
         setError('');
+      } else if (status === 429) {
+        // Too many requests (rate limiting)
+        setError('Too many requests. Please try again later.');
       } else if (errorData?.details && Array.isArray(errorData.details)) {
         // Show validation details if available
         const detailMessages = errorData.details.map((d: any) => {

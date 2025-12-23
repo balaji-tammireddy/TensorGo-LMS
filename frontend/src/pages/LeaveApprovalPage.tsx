@@ -168,6 +168,8 @@ const LeaveApprovalPage: React.FC = () => {
           <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
             {pendingError?.response?.status === 403 || approvedError?.response?.status === 403
               ? 'You do not have permission to view this page'
+              : pendingError?.response?.status === 429 || approvedError?.response?.status === 429
+              ? 'Too many requests. Please try again later.'
               : 'Error loading data. Please try again.'}
           </div>
         </div>
