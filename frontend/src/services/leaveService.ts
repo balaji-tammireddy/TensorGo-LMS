@@ -51,6 +51,7 @@ export interface ApplyLeaveData {
   endType: 'full' | 'half';
   reason: string;
   timeForPermission?: { start?: string; end?: string };
+  doctorNote?: string;
 }
 
 export const getLeaveBalances = async (): Promise<LeaveBalance> => {

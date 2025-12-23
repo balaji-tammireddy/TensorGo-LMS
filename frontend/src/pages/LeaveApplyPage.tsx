@@ -12,6 +12,7 @@ const LeaveApplyPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<number | null>(null);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const [doctorNoteFile, setDoctorNoteFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     leaveType: 'casual' as 'casual' | 'sick' | 'lop' | 'permission',
     startDate: '',
@@ -36,11 +37,58 @@ const LeaveApplyPage: React.FC = () => {
     return '';
   };
 
-  // When casual + half-day start + same start/end date, force endType to match startType
+  const computeRequestedDays = () => {
+    if (!formData.startDate || !formData.endDate) return 0;
+    const start = new Date(`${formData.startDate}T00:00:00`);
+    const end = new Date(`${formData.endDate}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+    const daysArr = eachDayOfInterval({ start, end });
+    let total = 0;
+    const startHalf = formData.startType !== 'full';
+    const endHalf = formData.endType !== 'full';
+    daysArr.forEach((d, idx) => {
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      if (isWeekend) return;
+      const isFirst = idx === 0;
+      const isLast = idx === daysArr.length - 1;
+      if (isFirst && isLast) {
+        total += startHalf || endHalf ? 0.5 : 1;
+      } else if (isFirst) {
+        total += startHalf ? 0.5 : 1;
+      } else if (isLast) {
+        total += endHalf ? 0.5 : 1;
+      } else {
+        total += 1;
+      }
+    });
+    return total;
+  };
+
+  const isSickLongLeave = formData.leaveType === 'sick' && computeRequestedDays() >= 3;
+
+  const readFileAsBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result?.toString() || '';
+        const base64 = result.includes('base64,') ? result.split('base64,')[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // Clear doctor note when not needed
+  useEffect(() => {
+    if (formData.leaveType !== 'sick' || !isSickLongLeave) {
+      setDoctorNoteFile(null);
+    }
+  }, [formData.leaveType, isSickLongLeave]);
+
+  // When the leave spans a single day (start === end and not permission), force endType to follow startType
   useEffect(() => {
     if (
-      formData.leaveType === 'casual' &&
-      (formData.startType === 'first_half' || formData.startType === 'second_half') &&
+      formData.leaveType !== 'permission' &&
       formData.startDate &&
       formData.endDate &&
       formData.startDate === formData.endDate &&
@@ -51,13 +99,7 @@ const LeaveApplyPage: React.FC = () => {
         endType: prev.startType
       }));
     }
-  }, [
-    formData.leaveType,
-    formData.startType,
-    formData.startDate,
-    formData.endDate,
-    formData.endType
-  ]);
+  }, [formData.leaveType, formData.startType, formData.startDate, formData.endDate, formData.endType]);
 
   const { data: balances, isLoading: balancesLoading } = useQuery(
     'leaveBalances',
@@ -107,6 +149,7 @@ const LeaveApplyPage: React.FC = () => {
           reason: '',
           timeForPermission: { start: '', end: '' }
         });
+        setDoctorNoteFile(null);
         setEditingId(null);
       },
       onError: (error: any) => {
@@ -139,6 +182,7 @@ const LeaveApplyPage: React.FC = () => {
         reason: '',
         timeForPermission: { start: '', end: '' }
       });
+      setDoctorNoteFile(null);
       setEditingId(null);
     },
     onError: (error: any) => {
@@ -146,34 +190,8 @@ const LeaveApplyPage: React.FC = () => {
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const computeRequestedDays = () => {
-      if (!formData.startDate || !formData.endDate) return 0;
-      const start = new Date(`${formData.startDate}T00:00:00`);
-      const end = new Date(`${formData.endDate}T00:00:00`);
-      const daysArr = eachDayOfInterval({ start, end });
-      let total = 0;
-      const startHalf = formData.startType !== 'full';
-      const endHalf = formData.endType !== 'full';
-      daysArr.forEach((d, idx) => {
-        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-        if (isWeekend) return;
-        const isFirst = idx === 0;
-        const isLast = idx === daysArr.length - 1;
-        if (isFirst && isLast) {
-          total += startHalf || endHalf ? 0.5 : 1;
-        } else if (isFirst) {
-          total += startHalf ? 0.5 : 1;
-        } else if (isLast) {
-          total += endHalf ? 0.5 : 1;
-        } else {
-          total += 1;
-        }
-      });
-      return total;
-    };
 
     const requestedDays = computeRequestedDays();
 
@@ -241,6 +259,20 @@ const LeaveApplyPage: React.FC = () => {
         end: formData.timeForPermission.end
       };
     }
+
+    if (isSickLongLeave) {
+      if (!doctorNoteFile) {
+        alert('Doctor prescription is required for sick leave longer than 3 days.');
+        return;
+      }
+      try {
+        const noteBase64 = await readFileAsBase64(doctorNoteFile);
+        submitData.doctorNote = noteBase64;
+      } catch (err) {
+        alert('Failed to read doctor prescription file. Please try again.');
+        return;
+      }
+    }
     
     if (editingId) {
       applyMutation.mutate({ id: editingId, data: submitData });
@@ -263,6 +295,7 @@ const LeaveApplyPage: React.FC = () => {
         reason: request.reason,
         timeForPermission: request.timeForPermission || { start: '', end: '' }
       });
+      setDoctorNoteFile(null);
       setEditingId(requestId);
       // Scroll to form
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -287,6 +320,7 @@ const LeaveApplyPage: React.FC = () => {
       reason: '',
       timeForPermission: { start: '', end: '' }
     });
+    setDoctorNoteFile(null);
     setEditingId(null);
   };
 
@@ -426,91 +460,109 @@ const LeaveApplyPage: React.FC = () => {
                   />
                 </div>
               </div>
-              <div className="form-group">
-                <label>Start Type</label>
-                <select
-                  value={formData.startType}
-                  onChange={(e) => setFormData({ ...formData, startType: e.target.value as any })}
-                  required
-                  disabled={formData.leaveType === 'permission'}
-                >
-                  <option value="full">Full day</option>
-                  <option value="first_half">First half</option>
-                  <option value="second_half">Second half</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>End Date</label>
-                <div className="date-input-wrapper">
+              {formData.leaveType !== 'permission' && (
+                <div className="form-group">
+                  <label>Start Type</label>
+                  <select
+                    value={formData.startType}
+                    onChange={(e) => setFormData({ ...formData, startType: e.target.value as any })}
+                    required
+                  >
+                    <option value="full">Full day</option>
+                    <option value="first_half">First half</option>
+                    <option value="second_half">Second half</option>
+                  </select>
+                </div>
+              )}
+              {formData.leaveType !== 'permission' && (
+                <>
+                  <div className="form-group">
+                    <label>End Date</label>
+                    <div className="date-input-wrapper">
+                      <input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        required
+                        min={formData.startDate || minStartDate}
+                        className="date-input"
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>End Type</label>
+                    <select
+                      value={formData.endType}
+                      onChange={(e) => setFormData({ ...formData, endType: e.target.value as any })}
+                      required
+                      disabled={
+                        !!formData.startDate &&
+                        !!formData.endDate &&
+                        formData.startDate === formData.endDate
+                      }
+                    >
+                      <option value="full">Full day</option>
+                      <option value="first_half">First half</option>
+                      <option value="second_half">Second half</option>
+                    </select>
+                  </div>
+                </>
+              )}
+              {formData.leaveType === 'sick' && (
+                <div className="form-group">
+                  <label>Doctor Prescription (image){isSickLongLeave ? ' *' : ''}</label>
                   <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    required={formData.leaveType !== 'permission'}
-                    disabled={formData.leaveType === 'permission'}
-                    min={formData.startDate || minStartDate}
-                    className="date-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setDoctorNoteFile(e.target.files?.[0] || null)}
+                    required={isSickLongLeave}
+                    disabled={!isSickLongLeave}
                   />
+                  {isSickLongLeave && (
+                    <small style={{ color: '#666' }}>
+                      Required for sick leave longer than 3 days.
+                    </small>
+                  )}
                 </div>
-              </div>
-              <div className="form-group">
-                <label>End Type</label>
-                <select
-                  value={formData.endType}
-                  onChange={(e) => setFormData({ ...formData, endType: e.target.value as any })}
-                  required={formData.leaveType !== 'permission'}
-                  disabled={
-                    formData.leaveType === 'permission' ||
-                    (formData.leaveType === 'casual' &&
-                      (formData.startType === 'first_half' || formData.startType === 'second_half') &&
-                      formData.startDate &&
-                      formData.endDate &&
-                      formData.startDate === formData.endDate)
-                  }
-                >
-                  <option value="full">Full day</option>
-                  <option value="first_half">First half</option>
-                  <option value="second_half">Second half</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>{formData.leaveType === 'permission' ? 'Timings' : 'Time For Permission'}</label>
-                <div className="time-inputs">
-                  <div className="time-input-wrapper">
-                    <input
-                      className="time-input"
-                      type="time"
-                      value={formData.timeForPermission.start}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          timeForPermission: { ...formData.timeForPermission, start: e.target.value }
-                        })
-                      }
-                      placeholder="Start time"
-                      disabled={formData.leaveType !== 'permission'}
-                      required={formData.leaveType === 'permission'}
-                    />
-                  </div>
-                  <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
-                  <div className="time-input-wrapper">
-                    <input
-                      className="time-input"
-                      type="time"
-                      value={formData.timeForPermission.end}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          timeForPermission: { ...formData.timeForPermission, end: e.target.value }
-                        })
-                      }
-                      placeholder="End time"
-                      disabled={formData.leaveType !== 'permission'}
-                      required={formData.leaveType === 'permission'}
-                    />
+              )}
+              {formData.leaveType === 'permission' && (
+                <div className="form-group">
+                  <label>Timings</label>
+                  <div className="time-inputs">
+                    <div className="time-input-wrapper">
+                      <input
+                        className="time-input"
+                        type="time"
+                        value={formData.timeForPermission.start}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            timeForPermission: { ...formData.timeForPermission, start: e.target.value }
+                          })
+                        }
+                        placeholder="Start time"
+                        required
+                      />
+                    </div>
+                    <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
+                    <div className="time-input-wrapper">
+                      <input
+                        className="time-input"
+                        type="time"
+                        value={formData.timeForPermission.end}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            timeForPermission: { ...formData.timeForPermission, end: e.target.value }
+                          })
+                        }
+                        placeholder="End time"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
             <div className="form-reason-row">
               <div className="form-group reason-group">
