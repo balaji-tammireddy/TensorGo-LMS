@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
+import { useToast } from '../contexts/ToastContext';
 import * as employeeService from '../services/employeeService';
 import { format } from 'date-fns';
 import { FaEye, FaPencilAlt } from 'react-icons/fa';
@@ -74,6 +75,7 @@ const emptyEmployeeForm = {
 const EmployeeManagementPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { showSuccess, showError, showWarning } = useToast();
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState('');
@@ -123,10 +125,10 @@ const EmployeeManagementPage: React.FC = () => {
       setIsModalOpen(false);
       setNewEmployee(emptyEmployeeForm);
       setIsSameAddress(false);
-      alert('Employee created successfully!');
+      showSuccess('Employee created successfully!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error?.message || 'Failed to create employee');
+      showError(error.response?.data?.error?.message || 'Failed to create employee');
     }
   });
 
@@ -141,10 +143,10 @@ const EmployeeManagementPage: React.FC = () => {
         setIsSameAddress(false);
         setIsEditMode(false);
         setEditingEmployeeId(null);
-        alert('Employee updated successfully!');
+        showSuccess('Employee updated successfully!');
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error?.message || 'Failed to update employee');
+        showError(error.response?.data?.error?.message || 'Failed to update employee');
       }
     }
   );
@@ -236,12 +238,12 @@ const EmployeeManagementPage: React.FC = () => {
     }
 
     if (missingFields.length > 0) {
-      alert('Please fill all the mandatory fields.');
+      showWarning('Please fill all the mandatory fields.');
       return;
     }
 
     if (newEmployee.aadharNumber && newEmployee.aadharNumber.length !== 12) {
-      alert('Aadhar Number must be exactly 12 digits.');
+      showWarning('Aadhar Number must be exactly 12 digits.');
       return;
     }
 
@@ -263,7 +265,7 @@ const EmployeeManagementPage: React.FC = () => {
     for (const field of phoneFields) {
       const v = field.value || '';
       if (v.length !== 10) {
-        alert(`${field.label} must be exactly 10 digits.`);
+        showWarning(`${field.label} must be exactly 10 digits.`);
         return;
       }
     }
@@ -347,7 +349,7 @@ const EmployeeManagementPage: React.FC = () => {
       setEditingEmployeeId(employeeId);
       setIsModalOpen(true);
     } catch (error: any) {
-      alert(error?.response?.data?.error?.message || 'Failed to load employee details');
+      showError(error?.response?.data?.error?.message || 'Failed to load employee details');
     } finally {
       setIsDetailLoading(false);
     }
@@ -398,7 +400,7 @@ const EmployeeManagementPage: React.FC = () => {
                 if (e.key === 'Enter') {
                   const value = e.currentTarget.value.trim();
                   if (value.length < 3) {
-                    alert('Please type at least 3 characters to search.');
+                    showWarning('Please type at least 3 characters to search.');
                     return;
                   }
                   setAppliedSearch(value);

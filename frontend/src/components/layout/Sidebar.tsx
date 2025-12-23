@@ -1,8 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaBell } from 'react-icons/fa';
-import { getNotifications } from '../../services/notificationService';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = () => {
@@ -10,7 +9,6 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
@@ -59,42 +57,9 @@ const Sidebar: React.FC = () => {
     navigate('/login');
   };
 
-  // Fetch unread notification count
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      if (user) {
-        try {
-          const data = await getNotifications(1, 1, true);
-          setUnreadCount(data.unreadCount);
-        } catch (error) {
-          console.error('Failed to fetch notification count:', error);
-        }
-      }
-    };
-
-    fetchUnreadCount();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
-
   return (
     <div className="sidebar">
       <div className="sidebar-nav">
-        {/* Notifications button at the top */}
-        <div
-          className={`nav-item ${location.pathname === '/notifications' ? 'active' : ''}`}
-          onClick={() => navigate('/notifications')}
-          title="Notifications"
-        >
-          <span className="nav-icon">
-            <FaBell />
-          </span>
-          {unreadCount > 0 && (
-            <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
-          )}
-        </div>
-        
         {getAvailableRoutes().map((route) => (
           <div
             key={route.path}

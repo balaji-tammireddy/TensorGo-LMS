@@ -2,16 +2,20 @@ import React, { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import * as profileService from '../services/profileService';
 import './ProfilePage.css';
 
 const ProfilePage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { showSuccess, showError, showWarning } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [initialFormData, setInitialFormData] = useState<any | null>(null);
   const [isSameAddress, setIsSameAddress] = useState(false);
+  const [deletePhotoConfirmOpen, setDeletePhotoConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const sanitizeName = (value: string) => {
@@ -59,27 +63,27 @@ const ProfilePage: React.FC = () => {
       setIsEditMode(false);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error?.message || 'Failed to update profile');
+      showError(error.response?.data?.error?.message || 'Failed to update profile');
     }
   });
 
   const uploadPhotoMutation = useMutation(profileService.uploadProfilePhoto, {
     onSuccess: () => {
       queryClient.invalidateQueries('profile');
-      alert('Profile photo updated successfully!');
+      showSuccess('Profile photo updated successfully!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error?.message || 'Failed to upload profile photo');
+      showError(error.response?.data?.error?.message || 'Failed to upload profile photo');
     }
   });
 
   const deletePhotoMutation = useMutation(profileService.deleteProfilePhoto, {
     onSuccess: () => {
       queryClient.invalidateQueries('profile');
-      alert('Profile photo deleted successfully!');
+      showSuccess('Profile photo deleted successfully!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error?.message || 'Failed to delete profile photo');
+      showError(error.response?.data?.error?.message || 'Failed to delete profile photo');
     }
   });
 
@@ -170,13 +174,13 @@ const ProfilePage: React.FC = () => {
     }
 
     if (missingFields.length > 0) {
-      alert('Please fill all the mandatory fields.');
+      showWarning('Please fill all the mandatory fields.');
       return;
     }
 
     const aadhar = formData.documents?.aadharNumber as string | undefined;
     if (aadhar && aadhar.length !== 12) {
-      alert('Aadhar Number must be exactly 12 digits.');
+      showWarning('Aadhar Number must be exactly 12 digits.');
       return;
     }
 
@@ -198,7 +202,7 @@ const ProfilePage: React.FC = () => {
     for (const field of phoneFields) {
       const v = field.value || '';
       if (v.length !== 10) {
-        alert(`${field.label} must be exactly 10 digits.`);
+        showWarning(`${field.label} must be exactly 10 digits.`);
         return;
       }
     }
@@ -225,10 +229,12 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleDeletePhoto = () => {
-    if (!window.confirm('Are you sure you want to delete your profile photo?')) {
-      return;
-    }
+    setDeletePhotoConfirmOpen(true);
+  };
+
+  const confirmDeletePhoto = () => {
     deletePhotoMutation.mutate();
+    setDeletePhotoConfirmOpen(false);
   };
 
   const handleCancelEdit = () => {
@@ -283,6 +289,7 @@ const ProfilePage: React.FC = () => {
 
   if (error) {
     return (
+      <>
       <AppLayout>
         <div className="profile-page">
           <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
@@ -292,10 +299,12 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       </AppLayout>
+      </>
     );
   }
 
   return (
+    <>
     <AppLayout>
       <div className="profile-page">
         <div className="profile-header">
@@ -900,6 +909,17 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
     </AppLayout>
+    <ConfirmationDialog
+      isOpen={deletePhotoConfirmOpen}
+      title="Delete Profile Photo"
+      message="Are you sure you want to delete your profile photo? This action cannot be undone."
+      confirmText="Delete"
+      cancelText="Cancel"
+      type="danger"
+      onConfirm={confirmDeletePhoto}
+      onCancel={() => setDeletePhotoConfirmOpen(false)}
+    />
+  </>
   );
 };
 

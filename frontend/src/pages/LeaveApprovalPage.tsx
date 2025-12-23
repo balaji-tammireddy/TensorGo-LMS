@@ -1,15 +1,25 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationDialog from '../components/ConfirmationDialog';
+import RejectCommentDialog from '../components/RejectCommentDialog';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import './LeaveApprovalPage.css';
 
 const LeaveApprovalPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { showSuccess, showError } = useToast();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
+  const [approveRequestId, setApproveRequestId] = useState<number | null>(null);
+  const [approveDayId, setApproveDayId] = useState<number | undefined>(undefined);
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [rejectRequestId, setRejectRequestId] = useState<number | null>(null);
+  const [rejectDayId, setRejectDayId] = useState<number | undefined>(undefined);
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
@@ -47,10 +57,10 @@ const LeaveApprovalPage: React.FC = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('pendingLeaves');
         queryClient.invalidateQueries('approvedLeaves');
-        alert('Leave approved successfully!');
+        showSuccess('Leave approved successfully!');
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error?.message || 'Failed to approve leave');
+        showError(error.response?.data?.error?.message || 'Failed to approve leave');
       }
     }
   );
@@ -64,32 +74,49 @@ const LeaveApprovalPage: React.FC = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('pendingLeaves');
         queryClient.invalidateQueries('approvedLeaves');
-        alert('Leave rejected successfully!');
+        showSuccess('Leave rejected successfully!');
       },
       onError: (error: any) => {
-        alert(error.response?.data?.error?.message || 'Failed to reject leave');
+        showError(error.response?.data?.error?.message || 'Failed to reject leave');
       }
     }
   );
 
   const handleApprove = (id: number, dayId?: number) => {
-    if (window.confirm('Are you sure you want to approve this leave?')) {
-      if (dayId) {
-        approveMutation.mutate({ id, dayId });
+    setApproveRequestId(id);
+    setApproveDayId(dayId);
+    setApproveConfirmOpen(true);
+  };
+
+  const confirmApprove = () => {
+    if (approveRequestId !== null) {
+      if (approveDayId) {
+        approveMutation.mutate({ id: approveRequestId, dayId: approveDayId });
       } else {
-        approveMutation.mutate({ id });
+        approveMutation.mutate({ id: approveRequestId });
       }
+      setApproveConfirmOpen(false);
+      setApproveRequestId(null);
+      setApproveDayId(undefined);
     }
   };
 
   const handleReject = (id: number, dayId?: number) => {
-    const comment = window.prompt('Please provide a reason for rejection:');
-    if (comment) {
-      if (dayId) {
-        rejectMutation.mutate({ id, dayId, comment });
+    setRejectRequestId(id);
+    setRejectDayId(dayId);
+    setRejectConfirmOpen(true);
+  };
+
+  const confirmReject = (comment: string) => {
+    if (rejectRequestId !== null) {
+      if (rejectDayId) {
+        rejectMutation.mutate({ id: rejectRequestId, dayId: rejectDayId, comment });
       } else {
-        rejectMutation.mutate({ id, comment });
+        rejectMutation.mutate({ id: rejectRequestId, comment });
       }
+      setRejectConfirmOpen(false);
+      setRejectRequestId(null);
+      setRejectDayId(undefined);
     }
   };
 
@@ -178,6 +205,7 @@ const LeaveApprovalPage: React.FC = () => {
   }
 
   return (
+    <>
     <AppLayout>
       <div className="leave-approval-page">
         <h1 className="page-title">Leave Requests</h1>
@@ -333,6 +361,35 @@ const LeaveApprovalPage: React.FC = () => {
         </div>
       </div>
     </AppLayout>
+    <ConfirmationDialog
+      isOpen={approveConfirmOpen}
+      title="Approve Leave Request"
+      message="Are you sure you want to approve this leave request?"
+      confirmText="Approve"
+      cancelText="Cancel"
+      type="info"
+      onConfirm={confirmApprove}
+      onCancel={() => {
+        setApproveConfirmOpen(false);
+        setApproveRequestId(null);
+        setApproveDayId(undefined);
+      }}
+    />
+    <RejectCommentDialog
+      isOpen={rejectConfirmOpen}
+      title="Reject Leave Request"
+      message="Please provide a reason for rejection:"
+      confirmText="Reject"
+      cancelText="Cancel"
+      type="danger"
+      onConfirm={confirmReject}
+      onCancel={() => {
+        setRejectConfirmOpen(false);
+        setRejectRequestId(null);
+        setRejectDayId(undefined);
+      }}
+    />
+    </>
   );
 };
 

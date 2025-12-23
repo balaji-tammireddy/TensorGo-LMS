@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isInactive, setIsInactive] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login, logout } = useAuth();
+  const { showError, showWarning } = useToast();
   const navigate = useNavigate();
 
   // Clear any old session data when component mounts
@@ -24,7 +25,6 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsInactive(false);
     setLoading(true);
 
@@ -48,19 +48,18 @@ const LoginPage: React.FC = () => {
       if (message === 'Account is not active') {
         // Show dedicated inactive account screen and block further access
         setIsInactive(true);
-        setError('');
       } else if (status === 429) {
         // Too many requests (rate limiting)
-        setError('Too many requests. Please try again later.');
+        showWarning('Too many requests. Please try again later.');
       } else if (errorData?.details && Array.isArray(errorData.details)) {
         // Show validation details if available
         const detailMessages = errorData.details.map((d: any) => {
           const field = d.path?.join('.') || 'field';
           return `${field}: ${d.message}`;
         }).join(', ');
-        setError(`${errorData.message || 'Validation failed'}: ${detailMessages}`);
+        showError(`${errorData.message || 'Validation failed'}: ${detailMessages}`);
       } else {
-        setError(message);
+        showError(message);
       }
     } finally {
       setLoading(false);
@@ -81,7 +80,6 @@ const LoginPage: React.FC = () => {
               className="login-button inactive-login-button"
               onClick={() => {
                 setIsInactive(false);
-                setError('');
                 setPassword('');
               }}
             >
@@ -123,7 +121,6 @@ const LoginPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              {error && <div className="error-message">{error}</div>}
               <button type="submit" disabled={loading} className="login-button">
                 {loading ? 'Logging in...' : 'Login'}
               </button>

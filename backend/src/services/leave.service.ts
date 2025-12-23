@@ -224,18 +224,13 @@ export const applyLeave = async (
       );
     }
 
-    // Create notification for reporting manager
+    // Create notification for reporting manager (if notifications table exists)
     if (reportingManagerId) {
       try {
-        const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [userId]);
-        const userName = userResult.rows[0] 
-          ? `${userResult.rows[0].first_name} ${userResult.rows[0].last_name || ''}`.trim()
-          : 'An employee';
-        
         await pool.query(
           `INSERT INTO notifications (user_id, title, message, type)
-           VALUES ($1, 'New Leave Request', $2, 'leave_submission')`,
-          [reportingManagerId, `${userName} has submitted a leave request for ${days} day(s). Please review.`]
+           VALUES ($1, 'New Leave Request', 'A leave request requires your approval', 'leave_request')`,
+          [reportingManagerId]
         );
       } catch (notifError: any) {
         // Log but don't fail the leave request if notification fails
@@ -641,30 +636,6 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
 
     await client.query('COMMIT');
 
-    // Create notification for reporting manager about cancellation
-    const leaveCheck = await pool.query(
-      'SELECT reporting_manager_id FROM users WHERE id = $1',
-      [userId]
-    );
-    const reportingManagerId = leaveCheck.rows[0]?.reporting_manager_id;
-    
-    if (reportingManagerId) {
-      try {
-        const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [userId]);
-        const userName = userResult.rows[0]
-          ? `${userResult.rows[0].first_name} ${userResult.rows[0].last_name || ''}`.trim()
-          : 'An employee';
-        
-        await pool.query(
-          `INSERT INTO notifications (user_id, title, message, type)
-           VALUES ($1, 'Leave Request Cancelled', $2, 'leave_cancellation')`,
-          [reportingManagerId, `${userName} has cancelled their leave request.`]
-        );
-      } catch (notifError: any) {
-        console.warn('Failed to create cancellation notification:', notifError.message);
-      }
-    }
-
     return { message: 'Leave request deleted successfully' };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -927,18 +898,10 @@ export const approveLeave = async (
   }
 
   // Create notification for employee
-  const approverResult = await pool.query(
-    'SELECT first_name, last_name, role FROM users WHERE id = $1',
-    [approverId]
-  );
-  const approverName = approverResult.rows[0]
-    ? `${approverResult.rows[0].first_name} ${approverResult.rows[0].last_name || ''}`.trim()
-    : approverRole;
-  
   await pool.query(
     `INSERT INTO notifications (user_id, title, message, type)
-     VALUES ($1, 'Leave Approved', $2, 'leave_approval')`,
-    [leave.employee_id, `Your leave request has been approved by ${approverName}.${comment ? ` Comment: ${comment}` : ''}`]
+     VALUES ($1, 'Leave Approved', 'Your leave request has been approved', 'leave_approval')`,
+    [leave.employee_id]
   );
 
   return { message: 'Leave approved successfully' };
@@ -1051,18 +1014,10 @@ export const rejectLeave = async (
   }
 
   // Create notification for employee
-  const approverResult = await pool.query(
-    'SELECT first_name, last_name FROM users WHERE id = $1',
-    [approverId]
-  );
-  const approverName = approverResult.rows[0]
-    ? `${approverResult.rows[0].first_name} ${approverResult.rows[0].last_name || ''}`.trim()
-    : approverRole;
-  
   await pool.query(
     `INSERT INTO notifications (user_id, title, message, type)
      VALUES ($1, 'Leave Rejected', $2, 'leave_rejection')`,
-    [leave.employee_id, `Your leave request has been rejected by ${approverName}. Reason: ${comment}`]
+    [leave.employee_id, `Your leave request has been rejected. Reason: ${comment}`]
   );
 
   await recalcLeaveRequestStatus(leaveRequestId);
@@ -1112,26 +1067,11 @@ const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
     newStatus = 'pending';
   }
 
-  const oldStatus = leave.current_status;
-  
   // Update header status only; keep original no_of_days for balance refunds
   await pool.query(
     `UPDATE leave_requests SET current_status = $1 WHERE id = $2`,
     [newStatus, leaveRequestId]
   );
-  
-  // Send notification for partial approval (only if status changed to partially_approved)
-  if (newStatus === 'partially_approved' && oldStatus !== 'partially_approved') {
-    try {
-      await pool.query(
-        `INSERT INTO notifications (user_id, title, message, type)
-         VALUES ($1, 'Leave Partially Approved', $2, 'leave_partial_approval')`,
-        [leave.employee_id, `Your leave request has been partially approved. ${approvedDays} day(s) approved, ${rejectedDays} day(s) rejected.`]
-      );
-    } catch (notifError: any) {
-      console.warn('Failed to create partial approval notification:', notifError.message);
-    }
-  }
 };
 
 export const approveLeaveDay = async (

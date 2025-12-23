@@ -1,0 +1,206 @@
+.confirmation-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.confirmation-dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  max-width: 450px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.confirmation-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e6e8f0;
+  position: relative;
+}
+
+.confirmation-dialog-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.confirmation-dialog-icon {
+  font-size: 24px;
+}
+
+.icon-danger {
+  color: #e53935;
+}
+
+.icon-danger + .confirmation-dialog-icon-wrapper {
+  background: #ffebee;
+}
+
+.icon-warning {
+  color: #ff9800;
+}
+
+.icon-warning + .confirmation-dialog-icon-wrapper {
+  background: #fff3e0;
+}
+
+.icon-info {
+  color: #1e4fd6;
+}
+
+.icon-info + .confirmation-dialog-icon-wrapper {
+  background: #e3ebf8;
+}
+
+.confirmation-dialog-title {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+  color: #203050;
+  margin: 0;
+}
+
+.confirmation-dialog-close {
+  background: none;
+  border: none;
+  color: #8a9ba8;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 18px;
+}
+
+.confirmation-dialog-close:hover {
+  background: #f0f3fb;
+  color: #203050;
+}
+
+.confirmation-dialog-body {
+  padding: 24px;
+}
+
+.confirmation-dialog-message {
+  font-size: 15px;
+  color: #5a6c7d;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.confirmation-dialog-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e6e8f0;
+  justify-content: flex-end;
+}
+
+.confirmation-dialog-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  min-width: 100px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.confirmation-dialog-button-cancel {
+  background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
+  color: #3a4a6b;
+  border: 1px solid #c3ccdd;
+  box-shadow: 0 4px 10px rgba(63, 81, 181, 0.12);
+}
+
+.confirmation-dialog-button-cancel:hover {
+  background: linear-gradient(135deg, #cfd7ea 0%, #c3ccdd 100%);
+  color: #203050;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(63, 81, 181, 0.18);
+}
+
+.confirmation-dialog-button-confirm {
+  color: #fff;
+}
+
+.confirm-danger {
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  border: 1px solid #c62828;
+  box-shadow: 0 6px 14px rgba(229, 57, 53, 0.22);
+}
+
+.confirm-danger:hover {
+  background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(229, 57, 53, 0.28);
+}
+
+.confirm-warning {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  border: 1px solid #f57c00;
+  box-shadow: 0 6px 14px rgba(255, 152, 0, 0.22);
+}
+
+.confirm-warning:hover {
+  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(255, 152, 0, 0.28);
+}
+
+.confirm-info {
+  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
+  border: 1px solid #2951c8;
+  box-shadow: 0 6px 14px rgba(60, 111, 242, 0.22);
+}
+
+.confirm-info:hover {
+  background: linear-gradient(135deg, #2951c8 0%, #1e3d8f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
+}
+

@@ -1,40 +1,38 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import './LoginPage.css';
 
 const ChangePasswordPage: React.FC = () => {
   const { user, logout } = useAuth();
+  const { showSuccess, showError, showWarning } = useToast();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-   const [showOldPassword, setShowOldPassword] = useState(false);
-   const [showNewPassword, setShowNewPassword] = useState(false);
-   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
 
     if (newPassword !== confirmPassword) {
-      setError('New password and confirm password do not match.');
+      showWarning('New password and confirm password do not match.');
       return;
     }
 
     if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters.');
+      showWarning('New password must be at least 6 characters.');
       return;
     }
 
     try {
       setLoading(true);
       await api.post('/auth/change-password', { oldPassword, newPassword });
-      setSuccess('Password updated successfully. Please log in again with your new password.');
+      showSuccess('Password updated successfully. Please log in again with your new password.');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -47,7 +45,7 @@ const ChangePasswordPage: React.FC = () => {
     } catch (err: any) {
       const message =
         err.response?.data?.error?.message || err.message || 'Failed to change password.';
-      setError(message);
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -123,8 +121,6 @@ const ChangePasswordPage: React.FC = () => {
               </button>
             </div>
           </div>
-          {error && <div className="error-message">{error}</div>}
-          {success && <div className="success-message">{success}</div>}
           <button type="submit" disabled={loading} className="login-button">
             {loading ? 'Updating...' : 'Change Password'}
           </button>

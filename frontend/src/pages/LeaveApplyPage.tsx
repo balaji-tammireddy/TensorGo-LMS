@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { FaPencilAlt, FaTrash } from 'react-icons/fa';
@@ -10,7 +12,10 @@ import './LeaveApplyPage.css';
 const LeaveApplyPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { showSuccess, showError, showWarning, showInfo } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteRequestId, setDeleteRequestId] = useState<number | null>(null);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [doctorNoteFile, setDoctorNoteFile] = useState<File | null>(null);
   const doctorNoteInputRef = useRef<HTMLInputElement | null>(null);
@@ -140,7 +145,7 @@ const LeaveApplyPage: React.FC = () => {
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries('leaveBalances');
         queryClient.invalidateQueries('myLeaveRequests');
-        alert(variables.id ? 'Leave updated successfully!' : 'Leave applied successfully!');
+        showSuccess(variables.id ? 'Leave updated successfully!' : 'Leave applied successfully!');
         setFormData({
           leaveType: 'casual',
           startDate: '',
@@ -160,9 +165,9 @@ const LeaveApplyPage: React.FC = () => {
         
         if (errorDetails && Array.isArray(errorDetails)) {
           const detailMessages = errorDetails.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
-          alert(`${errorMessage}\n\n${detailMessages}`);
+          showError(`${errorMessage}\n\n${detailMessages}`);
         } else {
-          alert(errorMessage);
+          showError(errorMessage);
         }
       }
     }
@@ -172,7 +177,7 @@ const LeaveApplyPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries('leaveBalances');
       queryClient.invalidateQueries('myLeaveRequests');
-      alert('Leave deleted successfully!');
+      showSuccess('Leave deleted successfully!');
       // Reset form after a delete (especially if we were editing)
       setFormData({
         leaveType: 'casual',
@@ -185,9 +190,13 @@ const LeaveApplyPage: React.FC = () => {
       });
       setDoctorNoteFile(null);
       setEditingId(null);
+      setDeleteConfirmOpen(false);
+      setDeleteRequestId(null);
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error?.message || 'Failed to delete leave');
+      showError(error.response?.data?.error?.message || 'Failed to delete leave');
+      setDeleteConfirmOpen(false);
+      setDeleteRequestId(null);
     }
   });
 
@@ -200,31 +209,31 @@ const LeaveApplyPage: React.FC = () => {
     if (balances) {
       if (formData.leaveType === 'casual') {
         if ((balances.casual || 0) <= 0) {
-          alert('Casual leave balance is zero. You cannot apply casual leave.');
+          showWarning('Casual leave balance is zero. You cannot apply casual leave.');
           return;
         }
         if (requestedDays > (balances.casual || 0)) {
-          alert(`Insufficient casual leave balance. Available: ${balances.casual || 0}, Required: ${requestedDays}`);
+          showWarning(`Insufficient casual leave balance. Available: ${balances.casual || 0}, Required: ${requestedDays}`);
           return;
         }
       }
       if (formData.leaveType === 'sick') {
         if ((balances.sick || 0) <= 0) {
-          alert('Sick leave balance is zero. You cannot apply sick leave.');
+          showWarning('Sick leave balance is zero. You cannot apply sick leave.');
           return;
         }
         if (requestedDays > (balances.sick || 0)) {
-          alert(`Insufficient sick leave balance. Available: ${balances.sick || 0}, Required: ${requestedDays}`);
+          showWarning(`Insufficient sick leave balance. Available: ${balances.sick || 0}, Required: ${requestedDays}`);
           return;
         }
       }
       if (formData.leaveType === 'lop') {
         if ((balances.lop || 0) <= 0) {
-          alert('LOP balance is zero. You cannot apply LOP leave.');
+          showWarning('LOP balance is zero. You cannot apply LOP leave.');
           return;
         }
         if (requestedDays > (balances.lop || 0)) {
-          alert(`Insufficient LOP balance. Available: ${balances.lop || 0}, Required: ${requestedDays}`);
+          showWarning(`Insufficient LOP balance. Available: ${balances.lop || 0}, Required: ${requestedDays}`);
           return;
         }
       }
@@ -232,7 +241,7 @@ const LeaveApplyPage: React.FC = () => {
 
     // Client-side guard: LOP only when casual balance is 0
     if (formData.leaveType === 'lop' && (balances?.casual ?? 0) > 0) {
-      alert('LOP can be applied only when casual leave balance is 0');
+      showWarning('LOP can be applied only when casual leave balance is 0');
       return;
     }
 
@@ -252,7 +261,7 @@ const LeaveApplyPage: React.FC = () => {
     // For permission, timeForPermission is required
     if (formData.leaveType === 'permission') {
       if (!formData.timeForPermission.start || !formData.timeForPermission.end) {
-        alert('Please provide start and end timings for permission');
+        showWarning('Please provide start and end timings for permission');
         return;
       }
       submitData.timeForPermission = {
@@ -263,14 +272,14 @@ const LeaveApplyPage: React.FC = () => {
 
     if (isSickLongLeave) {
       if (!doctorNoteFile) {
-        alert('Doctor prescription is required for sick leave longer than 3 days.');
+        showWarning('Doctor prescription is required for sick leave longer than 3 days.');
         return;
       }
       try {
         const noteBase64 = await readFileAsBase64(doctorNoteFile);
         submitData.doctorNote = noteBase64;
       } catch (err) {
-        alert('Failed to read doctor prescription file. Please try again.');
+        showError('Failed to read doctor prescription file. Please try again.');
         return;
       }
     }
@@ -301,13 +310,18 @@ const LeaveApplyPage: React.FC = () => {
       // Scroll to form
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: any) {
-      alert(error.response?.data?.error?.message || 'Failed to load leave request');
+      showError(error.response?.data?.error?.message || 'Failed to load leave request');
     }
   };
 
   const handleDelete = (requestId: number) => {
-    if (window.confirm('Are you sure you want to delete this leave request?')) {
-      deleteMutation.mutate(requestId);
+    setDeleteRequestId(requestId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteRequestId) {
+      deleteMutation.mutate(deleteRequestId);
     }
   };
 
@@ -716,6 +730,19 @@ const LeaveApplyPage: React.FC = () => {
           </table>
         </div>
       </div>
+      <ConfirmationDialog
+        isOpen={deleteConfirmOpen}
+        title="Delete Leave Request"
+        message="Are you sure you want to delete this leave request? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setDeleteRequestId(null);
+        }}
+      />
     </AppLayout>
   );
 };

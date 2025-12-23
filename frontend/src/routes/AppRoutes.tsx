@@ -6,7 +6,6 @@ import LeaveApplyPage from '../pages/LeaveApplyPage';
 import LeaveApprovalPage from '../pages/LeaveApprovalPage';
 import EmployeeManagementPage from '../pages/EmployeeManagementPage';
 import ProfilePage from '../pages/ProfilePage';
-import NotificationsPage from '../pages/NotificationsPage';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordPage from '../pages/ChangePasswordPage';
 
@@ -56,14 +55,6 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute>
-            <NotificationsPage />
           </ProtectedRoute>
         }
       />
