@@ -670,17 +670,11 @@ export const getPendingLeaveRequests = async (
 
   // Role-based filtering
   if (approverRole === 'manager') {
+    // CRITICAL: Managers can ONLY see leave requests from employees where they are the reporting manager
     query += ' AND u.reporting_manager_id = $1';
     params.push(approverId);
-  } else if (approverRole === 'hr') {
-    // HR can see manager leaves or employees whose manager is HR
-    query += ` AND (
-      u.reporting_manager_id IN (SELECT id FROM users WHERE role = 'manager' OR role = 'hr')
-      OR u.reporting_manager_id IS NULL
-      OR EXISTS (SELECT 1 FROM users WHERE id = u.reporting_manager_id AND role = 'hr')
-    )`;
-  } else if (approverRole === 'super_admin') {
-    // Super Admin can see all
+  } else if (approverRole === 'hr' || approverRole === 'super_admin') {
+    // HR and Super Admin can see ALL employee leave requests (no filter)
   } else {
     return { requests: [], pagination: { page, limit, total: 0 } };
   }
@@ -710,9 +704,15 @@ export const getPendingLeaveRequests = async (
 
   const result = await pool.query(query, params);
 
+  // Additional safeguard: Filter out any requests that don't belong to manager's direct reports
+  // This ensures data integrity even if query construction has issues
+  const filteredRows = approverRole === 'manager' 
+    ? result.rows.filter(row => row.reporting_manager_id === approverId)
+    : result.rows;
+
   // Get day-wise breakdown for each request
   const requestsWithDays = await Promise.all(
-    result.rows.map(async (row) => {
+    filteredRows.map(async (row) => {
       try {
       const daysResult = await pool.query(
           'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
@@ -761,13 +761,11 @@ export const getPendingLeaveRequests = async (
   const countParams: any[] = [];
 
   if (approverRole === 'manager') {
+    // CRITICAL: Managers can ONLY see leave requests from employees where they are the reporting manager
     countQuery += ' AND u.reporting_manager_id = $1';
     countParams.push(approverId);
-  } else if (approverRole === 'hr') {
-    countQuery += ` AND (
-      u.reporting_manager_id IN (SELECT id FROM users WHERE role = 'manager' OR role = 'hr')
-      OR u.reporting_manager_id IS NULL
-    )`;
+  } else if (approverRole === 'hr' || approverRole === 'super_admin') {
+    // HR and Super Admin can see ALL employee leave requests (no filter)
   }
 
   if (search) {
@@ -835,15 +833,25 @@ export const approveLeave = async (
 
   // Update approval status based on role
   if (approverRole === 'manager') {
-    await pool.query(
+    // Additional safeguard: ensure manager can only approve their direct reports
+    const updateResult = await pool.query(
       `UPDATE leave_requests 
        SET manager_approval_status = 'approved',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
            manager_approved_by = $2
-       WHERE id = $3`,
+       WHERE id = $3 
+         AND EXISTS (
+           SELECT 1 FROM users u 
+           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
+           AND u.reporting_manager_id = $2
+         )`,
       [comment || null, approverId, leaveRequestId]
     );
+    
+    if (updateResult.rowCount === 0) {
+      throw new Error('Not authorized to approve this leave');
+    }
 
     // Check if needs HR approval
     const managerRoleResult = await pool.query(
@@ -965,16 +973,26 @@ export const rejectLeave = async (
 
   // Update rejection status
   if (approverRole === 'manager') {
-    await pool.query(
+    // Additional safeguard: ensure manager can only reject their direct reports
+    const updateResult = await pool.query(
       `UPDATE leave_requests 
        SET manager_approval_status = 'rejected',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
            manager_approved_by = $2,
            current_status = 'rejected'
-       WHERE id = $3`,
+       WHERE id = $3 
+         AND EXISTS (
+           SELECT 1 FROM users u 
+           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
+           AND u.reporting_manager_id = $2
+         )`,
       [comment, approverId, leaveRequestId]
     );
+    
+    if (updateResult.rowCount === 0) {
+      throw new Error('Not authorized to reject this leave');
+    }
   } else if (approverRole === 'hr') {
     await pool.query(
       `UPDATE leave_requests 
@@ -1133,15 +1151,25 @@ export const approveLeaveDay = async (
 
   // mark role-specific approval fields
   if (approverRole === 'manager') {
-    await pool.query(
+    // Additional safeguard: ensure manager can only approve their direct reports
+    const updateResult = await pool.query(
       `UPDATE leave_requests 
        SET manager_approval_status = 'approved',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
            manager_approved_by = $2
-       WHERE id = $3`,
+       WHERE id = $3 
+         AND EXISTS (
+           SELECT 1 FROM users u 
+           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
+           AND u.reporting_manager_id = $2
+         )`,
       [comment || null, approverId, leaveRequestId]
     );
+    
+    if (updateResult.rowCount === 0) {
+      throw new Error('Not authorized to approve this leave');
+    }
   } else if (approverRole === 'hr') {
     await pool.query(
       `UPDATE leave_requests 
@@ -1238,15 +1266,25 @@ export const rejectLeaveDay = async (
   }
 
   if (approverRole === 'manager') {
-    await pool.query(
+    // Additional safeguard: ensure manager can only reject their direct reports
+    const updateResult = await pool.query(
       `UPDATE leave_requests 
        SET manager_approval_status = 'rejected',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
            manager_approved_by = $2
-       WHERE id = $3`,
+       WHERE id = $3 
+         AND EXISTS (
+           SELECT 1 FROM users u 
+           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
+           AND u.reporting_manager_id = $2
+         )`,
       [comment || null, approverId, leaveRequestId]
     );
+    
+    if (updateResult.rowCount === 0) {
+      throw new Error('Not authorized to reject this leave');
+    }
   } else if (approverRole === 'hr') {
     await pool.query(
       `UPDATE leave_requests 

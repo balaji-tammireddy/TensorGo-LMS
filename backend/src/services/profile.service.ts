@@ -212,16 +212,29 @@ export const deleteProfilePhoto = async (userId: number) => {
   return { message: 'Profile photo deleted successfully' };
 };
 
-export const getReportingManagers = async (search?: string) => {
+export const getReportingManagers = async (search?: string, employeeRole?: string) => {
+  // Reporting manager rules:
+  // - For managers, their reporting manager should be HR
+  // - For HR, their reporting manager should be super admin
+  // - For employees, their reporting manager should be a manager
+  let targetRole: string;
+  if (employeeRole === 'manager') {
+    targetRole = 'hr';
+  } else if (employeeRole === 'hr') {
+    targetRole = 'super_admin';
+  } else {
+    targetRole = 'manager';
+  }
+  
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
     FROM users
-    WHERE role IN ('manager', 'hr', 'super_admin') AND status = 'active'
+    WHERE role = $1 AND status = 'active'
   `;
-  const params: any[] = [];
+  const params: any[] = [targetRole];
 
   if (search) {
-    query += ` AND (first_name ILIKE $1 OR last_name ILIKE $1 OR emp_id ILIKE $1)`;
+    query += ` AND (first_name ILIKE $2 OR last_name ILIKE $2 OR emp_id ILIKE $2)`;
     params.push(`%${search}%`);
   }
 
