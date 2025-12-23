@@ -11,7 +11,7 @@ async function migrate() {
     
     await pool.query(migrationFile);
     console.log('Migration completed successfully');
-
+    
     // Ensure current_status supports partially_approved (idempotent)
     await pool.query(`
       ALTER TABLE leave_requests

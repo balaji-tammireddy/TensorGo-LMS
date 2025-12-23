@@ -111,7 +111,7 @@ export const applyLeave = async (
         throw new Error('Cannot apply for past dates.');
       }
     } else {
-      if (startDate <= today) {
+    if (startDate <= today) {
         throw new Error('Cannot apply for past dates or today.');
       }
     }
@@ -224,13 +224,18 @@ export const applyLeave = async (
       );
     }
 
-    // Create notification for reporting manager (if notifications table exists)
+    // Create notification for reporting manager
     if (reportingManagerId) {
       try {
+        const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [userId]);
+        const userName = userResult.rows[0] 
+          ? `${userResult.rows[0].first_name} ${userResult.rows[0].last_name || ''}`.trim()
+          : 'An employee';
+        
         await pool.query(
           `INSERT INTO notifications (user_id, title, message, type)
-           VALUES ($1, 'New Leave Request', 'A leave request requires your approval', 'leave_request')`,
-          [reportingManagerId]
+           VALUES ($1, 'New Leave Request', $2, 'leave_submission')`,
+          [reportingManagerId, `${userName} has submitted a leave request for ${days} day(s). Please review.`]
         );
       } catch (notifError: any) {
         // Log but don't fail the leave request if notification fails
@@ -363,10 +368,10 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
          FROM leave_requests
          WHERE id = $1`
       : `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
-                reason, time_for_permission_start, time_for_permission_end,
-                current_status, employee_id
-         FROM leave_requests
-         WHERE id = $1 AND employee_id = $2`,
+            reason, time_for_permission_start, time_for_permission_end,
+            current_status, employee_id
+     FROM leave_requests
+     WHERE id = $1 AND employee_id = $2`,
     userRole === 'super_admin' ? [requestId] : [requestId, userId]
   );
 
@@ -470,7 +475,7 @@ export const updateLeaveRequest = async (
       throw new Error('Cannot apply for past dates.');
     }
   } else {
-    if (startDate <= today) {
+  if (startDate <= today) {
       throw new Error('Cannot apply for past dates or today.');
     }
   }
@@ -509,23 +514,23 @@ export const updateLeaveRequest = async (
       if ((balance.casual || 0) > 0) {
         throw new Error('LOP can be applied only when casual leave balance is 0');
       }
-    }
+  }
 
     // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
     if (leaveData.leaveType !== 'permission') {
       if (!balance) {
         balance = await getLeaveBalances(userId);
       }
-      const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
-      const currentBalance = balance[balanceKey];
-      
+    const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
+    const currentBalance = balance[balanceKey];
+    
       if (currentBalance <= 0) {
         throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
       }
-      if (currentBalance < days) {
-        throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
-      }
+    if (currentBalance < days) {
+      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
     }
+  }
 
   // Start transaction
   const client = await pool.connect();
@@ -636,6 +641,30 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
 
     await client.query('COMMIT');
 
+    // Create notification for reporting manager about cancellation
+    const leaveCheck = await pool.query(
+      'SELECT reporting_manager_id FROM users WHERE id = $1',
+      [userId]
+    );
+    const reportingManagerId = leaveCheck.rows[0]?.reporting_manager_id;
+    
+    if (reportingManagerId) {
+      try {
+        const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [userId]);
+        const userName = userResult.rows[0]
+          ? `${userResult.rows[0].first_name} ${userResult.rows[0].last_name || ''}`.trim()
+          : 'An employee';
+        
+        await pool.query(
+          `INSERT INTO notifications (user_id, title, message, type)
+           VALUES ($1, 'Leave Request Cancelled', $2, 'leave_cancellation')`,
+          [reportingManagerId, `${userName} has cancelled their leave request.`]
+        );
+      } catch (notifError: any) {
+        console.warn('Failed to create cancellation notification:', notifError.message);
+      }
+    }
+
     return { message: 'Leave request deleted successfully' };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -714,28 +743,28 @@ export const getPendingLeaveRequests = async (
   const requestsWithDays = await Promise.all(
     result.rows.map(async (row) => {
       try {
-        const daysResult = await pool.query(
+      const daysResult = await pool.query(
           'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-          [row.id]
-        );
+        [row.id]
+      );
 
-        return {
-          id: row.id,
-          empId: row.emp_id,
-          empName: row.emp_name,
+      return {
+        id: row.id,
+        empId: row.emp_id,
+        empName: row.emp_name,
           appliedDate: formatDate(row.applied_date),
           leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
-          leaveType: row.leave_type,
-          noOfDays: parseFloat(row.no_of_days),
-          leaveReason: row.leave_reason,
-          currentStatus: row.current_status,
-          leaveDays: daysResult.rows.map(d => ({
+        leaveType: row.leave_type,
+        noOfDays: parseFloat(row.no_of_days),
+        leaveReason: row.leave_reason,
+        currentStatus: row.current_status,
+        leaveDays: daysResult.rows.map(d => ({
             id: d.id,
             date: formatDate(d.leave_date),
             type: d.day_type,
             status: d.day_status || 'pending'
-          }))
-        };
+        }))
+      };
       } catch (e) {
         console.error('Pending leave days fetch failed', { leaveRequestId: row.id, error: e });
         throw e;
@@ -898,10 +927,18 @@ export const approveLeave = async (
   }
 
   // Create notification for employee
+  const approverResult = await pool.query(
+    'SELECT first_name, last_name, role FROM users WHERE id = $1',
+    [approverId]
+  );
+  const approverName = approverResult.rows[0]
+    ? `${approverResult.rows[0].first_name} ${approverResult.rows[0].last_name || ''}`.trim()
+    : approverRole;
+  
   await pool.query(
     `INSERT INTO notifications (user_id, title, message, type)
-     VALUES ($1, 'Leave Approved', 'Your leave request has been approved', 'leave_approval')`,
-    [leave.employee_id]
+     VALUES ($1, 'Leave Approved', $2, 'leave_approval')`,
+    [leave.employee_id, `Your leave request has been approved by ${approverName}.${comment ? ` Comment: ${comment}` : ''}`]
   );
 
   return { message: 'Leave approved successfully' };
@@ -1014,10 +1051,18 @@ export const rejectLeave = async (
   }
 
   // Create notification for employee
+  const approverResult = await pool.query(
+    'SELECT first_name, last_name FROM users WHERE id = $1',
+    [approverId]
+  );
+  const approverName = approverResult.rows[0]
+    ? `${approverResult.rows[0].first_name} ${approverResult.rows[0].last_name || ''}`.trim()
+    : approverRole;
+  
   await pool.query(
     `INSERT INTO notifications (user_id, title, message, type)
      VALUES ($1, 'Leave Rejected', $2, 'leave_rejection')`,
-    [leave.employee_id, `Your leave request has been rejected. Reason: ${comment}`]
+    [leave.employee_id, `Your leave request has been rejected by ${approverName}. Reason: ${comment}`]
   );
 
   await recalcLeaveRequestStatus(leaveRequestId);
@@ -1067,11 +1112,26 @@ const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
     newStatus = 'pending';
   }
 
+  const oldStatus = leave.current_status;
+  
   // Update header status only; keep original no_of_days for balance refunds
   await pool.query(
     `UPDATE leave_requests SET current_status = $1 WHERE id = $2`,
     [newStatus, leaveRequestId]
   );
+  
+  // Send notification for partial approval (only if status changed to partially_approved)
+  if (newStatus === 'partially_approved' && oldStatus !== 'partially_approved') {
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, title, message, type)
+         VALUES ($1, 'Leave Partially Approved', $2, 'leave_partial_approval')`,
+        [leave.employee_id, `Your leave request has been partially approved. ${approvedDays} day(s) approved, ${rejectedDays} day(s) rejected.`]
+      );
+    } catch (notifError: any) {
+      console.warn('Failed to create partial approval notification:', notifError.message);
+    }
+  }
 };
 
 export const approveLeaveDay = async (
@@ -1350,12 +1410,12 @@ export const getApprovedLeaves = async (
         : `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`;
 
       return {
-        id: row.id,
-        empId: row.emp_id,
-        empName: row.emp_name,
+      id: row.id,
+      empId: row.emp_id,
+      empName: row.emp_name,
         appliedDate: formatDate(row.applied_date),
         leaveDate,
-        leaveType: row.leave_type,
+      leaveType: row.leave_type,
         noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
         leaveStatus: displayStatus
       };

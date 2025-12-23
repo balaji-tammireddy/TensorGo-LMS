@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.routes';
 import leaveRoutes from './routes/leave.routes';
 import employeeRoutes from './routes/employee.routes';
 import profileRoutes from './routes/profile.routes';
+import notificationRoutes from './routes/notification.routes';
 
 import { pool } from './database/db';
 
@@ -54,6 +55,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling
 app.use(errorHandler);
