@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import { format } from 'date-fns';
-import { FaEye, FaPencilAlt } from 'react-icons/fa';
+import { FaEye, FaPencilAlt, FaTrash } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import './EmployeeManagementPage.css';
 
@@ -96,6 +97,8 @@ const EmployeeManagementPage: React.FC = () => {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [newEmployee, setNewEmployee] = useState<any>(emptyEmployeeForm);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteEmployeeId, setDeleteEmployeeId] = useState<number | null>(null);
 
   const { data: managersData } = useQuery(
     ['reporting-managers', newEmployee.role],
@@ -166,6 +169,21 @@ const EmployeeManagementPage: React.FC = () => {
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to update employee');
+      }
+    }
+  );
+
+  const deleteEmployeeMutation = useMutation(
+    (id: number) => employeeService.deleteEmployee(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('employees');
+        setDeleteConfirmOpen(false);
+        setDeleteEmployeeId(null);
+        showSuccess('Employee and all related data deleted successfully!');
+      },
+      onError: (error: any) => {
+        showError(error.response?.data?.error?.message || 'Failed to delete employee');
       }
     }
   );
@@ -378,6 +396,17 @@ const EmployeeManagementPage: React.FC = () => {
   const handleEditEmployee = (employeeId: number) => openEmployeeModal(employeeId, 'edit');
   const handleViewEmployee = (employeeId: number) => openEmployeeModal(employeeId, 'view');
 
+  const handleDelete = (employeeId: number) => {
+    setDeleteEmployeeId(employeeId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteEmployeeId) {
+      deleteEmployeeMutation.mutate(deleteEmployeeId);
+    }
+  };
+
   const handleResetFilters = () => {
     setSearchInput('');
     setAppliedSearch(undefined);
@@ -514,6 +543,16 @@ const EmployeeManagementPage: React.FC = () => {
                       >
                       <FaPencilAlt />
                       </span>
+                      {user?.role === 'super_admin' && (
+                        <span
+                          className="action-icon"
+                          title="Delete"
+                          onClick={() => handleDelete(employee.id)}
+                          style={{ color: '#f44336' }}
+                        >
+                          <FaTrash />
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1167,6 +1206,19 @@ const EmployeeManagementPage: React.FC = () => {
           </div>
         )}
       </div>
+      <ConfirmationDialog
+        isOpen={deleteConfirmOpen}
+        title="Delete Employee"
+        message="Are you sure you want to delete this employee? This will permanently delete all their data including leave requests, education records, and other related information. This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setDeleteEmployeeId(null);
+        }}
+      />
     </AppLayout>
   );
 };

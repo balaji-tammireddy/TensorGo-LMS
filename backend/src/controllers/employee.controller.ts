@@ -68,6 +68,15 @@ export const updateEmployee = async (req: AuthRequest, res: Response) => {
 
 export const deleteEmployee = async (req: AuthRequest, res: Response) => {
   try {
+    // Ensure only super_admin can delete
+    if (req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only super admin can delete employees'
+        }
+      });
+    }
     const employeeId = parseInt(req.params.id);
     const result = await employeeService.deleteEmployee(employeeId);
     res.json(result);

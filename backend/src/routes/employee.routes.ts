@@ -13,7 +13,8 @@ router.get('/', employeeController.getEmployees);
 router.get('/:id', employeeController.getEmployeeById);
 router.post('/', employeeController.createEmployee);
 router.put('/:id', employeeController.updateEmployee);
-router.delete('/:id', employeeController.deleteEmployee);
+// Only super_admin can delete employees
+router.delete('/:id', authorizeRole('super_admin'), employeeController.deleteEmployee);
 
 export default router;
 

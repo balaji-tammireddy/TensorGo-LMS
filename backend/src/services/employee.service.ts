@@ -296,14 +296,59 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
 export const deleteEmployee = async (employeeId: number) => {
   // Check if employee exists
-  const result = await pool.query('SELECT id FROM users WHERE id = $1', [employeeId]);
+  const result = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
   if (result.rows.length === 0) {
     throw new Error('Employee not found');
   }
 
-  // Soft delete by setting status to resigned
-  await pool.query('UPDATE users SET status = $1 WHERE id = $2', ['resigned', employeeId]);
+  const employee = result.rows[0];
+  
+  // Prevent deletion of super_admin users
+  if (employee.role === 'super_admin') {
+    throw new Error('Cannot delete super admin users');
+  }
 
-  return { message: 'Employee deleted successfully' };
+  // Start transaction to delete all related data
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Delete all related data in order (respecting foreign key constraints)
+    // 1. Delete notifications
+    await client.query('DELETE FROM notifications WHERE user_id = $1', [employeeId]);
+
+    // 2. Delete audit logs
+    await client.query('DELETE FROM audit_logs WHERE user_id = $1', [employeeId]);
+
+    // 3. Delete leave days (these are linked to leave requests)
+    await client.query('DELETE FROM leave_days WHERE leave_request_id IN (SELECT id FROM leave_requests WHERE employee_id = $1)', [employeeId]);
+
+    // 4. Delete leave requests
+    await client.query('DELETE FROM leave_requests WHERE employee_id = $1', [employeeId]);
+
+    // 5. Delete leave balances
+    await client.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
+
+    // 6. Delete education records (has ON DELETE CASCADE, but explicit for clarity)
+    await client.query('DELETE FROM education WHERE employee_id = $1', [employeeId]);
+
+    // 7. Update reporting_manager_id in users table to NULL for employees reporting to this user
+    await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
+
+    // 8. Update created_by and updated_by references to NULL
+    await client.query('UPDATE users SET created_by = NULL WHERE created_by = $1', [employeeId]);
+    await client.query('UPDATE users SET updated_by = NULL WHERE updated_by = $1', [employeeId]);
+
+    // 9. Finally, delete the user
+    await client.query('DELETE FROM users WHERE id = $1', [employeeId]);
+
+    await client.query('COMMIT');
+    return { message: 'Employee and all related data deleted successfully' };
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
