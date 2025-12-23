@@ -28,6 +28,11 @@ export interface LeaveRequest {
   rejectionReason?: string;
   canEdit?: boolean;
   canDelete?: boolean;
+  leaveDays?: Array<{ date: string; type: string; status: string }>;
+  approvedDays?: number;
+  rejectedDays?: number;
+  pendingDays?: number;
+  totalDays?: number;
 }
 
 export interface PendingLeaveRequest {

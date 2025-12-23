@@ -952,24 +952,21 @@ const EmployeeManagementPage: React.FC = () => {
                     <thead>
                       <tr>
                         <th className="education-level-col"></th>
-                        <th>
-                          Group/Stream<span className="required-indicator">*</span>
-                        </th>
-                        <th>
-                          College/University<span className="required-indicator">*</span>
-                        </th>
-                        <th>
-                          Graduation Year<span className="required-indicator">*</span>
-                        </th>
-                        <th>
-                          Score %<span className="required-indicator">*</span>
-                        </th>
+                        <th>Group/Stream</th>
+                        <th>College/University</th>
+                        <th>Graduation Year</th>
+                        <th>Score %</th>
                       </tr>
                     </thead>
                     <tbody>
                       {newEmployee.education?.map((edu: any, idx: number) => (
                         <tr key={edu.level}>
-                          <td className="education-level-cell">{edu.level}</td>
+                          <td className="education-level-cell">
+                            {edu.level}
+                            {(edu.level === 'UG' || edu.level === '12th') && (
+                              <span className="required-indicator">*</span>
+                            )}
+                          </td>
                           <td>
                             <input
                               type="text"

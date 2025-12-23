@@ -95,9 +95,10 @@
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
-  resize: vertical;
-  min-height: 100px;
+  resize: none;
+  height: 100px;
   transition: border-color 0.2s;
+  overflow-y: auto;
 }
 
 .reject-comment-textarea:focus {

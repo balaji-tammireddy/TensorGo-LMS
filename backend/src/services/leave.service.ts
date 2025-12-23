@@ -238,6 +238,7 @@ export const applyLeave = async (
       }
     }
 
+
     return { leaveRequestId, message: 'Leave request submitted successfully' };
   } catch (error: any) {
     console.error('Error in applyLeave:', error);
@@ -903,6 +904,8 @@ export const approveLeave = async (
      VALUES ($1, 'Leave Approved', 'Your leave request has been approved', 'leave_approval')`,
     [leave.employee_id]
   );
+
+  await recalcLeaveRequestStatus(leaveRequestId);
 
   return { message: 'Leave approved successfully' };
 };

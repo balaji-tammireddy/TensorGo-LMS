@@ -72,6 +72,86 @@ const LeaveApplyPage: React.FC = () => {
 
   const isSickLongLeave = formData.leaveType === 'sick' && computeRequestedDays() >= 3;
 
+  // Check if requested dates overlap with existing leave requests
+  const checkDateOverlap = (): string | null => {
+    if (!formData.startDate || !formData.endDate || !myRequests?.requests) {
+      return null;
+    }
+
+    const start = new Date(`${formData.startDate}T00:00:00`);
+    const end = new Date(`${formData.endDate}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return null;
+    }
+
+    const requestedDays = eachDayOfInterval({ start, end });
+    const startHalf = formData.startType !== 'full';
+    const endHalf = formData.endType !== 'full';
+
+    // Check each requested day against existing leave requests
+    for (const day of requestedDays) {
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+      if (isWeekend) continue; // Skip weekends
+
+      const isFirst = dayStr === formData.startDate;
+      const isLast = dayStr === formData.endDate;
+      const isHalfDay = (isFirst && startHalf) || (isLast && endHalf);
+      const requestedHalf = isFirst ? formData.startType : (isLast ? formData.endType : 'full');
+
+      // Check against existing requests (exclude the one being edited)
+      for (const request of myRequests.requests) {
+        // Skip rejected requests and the request being edited
+        if (request.currentStatus === 'rejected' || request.id === editingId) {
+          continue;
+        }
+
+        // Check if this day falls within the request's date range
+        const reqStart = new Date(`${request.startDate}T00:00:00`);
+        const reqEnd = new Date(`${request.endDate}T00:00:00`);
+        
+        if (day >= reqStart && day <= reqEnd) {
+          // Check leaveDays array if available (more accurate)
+          if (request.leaveDays && Array.isArray(request.leaveDays)) {
+            const existingDay = request.leaveDays.find((ld: any) => ld.date === dayStr);
+            if (existingDay) {
+              // Check status - only block if approved or pending
+              if (existingDay.status === 'approved' || existingDay.status === 'pending') {
+                // If existing leave is full day, block any new leave (full or half)
+                if (existingDay.type === 'full') {
+                  const statusText = existingDay.status === 'approved' ? 'approved' : 'pending';
+                  return `Leave already applied for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
+                }
+                // If existing leave is half day
+                if (existingDay.type === 'half') {
+                  // Block if new request is full day
+                  if (!isHalfDay) {
+                    const statusText = existingDay.status === 'approved' ? 'approved' : 'pending';
+                    return `Leave already applied for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
+                  }
+                  // If both are half days, we can't determine if they're different halves
+                  // So we'll block to be safe (user can check their existing requests)
+                  const statusText = existingDay.status === 'approved' ? 'approved' : 'pending';
+                  return `Leave already applied for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
+                }
+              }
+            }
+          } else {
+            // Fallback: check date range overlap (less precise but better than nothing)
+            // If the request has approved or pending status, block the entire date range
+            if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
+              const statusText = request.currentStatus === 'approved' ? 'approved' : 
+                                request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
+              return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -128,7 +208,7 @@ const LeaveApplyPage: React.FC = () => {
   );
   const { data: myRequests, isLoading: requestsLoading, error: requestsError } = useQuery(
     'myLeaveRequests',
-    () => leaveService.getMyLeaveRequests(1, 10),
+    () => leaveService.getMyLeaveRequests(1, 100), // Fetch more requests to check overlaps
     { retry: false, onError: (error: any) => {
       if (error.response?.status === 401 || error.response?.status === 403) {
         window.location.href = '/login';
@@ -202,6 +282,13 @@ const LeaveApplyPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check for date overlaps with existing leave requests
+    const overlapError = checkDateOverlap();
+    if (overlapError) {
+      showWarning(overlapError);
+      return;
+    }
 
     const requestedDays = computeRequestedDays();
 
