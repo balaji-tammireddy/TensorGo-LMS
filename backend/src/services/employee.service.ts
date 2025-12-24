@@ -491,3 +491,108 @@ export const deleteEmployee = async (employeeId: number) => {
   }
 };
 
+export const addLeavesToEmployee = async (
+  employeeId: number,
+  leaveType: 'casual' | 'sick' | 'lop',
+  count: number,
+  updatedBy: number
+) => {
+  // Validate leave type
+  if (!['casual', 'sick', 'lop'].includes(leaveType)) {
+    throw new Error('Invalid leave type');
+  }
+
+  // Validate count
+  if (count <= 0) {
+    throw new Error('Leave count must be greater than 0');
+  }
+
+  // Check if employee exists
+  const employeeCheck = await pool.query('SELECT id FROM users WHERE id = $1', [employeeId]);
+  if (employeeCheck.rows.length === 0) {
+    throw new Error('Employee not found');
+  }
+
+  // Get or create leave balance
+  const balanceCheck = await pool.query(
+    'SELECT id, casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
+    [employeeId]
+  );
+
+  const balanceColumn = `${leaveType}_balance`;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    if (balanceCheck.rows.length === 0) {
+      // Create leave balance if it doesn't exist
+      // Check if count exceeds maximum limit
+      if (count > 99) {
+        throw new Error(`Cannot add ${count} leaves. Maximum limit is 99 leaves per employee.`);
+      }
+      
+      const initialBalances: any = { casual_balance: 0, sick_balance: 0, lop_balance: 0 };
+      initialBalances[balanceColumn] = count;
+      
+      await client.query(
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          employeeId,
+          initialBalances.casual_balance,
+          initialBalances.sick_balance,
+          initialBalances.lop_balance,
+          updatedBy
+        ]
+      );
+    } else {
+      // Get current balance for the leave type
+      const currentBalance = parseFloat(balanceCheck.rows[0][balanceColumn] || '0');
+      const newTotal = currentBalance + count;
+      
+      // Check if total would exceed maximum limit
+      if (newTotal > 99) {
+        throw new Error(`Cannot add ${count} leaves. Current balance: ${currentBalance}, Maximum limit: 99. Total would be: ${newTotal}`);
+      }
+      
+      // Update existing balance
+      await client.query(
+        `UPDATE leave_balances 
+         SET ${balanceColumn} = ${balanceColumn} + $1,
+             last_updated = CURRENT_TIMESTAMP,
+             updated_by = $2
+         WHERE employee_id = $3`,
+        [count, updatedBy, employeeId]
+      );
+    }
+
+    await client.query('COMMIT');
+    return { message: `${count} ${leaveType} leave(s) added successfully` };
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    throw new Error(error.message || 'Failed to add leaves');
+  } finally {
+    client.release();
+  }
+};
+
+export const getEmployeeLeaveBalances = async (employeeId: number) => {
+  const result = await pool.query(
+    'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
+    [employeeId]
+  );
+
+  if (result.rows.length === 0) {
+    // Return zero balances if not found
+    return { casual: 0, sick: 0, lop: 0 };
+  }
+
+  const balance = result.rows[0];
+  return {
+    casual: parseFloat(balance.casual_balance) || 0,
+    sick: parseFloat(balance.sick_balance) || 0,
+    lop: parseFloat(balance.lop_balance) || 0
+  };
+};
+

@@ -54,8 +54,18 @@ export const deleteEmployee = async (id: number) => {
   return response.data;
 };
 
+export const addLeavesToEmployee = async (employeeId: number, leaveType: 'casual' | 'sick' | 'lop', count: number) => {
+  const response = await api.post(`/employees/${employeeId}/leaves`, { leaveType, count });
+  return response.data;
+};
+
 export const getNextEmployeeId = async (): Promise<string> => {
   const response = await api.get('/employees/next-id');
   return response.data.nextEmployeeId;
+};
+
+export const getEmployeeLeaveBalances = async (employeeId: number) => {
+  const response = await api.get(`/employees/${employeeId}/leave-balances`);
+  return response.data;
 };
 

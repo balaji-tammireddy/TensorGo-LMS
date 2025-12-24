@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import AddLeavesModal from '../components/AddLeavesModal';
 import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import { format } from 'date-fns';
-import { FaEye, FaPencilAlt, FaTrash } from 'react-icons/fa';
+import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import './EmployeeManagementPage.css';
 
@@ -99,6 +100,8 @@ const EmployeeManagementPage: React.FC = () => {
   const [newEmployee, setNewEmployee] = useState<any>(emptyEmployeeForm);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<number | null>(null);
+  const [addLeavesModalOpen, setAddLeavesModalOpen] = useState(false);
+  const [selectedEmployeeForLeaves, setSelectedEmployeeForLeaves] = useState<{ id: number; name: string } | null>(null);
 
   const { data: managersData } = useQuery(
     ['reporting-managers', newEmployee.role, editingEmployeeId],
@@ -185,6 +188,22 @@ const EmployeeManagementPage: React.FC = () => {
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to delete employee');
+      }
+    }
+  );
+
+  const addLeavesMutation = useMutation(
+    ({ employeeId, leaveType, count }: { employeeId: number; leaveType: 'casual' | 'sick' | 'lop'; count: number }) =>
+      employeeService.addLeavesToEmployee(employeeId, leaveType, count),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('employees');
+        setAddLeavesModalOpen(false);
+        setSelectedEmployeeForLeaves(null);
+        showSuccess('Leaves added successfully!');
+      },
+      onError: (error: any) => {
+        showError(error.response?.data?.error?.message || 'Failed to add leaves');
       }
     }
   );
@@ -454,6 +473,21 @@ const EmployeeManagementPage: React.FC = () => {
     }
   };
 
+  const handleAddLeaves = (employeeId: number, employeeName: string) => {
+    setSelectedEmployeeForLeaves({ id: employeeId, name: employeeName });
+    setAddLeavesModalOpen(true);
+  };
+
+  const handleAddLeavesSubmit = (leaveType: 'casual' | 'sick' | 'lop', count: number) => {
+    if (selectedEmployeeForLeaves) {
+      addLeavesMutation.mutate({
+        employeeId: selectedEmployeeForLeaves.id,
+        leaveType,
+        count
+      });
+    }
+  };
+
   const handleResetFilters = () => {
     setSearchInput('');
     setAppliedSearch(undefined);
@@ -591,6 +625,17 @@ const EmployeeManagementPage: React.FC = () => {
                           onClick={() => handleEditEmployee(employee.id)}
                         >
                         <FaPencilAlt />
+                        </span>
+                      )}
+                      {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin */}
+                      {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) || user?.role === 'super_admin') && (
+                        <span
+                          className="action-icon"
+                          title="Add Leaves"
+                          onClick={() => handleAddLeaves(employee.id, employee.name)}
+                          style={{ color: '#3c6ff2' }}
+                        >
+                          <FaCalendarPlus />
                         </span>
                       )}
                       {user?.role === 'super_admin' && (
@@ -1355,6 +1400,18 @@ const EmployeeManagementPage: React.FC = () => {
           setDeleteConfirmOpen(false);
           setDeleteEmployeeId(null);
         }}
+        isLoading={deleteEmployeeMutation.isLoading}
+      />
+      <AddLeavesModal
+        isOpen={addLeavesModalOpen}
+        onClose={() => {
+          setAddLeavesModalOpen(false);
+          setSelectedEmployeeForLeaves(null);
+        }}
+        onAdd={handleAddLeavesSubmit}
+        employeeId={selectedEmployeeForLeaves?.id || 0}
+        employeeName={selectedEmployeeForLeaves?.name || ''}
+        isLoading={addLeavesMutation.isLoading}
       />
     </AppLayout>
   );

@@ -16,6 +16,10 @@ router.post('/', employeeController.createEmployee);
 router.put('/:id', employeeController.updateEmployee);
 // Only super_admin can delete employees
 router.delete('/:id', authorizeRole('super_admin'), employeeController.deleteEmployee);
+// HR and Super Admin can add leaves to employees
+router.post('/:id/leaves', employeeController.addLeavesToEmployee);
+// HR and Super Admin can view employee leave balances
+router.get('/:id/leave-balances', employeeController.getEmployeeLeaveBalances);
 
 export default router;
 
