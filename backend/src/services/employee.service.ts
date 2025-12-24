@@ -152,6 +152,20 @@ export const createEmployee = async (employeeData: any) => {
     throw new Error('Employee ID or email already exists');
   }
 
+  // Validate date of birth - employee must be at least 18 years old
+  if (employeeData.dateOfBirth) {
+    const dob = new Date(employeeData.dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      throw new Error('Employee must be at least 18 years old');
+    }
+  }
+
   // Default password for newly created employees (if none explicitly provided)
   const passwordHash = await hashPassword(employeeData.password || 'tensorgo@2023');
 
@@ -213,6 +227,16 @@ export const createEmployee = async (employeeData: any) => {
   if (employeeData.education) {
     for (const edu of employeeData.education) {
       if (edu.level) {
+        // Validate year if provided (must be between 1950 and 5 years from current year)
+        if (edu.year) {
+          const year = parseInt(edu.year, 10);
+          const currentYear = new Date().getFullYear();
+          const maxYear = currentYear + 5;
+          if (isNaN(year) || year < 1950 || year > maxYear) {
+            throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
+          }
+        }
+        
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -335,6 +359,20 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
+  // Validate date of birth - employee must be at least 18 years old
+  if (employeeData.dateOfBirth) {
+    const dob = new Date(employeeData.dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      throw new Error('Employee must be at least 18 years old');
+    }
+  }
+
   for (const [key, value] of Object.entries(employeeData)) {
     const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
     if (allowedFields.includes(dbKey) && value !== undefined) {
@@ -361,6 +399,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   if (employeeData.education) {
     for (const edu of employeeData.education) {
       if (edu.level) {
+        // Validate year if provided (must be between 1950 and 5 years from current year)
+        if (edu.year) {
+          const year = parseInt(edu.year, 10);
+          const currentYear = new Date().getFullYear();
+          const maxYear = currentYear + 5;
+          if (isNaN(year) || year < 1950 || year > maxYear) {
+            throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
+          }
+        }
+        
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
            VALUES ($1, $2, $3, $4, $5, $6)

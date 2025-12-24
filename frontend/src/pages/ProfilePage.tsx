@@ -146,6 +146,22 @@ const ProfilePage: React.FC = () => {
     if (isEmpty(formData.personalInfo?.contactNumber)) missingFields.push('Contact Number');
     if (isEmpty(formData.personalInfo?.altContact)) missingFields.push('Alt Contact');
     if (isEmpty(formData.personalInfo?.dateOfBirth)) missingFields.push('Date of Birth');
+    
+    // Validate age - employee must be at least 18 years old
+    if (formData.personalInfo?.dateOfBirth) {
+      const dob = new Date(formData.personalInfo.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        showWarning('Employee must be at least 18 years old');
+        return;
+      }
+    }
+    
     if (isEmpty(formData.personalInfo?.gender)) missingFields.push('Gender');
     if (isEmpty(formData.personalInfo?.bloodGroup)) missingFields.push('Blood Group');
     if (isEmpty(formData.personalInfo?.maritalStatus)) missingFields.push('Marital Status');
@@ -168,17 +184,37 @@ const ProfilePage: React.FC = () => {
 
     // Education information (PG optional, UG and 12th mandatory)
     if (formData.education && Array.isArray(formData.education)) {
-      formData.education.forEach((edu: any) => {
+      const currentYear = new Date().getFullYear();
+      const maxYear = currentYear + 5;
+      let yearValidationError: string | null = null;
+      
+      for (const edu of formData.education) {
         const levelLabel = edu.level || 'Education';
         if (levelLabel === 'PG') {
           // PG row is optional
-          return;
+          continue;
         }
         if (isEmpty(edu.groupStream)) missingFields.push(`${levelLabel} - Group/Stream`);
         if (isEmpty(edu.collegeUniversity)) missingFields.push(`${levelLabel} - College/University`);
-        if (isEmpty(edu.year)) missingFields.push(`${levelLabel} - Graduation Year`);
+        if (isEmpty(edu.year)) {
+          missingFields.push(`${levelLabel} - Graduation Year`);
+        } else {
+          // Validate year range (1950 to 5 years from current year)
+          const year = parseInt(edu.year, 10);
+          if (isNaN(year) || year < 1950 || year > maxYear) {
+            if (!yearValidationError) {
+              yearValidationError = `Graduation Year must be between 1950 and ${maxYear}`;
+            }
+          }
+        }
         if (isEmpty(edu.scorePercentage)) missingFields.push(`${levelLabel} - Score %`);
-      });
+      }
+      
+      // Show year validation error once if any invalid year found
+      if (yearValidationError) {
+        showWarning(yearValidationError);
+        return;
+      }
     }
 
     if (missingFields.length > 0) {
@@ -851,6 +887,15 @@ const ProfilePage: React.FC = () => {
                         newEducation[idx] = { ...edu, year: value };
                         setFormData({ ...formData, education: newEducation });
                       }}
+                      onBlur={(e) => {
+                        const year = parseInt(e.target.value, 10);
+                        const currentYear = new Date().getFullYear();
+                        const maxYear = currentYear + 5;
+                        if (e.target.value && (isNaN(year) || year < 1950 || year > maxYear)) {
+                          showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
+                        }
+                      }}
+                      placeholder="YYYY"
                       disabled={!isEditMode}
                     />
                   </td>
