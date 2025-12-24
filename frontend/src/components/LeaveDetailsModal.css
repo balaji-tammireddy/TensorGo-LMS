@@ -177,6 +177,80 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
+.status-dropdown {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+  color: #203050;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border: 1px solid #e6e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.status-dropdown:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+}
+
+.status-dropdown:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.status-dropdown:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.approver-role-badge {
+  font-size: 12px;
+  color: #5a6c7d;
+  font-weight: 500;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: rgba(90, 108, 125, 0.1);
+  border-radius: 12px;
+}
+
+.leave-reason-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+  color: #203050;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border: 1px solid #e6e8f0;
+  border-radius: 8px;
+  resize: none;
+  min-height: 100px;
+  max-height: 100px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  overflow-y: auto;
+}
+
+.leave-reason-textarea:hover {
+  border-color: #d5ddf0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.leave-reason-textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.leave-reason-textarea:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .status-pending {
   background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
   color: #000;

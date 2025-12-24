@@ -148,7 +148,18 @@ export const updateProfile = async (userId: number, profileData: any) => {
       if (value !== undefined && value !== null) {
         updates.push(`${dbKey} = $${paramCount}`);
         if (dbKey === 'pan_number' && typeof value === 'string') {
-          values.push(value.slice(0, 10));
+          const pan = value.trim().toUpperCase();
+          // Validate PAN format: 5 letters, 4 digits, 1 letter
+          if (pan && pan.length !== 10) {
+            throw new Error('PAN number must be exactly 10 characters long');
+          }
+          if (pan && pan.length === 10) {
+            const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+            if (!panRegex.test(pan)) {
+              throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
+            }
+          }
+          values.push(pan || null);
         } else {
           values.push(value);
         }

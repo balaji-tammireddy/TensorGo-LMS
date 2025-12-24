@@ -476,6 +476,8 @@ const LeaveApplyPage: React.FC = () => {
         leaveReason: request.leaveReason,
         currentStatus: request.currentStatus,
         rejectionReason: request.rejectionReason,
+        approverName: request.approverName || null,
+        approverRole: request.approverRole || null,
         doctorNote: request.doctorNote || null,
         leaveDays: request.leaveDays || []
       });
@@ -949,7 +951,7 @@ const LeaveApplyPage: React.FC = () => {
                         <span className="status-badge status-approved">Approved</span>
                       ) : request.currentStatus === 'rejected' ? (
                         <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
-                          Rejected{request.rejectionReason ? `: ${request.rejectionReason}` : ''}
+                          Rejected
                         </span>
                     ) : request.currentStatus === 'partially_approved' ? (
                       <span className="status-badge status-partial">Partially Approved</span>

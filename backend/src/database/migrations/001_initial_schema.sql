@@ -143,37 +143,37 @@ CREATE TABLE IF NOT EXISTS education (
 
 CREATE INDEX IF NOT EXISTS idx_education_employee ON education(employee_id);
 
--- Audit logs table
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id),
-  action VARCHAR(50) NOT NULL,
-  entity_type VARCHAR(50),
-  entity_id INTEGER,
-  old_values JSONB,
-  new_values JSONB,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- Audit logs table (removed - not used)
+-- CREATE TABLE IF NOT EXISTS audit_logs (
+--   id SERIAL PRIMARY KEY,
+--   user_id INTEGER REFERENCES users(id),
+--   action VARCHAR(50) NOT NULL,
+--   entity_type VARCHAR(50),
+--   entity_id INTEGER,
+--   old_values JSONB,
+--   new_values JSONB,
+--   ip_address VARCHAR(45),
+--   user_agent TEXT,
+--   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- );
+--
+-- CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+-- CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+-- CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
-
--- Notifications table
-CREATE TABLE IF NOT EXISTS notifications (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id),
-  title VARCHAR(200) NOT NULL,
-  message TEXT NOT NULL,
-  type VARCHAR(50),
-  is_read BOOLEAN DEFAULT false,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
+-- Notifications table (removed - not used)
+-- CREATE TABLE IF NOT EXISTS notifications (
+--   id SERIAL PRIMARY KEY,
+--   user_id INTEGER NOT NULL REFERENCES users(id),
+--   title VARCHAR(200) NOT NULL,
+--   message TEXT NOT NULL,
+--   type VARCHAR(50),
+--   is_read BOOLEAN DEFAULT false,
+--   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- );
+--
+-- CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+-- CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

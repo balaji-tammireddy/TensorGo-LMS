@@ -85,7 +85,7 @@ export const getMyRequests = async (req: AuthRequest, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const status = req.query.status as string | undefined;
     
-    const result = await leaveService.getMyLeaveRequests(req.user!.id, page, limit, status);
+    const result = await leaveService.getMyLeaveRequests(req.user!.id, page, limit, status, req.user!.role);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({
@@ -261,12 +261,64 @@ export const getApprovedLeaves = async (req: AuthRequest, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     
-    const result = await leaveService.getApprovedLeaves(page, limit);
+    const result = await leaveService.getApprovedLeaves(page, limit, req.user!.role);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
+export const updateLeaveStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const leaveRequestId = parseInt(req.params.id);
+    const { status, dayIds, rejectReason, leaveReason } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Status is required'
+        }
+      });
+    }
+
+    if (!['approved', 'rejected', 'partially_approved'].includes(status)) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid status. Must be approved, rejected, or partially_approved'
+        }
+      });
+    }
+
+    if (status === 'partially_approved' && (!dayIds || !Array.isArray(dayIds) || dayIds.length === 0)) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'dayIds array is required for partially_approved status'
+        }
+      });
+    }
+
+    const result = await leaveService.updateLeaveStatus(
+      leaveRequestId,
+      req.user!.id,
+      req.user!.role,
+      status,
+      dayIds,
+      rejectReason,
+      leaveReason
+    );
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'UPDATE_STATUS_ERROR',
         message: error.message
       }
     });
@@ -314,7 +366,7 @@ export const updateLeaveRequest = async (req: AuthRequest, res: Response) => {
 export const deleteLeaveRequest = async (req: AuthRequest, res: Response) => {
   try {
     const requestId = parseInt(req.params.id);
-    const result = await leaveService.deleteLeaveRequest(requestId, req.user!.id);
+    const result = await leaveService.deleteLeaveRequest(requestId, req.user!.id, req.user!.role);
     res.json(result);
   } catch (error: any) {
     res.status(error.message.includes('not found') || error.message.includes('permission') ? 404 : 400).json({

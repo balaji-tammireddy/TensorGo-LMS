@@ -379,30 +379,6 @@ export const applyLeave = async (
         );
       }
 
-      // Create notification for reporting manager (if notifications table exists)
-      // Use SAVEPOINT to prevent notification failure from aborting the transaction
-      if (reportingManagerId) {
-        try {
-          await client.query('SAVEPOINT notification_savepoint');
-          await client.query(
-            `INSERT INTO notifications (user_id, title, message, type)
-             VALUES ($1, 'New Leave Request', 'A leave request requires your approval', 'leave_request')`,
-            [reportingManagerId]
-          );
-          await client.query('RELEASE SAVEPOINT notification_savepoint');
-        } catch (notifError: any) {
-          // Rollback to savepoint to prevent transaction abort
-          try {
-            await client.query('ROLLBACK TO SAVEPOINT notification_savepoint');
-            await client.query('RELEASE SAVEPOINT notification_savepoint');
-          } catch (spError: any) {
-            // If savepoint doesn't exist, transaction might already be aborted
-            logger.warn('Failed to rollback to savepoint:', spError.message);
-          }
-          // Log but don't fail the leave request if notification fails
-          logger.warn('Failed to create notification:', notifError.message);
-        }
-      }
 
       await client.query('COMMIT');
     } catch (error: any) {
@@ -589,14 +565,19 @@ export const getMyLeaveRequests = async (
   userId: number,
   page: number = 1,
   limit: number = 10,
-  status?: string
+  status?: string,
+  userRole?: string
 ) => {
   const offset = (page - 1) * limit;
   let query = `
-    SELECT id, applied_date, reason as leave_reason, start_date, start_type, end_date, end_type,
-           no_of_days, leave_type, current_status, doctor_note
-    FROM leave_requests
-    WHERE employee_id = $1
+    SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
+           lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
+           lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+           lr.last_updated_by, lr.last_updated_by_role,
+           last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+    FROM leave_requests lr
+    LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+    WHERE lr.employee_id = $1
   `;
   const params: any[] = [userId];
   
@@ -652,6 +633,24 @@ export const getMyLeaveRequests = async (
       displayStatus = 'pending';
     }
 
+    // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+    const rejectionReason = (displayStatus === 'rejected') 
+      ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+      : null;
+    
+    // Get approver name from last_updated_by fields
+    let approverName: string | null = row.approver_name || null;
+    let approverRole: string | null = null;
+    
+    // Map role from database to display format
+    if (row.last_updated_by_role === 'super_admin') {
+      approverRole = 'Super Admin';
+    } else if (row.last_updated_by_role === 'hr') {
+      approverRole = 'HR';
+    } else if (row.last_updated_by_role === 'manager') {
+      approverRole = 'Manager';
+    }
+
     requests.push({
       id: row.id,
       appliedDate: formatDate(row.applied_date),
@@ -663,10 +662,13 @@ export const getMyLeaveRequests = async (
       noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
       leaveType: row.leave_type,
       currentStatus: displayStatus,
-      rejectionReason: row.manager_rejection_comment || row.hr_rejection_comment || row.super_admin_rejection_comment || null,
+      rejectionReason,
+      approverName,
+      approverRole,
       doctorNote: row.doctor_note || null,
-      canEdit: row.current_status === 'pending',
-      canDelete: row.current_status === 'pending',
+      // HR and Super Admin can edit/delete any leave, regular users can only edit/delete pending leaves
+      canEdit: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
+      canDelete: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
       leaveDays: days.map(d => ({
         date: formatDate(d.leave_date),
         type: d.day_type,
@@ -694,20 +696,53 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     throw new Error('Invalid leave request ID');
   }
 
-  const result = await pool.query(
-    userRole === 'super_admin'
-      ? `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
-                reason, time_for_permission_start, time_for_permission_end,
-                current_status, employee_id, doctor_note
-         FROM leave_requests
-         WHERE id = $1`
-      : `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
-            reason, time_for_permission_start, time_for_permission_end,
-            current_status, employee_id, doctor_note
-     FROM leave_requests
-     WHERE id = $1 AND employee_id = $2`,
-    userRole === 'super_admin' ? [requestId] : [requestId, userId]
-  );
+  // HR and Super Admin can view any leave
+  // Managers can view leaves of their direct reports
+  // Others can only view their own
+  const canViewAny = userRole === 'super_admin' || userRole === 'hr';
+  
+  let query: string;
+  let params: any[];
+  
+  if (canViewAny) {
+    query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
+                lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+                lr.current_status, lr.employee_id, lr.doctor_note,
+                lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+                lr.last_updated_by, lr.last_updated_by_role,
+                last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+         FROM leave_requests lr
+         LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+         WHERE lr.id = $1`;
+    params = [requestId];
+  } else if (userRole === 'manager') {
+    // Managers can view leaves of their direct reports
+    query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
+                lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+                lr.current_status, lr.employee_id, lr.doctor_note,
+                lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+                lr.last_updated_by, lr.last_updated_by_role,
+                last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+         FROM leave_requests lr
+         JOIN users u ON lr.employee_id = u.id
+         LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+         WHERE lr.id = $1 AND (lr.employee_id = $2 OR u.reporting_manager_id = $2)`;
+    params = [requestId, userId];
+  } else {
+    // Others can only view their own leaves
+    query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
+            lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+            lr.current_status, lr.employee_id, lr.doctor_note,
+            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+            lr.last_updated_by, lr.last_updated_by_role,
+            last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+     FROM leave_requests lr
+     LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+     WHERE lr.id = $1 AND lr.employee_id = $2`;
+    params = [requestId, userId];
+  }
+  
+  const result = await pool.query(query, params);
 
   if (result.rows.length === 0) {
     // Log for debugging
@@ -733,6 +768,24 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     return `${year}-${month}-${day}`;
   };
 
+  // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+  const rejectionReason = (row.current_status === 'rejected') 
+    ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+    : null;
+  
+  // Get approver name from last_updated_by fields
+  let approverName: string | null = row.approver_name || null;
+  let approverRole: string | null = null;
+  
+  // Map role from database to display format
+  if (row.last_updated_by_role === 'super_admin') {
+    approverRole = 'Super Admin';
+  } else if (row.last_updated_by_role === 'hr') {
+    approverRole = 'HR';
+  } else if (row.last_updated_by_role === 'manager') {
+    approverRole = 'Manager';
+  }
+
   return {
     id: row.id,
     leaveType: row.leave_type,
@@ -741,6 +794,9 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     endDate: formatDate(row.end_date),
     endType: row.end_type,
     reason: row.reason,
+    rejectionReason,
+    approverName,
+    approverRole,
     timeForPermission: row.time_for_permission_start && row.time_for_permission_end ? {
       start: typeof row.time_for_permission_start === 'string' ? row.time_for_permission_start : row.time_for_permission_start.toString().substring(0, 5),
       end: typeof row.time_for_permission_end === 'string' ? row.time_for_permission_end : row.time_for_permission_end.toString().substring(0, 5)
@@ -775,12 +831,17 @@ export const updateLeaveRequest = async (
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
-  const canEdit = currentStatus === 'pending';
+  
+  // HR and Super Admin can edit any leave (approved, rejected, etc.)
+  // Regular users can only edit pending leaves
+  const canEdit = currentStatus === 'pending' || userRole === 'hr' || userRole === 'super_admin';
 
   if (!canEdit) {
     throw new Error('Only pending leave requests can be edited');
   }
-  if (userRole !== 'super_admin' && !belongsToUser) {
+  
+  // Authorization: Super Admin and HR can edit any leave, others can only edit their own
+  if (userRole !== 'super_admin' && userRole !== 'hr' && !belongsToUser) {
     throw new Error('You do not have permission to edit this leave request');
   }
 
@@ -1013,8 +1074,8 @@ export const updateLeaveRequest = async (
   }
 };
 
-export const deleteLeaveRequest = async (requestId: number, userId: number) => {
-  // Verify the request belongs to the user and is pending
+export const deleteLeaveRequest = async (requestId: number, userId: number, userRole?: string) => {
+  // Verify the request
   const checkResult = await pool.query(
     'SELECT current_status, employee_id, leave_type, no_of_days FROM leave_requests WHERE id = $1',
     [requestId]
@@ -1024,12 +1085,16 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
     throw new Error('Leave request not found');
   }
 
-  if (checkResult.rows[0].employee_id !== userId) {
+  const belongsToUser = checkResult.rows[0].employee_id === userId;
+  const currentStatus = checkResult.rows[0].current_status;
+  
+  // Authorization: Super Admin and HR can delete any leave, others can only delete their own
+  if (userRole !== 'super_admin' && userRole !== 'hr' && !belongsToUser) {
     throw new Error('You do not have permission to delete this leave request');
   }
 
-  // Allow deletion only if status is pending (employees cannot delete partially approved, approved, or rejected)
-  const currentStatus = checkResult.rows[0].current_status;
+  // No one can delete approved or rejected leaves (including HR and Super Admin)
+  // Only pending leaves can be deleted
   if (currentStatus !== 'pending') {
     throw new Error('Only pending leave requests can be deleted');
   }
@@ -1082,24 +1147,6 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
       }
     }
 
-    // Delete notifications related to this leave request (if notifications table exists)
-    // Use SAVEPOINT to prevent notification deletion failure from aborting the transaction
-    try {
-      await client.query('SAVEPOINT notification_savepoint');
-      await client.query('DELETE FROM notifications WHERE leave_request_id = $1', [requestId]);
-      await client.query('RELEASE SAVEPOINT notification_savepoint');
-    } catch (notifError: any) {
-      // Rollback to savepoint to prevent transaction abort
-      try {
-        await client.query('ROLLBACK TO SAVEPOINT notification_savepoint');
-        await client.query('RELEASE SAVEPOINT notification_savepoint');
-      } catch (spError: any) {
-        // If savepoint doesn't exist, transaction might already be aborted
-        logger.warn('Failed to rollback to savepoint:', spError.message);
-      }
-      // Ignore if notifications table doesn't exist or column doesn't exist
-      logger.warn('Could not delete notifications for leave request:', notifError.message);
-    }
 
     // Delete leave days first (foreign key constraint)
     await client.query('DELETE FROM leave_days WHERE leave_request_id = $1', [requestId]);
@@ -1141,9 +1188,17 @@ export const getPendingLeaveRequests = async (
     SELECT DISTINCT lr.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
-           lr.doctor_note, u.reporting_manager_id
+           lr.doctor_note, u.reporting_manager_id,
+           lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+           lr.manager_approved_by, lr.hr_approved_by, lr.super_admin_approved_by,
+           manager.first_name || ' ' || COALESCE(manager.last_name, '') AS manager_approver_name,
+           hr.first_name || ' ' || COALESCE(hr.last_name, '') AS hr_approver_name,
+           super_admin.first_name || ' ' || COALESCE(super_admin.last_name, '') AS super_admin_approver_name
     FROM leave_requests lr
     JOIN users u ON lr.employee_id = u.id
+    LEFT JOIN users manager ON manager.id = lr.manager_approved_by
+    LEFT JOIN users hr ON hr.id = lr.hr_approved_by
+    LEFT JOIN users super_admin ON super_admin.id = lr.super_admin_approved_by
     WHERE 1=1
   `;
 
@@ -1200,6 +1255,24 @@ export const getPendingLeaveRequests = async (
         [row.id]
       );
 
+      // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+      const rejectionReason = (row.current_status === 'rejected') 
+        ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+        : null;
+      
+      // Get approver name from last_updated_by fields
+      let approverName: string | null = row.approver_name || null;
+      let approverRole: string | null = null;
+      
+      // Map role from database to display format
+      if (row.last_updated_by_role === 'super_admin') {
+        approverRole = 'Super Admin';
+      } else if (row.last_updated_by_role === 'hr') {
+        approverRole = 'HR';
+      } else if (row.last_updated_by_role === 'manager') {
+        approverRole = 'Manager';
+      }
+
       return {
         id: row.id,
         empId: row.emp_id,
@@ -1215,6 +1288,9 @@ export const getPendingLeaveRequests = async (
         startType: row.start_type,
         endType: row.end_type,
         doctorNote: row.doctor_note || null,
+        rejectionReason,
+        approverName,
+        approverRole,
         leaveDays: daysResult.rows.map(d => ({
             id: d.id,
             date: formatDate(d.leave_date),
@@ -1332,7 +1408,9 @@ export const approveLeave = async (
        SET manager_approval_status = 'approved',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
-           manager_approved_by = $2
+           manager_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'manager'
        WHERE id = $3 
          AND EXISTS (
            SELECT 1 FROM users u 
@@ -1358,7 +1436,9 @@ export const approveLeave = async (
          SET current_status = 'approved',
              hr_approval_status = 'approved',
              hr_approval_date = CURRENT_TIMESTAMP,
-             hr_approved_by = $1
+             hr_approved_by = $1,
+             last_updated_by = $1,
+             last_updated_by_role = 'hr'
          WHERE id = $2`,
         [approverId, leaveRequestId]
       );
@@ -1369,7 +1449,9 @@ export const approveLeave = async (
        SET hr_approval_status = 'approved',
            hr_approval_date = CURRENT_TIMESTAMP,
            hr_approval_comment = $1,
-           hr_approved_by = $2
+           hr_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'hr'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1391,7 +1473,9 @@ export const approveLeave = async (
            super_admin_approval_date = CURRENT_TIMESTAMP,
            super_admin_approval_comment = $1,
            super_admin_approved_by = $2,
-           current_status = 'approved'
+           current_status = 'approved',
+           last_updated_by = $2,
+           last_updated_by_role = 'super_admin'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1401,12 +1485,6 @@ export const approveLeave = async (
   // Recalculate status
   await recalcLeaveRequestStatus(leaveRequestId);
 
-  // Create notification for employee
-  await pool.query(
-    `INSERT INTO notifications (user_id, title, message, type)
-     VALUES ($1, 'Leave Approved', 'Your leave request has been approved', 'leave_approval')`,
-    [leave.employee_id]
-  );
 
   // Schedule delayed email (1 minute) to check final status and send appropriate email
   scheduleLeaveStatusEmail(leaveRequestId, 1);
@@ -1537,12 +1615,6 @@ export const rejectLeave = async (
     );
   }
 
-  // Create notification for employee
-  await pool.query(
-    `INSERT INTO notifications (user_id, title, message, type)
-     VALUES ($1, 'Leave Rejected', $2, 'leave_rejection')`,
-    [leave.employee_id, `Your leave request has been rejected. Reason: ${comment}`]
-  );
 
   // Cancel any scheduled approval email since leave is rejected
   cancelScheduledEmail(leaveRequestId);
@@ -1717,7 +1789,9 @@ export const approveLeaveDay = async (
        SET manager_approval_status = 'approved',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
-           manager_approved_by = $2
+           manager_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'manager'
        WHERE id = $3 
          AND EXISTS (
            SELECT 1 FROM users u 
@@ -1736,7 +1810,9 @@ export const approveLeaveDay = async (
        SET hr_approval_status = 'approved',
            hr_approval_date = CURRENT_TIMESTAMP,
            hr_approval_comment = $1,
-           hr_approved_by = $2
+           hr_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'hr'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1746,7 +1822,9 @@ export const approveLeaveDay = async (
        SET super_admin_approval_status = 'approved',
            super_admin_approval_date = CURRENT_TIMESTAMP,
            super_admin_approval_comment = $1,
-           super_admin_approved_by = $2
+           super_admin_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'super_admin'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1847,7 +1925,9 @@ export const approveLeaveDays = async (
        SET manager_approval_status = 'approved',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
-           manager_approved_by = $2
+           manager_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'manager'
        WHERE id = $3 
          AND EXISTS (
            SELECT 1 FROM users u 
@@ -1866,7 +1946,9 @@ export const approveLeaveDays = async (
        SET hr_approval_status = 'approved',
            hr_approval_date = CURRENT_TIMESTAMP,
            hr_approval_comment = $1,
-           hr_approved_by = $2
+           hr_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'hr'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1876,7 +1958,9 @@ export const approveLeaveDays = async (
        SET super_admin_approval_status = 'approved',
            super_admin_approval_date = CURRENT_TIMESTAMP,
            super_admin_approval_comment = $1,
-           super_admin_approved_by = $2
+           super_admin_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'super_admin'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1965,7 +2049,9 @@ export const rejectLeaveDay = async (
        SET manager_approval_status = 'rejected',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
-           manager_approved_by = $2
+           manager_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'manager'
        WHERE id = $3 
          AND EXISTS (
            SELECT 1 FROM users u 
@@ -1984,7 +2070,9 @@ export const rejectLeaveDay = async (
        SET hr_approval_status = 'rejected',
            hr_approval_date = CURRENT_TIMESTAMP,
            hr_approval_comment = $1,
-           hr_approved_by = $2
+           hr_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'hr'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -1994,7 +2082,9 @@ export const rejectLeaveDay = async (
        SET super_admin_approval_status = 'rejected',
            super_admin_approval_date = CURRENT_TIMESTAMP,
            super_admin_approval_comment = $1,
-           super_admin_approved_by = $2
+           super_admin_approved_by = $2,
+           last_updated_by = $2,
+           last_updated_by_role = 'super_admin'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -2008,9 +2098,244 @@ export const rejectLeaveDay = async (
   return { message: 'Leave day rejected successfully' };
 };
 
+// Update leave status for HR/Super Admin (bypasses normal authorization)
+export const updateLeaveStatus = async (
+  leaveRequestId: number,
+  approverId: number,
+  approverRole: string,
+  newStatus: string,
+  selectedDayIds?: number[],
+  rejectReason?: string,
+  leaveReason?: string
+) => {
+  // Only HR and Super Admin can use this function
+  if (approverRole !== 'hr' && approverRole !== 'super_admin') {
+    throw new Error('Not authorized to update leave status');
+  }
+
+  const leaveResult = await pool.query(
+    `SELECT lr.*, u.role as employee_role, u.email as employee_email,
+            u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+            approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+            lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date
+     FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN users approver ON approver.id = $2
+     WHERE lr.id = $1`,
+    [leaveRequestId, approverId]
+  );
+
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+
+  const leave = leaveResult.rows[0];
+
+  // Check who last updated the leave using last_updated_by_role
+  const lastUpdaterRole = leave.last_updated_by_role;
+
+  // Validate hierarchy: Check if current user can update based on who last updated
+  if (lastUpdaterRole === 'super_admin') {
+    // If super admin updated, only super admin can update
+    if (approverRole !== 'super_admin') {
+      throw new Error('Super Admin has updated the status of this leave. You cannot update it now.');
+    }
+  } else if (lastUpdaterRole === 'hr') {
+    // If HR updated, manager cannot update, but super admin can
+    if (approverRole === 'manager') {
+      throw new Error('HR has updated the status of this leave. You cannot update it now.');
+    }
+  }
+  // If manager updated (or no one updated yet), HR and super admin can update (already checked at function start)
+
+  // Get all leave days
+  const leaveDaysResult = await pool.query(
+    'SELECT id, leave_date, day_status, day_type FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
+    [leaveRequestId]
+  );
+  const allLeaveDays = leaveDaysResult.rows || [];
+
+  if (newStatus === 'approved') {
+    // Approve all days
+    await pool.query(
+      `UPDATE leave_days SET day_status = 'approved' WHERE leave_request_id = $1`,
+      [leaveRequestId]
+    );
+    
+    // Update leave request status and reason
+    // Clear rejection comments when changing to approved
+    // Update the appropriate approval field based on role
+    if (approverRole === 'super_admin') {
+      await pool.query(
+        `UPDATE leave_requests 
+         SET current_status = 'approved',
+             super_admin_approval_status = 'approved',
+             super_admin_approval_date = CURRENT_TIMESTAMP,
+             super_admin_approval_comment = $1,
+             super_admin_approved_by = $2,
+             reason = COALESCE($4, reason),
+             manager_approval_comment = NULL,
+             hr_approval_comment = NULL,
+             last_updated_by = $2,
+             last_updated_by_role = 'super_admin'
+         WHERE id = $3`,
+        [`Status updated by Super Admin`, approverId, leaveRequestId, leaveReason]
+      );
+    } else if (approverRole === 'hr') {
+      await pool.query(
+        `UPDATE leave_requests 
+         SET current_status = 'approved',
+             hr_approval_status = 'approved',
+             hr_approval_date = CURRENT_TIMESTAMP,
+             hr_approval_comment = $1,
+             hr_approved_by = $2,
+             reason = COALESCE($4, reason),
+             manager_approval_comment = NULL,
+             last_updated_by = $2,
+             last_updated_by_role = 'hr'
+         WHERE id = $3`,
+        [`Status updated by HR`, approverId, leaveRequestId, leaveReason]
+      );
+    }
+
+    // Schedule email
+    scheduleLeaveStatusEmail(leaveRequestId, 1);
+  } else if (newStatus === 'rejected') {
+    // Reject all days
+    await pool.query(
+      `UPDATE leave_days SET day_status = 'rejected' WHERE leave_request_id = $1`,
+      [leaveRequestId]
+    );
+
+    // Update leave request status and reason
+    // Update the appropriate approval field based on role
+    if (approverRole === 'super_admin') {
+      await pool.query(
+        `UPDATE leave_requests 
+         SET current_status = 'rejected',
+             super_admin_approval_status = 'rejected',
+             super_admin_approval_date = CURRENT_TIMESTAMP,
+             super_admin_approval_comment = $1,
+             super_admin_approved_by = $2,
+             reason = COALESCE($4, reason),
+             manager_approval_comment = NULL,
+             hr_approval_comment = NULL,
+             last_updated_by = $2,
+             last_updated_by_role = 'super_admin'
+         WHERE id = $3`,
+        [rejectReason || 'Status updated by Super Admin', approverId, leaveRequestId, leaveReason]
+      );
+    } else if (approverRole === 'hr') {
+      await pool.query(
+        `UPDATE leave_requests 
+         SET current_status = 'rejected',
+             hr_approval_status = 'rejected',
+             hr_approval_date = CURRENT_TIMESTAMP,
+             hr_approval_comment = $1,
+             hr_approved_by = $2,
+             reason = COALESCE($4, reason),
+             manager_approval_comment = NULL,
+             last_updated_by = $2,
+             last_updated_by_role = 'hr'
+         WHERE id = $3`,
+        [rejectReason || 'Status updated by HR', approverId, leaveRequestId, leaveReason]
+      );
+    }
+
+    // Send rejection email immediately
+    try {
+      const { generateLeaveStatusEmail } = await import('../utils/emailTemplates');
+      const { sendEmail } = await import('../utils/email');
+      
+      if (leave.employee_email && leave.employee_role !== 'super_admin') {
+        await sendEmail({
+          to: leave.employee_email,
+          subject: 'Leave Request Rejected',
+          html: generateLeaveStatusEmail({
+            employeeName: leave.employee_name,
+            leaveType: leave.leave_type,
+            startDate: leave.start_date,
+            endDate: leave.end_date,
+            status: 'rejected',
+            approverName: leave.approver_name,
+            approverRole: approverRole === 'hr' ? 'HR' : 'Super Admin',
+            rejectionReason: rejectReason || 'Status updated by HR/Super Admin'
+          }),
+          text: `Your leave request has been rejected.`
+        });
+      }
+    } catch (emailError: any) {
+      logger.warn('Failed to send rejection email:', emailError.message);
+    }
+  } else if (newStatus === 'partially_approved' && selectedDayIds && selectedDayIds.length > 0) {
+    // Approve selected days, reject remaining
+    const allDayIds = allLeaveDays.map(d => d.id);
+    const daysToReject = allDayIds.filter(id => !selectedDayIds.includes(id));
+
+    // Approve selected days
+    await pool.query(
+      `UPDATE leave_days SET day_status = 'approved' WHERE id = ANY($1::int[]) AND leave_request_id = $2`,
+      [selectedDayIds, leaveRequestId]
+    );
+
+    // Reject remaining days
+    if (daysToReject.length > 0) {
+      await pool.query(
+        `UPDATE leave_days SET day_status = 'rejected' WHERE id = ANY($1::int[]) AND leave_request_id = $2`,
+        [daysToReject, leaveRequestId]
+      );
+    }
+
+    // Update leave request and reason
+    // Clear rejection comments when partially approving
+    // Update the appropriate approval field based on role
+    if (approverRole === 'super_admin') {
+      await pool.query(
+        `UPDATE leave_requests 
+         SET super_admin_approval_status = 'approved',
+             super_admin_approval_date = CURRENT_TIMESTAMP,
+             super_admin_approval_comment = $1,
+             super_admin_approved_by = $2,
+             reason = COALESCE($4, reason),
+             manager_approval_comment = NULL,
+             hr_approval_comment = NULL,
+             last_updated_by = $2,
+             last_updated_by_role = 'super_admin'
+         WHERE id = $3`,
+        [`Status updated by Super Admin`, approverId, leaveRequestId, leaveReason]
+      );
+    } else if (approverRole === 'hr') {
+      await pool.query(
+        `UPDATE leave_requests 
+         SET hr_approval_status = 'approved',
+             hr_approval_date = CURRENT_TIMESTAMP,
+             hr_approval_comment = $1,
+             hr_approved_by = $2,
+             reason = COALESCE($4, reason),
+             manager_approval_comment = NULL,
+             last_updated_by = $2,
+             last_updated_by_role = 'hr'
+         WHERE id = $3`,
+        [`Status updated by HR`, approverId, leaveRequestId, leaveReason]
+      );
+    }
+
+    // Recalculate status
+    await recalcLeaveRequestStatus(leaveRequestId);
+
+    // Schedule email
+    scheduleLeaveStatusEmail(leaveRequestId, 1);
+  } else {
+    throw new Error('Invalid status or missing required parameters');
+  }
+
+  return { message: 'Leave status updated successfully' };
+};
+
 export const getApprovedLeaves = async (
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  userRole?: string
 ) => {
   const offset = (page - 1) * limit;
   
@@ -2025,6 +2350,12 @@ export const getApprovedLeaves = async (
         lr.leave_type,
         lr.no_of_days,
         lr.current_status AS leave_status,
+        lr.manager_approval_comment,
+        lr.hr_approval_comment,
+        lr.super_admin_approval_comment,
+        lr.last_updated_by,
+        lr.last_updated_by_role,
+        last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name,
         COALESCE(SUM(CASE WHEN ld.day_status = 'approved' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS approved_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'rejected' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS rejected_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'pending' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS pending_days,
@@ -2033,13 +2364,17 @@ export const getApprovedLeaves = async (
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
      LEFT JOIN leave_days ld ON ld.leave_request_id = lr.id
+     LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
      WHERE lr.current_status != 'pending'
         OR EXISTS (
           SELECT 1 FROM leave_days ld2
           WHERE ld2.leave_request_id = lr.id 
             AND (ld2.day_status = 'approved' OR ld2.day_status = 'rejected')
         )
-     GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status
+     GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
+              lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+              lr.last_updated_by, lr.last_updated_by_role,
+              last_updater.first_name, last_updater.last_name
      ORDER BY lr.applied_date DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
@@ -2056,8 +2391,14 @@ export const getApprovedLeaves = async (
         )`
   );
 
-  return {
-    requests: result.rows.map(row => {
+  // Get leave days for each request
+  const requestsWithDays = await Promise.all(
+    result.rows.map(async (row) => {
+      const daysResult = await pool.query(
+        'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
+        [row.id]
+      );
+
       const approvedDates = Array.isArray(row.approved_dates) ? row.approved_dates.filter((d: any) => d) : [];
       const rejectedDates = Array.isArray(row.rejected_dates) ? row.rejected_dates.filter((d: any) => d) : [];
       const approvedDays = parseFloat(row.approved_days) || 0;
@@ -2102,17 +2443,58 @@ export const getApprovedLeaves = async (
         noOfDays = parseFloat(row.no_of_days);
       }
 
+      // Manager can only view, HR and Super Admin can view and edit
+      // No one can delete approved/rejected leaves
+      const canEdit = userRole === 'hr' || userRole === 'super_admin';
+      const canDelete = false; // Approved/rejected leaves cannot be deleted
+
+      // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+      const rejectionReason = (displayStatus === 'rejected') 
+        ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+        : null;
+      
+      // Get approver name from last_updated_by fields
+      let approverName: string | null = row.approver_name || null;
+      let approverRole: string | null = null;
+      
+      // Map role from database to display format
+      if (row.last_updated_by_role === 'super_admin') {
+        approverRole = 'Super Admin';
+      } else if (row.last_updated_by_role === 'hr') {
+        approverRole = 'HR';
+      } else if (row.last_updated_by_role === 'manager') {
+        approverRole = 'Manager';
+      }
+
       return {
         id: row.id,
         empId: row.emp_id,
         empName: row.emp_name,
         appliedDate: formatDate(row.applied_date),
         leaveDate,
+        startDate: formatDate(row.start_date),
+        endDate: formatDate(row.end_date),
         leaveType: row.leave_type,
         noOfDays,
-        leaveStatus: displayStatus
+        leaveStatus: displayStatus,
+        rejectionReason,
+        approverName,
+        approverRole,
+        lastUpdatedByRole: row.last_updated_by_role || null,
+        canEdit,
+        canDelete,
+        leaveDays: daysResult.rows.map(d => ({
+          id: d.id,
+          date: formatDate(d.leave_date),
+          type: d.day_type,
+          status: d.day_status || 'pending'
+        }))
       };
-    }),
+    })
+  );
+
+  return {
+    requests: requestsWithDays,
     pagination: {
       page,
       limit,

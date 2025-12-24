@@ -2,21 +2,25 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import LeaveDetailsModal from '../components/LeaveDetailsModal';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaPencilAlt } from 'react-icons/fa';
+import { FaPencilAlt, FaEye } from 'react-icons/fa';
 import './LeaveApprovalPage.css';
 
 const LeaveApprovalPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
+  const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
@@ -131,6 +135,135 @@ const LeaveApprovalPage: React.FC = () => {
     }
     rejectMutation.mutate({ id: requestId, dayIds: selectedDayIds, comment: reason });
   };
+
+
+  const handleViewApprovedLeave = async (requestId: number) => {
+    try {
+      // Find the request from approvedData which already has leaveDays
+      const fullRequest = approvedData?.requests?.find((r: any) => r.id === requestId);
+      if (fullRequest) {
+        // Format the request to match LeaveDetailsModal structure
+        const request = await leaveService.getLeaveRequest(requestId);
+        setSelectedRequest({
+          id: request.id,
+          empId: fullRequest.empId,
+          empName: fullRequest.empName,
+          appliedDate: fullRequest.appliedDate,
+          startDate: request.startDate,
+          endDate: request.endDate,
+          startType: request.startType,
+          endType: request.endType,
+          leaveType: request.leaveType,
+          noOfDays: fullRequest.noOfDays,
+          leaveReason: request.reason,
+          currentStatus: fullRequest.leaveStatus,
+          doctorNote: request.doctorNote || null,
+          rejectionReason: fullRequest.rejectionReason || request.rejectionReason || null,
+          approverName: fullRequest.approverName || request.approverName || null,
+          approverRole: fullRequest.approverRole || request.approverRole || null,
+          leaveDays: fullRequest.leaveDays || []
+        });
+        setIsEditMode(false);
+        setIsModalOpen(true);
+      }
+    } catch (error: any) {
+      showError(error.response?.data?.error?.message || 'Failed to load leave details');
+    }
+  };
+
+  const handleEditApprovedLeave = async (requestId: number) => {
+    try {
+      setEditingRequestId(requestId);
+      // Check permissions before opening modal
+      const fullRequest = approvedData?.requests?.find((r: any) => r.id === requestId);
+      if (!fullRequest) {
+        showError('Leave request not found');
+        setEditingRequestId(null);
+        return;
+      }
+
+      // Check hierarchy: If super admin has updated, only super admin can edit
+      // If HR has updated, manager cannot edit
+      const lastUpdatedByRole = fullRequest.lastUpdatedByRole;
+      if (lastUpdatedByRole === 'super_admin') {
+        if (user?.role !== 'super_admin') {
+          showError('Super Admin has updated the status of this leave. You cannot update it now.');
+          setEditingRequestId(null);
+          return;
+        }
+      } else if (lastUpdatedByRole === 'hr') {
+        if (user?.role === 'manager') {
+          showError('HR has updated the status of this leave. You cannot update it now.');
+          setEditingRequestId(null);
+          return;
+        }
+      }
+
+      // Open the same modal in edit mode (only for HR and Super Admin)
+      const request = await leaveService.getLeaveRequest(requestId);
+      setSelectedRequest({
+        id: request.id,
+        empId: fullRequest.empId,
+        empName: fullRequest.empName,
+        appliedDate: fullRequest.appliedDate,
+        startDate: request.startDate,
+        endDate: request.endDate,
+        startType: request.startType,
+        endType: request.endType,
+        leaveType: request.leaveType,
+        noOfDays: fullRequest.noOfDays,
+        leaveReason: request.reason,
+        currentStatus: fullRequest.leaveStatus,
+        doctorNote: request.doctorNote || null,
+        rejectionReason: fullRequest.rejectionReason || request.rejectionReason || null,
+        approverName: fullRequest.approverName || request.approverName || null,
+        approverRole: fullRequest.approverRole || request.approverRole || null,
+        leaveDays: fullRequest.leaveDays || []
+      });
+      // Only set edit mode for HR and Super Admin
+      setIsEditMode((user?.role === 'hr' || user?.role === 'super_admin') && fullRequest.canEdit);
+      setIsModalOpen(true);
+    } catch (error: any) {
+      showError(error.response?.data?.error?.message || 'Failed to load leave for editing');
+    } finally {
+      setEditingRequestId(null);
+    }
+  };
+
+  const updateStatusMutation = useMutation(
+    ({ id, status, dayIds, rejectReason, leaveReason }: { id: number; status: string; dayIds?: number[]; rejectReason?: string; leaveReason?: string }) => {
+      // Use the new updateLeaveStatus endpoint for HR/Super Admin
+      return leaveService.updateLeaveStatus(id, status, dayIds, rejectReason, leaveReason);
+    },
+    {
+      onMutate: ({ id }) => {
+        setUpdatingRequestIds(prev => new Set(prev).add(id));
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries('pendingLeaves');
+        queryClient.invalidateQueries('approvedLeaves');
+        showSuccess('Leave status updated successfully!');
+        setIsModalOpen(false);
+        setSelectedRequest(null);
+        setIsEditMode(false);
+      },
+      onError: (error: any) => {
+        showError(error.response?.data?.error?.message || 'Failed to update leave status');
+      },
+      onSettled: (_, __, { id }) => {
+        setUpdatingRequestIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      }
+    }
+  );
+
+  const handleUpdateStatus = (requestId: number, status: string, selectedDayIds?: number[], rejectReason?: string, leaveReason?: string) => {
+    updateStatusMutation.mutate({ id: requestId, status, dayIds: selectedDayIds, rejectReason, leaveReason });
+  };
+
 
   const triggerSearch = () => {
     const term = searchInput.trim();
@@ -359,18 +492,20 @@ const LeaveApprovalPage: React.FC = () => {
                   <th>LEAVE TYPE</th>
                   <th>NO OF DAYS</th>
                   <th>LEAVE STATUS</th>
+                  <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
               {!approvedData?.requests || approvedData.requests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '16px' }}>
                     No leaves applied
                   </td>
                 </tr>
               ) : (
                 approvedData.requests.map((request: any, idx: number) => {
-                  const isUpdating = updatingRequestIds.has(request.id);
+                  const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
+                  const canEdit = request.canEdit && (user?.role === 'hr' || user?.role === 'super_admin');
                   return (
                   <tr 
                     key={request.id}
@@ -396,6 +531,33 @@ const LeaveApprovalPage: React.FC = () => {
                         <span className="status-badge">{request.leaveStatus}</span>
                       )}
                     </td>
+                    <td className="actions-cell">
+                      {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
+                        <div className="action-icons-container">
+                          <span
+                            className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                            title="View Details"
+                            onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
+                          >
+                            <FaEye />
+                          </span>
+                          <span
+                            className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                            title={isUpdating ? 'Loading...' : 'Edit'}
+                            onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
+                            style={{ 
+                              cursor: isUpdating ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {isUpdating && editingRequestId === request.id ? (
+                              <span className="loading-spinner-small"></span>
+                            ) : (
+                              <FaPencilAlt />
+                            )}
+                          </span>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                   );
                 })
@@ -412,10 +574,14 @@ const LeaveApprovalPage: React.FC = () => {
       onClose={() => {
         setIsModalOpen(false);
         setSelectedRequest(null);
+        setIsEditMode(false);
       }}
       onApprove={handleModalApprove}
       onReject={handleModalReject}
-      isLoading={approveMutation.isLoading || rejectMutation.isLoading}
+      onUpdate={handleUpdateStatus}
+      isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading}
+      isEditMode={isEditMode}
+      userRole={user?.role}
     />
     </>
   );

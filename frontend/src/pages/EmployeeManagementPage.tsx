@@ -33,7 +33,51 @@ const formatAadhaar = (value: string) => {
 };
 
 const sanitizePan = (value: string) => {
-  return value.toUpperCase().replace(/\s+/g, '').slice(0, 10);
+  // Remove all spaces and convert to uppercase
+  let cleaned = value.toUpperCase().replace(/\s+/g, '');
+  
+  // Enforce PAN format: 5 letters, 4 digits, 1 letter
+  let formatted = '';
+  for (let i = 0; i < cleaned.length && formatted.length < 10; i++) {
+    const char = cleaned[i];
+    const currentLength = formatted.length;
+    
+    if (currentLength < 5) {
+      // First 5 characters must be letters
+      if (/[A-Z]/.test(char)) {
+        formatted += char;
+      }
+    } else if (currentLength < 9) {
+      // Next 4 characters must be digits
+      if (/[0-9]/.test(char)) {
+        formatted += char;
+      }
+    } else if (currentLength === 9) {
+      // Last character must be a letter
+      if (/[A-Z]/.test(char)) {
+        formatted += char;
+      }
+    }
+  }
+  
+  return formatted;
+};
+
+const validatePan = (pan: string): string | null => {
+  if (!pan || pan.trim() === '') {
+    return null; // Empty is allowed (optional field)
+  }
+  
+  if (pan.length !== 10) {
+    return 'PAN number must be exactly 10 characters long';
+  }
+  
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  if (!panRegex.test(pan)) {
+    return 'Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)';
+  }
+  
+  return null;
 };
 const sanitizeLettersOnly = (value: string) => {
   return value.replace(/[^a-zA-Z\s]/g, '');
@@ -208,17 +252,9 @@ const EmployeeManagementPage: React.FC = () => {
     }
   );
 
-  const handleOpenAddEmployee = async () => {
+  const handleOpenAddEmployee = () => {
     const today = new Date().toISOString().split('T')[0];
-    try {
-      // Fetch next employee ID
-      const nextId = await employeeService.getNextEmployeeId();
-      setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today, empId: nextId });
-    } catch (error: any) {
-      // If fetching fails, still open modal with empty form
-      console.error('Failed to fetch next employee ID:', error);
-      setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
-    }
+    setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
     setIsSameAddress(false);
     setIsEditMode(false);
     setIsViewMode(false);
@@ -253,7 +289,12 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.role)) missingFields.push('Role');
     if (isEmpty(newEmployee.firstName)) missingFields.push('First Name');
     if (isEmpty(newEmployee.lastName)) missingFields.push('Last Name');
-    if (isEmpty(newEmployee.empId)) missingFields.push('Employee ID');
+    if (isEmpty(newEmployee.empId)) {
+      missingFields.push('Employee ID');
+    } else if (newEmployee.empId.length > 6) {
+      showWarning('Employee ID must be maximum 6 characters');
+      return;
+    }
     if (isEmpty(newEmployee.email)) missingFields.push('Official Email');
     if (isEmpty(newEmployee.contactNumber)) missingFields.push('Contact Number');
     if (isEmpty(newEmployee.altContact)) missingFields.push('Alt Contact');
@@ -294,7 +335,15 @@ const EmployeeManagementPage: React.FC = () => {
 
     // Document information
     if (isEmpty(newEmployee.aadharNumber)) missingFields.push('Aadhar Number');
-    if (isEmpty(newEmployee.panNumber)) missingFields.push('PAN Number');
+    if (isEmpty(newEmployee.panNumber)) {
+      missingFields.push('PAN Number');
+    } else {
+      const panError = validatePan(newEmployee.panNumber);
+      if (panError) {
+        showWarning(panError);
+        return;
+      }
+    }
 
     // Address information
     if (isEmpty(newEmployee.currentAddress)) missingFields.push('Current Address');
@@ -690,12 +739,17 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        inputMode="numeric"
                         value={newEmployee.empId || ''}
-                        disabled={true}
-                        readOnly
-                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-                        placeholder="Auto-generated"
+                        onChange={(e) => {
+                          // Limit to 6 characters, alphanumeric only
+                          const value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+                          setNewEmployee({
+                            ...newEmployee,
+                            empId: value
+                          });
+                        }}
+                        maxLength={6}
+                        disabled={isEditMode || isViewMode}
                       />
                     </div>
                     <div className="employee-modal-field employee-role-field">
@@ -1104,6 +1158,7 @@ const EmployeeManagementPage: React.FC = () => {
                             aadharNumber: sanitizeAadhaar(e.target.value)
                           })
                         }
+                        placeholder="XXXX XXXX XXXX"
                         disabled={isViewMode}
                       />
                     </div>
@@ -1114,14 +1169,28 @@ const EmployeeManagementPage: React.FC = () => {
                       <input
                         type="text"
                         value={newEmployee.panNumber}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const sanitized = sanitizePan(e.target.value);
                           setNewEmployee({
                             ...newEmployee,
-                            panNumber: sanitizePan(e.target.value)
-                          })
-                        }
+                            panNumber: sanitized
+                          });
+                        }}
+                        onBlur={(e) => {
+                          const panError = validatePan(newEmployee.panNumber);
+                          if (panError && newEmployee.panNumber) {
+                            showWarning(panError);
+                          }
+                        }}
+                        placeholder="ABCDE1234F"
+                        maxLength={10}
                         disabled={isViewMode}
                       />
+                      {newEmployee.panNumber && newEmployee.panNumber.length < 10 && (
+                        <span style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                          Format: 5 letters, 4 digits, 1 letter
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1245,7 +1314,6 @@ const EmployeeManagementPage: React.FC = () => {
                                   showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
                                 }
                               }}
-                              placeholder="YYYY"
                               disabled={isViewMode}
                             />
                           </td>

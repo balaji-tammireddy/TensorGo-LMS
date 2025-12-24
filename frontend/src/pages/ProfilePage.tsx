@@ -44,7 +44,51 @@ const ProfilePage: React.FC = () => {
   };
 
   const sanitizePan = (value: string) => {
-    return value.toUpperCase().replace(/\s+/g, '').slice(0, 10);
+    // Remove all spaces and convert to uppercase
+    let cleaned = value.toUpperCase().replace(/\s+/g, '');
+    
+    // Enforce PAN format: 5 letters, 4 digits, 1 letter
+    let formatted = '';
+    for (let i = 0; i < cleaned.length && formatted.length < 10; i++) {
+      const char = cleaned[i];
+      const currentLength = formatted.length;
+      
+      if (currentLength < 5) {
+        // First 5 characters must be letters
+        if (/[A-Z]/.test(char)) {
+          formatted += char;
+        }
+      } else if (currentLength < 9) {
+        // Next 4 characters must be digits
+        if (/[0-9]/.test(char)) {
+          formatted += char;
+        }
+      } else if (currentLength === 9) {
+        // Last character must be a letter
+        if (/[A-Z]/.test(char)) {
+          formatted += char;
+        }
+      }
+    }
+    
+    return formatted;
+  };
+
+  const validatePan = (pan: string): string | null => {
+    if (!pan || pan.trim() === '') {
+      return null; // Empty is allowed (optional field)
+    }
+    
+    if (pan.length !== 10) {
+      return 'PAN number must be exactly 10 characters long';
+    }
+    
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(pan)) {
+      return 'Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)';
+    }
+    
+    return null;
   };
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
@@ -176,7 +220,15 @@ const ProfilePage: React.FC = () => {
 
     // Document information
     if (isEmpty(formData.documents?.aadharNumber)) missingFields.push('Aadhar Number');
-    if (isEmpty(formData.documents?.panNumber)) missingFields.push('PAN Number');
+    if (isEmpty(formData.documents?.panNumber)) {
+      missingFields.push('PAN Number');
+    } else {
+      const panError = validatePan(formData.documents.panNumber);
+      if (panError) {
+        showWarning(panError);
+        return;
+      }
+    }
 
     // Address information
     if (isEmpty(formData.address?.currentAddress)) missingFields.push('Current Address');
@@ -822,6 +874,7 @@ const ProfilePage: React.FC = () => {
                     documents: { ...formData.documents, aadharNumber: raw }
                   });
                 }}
+                placeholder="XXXX XXXX XXXX"
                 disabled={!isEditMode}
               />
             </div>
@@ -832,13 +885,29 @@ const ProfilePage: React.FC = () => {
               </label>
               <input
                 type="text"
-              value={formData.documents?.panNumber || ''}
-              onChange={(e) => setFormData({
-                ...formData,
-                documents: { ...formData.documents, panNumber: sanitizePan(e.target.value) }
-              })}
+                value={formData.documents?.panNumber || ''}
+                onChange={(e) => {
+                  const sanitized = sanitizePan(e.target.value);
+                  setFormData({
+                    ...formData,
+                    documents: { ...formData.documents, panNumber: sanitized }
+                  });
+                }}
+                onBlur={(e) => {
+                  const panError = validatePan(formData.documents?.panNumber || '');
+                  if (panError && formData.documents?.panNumber) {
+                    showWarning(panError);
+                  }
+                }}
+                placeholder="ABCDE1234F"
+                maxLength={10}
                 disabled={!isEditMode}
               />
+              {formData.documents?.panNumber && formData.documents.panNumber.length < 10 && (
+                <span style={{ fontSize: '11px', color: '#666', marginTop: '4px', display: 'block' }}>
+                  Format: 5 letters, 4 digits, 1 letter
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -964,7 +1033,6 @@ const ProfilePage: React.FC = () => {
                           showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
                         }
                       }}
-                      placeholder="YYYY"
                       disabled={!isEditMode}
                     />
                   </td>

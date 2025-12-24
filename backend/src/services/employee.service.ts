@@ -139,8 +139,22 @@ export const getEmployeeById = async (employeeId: number) => {
 };
 
 export const createEmployee = async (employeeData: any) => {
-  // Always auto-generate employee ID (ignore any provided value)
-  const empId = await getNextEmployeeId();
+  // Employee ID must be provided by HR/Super Admin
+  if (!employeeData.empId || !employeeData.empId.trim()) {
+    throw new Error('Employee ID is required');
+  }
+  
+  const empId = employeeData.empId.trim().toUpperCase();
+  
+  // Validate employee ID length (max 6 characters)
+  if (empId.length > 6) {
+    throw new Error('Employee ID must be maximum 6 characters');
+  }
+  
+  // Validate employee ID format (alphanumeric only)
+  if (!/^[A-Z0-9]+$/.test(empId)) {
+    throw new Error('Employee ID must contain only letters and numbers');
+  }
 
   // Check if emp_id or email already exists
   const existingResult = await pool.query(
@@ -149,7 +163,17 @@ export const createEmployee = async (employeeData: any) => {
   );
 
   if (existingResult.rows.length > 0) {
-    throw new Error('Employee ID or email already exists');
+    const existing = existingResult.rows[0];
+    const existingCheck = await pool.query(
+      'SELECT emp_id, email FROM users WHERE id = $1',
+      [existing.id]
+    );
+    if (existingCheck.rows[0].emp_id === empId) {
+      throw new Error('Employee ID already exists');
+    }
+    if (existingCheck.rows[0].email === employeeData.email) {
+      throw new Error('Email already exists');
+    }
   }
 
   // Validate date of birth - employee must be at least 18 years old
@@ -205,7 +229,19 @@ export const createEmployee = async (employeeData: any) => {
       employeeData.department || null,
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
-      employeeData.panNumber ? String(employeeData.panNumber).slice(0, 10) : null,
+      (() => {
+        if (!employeeData.panNumber) return null;
+        const pan = String(employeeData.panNumber).trim().toUpperCase();
+        // Validate PAN format: 5 letters, 4 digits, 1 letter
+        if (pan.length !== 10) {
+          throw new Error('PAN number must be exactly 10 characters long');
+        }
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!panRegex.test(pan)) {
+          throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
+        }
+        return pan;
+      })(),
       employeeData.currentAddress || null,
       employeeData.permanentAddress || null,
       reportingManagerId,
@@ -375,10 +411,25 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   for (const [key, value] of Object.entries(employeeData)) {
     const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    // Employee ID cannot be changed once set
+    if (dbKey === 'emp_id') {
+      continue; // Skip employee ID updates
+    }
     if (allowedFields.includes(dbKey) && value !== undefined) {
       updates.push(`${dbKey} = $${paramCount}`);
       if (dbKey === 'pan_number' && typeof value === 'string') {
-        values.push(value.slice(0, 10));
+        const pan = value.trim().toUpperCase();
+        // Validate PAN format: 5 letters, 4 digits, 1 letter
+        if (pan && pan.length !== 10) {
+          throw new Error('PAN number must be exactly 10 characters long');
+        }
+        if (pan && pan.length === 10) {
+          const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+          if (!panRegex.test(pan)) {
+            throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
+          }
+        }
+        values.push(pan || null);
       } else {
         values.push(value);
       }
@@ -453,32 +504,26 @@ export const deleteEmployee = async (employeeId: number) => {
     await client.query('BEGIN');
 
     // Delete all related data in order (respecting foreign key constraints)
-    // 1. Delete notifications
-    await client.query('DELETE FROM notifications WHERE user_id = $1', [employeeId]);
-
-    // 2. Delete audit logs
-    await client.query('DELETE FROM audit_logs WHERE user_id = $1', [employeeId]);
-
-    // 3. Delete leave days (these are linked to leave requests)
+    // 1. Delete leave days (these are linked to leave requests)
     await client.query('DELETE FROM leave_days WHERE leave_request_id IN (SELECT id FROM leave_requests WHERE employee_id = $1)', [employeeId]);
 
-    // 4. Delete leave requests
+    // 2. Delete leave requests
     await client.query('DELETE FROM leave_requests WHERE employee_id = $1', [employeeId]);
 
-    // 5. Delete leave balances
+    // 3. Delete leave balances
     await client.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
 
-    // 6. Delete education records (has ON DELETE CASCADE, but explicit for clarity)
+    // 4. Delete education records (has ON DELETE CASCADE, but explicit for clarity)
     await client.query('DELETE FROM education WHERE employee_id = $1', [employeeId]);
 
-    // 7. Update reporting_manager_id in users table to NULL for employees reporting to this user
+    // 5. Update reporting_manager_id in users table to NULL for employees reporting to this user
     await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
 
-    // 8. Update created_by and updated_by references to NULL
+    // 6. Update created_by and updated_by references to NULL
     await client.query('UPDATE users SET created_by = NULL WHERE created_by = $1', [employeeId]);
     await client.query('UPDATE users SET updated_by = NULL WHERE updated_by = $1', [employeeId]);
 
-    // 9. Finally, delete the user
+    // 7. Finally, delete the user
     await client.query('DELETE FROM users WHERE id = $1', [employeeId]);
 
     await client.query('COMMIT');

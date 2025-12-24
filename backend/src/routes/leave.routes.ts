@@ -28,6 +28,7 @@ router.post('/:id/reject', authorizeRole('manager', 'hr', 'super_admin'), valida
 router.post('/:id/day/:dayId/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveDaySchema), leaveController.approveLeaveDay);
 router.post('/:id/days/approve', authorizeRole('manager', 'hr', 'super_admin'), leaveController.approveLeaveDays);
 router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveDaySchema), leaveController.rejectLeaveDay);
+router.post('/:id/update-status', authorizeRole('hr', 'super_admin'), leaveController.updateLeaveStatus);
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 
 export default router;

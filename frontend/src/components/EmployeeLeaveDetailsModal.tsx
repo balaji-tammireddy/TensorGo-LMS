@@ -23,6 +23,8 @@ interface EmployeeLeaveDetailsModalProps {
     leaveReason: string;
     currentStatus: string;
     rejectionReason?: string;
+    approverName?: string | null;
+    approverRole?: string | null;
     doctorNote?: string | null;
     leaveDays?: LeaveDay[];
   } | null;
@@ -215,10 +217,24 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
               </div>
             )}
 
-            {leaveRequest.rejectionReason && (
+            {/* Rejection Reason - show only if rejected */}
+            {leaveRequest.currentStatus === 'rejected' && leaveRequest.rejectionReason && (
               <div className="leave-detail-item leave-detail-item-full">
                 <label>Rejection Reason</label>
                 <div className="leave-detail-value rejection-reason">{leaveRequest.rejectionReason}</div>
+              </div>
+            )}
+
+            {/* Approver Information - show only if approved or rejected */}
+            {(leaveRequest.currentStatus === 'approved' || leaveRequest.currentStatus === 'rejected' || leaveRequest.currentStatus === 'partially_approved') && leaveRequest.approverName && (
+              <div className="leave-detail-item">
+                <label>{leaveRequest.currentStatus === 'rejected' ? 'Rejected By' : 'Approved By'}</label>
+                <div className="leave-detail-value">
+                  {leaveRequest.approverName}
+                  {leaveRequest.approverRole && (
+                    <span className="approver-role-badge"> ({leaveRequest.approverRole})</span>
+                  )}
+                </div>
               </div>
             )}
 

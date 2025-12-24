@@ -26,12 +26,18 @@ interface LeaveDetailsModalProps {
     leaveReason: string;
     currentStatus: string;
     doctorNote?: string | null;
+    rejectionReason?: string | null;
+    approverName?: string | null;
+    approverRole?: string | null;
     leaveDays?: LeaveDay[];
   } | null;
   onClose: () => void;
   onApprove: (requestId: number, selectedDayIds?: number[]) => void;
   onReject: (requestId: number, selectedDayIds?: number[], reason?: string) => void;
+  onUpdate?: (requestId: number, status: string, selectedDayIds?: number[], rejectReason?: string, leaveReason?: string) => void;
   isLoading?: boolean;
+  isEditMode?: boolean;
+  userRole?: string;
 }
 
 const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
@@ -40,12 +46,17 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   onClose,
   onApprove,
   onReject,
-  isLoading = false
+  onUpdate,
+  isLoading = false,
+  isEditMode = false,
+  userRole
 }) => {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [updatedLeaveReason, setUpdatedLeaveReason] = useState<string>('');
 
   // Reset state when modal closes
   useEffect(() => {
@@ -54,8 +65,14 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setToDate('');
       setShowRejectDialog(false);
       setRejectReason('');
+      setSelectedStatus('');
+      setUpdatedLeaveReason('');
+    } else if (isOpen && leaveRequest && isEditMode) {
+      // Set initial status and reason when opening in edit mode
+      setSelectedStatus(leaveRequest.currentStatus);
+      setUpdatedLeaveReason(leaveRequest.leaveReason || '');
     }
-  }, [isOpen]);
+  }, [isOpen, leaveRequest, isEditMode]);
 
   if (!isOpen || !leaveRequest) return null;
 
@@ -127,7 +144,13 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const confirmReject = () => {
     if (!rejectReason.trim()) return;
     
-    if (isMultiDay && pendingDays.length > 0) {
+    if (isEditMode && onUpdate) {
+      // Edit mode - update status to rejected
+      const allDayIds = allLeaveDates.map(day => day.id);
+      onUpdate(leaveRequest.id, 'rejected', allDayIds, rejectReason.trim(), updatedLeaveReason);
+      setShowRejectDialog(false);
+      setRejectReason('');
+    } else if (isMultiDay && pendingDays.length > 0) {
       // For multi-day, reject selected range or all pending if no range selected
       const daysToReject = fromDate && toDate 
         ? getSelectedDayIds()
@@ -209,6 +232,25 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     }
   };
 
+  // Helper to convert date string to YYYY-MM-DD format for input
+  const convertToInputDate = (dateStr: string): string => {
+    try {
+      if (dateStr.includes('/')) {
+        // DD/MM/YYYY format
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      } else if (dateStr.includes('-')) {
+        // Already YYYY-MM-DD
+        return dateStr;
+      } else {
+        const date = new Date(dateStr + 'T12:00:00');
+        return format(date, 'yyyy-MM-dd');
+      }
+    } catch {
+      return dateStr;
+    }
+  };
+
   const getStatusLabel = () => {
     if (approvedDays.length === 0 && rejectedDays.length === 0) {
       return 'Pending';
@@ -285,17 +327,80 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
 
               <div className="leave-detail-item">
                 <label>Current Status</label>
-                <div className="leave-detail-value">
-                  <span className={`status-badge status-${getStatusLabel().toLowerCase().replace(' ', '-')}`}>
-                    {getStatusLabel()}
-                  </span>
-                </div>
+                {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => {
+                      setSelectedStatus(e.target.value);
+                      // Clear date selection when status changes
+                      if (e.target.value !== 'partially_approved') {
+                        setFromDate('');
+                        setToDate('');
+                      }
+                    }}
+                    className="status-dropdown"
+                    disabled={isLoading}
+                  >
+                    {isMultiDay ? (
+                      <>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="partially_approved">Partially Approved</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </>
+                    )}
+                  </select>
+                ) : (
+                  <div className="leave-detail-value">
+                    <span className={`status-badge status-${getStatusLabel().toLowerCase().replace(' ', '-')}`}>
+                      {getStatusLabel()}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="leave-detail-item leave-detail-item-full">
                 <label>Leave Reason</label>
-                <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
+                {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
+                  <textarea
+                    value={updatedLeaveReason}
+                    onChange={(e) => setUpdatedLeaveReason(e.target.value)}
+                    className="leave-reason-textarea"
+                    rows={4}
+                    placeholder="Enter leave reason..."
+                    disabled={isLoading}
+                  />
+                ) : (
+                  <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
+                )}
               </div>
+
+              {/* Rejection Reason - show only if rejected */}
+              {leaveRequest.currentStatus === 'rejected' && leaveRequest.rejectionReason && (
+                <div className="leave-detail-item leave-detail-item-full">
+                  <label>Rejection Reason</label>
+                  <div className="leave-detail-value">
+                    {leaveRequest.rejectionReason}
+                  </div>
+                </div>
+              )}
+
+              {/* Approver Information - show only if approved or rejected */}
+              {(leaveRequest.currentStatus === 'approved' || leaveRequest.currentStatus === 'rejected' || leaveRequest.currentStatus === 'partially_approved') && leaveRequest.approverName && (
+                <div className="leave-detail-item">
+                  <label>{leaveRequest.currentStatus === 'rejected' ? 'Rejected By' : 'Approved By'}</label>
+                  <div className="leave-detail-value">
+                    {leaveRequest.approverName}
+                    {leaveRequest.approverRole && (
+                      <span className="approver-role-badge"> ({leaveRequest.approverRole})</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {leaveRequest.leaveType === 'sick' && leaveRequest.doctorNote && (
                 <div className="leave-detail-item leave-detail-item-full">
@@ -375,7 +480,8 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 </div>
               )}
 
-              {isMultiDay && leaveRequest.leaveDays && leaveRequest.leaveDays.length > 0 && pendingDays.length > 0 && (
+              {/* Date selection for pending leaves (approval flow) */}
+              {isMultiDay && leaveRequest.leaveDays && leaveRequest.leaveDays.length > 0 && pendingDays.length > 0 && !isEditMode && (
                 <div className="leave-detail-item leave-detail-item-full">
                   <label>Select Date Range to Approve/Reject</label>
                   <div className="date-range-picker-container">
@@ -424,6 +530,61 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Date selection for edit mode - partially approved */}
+              {isEditMode && isMultiDay && selectedStatus === 'partially_approved' && (
+                <div className="leave-detail-item leave-detail-item-full">
+                  <label>Select Date Range to Approve</label>
+                  <div className="date-range-picker-container">
+                    <div className="date-range-selection-hint">
+                      Select the date range to approve. Remaining dates will be rejected.
+                    </div>
+                    <div className="date-range-inputs">
+                      <div className="date-range-input-group">
+                        <label>From Date</label>
+                        <input
+                          type="date"
+                          value={fromDate}
+                          min={convertToInputDate(leaveRequest.startDate)}
+                          max={convertToInputDate(leaveRequest.endDate)}
+                          onChange={(e) => {
+                            const newFromDate = e.target.value;
+                            setFromDate(newFromDate);
+                            if (toDate && newFromDate && toDate < newFromDate) {
+                              setToDate('');
+                            }
+                          }}
+                          disabled={isLoading}
+                          className="date-range-input"
+                        />
+                      </div>
+                      <div className="date-range-input-group">
+                        <label>To Date</label>
+                        <input
+                          type="date"
+                          value={toDate}
+                          min={fromDate || convertToInputDate(leaveRequest.startDate)}
+                          max={convertToInputDate(leaveRequest.endDate)}
+                          onChange={(e) => {
+                            const newToDate = e.target.value;
+                            if (fromDate && newToDate && newToDate < fromDate) {
+                              return;
+                            }
+                            setToDate(newToDate);
+                          }}
+                          disabled={isLoading || !fromDate}
+                          className="date-range-input"
+                        />
+                      </div>
+                    </div>
+                    {fromDate && toDate && (
+                      <div className="date-range-selection-info">
+                        Selected range: {formatDateSafe(fromDate)} to {formatDateSafe(toDate)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -435,34 +596,83 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
             >
               Close
             </button>
-            {pendingDays.length > 0 && (
-              <>
-                {!fromDate || !toDate ? (
+            {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
+              <button
+                className="leave-details-modal-button leave-details-modal-button-approve"
+                onClick={() => {
+                  if (!onUpdate) return;
+                  
+                  // For partially approved, need date range
+                  if (selectedStatus === 'partially_approved') {
+                    if (!fromDate || !toDate) {
+                      alert('Please select a date range for partial approval');
+                      return;
+                    }
+                    // Get day IDs for selected date range
+                    const from = parse(fromDate, 'yyyy-MM-dd', new Date());
+                    const to = parse(toDate, 'yyyy-MM-dd', new Date());
+                    const interval = eachDayOfInterval({ start: from, end: to });
+                    const selectedDayIds: number[] = [];
+                    interval.forEach(date => {
+                      const dateStr = format(date, 'yyyy-MM-dd');
+                      const dayInfo = dateMap.get(dateStr);
+                      if (dayInfo) {
+                        selectedDayIds.push(dayInfo.id);
+                      }
+                    });
+                    onUpdate(leaveRequest.id, selectedStatus, selectedDayIds, undefined, updatedLeaveReason);
+                  } else if (selectedStatus === 'rejected') {
+                    // For rejection, show dialog for reason
+                    setShowRejectDialog(true);
+                  } else {
+                    // For approved, approve all days
+                    const allDayIds = allLeaveDates.map(day => day.id);
+                    onUpdate(leaveRequest.id, selectedStatus, allDayIds, undefined, updatedLeaveReason);
+                  }
+                }}
+                disabled={isLoading || selectedStatus === leaveRequest.currentStatus || (selectedStatus === 'partially_approved' && (!fromDate || !toDate))}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <FaCheck /> Update Status
+                  </>
+                )}
+              </button>
+            ) : (
+              pendingDays.length > 0 && (
+                <>
+                  {!fromDate || !toDate ? (
+                    <button
+                      className="leave-details-modal-button leave-details-modal-button-reject"
+                      onClick={handleRejectClick}
+                      disabled={isLoading}
+                    >
+                      <FaTimesCircle /> Reject All
+                    </button>
+                  ) : null}
                   <button
-                    className="leave-details-modal-button leave-details-modal-button-reject"
-                    onClick={handleRejectClick}
+                    className="leave-details-modal-button leave-details-modal-button-approve"
+                    onClick={handleApproveClick}
                     disabled={isLoading}
                   >
-                    <FaTimesCircle /> Reject All
+                    {isLoading ? (
+                      <>
+                        <span className="loading-spinner"></span>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <FaCheck /> {fromDate && toDate ? 'Approve Selected' : 'Approve'}
+                      </>
+                    )}
                   </button>
-                ) : null}
-                <button
-                  className="leave-details-modal-button leave-details-modal-button-approve"
-                  onClick={handleApproveClick}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <span className="loading-spinner"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FaCheck /> {fromDate && toDate ? 'Approve Selected' : 'Approve'}
-                    </>
-                  )}
-                </button>
-              </>
+                </>
+              )
             )}
           </div>
         </div>

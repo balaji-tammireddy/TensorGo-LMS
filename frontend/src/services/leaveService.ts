@@ -148,3 +148,19 @@ export const deleteLeaveRequest = async (requestId: number) => {
   return response.data;
 };
 
+export const updateLeaveStatus = async (
+  requestId: number,
+  status: string,
+  dayIds?: number[],
+  rejectReason?: string,
+  leaveReason?: string
+) => {
+  const response = await api.post(`/leave/${requestId}/update-status`, {
+    status,
+    dayIds,
+    rejectReason,
+    leaveReason
+  });
+  return response.data;
+};
+

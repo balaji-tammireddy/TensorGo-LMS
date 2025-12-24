@@ -43,6 +43,14 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS doctor_note TEXT;
     `);
     
+    // Add last_updated_by and last_updated_by_role columns for tracking last approver (idempotent)
+    await pool.query(`
+      ALTER TABLE leave_requests
+      ADD COLUMN IF NOT EXISTS last_updated_by INTEGER REFERENCES users(id);
+      ALTER TABLE leave_requests
+      ADD COLUMN IF NOT EXISTS last_updated_by_role VARCHAR(20) CHECK (last_updated_by_role IN ('manager', 'hr', 'super_admin'));
+    `);
+    
     // Leave rules insertion disabled - rules cannot be changed until explicitly enabled
     // await pool.query(`
     //   INSERT INTO leave_rules (leave_required_min, leave_required_max, prior_information_days, is_active)
