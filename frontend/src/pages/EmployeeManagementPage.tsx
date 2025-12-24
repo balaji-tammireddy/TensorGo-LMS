@@ -754,13 +754,40 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        maxLength={10}
                         value={newEmployee.contactNumber}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const input = e.target;
+                          const cursorPosition = input.selectionStart || 0;
+                          const oldValue = newEmployee.contactNumber || '';
+                          const inputValue = e.target.value;
+                          const newValue = sanitizePhone(inputValue);
+                          
+                          // Calculate new cursor position accounting for removed characters
+                          let newCursorPosition = cursorPosition;
+                          if (inputValue.length > newValue.length) {
+                            // Characters were removed, adjust cursor position
+                            const removedCount = inputValue.length - newValue.length;
+                            newCursorPosition = Math.max(0, cursorPosition - removedCount);
+                          } else {
+                            // Normal typing, keep cursor position
+                            newCursorPosition = Math.min(cursorPosition, newValue.length);
+                          }
+                          
                           setNewEmployee({
                             ...newEmployee,
-                            contactNumber: sanitizePhone(e.target.value)
-                          })
-                        }
+                            contactNumber: newValue
+                          });
+                          
+                          // Restore cursor position after state update
+                          setTimeout(() => {
+                            const inputElement = input;
+                            if (inputElement) {
+                              inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+                            }
+                          }, 0);
+                        }}
                         disabled={isViewMode}
                       />
                     </div>
@@ -770,13 +797,29 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        maxLength={10}
                         value={newEmployee.altContact}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const input = e.target;
+                          const cursorPosition = input.selectionStart || 0;
+                          const oldValue = newEmployee.altContact || '';
+                          const newValue = sanitizePhone(e.target.value);
+                          
                           setNewEmployee({
                             ...newEmployee,
-                            altContact: sanitizePhone(e.target.value)
-                          })
-                        }
+                            altContact: newValue
+                          });
+                          
+                          // Restore cursor position after state update
+                          setTimeout(() => {
+                            const inputElement = input;
+                            if (inputElement) {
+                              const newCursorPosition = Math.min(cursorPosition, newValue.length);
+                              inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+                            }
+                          }, 0);
+                        }}
                         disabled={isViewMode}
                       />
                     </div>
@@ -874,13 +917,39 @@ const EmployeeManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        maxLength={10}
                         value={newEmployee.emergencyContactNo}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const input = e.target;
+                          const cursorPosition = input.selectionStart || 0;
+                          const inputValue = e.target.value;
+                          const newValue = sanitizePhone(inputValue);
+                          
+                          // Calculate new cursor position accounting for removed characters
+                          let newCursorPosition = cursorPosition;
+                          if (inputValue.length > newValue.length) {
+                            // Characters were removed, adjust cursor position
+                            const removedCount = inputValue.length - newValue.length;
+                            newCursorPosition = Math.max(0, cursorPosition - removedCount);
+                          } else {
+                            // Normal typing, keep cursor position
+                            newCursorPosition = Math.min(cursorPosition, newValue.length);
+                          }
+                          
                           setNewEmployee({
                             ...newEmployee,
-                            emergencyContactNo: sanitizePhone(e.target.value)
-                          })
-                        }
+                            emergencyContactNo: newValue
+                          });
+                          
+                          // Restore cursor position after state update
+                          setTimeout(() => {
+                            const inputElement = input;
+                            if (inputElement) {
+                              inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+                            }
+                          }, 0);
+                        }}
                         disabled={isViewMode}
                       />
                     </div>

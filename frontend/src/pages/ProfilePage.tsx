@@ -507,11 +507,34 @@ const ProfilePage: React.FC = () => {
                 maxLength={10}
                 value={formData.personalInfo?.contactNumber || ''}
                 onChange={(e) => {
-                  const value = sanitizePhone(e.target.value);
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const inputValue = e.target.value;
+                  const newValue = sanitizePhone(inputValue);
+                  
+                  // Calculate new cursor position accounting for removed characters
+                  let newCursorPosition = cursorPosition;
+                  if (inputValue.length > newValue.length) {
+                    // Characters were removed, adjust cursor position
+                    const removedCount = inputValue.length - newValue.length;
+                    newCursorPosition = Math.max(0, cursorPosition - removedCount);
+                  } else {
+                    // Normal typing, keep cursor position
+                    newCursorPosition = Math.min(cursorPosition, newValue.length);
+                  }
+                  
                   setFormData({
                     ...formData,
-                    personalInfo: { ...formData.personalInfo, contactNumber: value }
+                    personalInfo: { ...formData.personalInfo, contactNumber: newValue }
                   });
+                  
+                  // Restore cursor position after state update
+                  setTimeout(() => {
+                    const inputElement = input;
+                    if (inputElement) {
+                      inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+                    }
+                  }, 0);
                 }}
                 disabled={!isEditMode}
               />
@@ -527,11 +550,34 @@ const ProfilePage: React.FC = () => {
                 maxLength={10}
                 value={formData.personalInfo?.altContact || ''}
                 onChange={(e) => {
-                  const value = sanitizePhone(e.target.value);
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const inputValue = e.target.value;
+                  const newValue = sanitizePhone(inputValue);
+                  
+                  // Calculate new cursor position accounting for removed characters
+                  let newCursorPosition = cursorPosition;
+                  if (inputValue.length > newValue.length) {
+                    // Characters were removed, adjust cursor position
+                    const removedCount = inputValue.length - newValue.length;
+                    newCursorPosition = Math.max(0, cursorPosition - removedCount);
+                  } else {
+                    // Normal typing, keep cursor position
+                    newCursorPosition = Math.min(cursorPosition, newValue.length);
+                  }
+                  
                   setFormData({
                     ...formData,
-                    personalInfo: { ...formData.personalInfo, altContact: value }
+                    personalInfo: { ...formData.personalInfo, altContact: newValue }
                   });
+                  
+                  // Restore cursor position after state update
+                  setTimeout(() => {
+                    const inputElement = input;
+                    if (inputElement) {
+                      inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+                    }
+                  }, 0);
                 }}
                 disabled={!isEditMode}
               />
@@ -644,11 +690,34 @@ const ProfilePage: React.FC = () => {
                 maxLength={10}
                 value={formData.personalInfo?.emergencyContactNo || ''}
                 onChange={(e) => {
-                  const value = sanitizePhone(e.target.value);
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const inputValue = e.target.value;
+                  const newValue = sanitizePhone(inputValue);
+                  
+                  // Calculate new cursor position accounting for removed characters
+                  let newCursorPosition = cursorPosition;
+                  if (inputValue.length > newValue.length) {
+                    // Characters were removed, adjust cursor position
+                    const removedCount = inputValue.length - newValue.length;
+                    newCursorPosition = Math.max(0, cursorPosition - removedCount);
+                  } else {
+                    // Normal typing, keep cursor position
+                    newCursorPosition = Math.min(cursorPosition, newValue.length);
+                  }
+                  
                   setFormData({
                     ...formData,
-                    personalInfo: { ...formData.personalInfo, emergencyContactNo: value }
+                    personalInfo: { ...formData.personalInfo, emergencyContactNo: newValue }
                   });
+                  
+                  // Restore cursor position after state update
+                  setTimeout(() => {
+                    const inputElement = input;
+                    if (inputElement) {
+                      inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+                    }
+                  }, 0);
                 }}
                 disabled={!isEditMode}
               />
