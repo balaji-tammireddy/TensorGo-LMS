@@ -13,6 +13,7 @@ router.use(authenticateToken);
 // Public leave routes (for all authenticated users)
 router.get('/balances', leaveController.getBalances);
 router.get('/holidays', leaveController.getHolidays);
+// IMPORTANT: Leave Rules is READ-ONLY. No POST/PUT/DELETE routes should ever be added for /rules
 router.get('/rules', leaveController.getRules);
 router.post('/apply', validateRequest(applyLeaveSchema), leaveController.applyLeave);
 router.get('/my-requests', leaveController.getMyRequests);

@@ -40,6 +40,12 @@ export const getHolidays = async (req: AuthRequest, res: Response) => {
   }
 };
 
+/**
+ * Get Leave Rules - READ ONLY
+ * 
+ * IMPORTANT: This endpoint is read-only. The leave_rules table should NEVER be modified
+ * through the application. No create, update, or delete endpoints should be implemented.
+ */
 export const getRules = async (req: AuthRequest, res: Response) => {
   try {
     const rules = await leaveService.getLeaveRules();

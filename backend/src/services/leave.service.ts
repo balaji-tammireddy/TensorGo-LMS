@@ -77,6 +77,14 @@ export const getHolidays = async (year?: number) => {
   }));
 };
 
+/**
+ * Get Leave Rules - READ ONLY
+ * 
+ * IMPORTANT: The leave_rules table should NEVER be modified through the application.
+ * This is a read-only function. No create, update, or delete operations should be
+ * implemented for leave_rules. Any changes to leave rules must be done directly
+ * in the database by authorized administrators only.
+ */
 export const getLeaveRules = async () => {
   const result = await pool.query(
     'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
