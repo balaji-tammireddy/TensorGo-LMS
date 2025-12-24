@@ -107,6 +107,16 @@ export const applyLeave = async (
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
 
+    // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
+    const startDayOfWeek = startDate.getDay();
+    const endDayOfWeek = endDate.getDay();
+    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+    }
+    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
+      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+    }
+
     // Validation: Cannot apply for past dates; today is allowed only for sick
     if (leaveData.leaveType === 'sick') {
       if (startDate < today) {
@@ -221,14 +231,8 @@ export const applyLeave = async (
       throw new Error('Start and end timings are required for permission requests');
     }
 
-    // LOP requires zero casual balance
-    if (leaveData.leaveType === 'lop') {
-      const balance = await getLeaveBalances(userId);
-      if ((balance.casual || 0) > 0) {
-        throw new Error('LOP can be applied only when casual leave balance is 0');
-      }
-    } else if (leaveData.leaveType !== 'permission') {
-      // Check balance for other leave types (permission skips balance)
+    // Check balance for all leave types (permission skips balance)
+    if (leaveData.leaveType !== 'permission') {
       const balance = await getLeaveBalances(userId);
       const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
       if (balance[balanceKey] < days) {
@@ -764,20 +768,30 @@ export const updateLeaveRequest = async (
     throw new Error('Invalid date format');
   }
   
-  const startDate = new Date(startYear, startMonth - 1, startDay);
-  const endDate = new Date(endYear, endMonth - 1, endDay);
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
+    const startDate = new Date(startYear, startMonth - 1, startDay);
+    const endDate = new Date(endYear, endMonth - 1, endDay);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
 
-  // Validation: Cannot apply for past dates; today is allowed only for sick
-  if (leaveData.leaveType === 'sick') {
-    if (startDate < today) {
-      throw new Error('Cannot apply for past dates.');
+    // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
+    const startDayOfWeek = startDate.getDay();
+    const endDayOfWeek = endDate.getDay();
+    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
     }
-  } else {
+    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
+      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+    }
+
+    // Validation: Cannot apply for past dates; today is allowed only for sick
+    if (leaveData.leaveType === 'sick') {
+      if (startDate < today) {
+        throw new Error('Cannot apply for past dates.');
+      }
+    } else {
   if (startDate <= today) {
       throw new Error('Cannot apply for past dates or today.');
     }
@@ -887,31 +901,19 @@ export const updateLeaveRequest = async (
     throw new Error('Start and end timings are required for permission requests');
   }
 
-  // LOP requires zero casual balance
-    let balance: LeaveBalance | null = null;
-
-    if (leaveData.leaveType === 'lop') {
-      balance = await getLeaveBalances(userId);
-      if ((balance.casual || 0) > 0) {
-        throw new Error('LOP can be applied only when casual leave balance is 0');
-      }
-  }
-
-    // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
+  // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
     if (leaveData.leaveType !== 'permission') {
-      if (!balance) {
-        balance = await getLeaveBalances(userId);
-      }
-    const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
-    const currentBalance = balance[balanceKey];
-    
+      const balance = await getLeaveBalances(userId);
+      const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
+      const currentBalance = balance[balanceKey];
+      
       if (currentBalance <= 0) {
         throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
       }
-    if (currentBalance < days) {
-      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+      if (currentBalance < days) {
+        throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+      }
     }
-  }
 
   // Start transaction
   const client = await pool.connect();
@@ -1010,19 +1012,28 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
     await client.query('BEGIN');
 
     // Restore balance on delete (except permission)
-    // Only restore balance for approved days, not rejected or pending days
+    // Since balance was deducted when leave was applied, we need to refund all non-rejected days
+    // For pending leaves: refund all days (they were deducted but never approved)
+    // For partially approved leaves: refund all non-rejected days (pending + approved)
     if (leave_type !== 'permission') {
-      // Get approved days count
-      const approvedDaysResult = await client.query(
-        `SELECT COALESCE(SUM(CASE WHEN day_status = 'approved' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) as approved_days
+      // Get total days that need to be refunded (all days minus rejected days)
+      // Rejected days were already refunded when rejected, so don't refund again
+      const daysToRefundResult = await client.query(
+        `SELECT COALESCE(SUM(CASE WHEN day_status != 'rejected' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) as days_to_refund
          FROM leave_days
          WHERE leave_request_id = $1`,
         [requestId]
       );
       
-      const approvedDays = parseFloat(approvedDaysResult.rows[0]?.approved_days || '0');
+      let daysToRefund = parseFloat(daysToRefundResult.rows[0]?.days_to_refund || '0');
       
-      if (approvedDays > 0) {
+      // If no leave_days exist (edge case) or query returned 0, use the original no_of_days
+      // This handles cases where leave_days might not have been created yet
+      if (daysToRefund === 0) {
+        daysToRefund = parseFloat(no_of_days || '0');
+      }
+      
+      if (daysToRefund > 0) {
         const balanceColumn =
           leave_type === 'casual'
             ? 'casual_balance'
@@ -1034,7 +1045,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
           `UPDATE leave_balances 
            SET ${balanceColumn} = ${balanceColumn} + $1
            WHERE employee_id = $2`,
-          [approvedDays, userId]
+          [daysToRefund, userId]
         );
       }
     }

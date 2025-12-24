@@ -36,6 +36,15 @@ const LeaveApplyPage: React.FC = () => {
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
   };
+
+  // Check if a date is a weekend (Saturday = 6, Sunday = 0)
+  const isWeekend = (dateStr: string): boolean => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr + 'T00:00:00');
+    const dayOfWeek = date.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+  };
+
   const formatHalfLabel = (val?: string) => {
     if (!val) return '';
     if (val === 'first_half') return ' (First half)';
@@ -200,12 +209,6 @@ const LeaveApplyPage: React.FC = () => {
     }}
   );
 
-  // Reset leave type to casual if LOP is selected but casual balance is not zero (unless editing existing LOP)
-  useEffect(() => {
-    if (formData.leaveType === 'lop' && balances && (balances.casual ?? 0) > 0 && !editingId) {
-      setFormData((prev) => ({ ...prev, leaveType: 'casual' }));
-    }
-  }, [balances, editingId, formData.leaveType]);
 
   const { data: holidays = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
     'holidays',
@@ -336,12 +339,6 @@ const LeaveApplyPage: React.FC = () => {
           return;
         }
       }
-    }
-
-    // Client-side guard: LOP only when casual balance is 0
-    if (formData.leaveType === 'lop' && (balances?.casual ?? 0) > 0) {
-      showWarning('LOP can be applied only when casual leave balance is 0');
-      return;
     }
 
     // Prepare the data for submission
@@ -573,7 +570,7 @@ const LeaveApplyPage: React.FC = () => {
                 >
                   <option value="casual">Casual</option>
                   <option value="sick">Sick</option>
-                  {((balances?.casual ?? 0) === 0 || formData.leaveType === 'lop') && <option value="lop">LOP</option>}
+                  <option value="lop">LOP</option>
                   <option value="permission">Permission</option>
                 </select>
               </div>
@@ -586,6 +583,11 @@ const LeaveApplyPage: React.FC = () => {
                     min={minStartDate}
                     onChange={(e) => {
                       const newStartDate = e.target.value;
+                      // Block weekends (Saturday and Sunday)
+                      if (isWeekend(newStartDate)) {
+                        showWarning('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+                        return;
+                      }
                       // For permission, update end date to match start date
                       if (formData.leaveType === 'permission') {
                         setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
@@ -620,7 +622,15 @@ const LeaveApplyPage: React.FC = () => {
                       <input
                         type="date"
                         value={formData.endDate}
-                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        onChange={(e) => {
+                          const newEndDate = e.target.value;
+                          // Block weekends (Saturday and Sunday)
+                          if (isWeekend(newEndDate)) {
+                            showWarning('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+                            return;
+                          }
+                          setFormData({ ...formData, endDate: newEndDate });
+                        }}
                         required
                         min={formData.startDate || minStartDate}
                         className="date-input"
