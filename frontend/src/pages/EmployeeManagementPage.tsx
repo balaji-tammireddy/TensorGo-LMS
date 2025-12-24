@@ -544,13 +544,16 @@ const EmployeeManagementPage: React.FC = () => {
                       >
                       <FaEye />
                       </span>
-                      <span
-                        className="action-icon"
-                        title="Edit"
-                        onClick={() => handleEditEmployee(employee.id)}
-                      >
-                      <FaPencilAlt />
-                      </span>
+                      {/* HR cannot edit super_admin users or their own details */}
+                      {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
+                        <span
+                          className="action-icon"
+                          title="Edit"
+                          onClick={() => handleEditEmployee(employee.id)}
+                        >
+                        <FaPencilAlt />
+                        </span>
+                      )}
                       {user?.role === 'super_admin' && (
                         <span
                           className="action-icon"

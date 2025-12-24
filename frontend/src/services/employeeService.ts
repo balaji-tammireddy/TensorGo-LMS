@@ -7,6 +7,7 @@ export interface Employee {
   position: string;
   joiningDate: string;
   status: string;
+  role: string;
 }
 
 export interface EmployeeListResponse {

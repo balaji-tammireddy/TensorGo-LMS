@@ -11,7 +11,7 @@ export const getEmployees = async (
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
-           designation as position, date_of_joining as joining_date, status
+           designation as position, date_of_joining as joining_date, status, role
     FROM users
     WHERE 1=1
   `;
@@ -77,7 +77,8 @@ export const getEmployees = async (
       name: row.name,
       position: row.position,
       joiningDate: row.joining_date.toISOString().split('T')[0],
-      status: row.status
+      status: row.status,
+      role: row.role
     })),
     pagination: {
       page,
@@ -232,7 +233,25 @@ export const createEmployee = async (employeeData: any) => {
   return { employeeId: userId, message: 'Employee created successfully' };
 };
 
-export const updateEmployee = async (employeeId: number, employeeData: any, requesterRole?: string) => {
+export const updateEmployee = async (employeeId: number, employeeData: any, requesterRole?: string, requesterId?: number) => {
+  // Check if employee exists and get their role
+  const employeeCheck = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
+  if (employeeCheck.rows.length === 0) {
+    throw new Error('Employee not found');
+  }
+
+  const employeeRole = employeeCheck.rows[0].role;
+  
+  // Prevent HR from editing super_admin users
+  if (requesterRole === 'hr' && employeeRole === 'super_admin') {
+    throw new Error('HR cannot edit super admin users');
+  }
+
+  // Prevent HR from editing their own details
+  if (requesterRole === 'hr' && requesterId && requesterId === employeeId) {
+    throw new Error('HR cannot edit their own details');
+  }
+
   // Build update query dynamically
   const updates: string[] = [];
   const values: any[] = [];
