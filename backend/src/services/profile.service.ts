@@ -236,7 +236,7 @@ export const deleteProfilePhoto = async (userId: number) => {
   return { message: 'Profile photo deleted successfully' };
 };
 
-export const getReportingManagers = async (search?: string, employeeRole?: string) => {
+export const getReportingManagers = async (search?: string, employeeRole?: string, excludeEmployeeId?: number) => {
   // Reporting manager rules:
   // - For managers, their reporting manager should be HR
   // - For HR, their reporting manager should be super admin
@@ -256,9 +256,17 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
     WHERE role = $1 AND status = 'active'
   `;
   const params: any[] = [targetRole];
+  let paramIndex = 2;
+
+  // Exclude the current employee if editing
+  if (excludeEmployeeId) {
+    query += ` AND id != $${paramIndex}`;
+    params.push(excludeEmployeeId);
+    paramIndex++;
+  }
 
   if (search) {
-    query += ` AND (first_name ILIKE $2 OR last_name ILIKE $2 OR emp_id ILIKE $2)`;
+    query += ` AND (first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex} OR emp_id ILIKE $${paramIndex})`;
     params.push(`%${search}%`);
   }
 

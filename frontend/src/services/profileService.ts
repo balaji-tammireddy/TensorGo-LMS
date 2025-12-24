@@ -77,10 +77,11 @@ export const deleteProfilePhoto = async () => {
   return response.data;
 };
 
-export const getReportingManagers = async (search?: string, employeeRole?: string): Promise<ReportingManager[]> => {
+export const getReportingManagers = async (search?: string, employeeRole?: string, excludeEmployeeId?: number): Promise<ReportingManager[]> => {
   const params = new URLSearchParams();
   if (search) params.append('search', search);
   if (employeeRole) params.append('employeeRole', employeeRole);
+  if (excludeEmployeeId) params.append('excludeEmployeeId', excludeEmployeeId.toString());
   const response = await api.get(`/profile/reporting-managers?${params}`);
   return response.data.managers;
 };

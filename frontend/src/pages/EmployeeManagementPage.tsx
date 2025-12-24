@@ -101,8 +101,8 @@ const EmployeeManagementPage: React.FC = () => {
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<number | null>(null);
 
   const { data: managersData } = useQuery(
-    ['reporting-managers', newEmployee.role],
-    () => getReportingManagers(undefined, newEmployee.role),
+    ['reporting-managers', newEmployee.role, editingEmployeeId],
+    () => getReportingManagers(undefined, newEmployee.role, editingEmployeeId || undefined),
     {
       retry: false,
       enabled: isModalOpen && !!newEmployee.role

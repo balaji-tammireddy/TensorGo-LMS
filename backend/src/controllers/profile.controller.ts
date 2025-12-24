@@ -113,7 +113,8 @@ export const getReportingManagers = async (req: AuthRequest, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
     const employeeRole = req.query.employeeRole as string | undefined;
-    const result = await profileService.getReportingManagers(search, employeeRole);
+    const excludeEmployeeId = req.query.excludeEmployeeId ? parseInt(req.query.excludeEmployeeId as string) : undefined;
+    const result = await profileService.getReportingManagers(search, employeeRole, excludeEmployeeId);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({
