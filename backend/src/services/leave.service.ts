@@ -130,6 +130,79 @@ export const applyLeave = async (
       throw new Error('End date must be greater than or equal to start date');
     }
 
+    // Check for existing leaves on the requested dates (exclude rejected)
+    // Use DATE comparison to ensure accurate matching
+    const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    
+    const existingLeavesCheck = await pool.query(
+      `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
+       FROM leave_days ld
+       JOIN leave_requests lr ON ld.leave_request_id = lr.id
+       WHERE ld.employee_id = $1
+         AND ld.leave_date >= $2::date
+         AND ld.leave_date <= $3::date
+         AND ld.day_status != 'rejected'
+         AND lr.current_status != 'rejected'
+       ORDER BY ld.leave_date`,
+      [userId, startDateStr, endDateStr]
+    );
+
+    if (existingLeavesCheck.rows.length > 0) {
+      // Check each requested day against existing leaves
+      const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
+      const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
+      
+      const { leaveDays: requestedLeaveDays } = await calculateLeaveDays(
+        startDate,
+        endDate,
+        normalizedStartType as 'full' | 'half',
+        normalizedEndType as 'full' | 'half'
+      );
+
+      for (const requestedDay of requestedLeaveDays) {
+        const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
+        
+        // Find existing leave by comparing date strings (handle both Date objects and strings)
+        const existingLeave = existingLeavesCheck.rows.find((row: any) => {
+          let existingDateStr: string;
+          if (row.leave_date instanceof Date) {
+            existingDateStr = `${row.leave_date.getFullYear()}-${String(row.leave_date.getMonth() + 1).padStart(2, '0')}-${String(row.leave_date.getDate()).padStart(2, '0')}`;
+          } else if (typeof row.leave_date === 'string') {
+            existingDateStr = row.leave_date.split('T')[0];
+          } else {
+            // Try to parse as date
+            const d = new Date(row.leave_date);
+            existingDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          }
+          return existingDateStr === requestedDateStr;
+        });
+        
+        if (existingLeave) {
+          const existingType = existingLeave.day_type;
+          const existingStatus = existingLeave.day_status || 'pending';
+          const statusText = existingStatus === 'approved' ? 'approved' : existingStatus === 'partially_approved' ? 'partially approved' : 'pending';
+          
+          // If existing leave is full day, block any new leave
+          if (existingType === 'full') {
+            throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - full day). Cannot apply leave on this date.`);
+          }
+          
+          // If existing leave is half day
+          if (existingType === 'half') {
+            // Block if new request is full day
+            if (requestedDay.type === 'full') {
+              throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - half day). Cannot apply full day leave on this date.`);
+            }
+            // If both are half days, block to prevent conflicts
+            if (requestedDay.type === 'half') {
+              throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - half day). Cannot apply leave on this date.`);
+            }
+          }
+        }
+      }
+    }
+
     // Calculate leave days
     // Normalize first_half/second_half to half for calculation
     const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
@@ -582,6 +655,80 @@ export const updateLeaveRequest = async (
   // Validation: End date must be >= start date
   if (endDate < startDate) {
     throw new Error('End date must be greater than or equal to start date');
+  }
+
+  // Check for existing leaves on the requested dates (exclude rejected and the request being updated)
+  // Use DATE comparison to ensure accurate matching
+  const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+  const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+  
+  const existingLeavesCheck = await pool.query(
+    `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
+     FROM leave_days ld
+     JOIN leave_requests lr ON ld.leave_request_id = lr.id
+     WHERE ld.employee_id = $1
+       AND ld.leave_request_id != $2
+       AND ld.leave_date >= $3::date
+       AND ld.leave_date <= $4::date
+       AND ld.day_status != 'rejected'
+       AND lr.current_status != 'rejected'
+     ORDER BY ld.leave_date`,
+    [userId, requestId, startDateStr, endDateStr]
+  );
+
+  if (existingLeavesCheck.rows.length > 0) {
+    // Check each requested day against existing leaves
+    const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
+    const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
+    
+    const { leaveDays: requestedLeaveDays } = await calculateLeaveDays(
+      startDate,
+      endDate,
+      normalizedStartType as 'full' | 'half',
+      normalizedEndType as 'full' | 'half'
+    );
+
+    for (const requestedDay of requestedLeaveDays) {
+      const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
+      
+      // Find existing leave by comparing date strings (handle both Date objects and strings)
+      const existingLeave = existingLeavesCheck.rows.find((row: any) => {
+        let existingDateStr: string;
+        if (row.leave_date instanceof Date) {
+          existingDateStr = `${row.leave_date.getFullYear()}-${String(row.leave_date.getMonth() + 1).padStart(2, '0')}-${String(row.leave_date.getDate()).padStart(2, '0')}`;
+        } else if (typeof row.leave_date === 'string') {
+          existingDateStr = row.leave_date.split('T')[0];
+        } else {
+          // Try to parse as date
+          const d = new Date(row.leave_date);
+          existingDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        return existingDateStr === requestedDateStr;
+      });
+      
+      if (existingLeave) {
+        const existingType = existingLeave.day_type;
+        const existingStatus = existingLeave.day_status || 'pending';
+        const statusText = existingStatus === 'approved' ? 'approved' : existingStatus === 'partially_approved' ? 'partially approved' : 'pending';
+        
+        // If existing leave is full day, block any new leave
+        if (existingType === 'full') {
+          throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - full day). Cannot apply leave on this date.`);
+        }
+        
+        // If existing leave is half day
+        if (existingType === 'half') {
+          // Block if new request is full day
+          if (requestedDay.type === 'full') {
+            throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - half day). Cannot apply full day leave on this date.`);
+          }
+          // If both are half days, block to prevent conflicts
+          if (requestedDay.type === 'half') {
+            throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - half day). Cannot apply leave on this date.`);
+          }
+        }
+      }
+    }
   }
 
   // Normalize first_half/second_half to half for calculation

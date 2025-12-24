@@ -115,24 +115,26 @@ const LeaveApplyPage: React.FC = () => {
           if (request.leaveDays && Array.isArray(request.leaveDays)) {
             const existingDay = request.leaveDays.find((ld: any) => ld.date === dayStr);
             if (existingDay) {
-              // Check status - only block if approved or pending
-              if (existingDay.status === 'approved' || existingDay.status === 'pending') {
+              // Check status - block if approved, pending, or partially_approved (not rejected)
+              if (existingDay.status === 'approved' || existingDay.status === 'pending' || existingDay.status === 'partially_approved') {
                 // If existing leave is full day, block any new leave (full or half)
                 if (existingDay.type === 'full') {
-                  const statusText = existingDay.status === 'approved' ? 'approved' : 'pending';
-                  return `Leave already applied for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
+                  const statusText = existingDay.status === 'approved' ? 'approved' : 
+                                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                  return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
                 }
                 // If existing leave is half day
                 if (existingDay.type === 'half') {
                   // Block if new request is full day
                   if (!isHalfDay) {
-                    const statusText = existingDay.status === 'approved' ? 'approved' : 'pending';
-                    return `Leave already applied for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
+                    const statusText = existingDay.status === 'approved' ? 'approved' : 
+                                      existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                    return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
                   }
-                  // If both are half days, we can't determine if they're different halves
-                  // So we'll block to be safe (user can check their existing requests)
-                  const statusText = existingDay.status === 'approved' ? 'approved' : 'pending';
-                  return `Leave already applied for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
+                  // If both are half days, block to prevent conflicts
+                  const statusText = existingDay.status === 'approved' ? 'approved' : 
+                                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                  return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
                 }
               }
             }
