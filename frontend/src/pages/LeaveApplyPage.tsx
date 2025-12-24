@@ -816,7 +816,7 @@ const LeaveApplyPage: React.FC = () => {
                       )}
                     </td>
                     <td>
-                      {request.currentStatus === 'pending' && (
+                      {(request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') && (
                         <>
                           <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>
                             <FaPencilAlt />

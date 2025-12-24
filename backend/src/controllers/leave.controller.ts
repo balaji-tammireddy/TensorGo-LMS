@@ -228,6 +228,14 @@ export const getApprovedLeaves = async (req: AuthRequest, res: Response) => {
 export const getLeaveRequest = async (req: AuthRequest, res: Response) => {
   try {
     const requestId = parseInt(req.params.id);
+    if (isNaN(requestId)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST_ID',
+          message: 'Invalid leave request ID'
+        }
+      });
+    }
     const result = await leaveService.getLeaveRequestById(requestId, req.user!.id, req.user!.role);
     res.json(result);
   } catch (error: any) {

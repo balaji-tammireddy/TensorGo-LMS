@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -17,14 +17,16 @@ export interface TokenPayload {
 }
 
 export const generateAccessToken = (payload: TokenPayload): string => {
+  // @ts-ignore - jsonwebtoken types are overly strict
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: ACCESS_EXPIRY as string | number
+    expiresIn: ACCESS_EXPIRY
   });
 };
 
 export const generateRefreshToken = (payload: TokenPayload): string => {
+  // @ts-ignore - jsonwebtoken types are overly strict
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: REFRESH_EXPIRY as string | number
+    expiresIn: REFRESH_EXPIRY
   });
 };
 

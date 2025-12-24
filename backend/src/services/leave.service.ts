@@ -132,8 +132,8 @@ export const applyLeave = async (
 
     // Check for existing leaves on the requested dates (exclude rejected)
     // Use DATE comparison to ensure accurate matching
-    const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    const checkStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const checkEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
     
     const existingLeavesCheck = await pool.query(
       `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
@@ -144,8 +144,8 @@ export const applyLeave = async (
          AND ld.leave_date <= $3::date
          AND ld.day_status != 'rejected'
          AND lr.current_status != 'rejected'
-       ORDER BY ld.leave_date`,
-      [userId, startDateStr, endDateStr]
+       ORDER BY leave_date`,
+      [userId, checkStartDateStr, checkEndDateStr]
     );
 
     if (existingLeavesCheck.rows.length > 0) {
@@ -236,102 +236,146 @@ export const applyLeave = async (
       }
     }
 
-    // Get employee's information, reporting manager details, and HR (manager's reporting manager)
-    const userResult = await pool.query(
-      `SELECT 
-        u.reporting_manager_id,
-        u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-        u.emp_id as employee_emp_id,
-        rm.email as manager_email,
-        rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
-        rm.reporting_manager_id as hr_id,
-        hr.email as hr_email,
-        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
-      FROM users u
-      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
-      LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
-      WHERE u.id = $1`,
-      [userId]
-    );
-    const reportingManagerId = userResult.rows[0]?.reporting_manager_id;
-    const employeeName = userResult.rows[0]?.employee_name || 'Employee';
-    const employeeEmpId = userResult.rows[0]?.employee_emp_id || '';
-    const managerEmail = userResult.rows[0]?.manager_email;
-    const hrId = userResult.rows[0]?.hr_id;
-    const hrEmail = userResult.rows[0]?.hr_email;
-
     // Format dates as YYYY-MM-DD for database
     const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-    // Insert leave request
-    const leaveRequestResult = await pool.query(
-      `INSERT INTO leave_requests (
-        employee_id, leave_type, start_date, start_type, end_date, end_type,
-        reason, no_of_days, time_for_permission_start, time_for_permission_end
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING id`,
-      [
-        userId,
-        leaveData.leaveType,
-        startDateStr,
-        leaveData.startType,
-        endDateStr,
-        leaveData.endType,
-        leaveData.reason,
-        days,
-        leaveData.timeForPermission?.start || null,
-        leaveData.timeForPermission?.end || null
-      ]
-    );
+    // Use transaction for all database operations to ensure atomicity
+    const client = await pool.connect();
+    let leaveRequestId: number;
+    let reportingManagerId: number | null = null;
+    let employeeName = 'Employee';
+    let employeeEmpId = '';
+    let managerEmail: string | null = null;
+    let hrId: number | null = null;
+    let hrEmail: string | null = null;
+    let managerName: string | null = null;
+    let hrName: string | null = null;
+    
+    try {
+      await client.query('BEGIN');
 
-    const leaveRequestId = leaveRequestResult.rows[0].id;
-
-    // Insert leave days
-    for (const leaveDay of leaveDays) {
-      // Format leave day date properly
-      const leaveDayDate = new Date(leaveDay.date);
-      const ldYear = leaveDayDate.getFullYear();
-      const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
-      const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
-      const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
-      
-      await pool.query(
-        `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [leaveRequestId, leaveDayDateStr, leaveDay.type, leaveData.leaveType, userId]
+      // Get employee's information, reporting manager details, and HR (manager's reporting manager)
+      const userResult = await client.query(
+        `SELECT 
+          u.reporting_manager_id,
+          u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+          u.emp_id as employee_emp_id,
+          rm.email as manager_email,
+          rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
+          rm.reporting_manager_id as hr_id,
+          hr.email as hr_email,
+          hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
+        FROM users u
+        LEFT JOIN users rm ON u.reporting_manager_id = rm.id
+        LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
+        WHERE u.id = $1`,
+        [userId]
       );
-    }
+      reportingManagerId = userResult.rows[0]?.reporting_manager_id || null;
+      employeeName = userResult.rows[0]?.employee_name || 'Employee';
+      employeeEmpId = userResult.rows[0]?.employee_emp_id || '';
+      managerEmail = userResult.rows[0]?.manager_email || null;
+      managerName = userResult.rows[0]?.manager_name || null;
+      hrId = userResult.rows[0]?.hr_id || null;
+      hrEmail = userResult.rows[0]?.hr_email || null;
+      hrName = userResult.rows[0]?.hr_name || null;
 
-    // Deduct balance immediately on apply (all leave types except permission)
-    if (leaveData.leaveType !== 'permission') {
-      const balanceColumn =
-        leaveData.leaveType === 'casual'
-          ? 'casual_balance'
-          : leaveData.leaveType === 'sick'
-          ? 'sick_balance'
-          : 'lop_balance';
-
-      await pool.query(
-        `UPDATE leave_balances 
-         SET ${balanceColumn} = ${balanceColumn} - $1
-         WHERE employee_id = $2`,
-        [days, userId]
+      // Insert leave request
+      const leaveRequestResult = await client.query(
+        `INSERT INTO leave_requests (
+          employee_id, leave_type, start_date, start_type, end_date, end_type,
+          reason, no_of_days, time_for_permission_start, time_for_permission_end
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id`,
+        [
+          userId,
+          leaveData.leaveType,
+          startDateStr,
+          leaveData.startType,
+          endDateStr,
+          leaveData.endType,
+          leaveData.reason,
+          days,
+          leaveData.timeForPermission?.start || null,
+          leaveData.timeForPermission?.end || null
+        ]
       );
-    }
 
-    // Create notification for reporting manager (if notifications table exists)
-    if (reportingManagerId) {
-      try {
-        await pool.query(
-          `INSERT INTO notifications (user_id, title, message, type)
-           VALUES ($1, 'New Leave Request', 'A leave request requires your approval', 'leave_request')`,
-          [reportingManagerId]
+      leaveRequestId = leaveRequestResult.rows[0].id;
+
+      // Insert leave days
+      for (const leaveDay of leaveDays) {
+        // Format leave day date properly
+        const leaveDayDate = new Date(leaveDay.date);
+        const ldYear = leaveDayDate.getFullYear();
+        const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
+        const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
+        const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
+        
+        await client.query(
+          `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [leaveRequestId, leaveDayDateStr, leaveDay.type, leaveData.leaveType, userId]
         );
-      } catch (notifError: any) {
-        // Log but don't fail the leave request if notification fails
-        logger.warn('Failed to create notification:', notifError.message);
       }
+
+      // Deduct balance immediately on apply (all leave types except permission)
+      if (leaveData.leaveType !== 'permission') {
+        const balanceColumn =
+          leaveData.leaveType === 'casual'
+            ? 'casual_balance'
+            : leaveData.leaveType === 'sick'
+            ? 'sick_balance'
+            : 'lop_balance';
+
+        await client.query(
+          `UPDATE leave_balances 
+           SET ${balanceColumn} = ${balanceColumn} - $1
+           WHERE employee_id = $2`,
+          [days, userId]
+        );
+      }
+
+      // Create notification for reporting manager (if notifications table exists)
+      // Use SAVEPOINT to prevent notification failure from aborting the transaction
+      if (reportingManagerId) {
+        try {
+          await client.query('SAVEPOINT notification_savepoint');
+          await client.query(
+            `INSERT INTO notifications (user_id, title, message, type)
+             VALUES ($1, 'New Leave Request', 'A leave request requires your approval', 'leave_request')`,
+            [reportingManagerId]
+          );
+          await client.query('RELEASE SAVEPOINT notification_savepoint');
+        } catch (notifError: any) {
+          // Rollback to savepoint to prevent transaction abort
+          try {
+            await client.query('ROLLBACK TO SAVEPOINT notification_savepoint');
+            await client.query('RELEASE SAVEPOINT notification_savepoint');
+          } catch (spError: any) {
+            // If savepoint doesn't exist, transaction might already be aborted
+            logger.warn('Failed to rollback to savepoint:', spError.message);
+          }
+          // Log but don't fail the leave request if notification fails
+          logger.warn('Failed to create notification:', notifError.message);
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (error: any) {
+      // Rollback transaction - wrap in try-catch to handle already-aborted transactions
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError: any) {
+        // Transaction might already be aborted, log but don't throw
+        logger.warn('Error during rollback (transaction may already be aborted):', rollbackError.message);
+      }
+      logger.error(`Error applying leave for user ${userId}:`, error);
+      throw error;
+    } finally {
+      // Always release the client connection
+      client.release();
     }
 
     // Prepare base email data
@@ -348,10 +392,9 @@ export const applyLeave = async (
       timeForPermission: leaveData.timeForPermission,
     };
 
-    // Send email notification to reporting manager
+    // Send email notification to reporting manager (outside transaction)
     if (reportingManagerId && managerEmail) {
       try {
-        const managerName = userResult.rows[0]?.manager_name;
         const emailData = {
           ...baseEmailData,
           recipientName: managerName || undefined,
@@ -378,10 +421,9 @@ export const applyLeave = async (
       logger.warn(`Reporting manager ID ${reportingManagerId} exists but has no email address`);
     }
 
-    // Send email notification to HR (manager's reporting manager)
+    // Send email notification to HR (manager's reporting manager) (outside transaction)
     if (hrId && hrEmail) {
       try {
-        const hrName = userResult.rows[0]?.hr_name;
         const emailData = {
           ...baseEmailData,
           recipientName: hrName || undefined,
@@ -525,6 +567,10 @@ export const getMyLeaveRequests = async (
 };
 
 export const getLeaveRequestById = async (requestId: number, userId: number, userRole?: string) => {
+  if (isNaN(requestId) || requestId <= 0) {
+    throw new Error('Invalid leave request ID');
+  }
+
   const result = await pool.query(
     userRole === 'super_admin'
       ? `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
@@ -541,13 +587,16 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   );
 
   if (result.rows.length === 0) {
+    // Log for debugging
+    logger.warn(`Leave request not found: requestId=${requestId}, userId=${userId}, userRole=${userRole}`);
     throw new Error('Leave request not found or you do not have permission to access it');
   }
 
   const row = result.rows[0];
   
-  if (row.current_status !== 'pending' && userRole !== 'super_admin') {
-    throw new Error('Only pending leave requests can be edited');
+  // Allow editing pending or partially_approved requests (same as deletion)
+  if (row.current_status !== 'pending' && row.current_status !== 'partially_approved' && userRole !== 'super_admin') {
+    throw new Error('Only pending or partially approved leave requests can be edited');
   }
 
   // Helper function to format date without timezone conversion
@@ -603,10 +652,11 @@ export const updateLeaveRequest = async (
   }
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
-  const isPending = checkResult.rows[0].current_status === 'pending';
+  const currentStatus = checkResult.rows[0].current_status;
+  const canEdit = currentStatus === 'pending' || currentStatus === 'partially_approved';
 
-  if (!isPending) {
-    throw new Error('Only pending leave requests can be edited');
+  if (!canEdit) {
+    throw new Error('Only pending or partially approved leave requests can be edited');
   }
   if (userRole !== 'super_admin' && !belongsToUser) {
     throw new Error('You do not have permission to edit this leave request');
@@ -659,8 +709,8 @@ export const updateLeaveRequest = async (
 
   // Check for existing leaves on the requested dates (exclude rejected and the request being updated)
   // Use DATE comparison to ensure accurate matching
-  const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-  const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+  const checkStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+  const checkEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
   
   const existingLeavesCheck = await pool.query(
     `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
@@ -672,8 +722,8 @@ export const updateLeaveRequest = async (
        AND ld.leave_date <= $4::date
        AND ld.day_status != 'rejected'
        AND lr.current_status != 'rejected'
-     ORDER BY ld.leave_date`,
-    [userId, requestId, startDateStr, endDateStr]
+     ORDER BY leave_date`,
+    [userId, requestId, checkStartDateStr, checkEndDateStr]
   );
 
   if (existingLeavesCheck.rows.length > 0) {
@@ -826,10 +876,17 @@ export const updateLeaveRequest = async (
     await client.query('COMMIT');
 
     return { message: 'Leave request updated successfully', id: requestId };
-  } catch (error) {
-    await client.query('ROLLBACK');
+  } catch (error: any) {
+    // Rollback transaction - wrap in try-catch to handle already-aborted transactions
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError: any) {
+      // Transaction might already be aborted, log but don't throw
+      logger.warn('Error during rollback (transaction may already be aborted):', rollbackError.message);
+    }
     throw error;
   } finally {
+    // Always release the client connection
     client.release();
   }
 };
@@ -849,31 +906,68 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
     throw new Error('You do not have permission to delete this leave request');
   }
 
-  if (checkResult.rows[0].current_status !== 'pending') {
-    throw new Error('Only pending leave requests can be deleted');
+  // Allow deletion if status is pending or partially_approved (user can delete their own requests)
+  const currentStatus = checkResult.rows[0].current_status;
+  if (currentStatus !== 'pending' && currentStatus !== 'partially_approved') {
+    throw new Error('Only pending or partially approved leave requests can be deleted');
   }
 
   const { leave_type, no_of_days } = checkResult.rows[0];
+
+  // Cancel any scheduled emails for this leave request
+  cancelScheduledEmail(requestId);
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     // Restore balance on delete (except permission)
+    // Only restore balance for approved days, not rejected or pending days
     if (leave_type !== 'permission') {
-      const balanceColumn =
-        leave_type === 'casual'
-          ? 'casual_balance'
-          : leave_type === 'sick'
-          ? 'sick_balance'
-          : 'lop_balance';
-
-      await client.query(
-        `UPDATE leave_balances 
-         SET ${balanceColumn} = ${balanceColumn} + $1
-         WHERE employee_id = $2`,
-        [no_of_days, userId]
+      // Get approved days count
+      const approvedDaysResult = await client.query(
+        `SELECT COALESCE(SUM(CASE WHEN day_status = 'approved' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) as approved_days
+         FROM leave_days
+         WHERE leave_request_id = $1`,
+        [requestId]
       );
+      
+      const approvedDays = parseFloat(approvedDaysResult.rows[0]?.approved_days || '0');
+      
+      if (approvedDays > 0) {
+        const balanceColumn =
+          leave_type === 'casual'
+            ? 'casual_balance'
+            : leave_type === 'sick'
+            ? 'sick_balance'
+            : 'lop_balance';
+
+        await client.query(
+          `UPDATE leave_balances 
+           SET ${balanceColumn} = ${balanceColumn} + $1
+           WHERE employee_id = $2`,
+          [approvedDays, userId]
+        );
+      }
+    }
+
+    // Delete notifications related to this leave request (if notifications table exists)
+    // Use SAVEPOINT to prevent notification deletion failure from aborting the transaction
+    try {
+      await client.query('SAVEPOINT notification_savepoint');
+      await client.query('DELETE FROM notifications WHERE leave_request_id = $1', [requestId]);
+      await client.query('RELEASE SAVEPOINT notification_savepoint');
+    } catch (notifError: any) {
+      // Rollback to savepoint to prevent transaction abort
+      try {
+        await client.query('ROLLBACK TO SAVEPOINT notification_savepoint');
+        await client.query('RELEASE SAVEPOINT notification_savepoint');
+      } catch (spError: any) {
+        // If savepoint doesn't exist, transaction might already be aborted
+        logger.warn('Failed to rollback to savepoint:', spError.message);
+      }
+      // Ignore if notifications table doesn't exist or column doesn't exist
+      logger.warn('Could not delete notifications for leave request:', notifError.message);
     }
 
     // Delete leave days first (foreign key constraint)
@@ -885,10 +979,18 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
     await client.query('COMMIT');
 
     return { message: 'Leave request deleted successfully' };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
+  } catch (error: any) {
+    // Rollback transaction - wrap in try-catch to handle already-aborted transactions
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError: any) {
+      // Transaction might already be aborted, log but don't throw
+      logger.warn('Error during rollback (transaction may already be aborted):', rollbackError.message);
+    }
+    logger.error(`Error deleting leave request ${requestId}:`, error);
+    throw new Error(error.message || 'Failed to delete leave request');
   } finally {
+    // Always release the client connection
     client.release();
   }
 };
