@@ -240,9 +240,7 @@ export const applyLeave = async (
     const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-    // Use transaction for all database operations to ensure atomicity
-    const client = await pool.connect();
-    let leaveRequestId: number;
+    // Declare variables for employee and manager information
     let reportingManagerId: number | null = null;
     let employeeName = 'Employee';
     let employeeEmpId = '';
@@ -251,37 +249,47 @@ export const applyLeave = async (
     let hrEmail: string | null = null;
     let managerName: string | null = null;
     let hrName: string | null = null;
-    
-    try {
-      await client.query('BEGIN');
 
     // Get employee's information, reporting manager details, and HR (manager's reporting manager)
+    // This query needs to be outside transaction to get role information for email logic
     const userResult = await pool.query(
       `SELECT 
+        u.role as employee_role,
         u.reporting_manager_id,
         u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
         u.emp_id as employee_emp_id,
         rm.email as manager_email,
         rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
+        rm.role as manager_role,
         rm.reporting_manager_id as hr_id,
         hr.email as hr_email,
-        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
+        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
+        hr.role as hr_role
       FROM users u
       LEFT JOIN users rm ON u.reporting_manager_id = rm.id
       LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
       WHERE u.id = $1`,
       [userId]
     );
-    const reportingManagerId = userResult.rows[0]?.reporting_manager_id;
-    const employeeName = userResult.rows[0]?.employee_name || 'Employee';
-    const employeeEmpId = userResult.rows[0]?.employee_emp_id || '';
-    const managerEmail = userResult.rows[0]?.manager_email;
-    const hrId = userResult.rows[0]?.hr_id;
-    const hrEmail = userResult.rows[0]?.hr_email;
+    
+    const employeeRole = userResult.rows[0]?.employee_role;
+    reportingManagerId = userResult.rows[0]?.reporting_manager_id;
+    employeeName = userResult.rows[0]?.employee_name || 'Employee';
+    employeeEmpId = userResult.rows[0]?.employee_emp_id || '';
+    managerEmail = userResult.rows[0]?.manager_email;
+    const managerRole = userResult.rows[0]?.manager_role;
+    hrId = userResult.rows[0]?.hr_id;
+    hrEmail = userResult.rows[0]?.hr_email;
+    const hrRole = userResult.rows[0]?.hr_role;
+    managerName = userResult.rows[0]?.manager_name;
+    hrName = userResult.rows[0]?.hr_name;
 
-    // Format dates as YYYY-MM-DD for database
-    const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    // Use transaction for all database operations to ensure atomicity
+    const client = await pool.connect();
+    let leaveRequestId: number;
+    
+    try {
+      await client.query('BEGIN');
 
       // Insert leave request
       const leaveRequestResult = await client.query(
@@ -394,22 +402,25 @@ export const applyLeave = async (
       timeForPermission: leaveData.timeForPermission,
     };
 
-    // Send email notification to reporting manager
-    if (reportingManagerId && managerEmail) {
-      try {
-        const managerName = userResult.rows[0]?.manager_name;
-        const emailData = {
-          ...baseEmailData,
-          recipientName: managerName || undefined,
-        };
-        const emailContent = generateLeaveApplicationEmail(emailData);
-        
-        const emailSent = await sendEmail({
-          to: managerEmail,
-          subject: emailContent.subject,
-          html: emailContent.html,
-          text: emailContent.text,
-        });
+    // Send emails based on employee role
+    if (employeeRole === 'employee') {
+      // Employee applies: send to manager and manager's HR
+      
+      // Send email notification to reporting manager (skip if manager is super_admin)
+      if (reportingManagerId && managerEmail && managerRole !== 'super_admin') {
+        try {
+          const emailData = {
+            ...baseEmailData,
+            recipientName: managerName || undefined,
+          };
+          const emailContent = generateLeaveApplicationEmail(emailData);
+          
+          const emailSent = await sendEmail({
+            to: managerEmail,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text,
+          });
 
           if (emailSent) {
             logger.info(`Leave application email sent to manager ${managerEmail} for employee ${employeeName}`);
@@ -425,22 +436,21 @@ export const applyLeave = async (
         logger.info(`Skipping email to manager ${managerEmail} - super admin should not receive leave emails`);
       }
 
-    // Send email notification to HR (manager's reporting manager)
-    if (hrId && hrEmail) {
-      try {
-        const hrName = userResult.rows[0]?.hr_name;
-        const emailData = {
-          ...baseEmailData,
-          recipientName: hrName || undefined,
-        };
-        const emailContent = generateLeaveApplicationEmail(emailData);
-        
-        const emailSent = await sendEmail({
-          to: hrEmail,
-          subject: emailContent.subject,
-          html: emailContent.html,
-          text: emailContent.text,
-        });
+      // Send email notification to HR (manager's reporting manager) (skip if HR is super_admin)
+      if (hrId && hrEmail && hrRole !== 'super_admin') {
+        try {
+          const emailData = {
+            ...baseEmailData,
+            recipientName: hrName || undefined,
+          };
+          const emailContent = generateLeaveApplicationEmail(emailData);
+          
+          const emailSent = await sendEmail({
+            to: hrEmail,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text,
+          });
 
           if (emailSent) {
             logger.info(`Leave application email sent to HR ${hrEmail} for employee ${employeeName}`);
@@ -452,12 +462,13 @@ export const applyLeave = async (
         }
       } else if (hrId && hrRole === 'super_admin') {
         logger.info(`Skipping email to HR ${hrEmail} - super admin should not receive leave emails`);
+      } else if (hrId && !hrEmail) {
+        logger.warn(`HR ID ${hrId} exists but has no email address`);
       }
     } else if (employeeRole === 'manager') {
       // Manager applies: send to manager's HR only
       if (hrId && hrEmail && hrRole !== 'super_admin') {
         try {
-          const hrName = userResult.rows[0]?.hr_name;
           const emailData = {
             ...baseEmailData,
             recipientName: hrName || undefined,
@@ -525,8 +536,6 @@ export const applyLeave = async (
       } catch (error: any) {
         logger.error('Failed to fetch super admin users for HR leave notification:', error);
       }
-    } else if (hrId && !hrEmail) {
-      logger.warn(`HR ID ${hrId} exists but has no email address`);
     }
 
     return { leaveRequestId, message: 'Leave request submitted successfully' };
