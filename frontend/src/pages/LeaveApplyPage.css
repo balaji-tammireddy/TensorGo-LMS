@@ -51,6 +51,18 @@
   flex-shrink: 0;
 }
 
+.holidays-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.holidays-header h2 {
+  margin-bottom: 0;
+}
+
 /* Leave Balances Cards */
 .balance-cards-container {
   display: flex;
@@ -129,6 +141,58 @@
 
 .rules-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Holiday Year Buttons */
+.holiday-year-buttons {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0;
+  margin-top: 0;
+}
+
+.year-button {
+  padding: 6px 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  color: #666;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.year-button:hover:not(:disabled) {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+  opacity: 0.85;
+  color: #333;
+}
+
+.year-button.active {
+  background-color: #3c6ff2;
+  color: #ffffff;
+  border-color: #3c6ff2;
+  opacity: 1;
+  box-shadow: 0 2px 4px rgba(60, 111, 242, 0.2);
+}
+
+.year-button.active:hover {
+  background-color: #2951c8;
+  border-color: #2951c8;
+  opacity: 1;
+}
+
+.year-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background-color: #f8f9fa;
+  border-color: #e0e0e0;
+  color: #999;
+  box-shadow: none;
 }
 
 /* Holidays Table with Scrollbar */

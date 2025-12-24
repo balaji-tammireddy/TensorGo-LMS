@@ -18,9 +18,19 @@ export const getBalances = async (req: AuthRequest, res: Response) => {
 
 export const getHolidays = async (req: AuthRequest, res: Response) => {
   try {
-    const holidays = await leaveService.getHolidays();
+    let year: number | undefined = undefined;
+    if (req.query.year) {
+      const yearParam = parseInt(req.query.year as string, 10);
+      if (!isNaN(yearParam)) {
+        year = yearParam;
+      }
+    }
+    console.log(`[getHolidays] Request received - year param: ${req.query.year}, parsed year: ${year}`);
+    const holidays = await leaveService.getHolidays(year);
+    console.log(`[getHolidays] Returning ${holidays.length} holidays`);
     res.json({ holidays });
   } catch (error: any) {
+    console.error('[getHolidays] Error:', error);
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',

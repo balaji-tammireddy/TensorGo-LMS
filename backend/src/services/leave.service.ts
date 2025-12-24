@@ -50,10 +50,27 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
   };
 };
 
-export const getHolidays = async () => {
-  const result = await pool.query(
-    'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true ORDER BY holiday_date'
-  );
+export const getHolidays = async (year?: number) => {
+  let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
+  const params: any[] = [];
+  
+  // Ensure year is a valid number if provided
+  if (year !== undefined && year !== null && !isNaN(year)) {
+    const yearNum = parseInt(String(year), 10);
+    query += ' AND EXTRACT(YEAR FROM holiday_date) = $1';
+    params.push(yearNum);
+    logger.info(`Fetching holidays for year: ${yearNum}`);
+  } else {
+    logger.info('Fetching all active holidays (no year filter)');
+  }
+  
+  query += ' ORDER BY holiday_date';
+  
+  const result = await pool.query(query, params);
+  
+  // Log for debugging
+  logger.info(`Fetched ${result.rows.length} holidays${year ? ` for year ${year}` : ''}`);
+  
   return result.rows.map(row => ({
     date: formatDate(row.holiday_date),
     name: row.holiday_name

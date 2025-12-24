@@ -64,8 +64,16 @@ export const getLeaveBalances = async (): Promise<LeaveBalance> => {
   return response.data;
 };
 
-export const getHolidays = async (): Promise<Holiday[]> => {
-  const response = await api.get('/leave/holidays');
+export const getHolidays = async (year?: number): Promise<Holiday[]> => {
+  const params = new URLSearchParams();
+  if (year) {
+    params.append('year', year.toString());
+  }
+  const queryString = params.toString();
+  const url = queryString ? `/leave/holidays?${queryString}` : '/leave/holidays';
+  console.log(`[getHolidays] Calling API with year: ${year}, URL: ${url}`);
+  const response = await api.get(url);
+  console.log(`[getHolidays] Received ${response.data.holidays?.length || 0} holidays`);
   return response.data.holidays;
 };
 

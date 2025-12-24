@@ -214,11 +214,41 @@ const LeaveApplyPage: React.FC = () => {
   );
 
 
-  const { data: holidays = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
-    'holidays',
-    leaveService.getHolidays,
-    { retry: false }
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  
+  const { data: holidaysData = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
+    ['holidays', selectedYear],
+    () => {
+      console.log(`[Frontend] Fetching holidays for year: ${selectedYear}`);
+      return leaveService.getHolidays(selectedYear);
+    },
+    { 
+      retry: false,
+      staleTime: 0, // Always refetch when year changes
+      cacheTime: 0, // Don't cache old year data
+      refetchOnMount: true, // Always refetch when component mounts
+      refetchOnWindowFocus: false // Don't refetch on window focus
+    }
   );
+
+  // Filter holidays by selected year on the client side as well (double-check)
+  const holidays = React.useMemo(() => {
+    if (!holidaysData || holidaysData.length === 0) return [];
+    return holidaysData.filter((holiday: any) => {
+      try {
+        const holidayDate = new Date(holiday.date + 'T00:00:00');
+        const holidayYear = holidayDate.getFullYear();
+        const matches = holidayYear === selectedYear;
+        if (!matches) {
+          console.warn(`[Frontend] Filtered out holiday: ${holiday.date} (year: ${holidayYear}, expected: ${selectedYear})`);
+        }
+        return matches;
+      } catch (error) {
+        console.error(`[Frontend] Error parsing holiday date: ${holiday.date}`, error);
+        return false;
+      }
+    });
+  }, [holidaysData, selectedYear]);
   const { data: rules = [], isLoading: rulesLoading, error: rulesError } = useQuery(
     'leaveRules',
     leaveService.getLeaveRules,
@@ -553,7 +583,33 @@ const LeaveApplyPage: React.FC = () => {
 
           {/* Holidays List - Top Right */}
           <div className="holidays-section">
-            <h2>Holidays List</h2>
+            <div className="holidays-header">
+              <h2>Holidays List</h2>
+              <div className="holiday-year-buttons">
+                <button
+                  className={`year-button ${selectedYear === 2024 ? 'active' : ''}`}
+                  onClick={() => setSelectedYear(2024)}
+                  disabled={true}
+                  title="2024 holidays (disabled)"
+                >
+                  2024
+                </button>
+                <button
+                  className={`year-button ${selectedYear === 2025 ? 'active' : ''}`}
+                  onClick={() => setSelectedYear(2025)}
+                  disabled={false}
+                >
+                  2025
+                </button>
+                <button
+                  className={`year-button ${selectedYear === 2026 ? 'active' : ''}`}
+                  onClick={() => setSelectedYear(2026)}
+                  disabled={false}
+                >
+                  2026
+                </button>
+              </div>
+            </div>
             <div className="holidays-table-container">
               <table className="holidays-table">
                 <thead>
@@ -563,12 +619,20 @@ const LeaveApplyPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {holidays.map((holiday, idx) => (
-                    <tr key={idx}>
-                    <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
-                      <td>{holiday.name}</td>
+                  {holidays.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        No holidays found for {selectedYear}
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    holidays.map((holiday, idx) => (
+                      <tr key={idx}>
+                        <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
+                        <td>{holiday.name}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
