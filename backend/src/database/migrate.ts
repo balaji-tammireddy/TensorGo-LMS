@@ -43,15 +43,15 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS doctor_note TEXT;
     `);
     
-    // Insert default leave rules
-    await pool.query(`
-      INSERT INTO leave_rules (leave_required_min, leave_required_max, prior_information_days, is_active)
-      VALUES 
-        (0.5, 4, 3, true),
-        (4, 10, 14, true),
-        (10, NULL, 30, true)
-      ON CONFLICT DO NOTHING
-    `);
+    // Leave rules insertion disabled - rules cannot be changed until explicitly enabled
+    // await pool.query(`
+    //   INSERT INTO leave_rules (leave_required_min, leave_required_max, prior_information_days, is_active)
+    //   VALUES 
+    //     (0.5, 4, 3, true),
+    //     (4, 10, 14, true),
+    //     (10, NULL, 30, true)
+    //   ON CONFLICT DO NOTHING
+    // `);
     
     // Insert sample holidays (2025 calendar)
     await pool.query(`

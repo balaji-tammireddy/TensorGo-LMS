@@ -33,9 +33,9 @@ const LeaveApplyPage: React.FC = () => {
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
-  const minStartDate = (formData.leaveType === 'casual' || formData.leaveType === 'lop')
-    ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days
-    : todayStr;
+  const minStartDate = formData.leaveType === 'casual'
+    ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days for casual
+    : todayStr; // LOP and sick can be applied for today, permission also uses today
 
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');

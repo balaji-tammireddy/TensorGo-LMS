@@ -135,22 +135,23 @@ export const applyLeave = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Cannot apply for past dates; today is allowed only for sick
-    if (leaveData.leaveType === 'sick') {
+    // Validation: Cannot apply for past dates; today is allowed for sick and LOP
+    if (leaveData.leaveType === 'sick' || leaveData.leaveType === 'lop') {
       if (startDate < today) {
         throw new Error('Cannot apply for past dates.');
       }
     } else {
-    if (startDate <= today) {
+      if (startDate <= today) {
         throw new Error('Cannot apply for past dates or today.');
       }
     }
 
-    // Validation: casual/LOP need at least 3 days notice (block today + next two days)
+    // Validation: casual needs at least 3 days notice (block today + next two days)
+    // LOP can be applied at any date except past dates (no advance notice required)
     const msPerDay = 1000 * 60 * 60 * 24;
     const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
-    if ((leaveData.leaveType === 'casual' || leaveData.leaveType === 'lop') && daysUntilStart < 3) {
-      throw new Error('Casual and LOP leaves must be applied at least 3 days in advance.');
+    if (leaveData.leaveType === 'casual' && daysUntilStart < 3) {
+      throw new Error('Casual leaves must be applied at least 3 days in advance.');
     }
 
     // Validation: End date must be >= start date
@@ -807,22 +808,23 @@ export const updateLeaveRequest = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Cannot apply for past dates; today is allowed only for sick
-    if (leaveData.leaveType === 'sick') {
+    // Validation: Cannot apply for past dates; today is allowed for sick and LOP
+    if (leaveData.leaveType === 'sick' || leaveData.leaveType === 'lop') {
       if (startDate < today) {
         throw new Error('Cannot apply for past dates.');
       }
     } else {
-  if (startDate <= today) {
-      throw new Error('Cannot apply for past dates or today.');
+      if (startDate <= today) {
+        throw new Error('Cannot apply for past dates or today.');
+      }
     }
-  }
 
-  // Validation: casual/LOP need at least 3 days notice (block today + next two days)
+  // Validation: casual needs at least 3 days notice (block today + next two days)
+  // LOP can be applied at any date except past dates (no advance notice required)
   const msPerDay = 1000 * 60 * 60 * 24;
   const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
-  if ((leaveData.leaveType === 'casual' || leaveData.leaveType === 'lop') && daysUntilStart < 3) {
-    throw new Error('Casual and LOP leaves must be applied at least 3 days in advance.');
+  if (leaveData.leaveType === 'casual' && daysUntilStart < 3) {
+    throw new Error('Casual leaves must be applied at least 3 days in advance.');
   }
 
   // Validation: End date must be >= start date
