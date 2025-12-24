@@ -135,9 +135,10 @@ const EmployeeManagementPage: React.FC = () => {
   const sortedEmployees = React.useMemo(() => {
     if (!employeesData?.employees) return [];
     return [...employeesData.employees].sort((a, b) => {
-      const aDate = new Date(a.joiningDate).getTime();
-      const bDate = new Date(b.joiningDate).getTime();
-      return aDate - bDate; // oldest first, most recent last
+      // Sort by Employee ID (numeric order)
+      const aId = parseInt(a.empId) || 0;
+      const bId = parseInt(b.empId) || 0;
+      return aId - bId; // ascending order (001, 002, 003, etc.)
     });
   }, [employeesData]);
 

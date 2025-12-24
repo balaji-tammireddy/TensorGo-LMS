@@ -39,7 +39,7 @@ export const getEmployees = async (
     params.push(joiningDate);
   }
 
-  query += ` ORDER BY date_of_joining ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  query += ` ORDER BY CAST(emp_id AS INTEGER) ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
   const result = await pool.query(query, params);
