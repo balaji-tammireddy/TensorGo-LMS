@@ -1,6 +1,10 @@
 import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { sendEmail } from '../utils/email';
+import { generateLeaveApplicationEmail, generateLeaveStatusEmail } from '../utils/emailTemplates';
+import { scheduleLeaveStatusEmail, cancelScheduledEmail } from '../utils/delayedEmail';
+import { logger } from '../utils/logger';
 
 // Local date formatter to avoid timezone shifts
 const formatDate = (date: Date | string): string => {
@@ -159,12 +163,29 @@ export const applyLeave = async (
       }
     }
 
-    // Get employee's reporting manager
+    // Get employee's information, reporting manager details, and HR (manager's reporting manager)
     const userResult = await pool.query(
-      'SELECT reporting_manager_id FROM users WHERE id = $1',
+      `SELECT 
+        u.reporting_manager_id,
+        u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+        u.emp_id as employee_emp_id,
+        rm.email as manager_email,
+        rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
+        rm.reporting_manager_id as hr_id,
+        hr.email as hr_email,
+        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
+      FROM users u
+      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
+      LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
+      WHERE u.id = $1`,
       [userId]
     );
     const reportingManagerId = userResult.rows[0]?.reporting_manager_id;
+    const employeeName = userResult.rows[0]?.employee_name || 'Employee';
+    const employeeEmpId = userResult.rows[0]?.employee_emp_id || '';
+    const managerEmail = userResult.rows[0]?.manager_email;
+    const hrId = userResult.rows[0]?.hr_id;
+    const hrEmail = userResult.rows[0]?.hr_email;
 
     // Format dates as YYYY-MM-DD for database
     const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
@@ -236,10 +257,83 @@ export const applyLeave = async (
         );
       } catch (notifError: any) {
         // Log but don't fail the leave request if notification fails
-        console.warn('Failed to create notification:', notifError.message);
+        logger.warn('Failed to create notification:', notifError.message);
       }
     }
 
+    // Prepare base email data
+    const baseEmailData = {
+      employeeName,
+      employeeEmpId,
+      leaveType: leaveData.leaveType,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      reason: leaveData.reason,
+      noOfDays: days,
+      startType: leaveData.startType,
+      endType: leaveData.endType,
+      timeForPermission: leaveData.timeForPermission,
+    };
+
+    // Send email notification to reporting manager
+    if (reportingManagerId && managerEmail) {
+      try {
+        const managerName = userResult.rows[0]?.manager_name;
+        const emailData = {
+          ...baseEmailData,
+          recipientName: managerName || undefined,
+        };
+        const emailContent = generateLeaveApplicationEmail(emailData);
+        
+        const emailSent = await sendEmail({
+          to: managerEmail,
+          subject: emailContent.subject,
+          html: emailContent.html,
+          text: emailContent.text,
+        });
+
+        if (emailSent) {
+          logger.info(`Leave application email sent to manager ${managerEmail} for employee ${employeeName}`);
+        } else {
+          logger.warn(`Failed to send leave application email to manager ${managerEmail}`);
+        }
+      } catch (emailError: any) {
+        // Log but don't fail the leave request if email fails
+        logger.error('Failed to send leave application email to manager:', emailError);
+      }
+    } else if (reportingManagerId && !managerEmail) {
+      logger.warn(`Reporting manager ID ${reportingManagerId} exists but has no email address`);
+    }
+
+    // Send email notification to HR (manager's reporting manager)
+    if (hrId && hrEmail) {
+      try {
+        const hrName = userResult.rows[0]?.hr_name;
+        const emailData = {
+          ...baseEmailData,
+          recipientName: hrName || undefined,
+        };
+        const emailContent = generateLeaveApplicationEmail(emailData);
+        
+        const emailSent = await sendEmail({
+          to: hrEmail,
+          subject: emailContent.subject,
+          html: emailContent.html,
+          text: emailContent.text,
+        });
+
+        if (emailSent) {
+          logger.info(`Leave application email sent to HR ${hrEmail} for employee ${employeeName}`);
+        } else {
+          logger.warn(`Failed to send leave application email to HR ${hrEmail}`);
+        }
+      } catch (emailError: any) {
+        // Log but don't fail the leave request if email fails
+        logger.error('Failed to send leave application email to HR:', emailError);
+      }
+    } else if (hrId && !hrEmail) {
+      logger.warn(`HR ID ${hrId} exists but has no email address`);
+    }
 
     return { leaveRequestId, message: 'Leave request submitted successfully' };
   } catch (error: any) {
@@ -807,13 +901,20 @@ export const approveLeave = async (
   approverRole: string,
   comment?: string
 ) => {
-  // Get leave request details
+  // Get leave request details with employee and approver information
   const leaveResult = await pool.query(
-    `SELECT lr.*, u.reporting_manager_id, u.role as employee_role
+    `SELECT 
+      lr.*, 
+      u.reporting_manager_id, 
+      u.role as employee_role,
+      u.email as employee_email,
+      u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN users approver ON approver.id = $2
      WHERE lr.id = $1`,
-    [leaveRequestId]
+    [leaveRequestId, approverId]
   );
 
   if (leaveResult.rows.length === 0) {
@@ -916,6 +1017,9 @@ export const approveLeave = async (
 
   }
 
+  // Recalculate status
+  await recalcLeaveRequestStatus(leaveRequestId);
+
   // Create notification for employee
   await pool.query(
     `INSERT INTO notifications (user_id, title, message, type)
@@ -923,7 +1027,8 @@ export const approveLeave = async (
     [leave.employee_id]
   );
 
-  await recalcLeaveRequestStatus(leaveRequestId);
+  // Schedule delayed email (1 minute) to check final status and send appropriate email
+  scheduleLeaveStatusEmail(leaveRequestId, 1);
 
   return { message: 'Leave approved successfully' };
 };
@@ -934,13 +1039,20 @@ export const rejectLeave = async (
   approverRole: string,
   comment: string
 ) => {
-  // Similar authorization check as approve
+  // Similar authorization check as approve - get employee and approver information
   const leaveResult = await pool.query(
-    `SELECT lr.*, u.reporting_manager_id, u.role as employee_role
+    `SELECT 
+      lr.*, 
+      u.reporting_manager_id, 
+      u.role as employee_role,
+      u.email as employee_email,
+      u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN users approver ON approver.id = $2
      WHERE lr.id = $1`,
-    [leaveRequestId]
+    [leaveRequestId, approverId]
   );
 
   if (leaveResult.rows.length === 0) {
@@ -1050,6 +1162,56 @@ export const rejectLeave = async (
      VALUES ($1, 'Leave Rejected', $2, 'leave_rejection')`,
     [leave.employee_id, `Your leave request has been rejected. Reason: ${comment}`]
   );
+
+  // Cancel any scheduled approval email since leave is rejected
+  cancelScheduledEmail(leaveRequestId);
+
+  // Send rejection email immediately (no delay needed for rejections)
+  const employeeEmail = leaveResult.rows[0]?.employee_email;
+  const employeeName = leaveResult.rows[0]?.employee_name || 'Employee';
+  const approverName = leaveResult.rows[0]?.approver_name || (approverRole === 'manager' ? 'Manager' : approverRole === 'hr' ? 'HR' : 'Super Admin');
+  
+  if (employeeEmail) {
+    try {
+      // Format dates for display
+      const formatDateForEmail = (date: Date | string): string => {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const emailData = {
+        employeeName,
+        employeeEmail,
+        leaveType: leave.leave_type,
+        startDate: formatDateForEmail(leave.start_date),
+        endDate: formatDateForEmail(leave.end_date),
+        noOfDays: parseFloat(leave.no_of_days) || 0,
+        status: 'rejected' as const,
+        approverName,
+        approverRole,
+        rejectionReason: comment,
+      };
+
+      const emailContent = generateLeaveStatusEmail(emailData);
+      const emailSent = await sendEmail({
+        to: employeeEmail,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+      });
+
+      if (emailSent) {
+        logger.info(`Leave rejection email sent to employee ${employeeEmail} for leave request ${leaveRequestId}`);
+      } else {
+        logger.warn(`Failed to send leave rejection email to employee ${employeeEmail}`);
+      }
+    } catch (emailError: any) {
+      logger.error('Failed to send leave rejection email to employee:', emailError);
+    }
+  }
 
   await recalcLeaveRequestStatus(leaveRequestId);
   return { message: 'Leave rejected successfully' };
@@ -1348,14 +1510,16 @@ export const getApprovedLeaves = async (
         COALESCE(SUM(CASE WHEN ld.day_status = 'approved' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS approved_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'rejected' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS rejected_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'pending' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS pending_days,
-        ARRAY_REMOVE(ARRAY_AGG(CASE WHEN ld.day_status = 'approved' THEN ld.leave_date END ORDER BY ld.leave_date), NULL) AS approved_dates
+        ARRAY_REMOVE(ARRAY_AGG(CASE WHEN ld.day_status = 'approved' THEN ld.leave_date END ORDER BY ld.leave_date), NULL) AS approved_dates,
+        ARRAY_REMOVE(ARRAY_AGG(CASE WHEN ld.day_status = 'rejected' THEN ld.leave_date END ORDER BY ld.leave_date), NULL) AS rejected_dates
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
      LEFT JOIN leave_days ld ON ld.leave_request_id = lr.id
-     WHERE lr.current_status = 'approved'
+     WHERE lr.current_status != 'pending'
         OR EXISTS (
           SELECT 1 FROM leave_days ld2
-          WHERE ld2.leave_request_id = lr.id AND ld2.day_status = 'approved'
+          WHERE ld2.leave_request_id = lr.id 
+            AND (ld2.day_status = 'approved' OR ld2.day_status = 'rejected')
         )
      GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status
      ORDER BY lr.applied_date DESC
@@ -1364,18 +1528,20 @@ export const getApprovedLeaves = async (
   );
 
   const countResult = await pool.query(
-    `SELECT COUNT(*)
+    `SELECT COUNT(DISTINCT lr.id)
      FROM leave_requests lr
-     WHERE lr.current_status = 'approved'
+     WHERE lr.current_status != 'pending'
         OR EXISTS (
           SELECT 1 FROM leave_days ld2
-          WHERE ld2.leave_request_id = lr.id AND ld2.day_status = 'approved'
+          WHERE ld2.leave_request_id = lr.id 
+            AND (ld2.day_status = 'approved' OR ld2.day_status = 'rejected')
         )`
   );
 
   return {
     requests: result.rows.map(row => {
       const approvedDates = Array.isArray(row.approved_dates) ? row.approved_dates.filter((d: any) => d) : [];
+      const rejectedDates = Array.isArray(row.rejected_dates) ? row.rejected_dates.filter((d: any) => d) : [];
       const approvedDays = parseFloat(row.approved_days) || 0;
       const rejectedDays = parseFloat(row.rejected_days) || 0;
       const pendingDays = parseFloat(row.pending_days) || 0;
@@ -1391,23 +1557,41 @@ export const getApprovedLeaves = async (
         displayStatus = 'pending';
       }
 
-      const leaveDate = approvedDates.length > 0
-        ? (() => {
-            const formatted = approvedDates.map((d: Date) => formatDate(d));
-            const first = formatted[0];
-            const last = formatted[formatted.length - 1];
-            return formatted.length === 1 ? first : `${first} to ${last}`;
-          })()
-        : `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`;
+      // Format leave date - show approved dates if available, otherwise show rejected dates, otherwise show full range
+      let leaveDate: string;
+      if (approvedDates.length > 0) {
+        const formatted = approvedDates.map((d: Date) => formatDate(d));
+        const first = formatted[0];
+        const last = formatted[formatted.length - 1];
+        leaveDate = formatted.length === 1 ? first : `${first} to ${last}`;
+      } else if (rejectedDates.length > 0 && approvedDays === 0) {
+        // If all rejected, show rejected date range
+        const formatted = rejectedDates.map((d: Date) => formatDate(d));
+        const first = formatted[0];
+        const last = formatted[formatted.length - 1];
+        leaveDate = formatted.length === 1 ? first : `${first} to ${last}`;
+      } else {
+        leaveDate = `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`;
+      }
+
+      // Calculate total days based on status
+      let noOfDays: number;
+      if (displayStatus === 'approved' || displayStatus === 'partially_approved') {
+        noOfDays = approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days);
+      } else if (displayStatus === 'rejected') {
+        noOfDays = rejectedDays > 0 ? rejectedDays : parseFloat(row.no_of_days);
+      } else {
+        noOfDays = parseFloat(row.no_of_days);
+      }
 
       return {
-      id: row.id,
-      empId: row.emp_id,
-      empName: row.emp_name,
+        id: row.id,
+        empId: row.emp_id,
+        empName: row.emp_name,
         appliedDate: formatDate(row.applied_date),
         leaveDate,
-      leaveType: row.leave_type,
-        noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
+        leaveType: row.leave_type,
+        noOfDays,
         leaveStatus: displayStatus
       };
     }),
