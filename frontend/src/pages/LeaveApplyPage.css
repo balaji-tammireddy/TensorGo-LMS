@@ -383,6 +383,61 @@
   line-height: 1.2;
 }
 
+/* Custom time picker with select dropdowns */
+.custom-time-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.time-hour-select,
+.time-minute-select {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  height: 44px;
+  background-color: white;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 8px;
+}
+
+/* Remove dropdown arrows for all browsers */
+.time-hour-select::-ms-expand,
+.time-minute-select::-ms-expand {
+  display: none;
+}
+
+.time-hour-select::-webkit-inner-spin-button,
+.time-minute-select::-webkit-inner-spin-button,
+.time-hour-select::-webkit-outer-spin-button,
+.time-minute-select::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.time-hour-select:focus,
+.time-minute-select:focus,
+.time-hour-select:active,
+.time-minute-select:active {
+  outline: none;
+  border-color: #ddd;
+  box-shadow: none;
+}
+
+.time-separator {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin: 0 2px;
+}
+
 .time-inputs span {
   font-size: 12px;
   color: #666;

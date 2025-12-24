@@ -57,6 +57,251 @@ const LeaveApplyPage: React.FC = () => {
     return '';
   };
 
+  // Round time to nearest 15-minute slot
+  const roundTo15Minutes = (timeStr: string): string => {
+    if (!timeStr) return timeStr;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    if (roundedMinutes >= 60) {
+      return `${String(hours + 1).padStart(2, '0')}:00`;
+    }
+    return `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+  };
+
+  // Validate and force 15-minute intervals (00, 15, 30, 45 only)
+  const validate15MinuteInterval = (timeStr: string): string => {
+    if (!timeStr) return timeStr;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    // Only allow 00, 15, 30, 45
+    const validMinutes = [0, 15, 30, 45];
+    if (!validMinutes.includes(minutes)) {
+      // Round to nearest valid minute
+      return roundTo15Minutes(timeStr);
+    }
+    return timeStr;
+  };
+
+  // Round current time to next 15-minute slot within office hours (10:00-19:00)
+  const getNext15MinuteSlot = (): string => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    
+    // If before office hours, return 10:00
+    if (currentHour < 10) {
+      return '10:00';
+    }
+    
+    // If after office hours for start time (18:00), return 10:00 (next day, but we'll handle this in validation)
+    if (currentHour >= 18) {
+      return '10:00';
+    }
+    
+    // Round to next 15-minute slot
+    const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
+    
+    if (roundedMinutes >= 60) {
+      const nextHour = currentHour + 1;
+      // If next hour is after office hours for start time, cap at 18:00
+      if (nextHour >= 18) {
+        return '18:00';
+      }
+      return `${String(nextHour).padStart(2, '0')}:00`;
+    }
+    
+    const result = `${String(currentHour).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+    
+    // Ensure result is within office hours for start time (max 18:00)
+    if (result >= '18:00') {
+      return '18:00';
+    }
+    
+    return result;
+  };
+
+  // Clamp time to office hours (10:00-19:00 for end time, 10:00-18:00 for start time)
+  const clampToOfficeHours = (timeStr: string, isStartTime: boolean = false): string => {
+    if (!timeStr) return timeStr;
+    if (timeStr < '10:00') return '10:00';
+    const maxTime = isStartTime ? '18:00' : '19:00';
+    if (timeStr > maxTime) return maxTime;
+    return timeStr;
+  };
+
+  // Handle start time change from custom picker
+  const handleStartTimeChange = (newStartTime: string) => {
+    if (!newStartTime) return;
+    
+    // Round to nearest 15-minute slot (should already be valid from select, but ensure)
+    let roundedStartTime = roundTo15Minutes(newStartTime);
+    
+    // Clamp to office hours (10:00-18:00 for start time)
+    if (roundedStartTime < '10:00') {
+      showWarning('Start time must be within office hours (10:00 AM - 6:00 PM). Setting to 10:00.');
+      roundedStartTime = '10:00';
+    } else if (roundedStartTime > '18:00') {
+      showWarning('Start time must be within office hours (10:00 AM - 6:00 PM). Setting to 18:00.');
+      roundedStartTime = '18:00';
+    }
+    
+    // Validate start time is not in the past (if date is today)
+    if (formData.startDate === todayStr) {
+      const now = new Date();
+      const [hours, minutes] = roundedStartTime.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime < now) {
+        const nextSlot = clampToOfficeHours(getNext15MinuteSlot(), true);
+        showWarning('Start time cannot be in the past. Setting to next available 15-minute slot within office hours.');
+        setFormData({
+          ...formData,
+          timeForPermission: { 
+            start: nextSlot, 
+            end: (() => {
+              const [h, m] = nextSlot.split(':').map(Number);
+              const st = new Date();
+              st.setHours(h, m, 0, 0);
+              const et = new Date(st);
+              et.setHours(et.getHours() + 2);
+              let eh = et.getHours();
+              let em = et.getMinutes();
+              em = Math.round(em / 15) * 15;
+              if (em >= 60) {
+                eh += 1;
+                em = 0;
+              }
+              if (eh >= 19) {
+                eh = 19;
+                em = 0;
+              }
+              return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+            })()
+          }
+        });
+        return;
+      }
+    }
+    
+    // Calculate end time (2 hours after start, rounded to 15 minutes)
+    const [hours, minutes] = roundedStartTime.split(':').map(Number);
+    const startTime = new Date();
+    startTime.setHours(hours, minutes, 0, 0);
+    const endTime = new Date(startTime);
+    endTime.setHours(endTime.getHours() + 2);
+    
+    // Round end time to 15-minute slot and clamp to office hours
+    let endHour = endTime.getHours();
+    let endMinute = endTime.getMinutes();
+    
+    // Round to 15-minute slot
+    endMinute = Math.round(endMinute / 15) * 15;
+    if (endMinute >= 60) {
+      endHour += 1;
+      endMinute = 0;
+    }
+    
+    // Clamp to office hours (19:00 max)
+    if (endHour >= 19) {
+      endHour = 19;
+      endMinute = 0;
+    }
+    
+    const calculatedEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+    
+    setFormData({
+      ...formData,
+      timeForPermission: { start: roundedStartTime, end: calculatedEndTime }
+    });
+  };
+
+  // Handle end time change from custom picker
+  const handleEndTimeChange = (newEndTime: string) => {
+    if (!newEndTime || !formData.timeForPermission.start) return;
+    
+    // Round to nearest 15-minute slot (should already be valid from select, but ensure)
+    let roundedEndTime = roundTo15Minutes(newEndTime);
+    
+    // Clamp to office hours (10:00-19:00)
+    if (roundedEndTime < '10:00') {
+      roundedEndTime = '10:00';
+      showWarning('End time must be within office hours (10:00 AM - 7:00 PM).');
+    } else if (roundedEndTime > '19:00') {
+      roundedEndTime = '19:00';
+      showWarning('End time must be within office hours (10:00 AM - 7:00 PM).');
+    }
+    
+    const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
+    const [endHours, endMinutes] = roundedEndTime.split(':').map(Number);
+    const startTime = new Date(`2000-01-01T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00`);
+    let endTime = new Date(`2000-01-01T${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`);
+    
+    // Handle case where end time is next day (after midnight)
+    if (endTime < startTime) {
+      endTime.setDate(endTime.getDate() + 1);
+    }
+    
+    const diffMs = endTime.getTime() - startTime.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    // Validate end time is after start time
+    if (diffHours <= 0) {
+      showWarning('End time must be after start time.');
+      // Reset to 2 hours after start, rounded to 15 minutes, within office hours
+      const calculatedEndTime = new Date(startTime);
+      calculatedEndTime.setHours(calculatedEndTime.getHours() + 2);
+      let endHour = calculatedEndTime.getHours();
+      let endMinute = calculatedEndTime.getMinutes();
+      endMinute = Math.round(endMinute / 15) * 15;
+      if (endMinute >= 60) {
+        endHour += 1;
+        endMinute = 0;
+      }
+      // Clamp to office hours
+      if (endHour >= 19) {
+        endHour = 19;
+        endMinute = 0;
+      }
+      const validEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+      setFormData({
+        ...formData,
+        timeForPermission: { ...formData.timeForPermission, end: validEndTime }
+      });
+      return;
+    }
+    
+    // Validate duration doesn't exceed 2 hours
+    if (diffHours > 2) {
+      showWarning('Permission duration cannot exceed 2 hours. Maximum end time is 2 hours after start time.');
+      // Reset to 2 hours after start, rounded to 15 minutes, within office hours
+      const calculatedEndTime = new Date(startTime);
+      calculatedEndTime.setHours(calculatedEndTime.getHours() + 2);
+      let endHour = calculatedEndTime.getHours();
+      let endMinute = calculatedEndTime.getMinutes();
+      endMinute = Math.round(endMinute / 15) * 15;
+      if (endMinute >= 60) {
+        endHour += 1;
+        endMinute = 0;
+      }
+      // Clamp to office hours
+      if (endHour >= 19) {
+        endHour = 19;
+        endMinute = 0;
+      }
+      const validEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+      setFormData({
+        ...formData,
+        timeForPermission: { ...formData.timeForPermission, end: validEndTime }
+      });
+      return;
+    }
+    
+    setFormData({
+      ...formData,
+      timeForPermission: { ...formData.timeForPermission, end: roundedEndTime }
+    });
+  };
+
   const computeRequestedDays = () => {
     if (!formData.startDate || !formData.endDate) return 0;
     const start = new Date(`${formData.startDate}T00:00:00`);
@@ -202,6 +447,97 @@ const LeaveApplyPage: React.FC = () => {
       }));
     }
   }, [formData.leaveType, formData.startType, formData.startDate, formData.endDate, formData.endType]);
+
+  // Set default permission times when permission type is selected
+  useEffect(() => {
+    if (formData.leaveType === 'permission' && formData.startDate && !formData.timeForPermission.start) {
+      const isToday = formData.startDate === todayStr;
+      
+      // If it's today, use next 15-minute slot within office hours; otherwise use 10:00
+      let defaultStartTime = isToday ? getNext15MinuteSlot() : '10:00';
+      defaultStartTime = clampToOfficeHours(defaultStartTime);
+      
+      // Calculate end time (2 hours after start time, rounded to 15 minutes, within office hours)
+      const [startHours, startMinutes] = defaultStartTime.split(':').map(Number);
+      const startTime = new Date();
+      startTime.setHours(startHours, startMinutes, 0, 0);
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + 2);
+      let endHour = endTime.getHours();
+      let endMinute = endTime.getMinutes();
+      
+      // Round to 15-minute slot
+      endMinute = Math.round(endMinute / 15) * 15;
+      if (endMinute >= 60) {
+        endHour += 1;
+        endMinute = 0;
+      }
+      
+      // Clamp to office hours (19:00 max)
+      if (endHour >= 19) {
+        endHour = 19;
+        endMinute = 0;
+      }
+      
+      const defaultEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+      
+      setFormData(prev => ({
+        ...prev,
+        timeForPermission: { start: defaultStartTime, end: defaultEndTime }
+      }));
+    }
+  }, [formData.leaveType, formData.startDate, todayStr]);
+
+  // Update end time when start time changes (for permission) - auto-set to 2 hours after start
+  useEffect(() => {
+    if (formData.leaveType === 'permission' && formData.timeForPermission.start) {
+      const [hours, minutes] = formData.timeForPermission.start.split(':').map(Number);
+      const startTime = new Date();
+      startTime.setHours(hours, minutes, 0, 0);
+      
+      // Calculate end time (2 hours after start, rounded to 15 minutes)
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + 2);
+      let endHour = endTime.getHours();
+      let endMinute = endTime.getMinutes();
+      
+      // Round to 15-minute slot
+      endMinute = Math.round(endMinute / 15) * 15;
+      if (endMinute >= 60) {
+        endHour += 1;
+        endMinute = 0;
+      }
+      if (endHour >= 24) {
+        endHour = 23;
+        endMinute = 45;
+      }
+      
+      const calculatedEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+      
+      // Auto-update end time to be 2 hours after start (unless user manually changed it)
+      // We'll allow manual changes but validate max 2 hours
+      setFormData(prev => {
+        // Only auto-update if end time is empty or if current end time is more than 2 hours
+        const shouldUpdate = !prev.timeForPermission.end || (() => {
+          if (!prev.timeForPermission.end) return true;
+          const [endHours, endMinutes] = prev.timeForPermission.end.split(':').map(Number);
+          const currentEndTime = new Date();
+          currentEndTime.setHours(endHours, endMinutes, 0, 0);
+          const diffMs = currentEndTime.getTime() - startTime.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          return diffHours > 2;
+        })();
+        
+        return {
+          ...prev,
+          timeForPermission: { 
+            ...prev.timeForPermission, 
+            end: shouldUpdate ? calculatedEndTime : prev.timeForPermission.end 
+          }
+        };
+      });
+    }
+  }, [formData.timeForPermission.start, formData.leaveType]);
 
   const { data: balances, isLoading: balancesLoading, error: balancesError } = useQuery(
     'leaveBalances',
@@ -391,6 +727,30 @@ const LeaveApplyPage: React.FC = () => {
     if (formData.leaveType === 'permission') {
       if (!formData.timeForPermission.start || !formData.timeForPermission.end) {
         showWarning('Please provide start and end timings for permission');
+        return;
+      }
+      
+      // Validate permission duration (max 2 hours)
+      const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
+      const [endHours, endMinutes] = formData.timeForPermission.end.split(':').map(Number);
+      const startTime = new Date(`2000-01-01T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00`);
+      const endTime = new Date(`2000-01-01T${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`);
+      
+      // Handle case where end time is next day (after midnight)
+      if (endTime < startTime) {
+        endTime.setDate(endTime.getDate() + 1);
+      }
+      
+      const diffMs = endTime.getTime() - startTime.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      
+      if (diffHours > 2) {
+        showWarning('Permission duration cannot exceed 2 hours');
+        return;
+      }
+      
+      if (diffHours <= 0) {
+        showWarning('End time must be after start time');
         return;
       }
       submitData.timeForPermission = {
@@ -787,33 +1147,107 @@ const LeaveApplyPage: React.FC = () => {
                   <label>Timings</label>
                   <div className="time-inputs">
                     <div className="time-input-wrapper">
+                      <div className="custom-time-picker">
+                        <select
+                          className="time-hour-select"
+                          value={(() => {
+                            const [hours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                            return String(hours);
+                          })()}
+                          onChange={(e) => {
+                            const selectedHour = Number(e.target.value);
+                            const [, currentMinutes] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                            const newStartTime = `${String(selectedHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
+                            
+                            // Validate and update
+                            handleStartTimeChange(newStartTime);
+                          }}
+                        >
+                          {Array.from({ length: 9 }, (_, i) => i + 10).map(hour => (
+                            <option key={hour} value={hour}>
+                              {String(hour).padStart(2, '0')}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="time-separator">:</span>
+                        <select
+                          className="time-minute-select"
+                          value={(() => {
+                            const [, minutes] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                            return String(minutes);
+                          })()}
+                          onChange={(e) => {
+                            const selectedMinute = Number(e.target.value);
+                            const [currentHours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                            const newStartTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                            
+                            // Validate and update
+                            handleStartTimeChange(newStartTime);
+                          }}
+                        >
+                          <option value="0">00</option>
+                          <option value="15">15</option>
+                          <option value="30">30</option>
+                          <option value="45">45</option>
+                        </select>
+                      </div>
+                      {/* Hidden input for form validation */}
                       <input
-                        className="time-input"
-                        type="time"
+                        type="hidden"
                         value={formData.timeForPermission.start}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            timeForPermission: { ...formData.timeForPermission, start: e.target.value }
-                          })
-                        }
-                        placeholder="Start time"
                         required
                       />
                     </div>
                     <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
                     <div className="time-input-wrapper">
+                      <div className="custom-time-picker">
+                        <select
+                          className="time-hour-select"
+                          value={(() => {
+                            const [hours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                            return String(hours);
+                          })()}
+                          onChange={(e) => {
+                            const selectedHour = Number(e.target.value);
+                            const [, currentMinutes] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                            const newEndTime = `${String(selectedHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
+                            
+                            // Validate and update
+                            handleEndTimeChange(newEndTime);
+                          }}
+                        >
+                          {Array.from({ length: 10 }, (_, i) => i + 10).map(hour => (
+                            <option key={hour} value={hour}>
+                              {String(hour).padStart(2, '0')}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="time-separator">:</span>
+                        <select
+                          className="time-minute-select"
+                          value={(() => {
+                            const [, minutes] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                            return String(minutes);
+                          })()}
+                          onChange={(e) => {
+                            const selectedMinute = Number(e.target.value);
+                            const [currentHours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                            const newEndTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                            
+                            // Validate and update
+                            handleEndTimeChange(newEndTime);
+                          }}
+                        >
+                          <option value="0">00</option>
+                          <option value="15">15</option>
+                          <option value="30">30</option>
+                          <option value="45">45</option>
+                        </select>
+                      </div>
+                      {/* Hidden input for form validation */}
                       <input
-                        className="time-input"
-                        type="time"
+                        type="hidden"
                         value={formData.timeForPermission.end}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            timeForPermission: { ...formData.timeForPermission, end: e.target.value }
-                          })
-                        }
-                        placeholder="End time"
                         required
                       />
                     </div>
