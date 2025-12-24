@@ -629,7 +629,7 @@ const EmployeeManagementPage: React.FC = () => {
                             reportingManagerName: ''
                           });
                         }}
-                        disabled={isEditMode || isViewMode}
+                        disabled={isViewMode || (isEditMode && user?.role !== 'hr' && user?.role !== 'super_admin')}
                       >
                         <option value="">Select role</option>
                         {(user?.role === 'super_admin'

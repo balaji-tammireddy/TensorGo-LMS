@@ -242,14 +242,45 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   const employeeRole = employeeCheck.rows[0].role;
   
-  // Prevent HR from editing super_admin users
-  if (requesterRole === 'hr' && employeeRole === 'super_admin') {
-    throw new Error('HR cannot edit super admin users');
+  // Check what fields are being updated
+  const fieldsBeingUpdated = Object.keys(employeeData).map(key => 
+    key.replace(/([A-Z])/g, '_$1').toLowerCase()
+  );
+  const isOnlyRoleUpdate = fieldsBeingUpdated.length === 1 && fieldsBeingUpdated[0] === 'role';
+  const isRoleBeingUpdated = fieldsBeingUpdated.includes('role');
+
+  // Prevent HR from editing super_admin users (except role updates)
+  if (requesterRole === 'hr' && employeeRole === 'super_admin' && !isOnlyRoleUpdate) {
+    // If role is being updated along with other fields, remove role from the update
+    // HR can only update role for super_admin, not other fields
+    if (isRoleBeingUpdated) {
+      // Remove all fields except role
+      Object.keys(employeeData).forEach(key => {
+        const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+        if (dbKey !== 'role') {
+          delete employeeData[key];
+        }
+      });
+    } else {
+      throw new Error('HR cannot edit super admin users');
+    }
   }
 
-  // Prevent HR from editing their own details
-  if (requesterRole === 'hr' && requesterId && requesterId === employeeId) {
-    throw new Error('HR cannot edit their own details');
+  // Prevent HR from editing their own details (except role updates)
+  if (requesterRole === 'hr' && requesterId && requesterId === employeeId && !isOnlyRoleUpdate) {
+    // If role is being updated along with other fields, remove role from the update
+    // HR can only update role for themselves, not other fields
+    if (isRoleBeingUpdated) {
+      // Remove all fields except role
+      Object.keys(employeeData).forEach(key => {
+        const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+        if (dbKey !== 'role') {
+          delete employeeData[key];
+        }
+      });
+    } else {
+      throw new Error('HR cannot edit their own details');
+    }
   }
 
   // Build update query dynamically
@@ -265,6 +296,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
     'reporting_manager_id', 'reporting_manager_name', 'status'
   ];
+
+  // HR and Super Admin can update role
+  if (requesterRole === 'hr' || requesterRole === 'super_admin') {
+    allowedFields.push('role');
+  }
 
   // Only super_admin can update email
   if (requesterRole === 'super_admin') {
