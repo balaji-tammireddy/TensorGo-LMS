@@ -4,9 +4,9 @@ export const applyLeaveSchema = z.object({
   body: z.object({
     leaveType: z.enum(['casual', 'sick', 'lop', 'permission']),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-    startType: z.enum(['full', 'half']),
+    startType: z.enum(['full', 'half', 'first_half', 'second_half']),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-    endType: z.enum(['full', 'half']),
+    endType: z.enum(['full', 'half', 'first_half', 'second_half']),
     reason: z.string().min(5, 'Reason must be at least 5 characters'),
     timeForPermission: z.object({
       start: z.string().optional(),
@@ -60,9 +60,9 @@ export const updateLeaveSchema = z.object({
   body: z.object({
     leaveType: z.enum(['casual', 'sick', 'lop', 'permission']),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-    startType: z.enum(['full', 'half']),
+    startType: z.enum(['full', 'half', 'first_half', 'second_half']),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-    endType: z.enum(['full', 'half']),
+    endType: z.enum(['full', 'half', 'first_half', 'second_half']),
     reason: z.string().min(5, 'Reason must be at least 5 characters'),
     timeForPermission: z.object({
       start: z.string().optional(),

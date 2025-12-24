@@ -160,6 +160,55 @@ const LeaveApprovalPage: React.FC = () => {
 
   const pendingRequests = pendingData?.requests || [];
 
+  // Helper function to get half day label
+  const getHalfDayLabel = (dayDate: string, dayType: string, request: any): string => {
+    if (dayType !== 'half') return '';
+    
+    // Dates from backend are in YYYY-MM-DD format, compare directly
+    // Normalize to YYYY-MM-DD format for comparison
+    const normalizeDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      // If already in YYYY-MM-DD format, return as is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+      // If in DD/MM/YYYY format, convert to YYYY-MM-DD
+      if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+      // Try to parse as date
+      try {
+        const d = new Date(dateStr + 'T12:00:00');
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } catch {
+        return dateStr;
+      }
+    };
+    
+    const normalizedDayDate = normalizeDate(dayDate);
+    const normalizedStartDate = normalizeDate(request.startDate);
+    const normalizedEndDate = normalizeDate(request.endDate);
+    
+    // Check if this is the start date
+    if (normalizedDayDate === normalizedStartDate) {
+      if (request.startType === 'first_half') return ' (First Half)';
+      if (request.startType === 'second_half') return ' (Second Half)';
+    }
+    
+    // Check if this is the end date
+    if (normalizedDayDate === normalizedEndDate) {
+      if (request.endType === 'first_half') return ' (First Half)';
+      if (request.endType === 'second_half') return ' (Second Half)';
+    }
+    
+    // Fallback for half days where we can't determine which half
+    return ' (Half day)';
+  };
+
   // Expand into day-wise rows for display (duplicate other columns per row) and show only pending days
   const expandedPendingRequests = pendingRequests.flatMap((request: any) => {
     if (!request.leaveDays || request.leaveDays.length === 0) {
@@ -169,13 +218,19 @@ const LeaveApprovalPage: React.FC = () => {
     if (pendingDays.length === 0) {
       return [];
     }
-    return pendingDays.map((day: any) => ({
-      ...request,
-      leaveDate: formatDateSafe(day.date),
-      dayType: day.type,
-      leaveDayId: day.id,
-      dayStatus: day.status || 'pending'
-    }));
+    return pendingDays.map((day: any) => {
+      const dayDate = formatDateSafe(day.date);
+      // Compare raw dates (YYYY-MM-DD format from backend) before formatting
+      const rawDayDate = day.date; // This is already in YYYY-MM-DD from backend
+      return {
+        ...request,
+        leaveDate: dayDate,
+        dayType: day.type,
+        leaveDayId: day.id,
+        dayStatus: day.status || 'pending',
+        halfDayLabel: getHalfDayLabel(rawDayDate, day.type, request)
+      };
+    });
   });
 
   if (pendingLoading || approvedLoading) {
@@ -268,7 +323,7 @@ const LeaveApprovalPage: React.FC = () => {
                   <td>{formatDateSafe(request.appliedDate)}</td>
                   <td>
                     {request.leaveDate}
-                    {request.dayType === 'half' ? ' (Half day)' : ''}
+                    {request.halfDayLabel || (request.dayType === 'half' ? ' (Half day)' : '')}
                   </td>
                   <td>{request.leaveType}</td>
                   <td>{request.noOfDays}</td>

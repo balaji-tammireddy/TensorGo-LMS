@@ -127,11 +127,15 @@ export const applyLeave = async (
     }
 
     // Calculate leave days
+    // Normalize first_half/second_half to half for calculation
+    const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
+    const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
+    
     const { days, leaveDays } = await calculateLeaveDays(
       startDate,
       endDate,
-      leaveData.startType as 'full' | 'half',
-      leaveData.endType as 'full' | 'half'
+      normalizedStartType as 'full' | 'half',
+      normalizedEndType as 'full' | 'half'
     );
 
     // Require timings for permission
@@ -486,12 +490,16 @@ export const updateLeaveRequest = async (
     throw new Error('End date must be greater than or equal to start date');
   }
 
+  // Normalize first_half/second_half to half for calculation
+  const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
+  const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
+  
   // Calculate leave days
   const { days, leaveDays } = await calculateLeaveDays(
     startDate,
     endDate,
-    leaveData.startType as 'full' | 'half',
-    leaveData.endType as 'full' | 'half'
+    normalizedStartType as 'full' | 'half',
+    normalizedEndType as 'full' | 'half'
   );
 
   // Require timings for permission
@@ -657,8 +665,8 @@ export const getPendingLeaveRequests = async (
   // Build query based on role
   let query = `
     SELECT DISTINCT lr.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-           lr.applied_date, lr.start_date, lr.end_date, lr.leave_type,
-           lr.no_of_days, lr.reason as leave_reason, lr.current_status,
+           lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
+           lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            u.reporting_manager_id
     FROM leave_requests lr
     JOIN users u ON lr.employee_id = u.id
@@ -728,6 +736,10 @@ export const getPendingLeaveRequests = async (
         noOfDays: parseFloat(row.no_of_days),
         leaveReason: row.leave_reason,
         currentStatus: row.current_status,
+        startDate: formatDate(row.start_date),
+        endDate: formatDate(row.end_date),
+        startType: row.start_type,
+        endType: row.end_type,
         leaveDays: daysResult.rows.map(d => ({
             id: d.id,
             date: formatDate(d.leave_date),

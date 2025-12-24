@@ -342,14 +342,13 @@ const LeaveApplyPage: React.FC = () => {
 
     // Prepare the data for submission
     // Date inputs already return YYYY-MM-DD format, so use directly to avoid timezone issues
-    const normalizeHalf = (val: string) => (val === 'first_half' || val === 'second_half' ? 'half' : val);
     const submitData: any = {
       leaveType: formData.leaveType,
       startDate: formData.startDate,
-      startType: formData.leaveType === 'permission' ? 'full' : normalizeHalf(formData.startType),
+      startType: formData.leaveType === 'permission' ? 'full' : formData.startType,
       // For permission, end date should be same as start date
       endDate: formData.leaveType === 'permission' ? formData.startDate : formData.endDate,
-      endType: formData.leaveType === 'permission' ? 'full' : normalizeHalf(formData.endType),
+      endType: formData.leaveType === 'permission' ? 'full' : formData.endType,
       reason: formData.reason
     };
     
