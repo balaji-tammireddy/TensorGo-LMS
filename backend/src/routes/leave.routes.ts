@@ -25,6 +25,7 @@ router.get('/pending', authorizeRole('manager', 'hr', 'super_admin'), leaveContr
 router.post('/:id/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveSchema), leaveController.approveLeave);
 router.post('/:id/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveSchema), leaveController.rejectLeave);
 router.post('/:id/day/:dayId/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveDaySchema), leaveController.approveLeaveDay);
+router.post('/:id/days/approve', authorizeRole('manager', 'hr', 'super_admin'), leaveController.approveLeaveDays);
 router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveDaySchema), leaveController.rejectLeaveDay);
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 

@@ -109,6 +109,11 @@ export const approveLeaveDay = async (leaveId: number, dayId: number, comment?: 
   return response.data;
 };
 
+export const approveLeaveDays = async (leaveId: number, dayIds: number[], comment?: string) => {
+  const response = await api.post(`/leave/${leaveId}/days/approve`, { dayIds, comment });
+  return response.data;
+};
+
 export const rejectLeaveDay = async (leaveId: number, dayId: number, comment: string) => {
   const response = await api.post(`/leave/${leaveId}/day/${dayId}/reject`, { comment });
   return response.data;

@@ -4,9 +4,10 @@ import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
-import { FaPencilAlt, FaTrash } from 'react-icons/fa';
+import { FaPencilAlt, FaTrash, FaEye } from 'react-icons/fa';
 import './LeaveApplyPage.css';
 
 const LeaveApplyPage: React.FC = () => {
@@ -17,6 +18,8 @@ const LeaveApplyPage: React.FC = () => {
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteRequestId, setDeleteRequestId] = useState<number | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewRequest, setViewRequest] = useState<any | null>(null);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [doctorNoteFile, setDoctorNoteFile] = useState<File | null>(null);
   const doctorNoteInputRef = useRef<HTMLInputElement | null>(null);
@@ -420,6 +423,30 @@ const LeaveApplyPage: React.FC = () => {
   const handleDelete = (requestId: number) => {
     setDeleteRequestId(requestId);
     setDeleteConfirmOpen(true);
+  };
+
+  const handleView = (requestId: number) => {
+    // Get the request data directly from myRequests (no need to call API)
+    const request = myRequests?.requests?.find((r: any) => r.id === requestId);
+    if (request) {
+      setViewRequest({
+        id: request.id,
+        appliedDate: request.appliedDate,
+        startDate: request.startDate,
+        endDate: request.endDate,
+        startType: request.startType || 'full',
+        endType: request.endType || 'full',
+        leaveType: request.leaveType,
+        noOfDays: request.noOfDays,
+        leaveReason: request.leaveReason,
+        currentStatus: request.currentStatus,
+        rejectionReason: request.rejectionReason,
+        leaveDays: request.leaveDays || []
+      });
+      setViewModalOpen(true);
+    } else {
+      showError('Leave request not found');
+    }
   };
 
   const confirmDelete = () => {
@@ -869,32 +896,41 @@ const LeaveApplyPage: React.FC = () => {
                       )}
                     </td>
                     <td>
-                      {(request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') && (
-                        <>
-                          <span 
-                            className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
-                            title={isUpdating ? 'Updating...' : 'Edit'} 
-                            onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
-                          >
-                            {isUpdating && editingId === request.id ? (
-                              <span className="loading-spinner-small"></span>
-                            ) : (
-                              <FaPencilAlt />
-                            )}
-                          </span>
-                          <span 
-                            className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
-                            title={isUpdating ? 'Updating...' : 'Delete'} 
-                            onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
-                          >
-                            {isUpdating && deleteRequestId === request.id ? (
-                              <span className="loading-spinner-small"></span>
-                            ) : (
-                              <FaTrash />
-                            )}
-                          </span>
-                        </>
-                      )}
+                      <div className="action-icons-container">
+                        <span 
+                          className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
+                          title="View Details" 
+                          onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
+                        >
+                          <FaEye />
+                        </span>
+                        {request.canEdit && request.canDelete && (
+                          <>
+                            <span 
+                              className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
+                              title={isUpdating ? 'Updating...' : 'Edit'} 
+                              onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
+                            >
+                              {isUpdating && editingId === request.id ? (
+                                <span className="loading-spinner-small"></span>
+                              ) : (
+                                <FaPencilAlt />
+                              )}
+                            </span>
+                            <span 
+                              className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
+                              title={isUpdating ? 'Updating...' : 'Delete'} 
+                              onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
+                            >
+                              {isUpdating && deleteRequestId === request.id ? (
+                                <span className="loading-spinner-small"></span>
+                              ) : (
+                                <FaTrash />
+                              )}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   );
@@ -905,6 +941,14 @@ const LeaveApplyPage: React.FC = () => {
           </div>
         </div>
       </div>
+      <EmployeeLeaveDetailsModal
+        isOpen={viewModalOpen}
+        leaveRequest={viewRequest}
+        onClose={() => {
+          setViewModalOpen(false);
+          setViewRequest(null);
+        }}
+      />
       <ConfirmationDialog
         isOpen={deleteConfirmOpen}
         title="Delete Leave Request"

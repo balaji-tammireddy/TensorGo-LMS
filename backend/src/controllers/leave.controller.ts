@@ -184,6 +184,38 @@ export const approveLeaveDay = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const approveLeaveDays = async (req: AuthRequest, res: Response) => {
+  try {
+    const leaveRequestId = parseInt(req.params.id);
+    const { dayIds, comment } = req.body;
+    
+    if (!dayIds || !Array.isArray(dayIds) || dayIds.length === 0) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'dayIds array is required'
+        }
+      });
+    }
+    
+    const result = await leaveService.approveLeaveDays(
+      leaveRequestId,
+      dayIds,
+      req.user!.id,
+      req.user!.role,
+      comment
+    );
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'APPROVAL_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
 export const rejectLeaveDay = async (req: AuthRequest, res: Response) => {
   try {
     const leaveRequestId = parseInt(req.params.id);

@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
-import ConfirmationDialog from '../components/ConfirmationDialog';
-import RejectCommentDialog from '../components/RejectCommentDialog';
+import LeaveDetailsModal from '../components/LeaveDetailsModal';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
+import { FaPencilAlt } from 'react-icons/fa';
 import './LeaveApprovalPage.css';
 
 const LeaveApprovalPage: React.FC = () => {
@@ -14,12 +14,8 @@ const LeaveApprovalPage: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
-  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
-  const [approveRequestId, setApproveRequestId] = useState<number | null>(null);
-  const [approveDayId, setApproveDayId] = useState<number | undefined>(undefined);
-  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
-  const [rejectRequestId, setRejectRequestId] = useState<number | null>(null);
-  const [rejectDayId, setRejectDayId] = useState<number | undefined>(undefined);
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
@@ -50,10 +46,14 @@ const LeaveApprovalPage: React.FC = () => {
   );
 
   const approveMutation = useMutation(
-    ({ id, dayId, comment }: { id: number; dayId?: number; comment?: string }) =>
-      dayId
-        ? leaveService.approveLeaveDay(id, dayId, comment)
-        : leaveService.approveLeave(id, comment),
+    ({ id, dayIds, comment }: { id: number; dayIds?: number[]; comment?: string }) => {
+      if (dayIds && dayIds.length > 0) {
+        // Approve multiple days at once (auto-rejects remaining)
+        return leaveService.approveLeaveDays(id, dayIds, comment);
+      } else {
+        return leaveService.approveLeave(id, comment);
+      }
+    },
     {
       onMutate: ({ id }) => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
@@ -62,6 +62,8 @@ const LeaveApprovalPage: React.FC = () => {
         queryClient.invalidateQueries('pendingLeaves');
         queryClient.invalidateQueries('approvedLeaves');
         showSuccess('Leave approved successfully!');
+        setIsModalOpen(false);
+        setSelectedRequest(null);
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to approve leave');
@@ -77,10 +79,14 @@ const LeaveApprovalPage: React.FC = () => {
   );
 
   const rejectMutation = useMutation(
-    ({ id, dayId, comment }: { id: number; dayId?: number; comment: string }) =>
-      dayId
-        ? leaveService.rejectLeaveDay(id, dayId, comment)
-        : leaveService.rejectLeave(id, comment),
+    ({ id, dayIds, comment }: { id: number; dayIds?: number[]; comment: string }) => {
+      if (dayIds && dayIds.length > 0) {
+        // Reject multiple days sequentially
+        return Promise.all(dayIds.map(dayId => leaveService.rejectLeaveDay(id, dayId, comment)));
+      } else {
+        return leaveService.rejectLeave(id, comment);
+      }
+    },
     {
       onMutate: ({ id }) => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
@@ -89,6 +95,8 @@ const LeaveApprovalPage: React.FC = () => {
         queryClient.invalidateQueries('pendingLeaves');
         queryClient.invalidateQueries('approvedLeaves');
         showSuccess('Leave rejected successfully!');
+        setIsModalOpen(false);
+        setSelectedRequest(null);
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to reject leave');
@@ -103,42 +111,25 @@ const LeaveApprovalPage: React.FC = () => {
     }
   );
 
-  const handleApprove = (id: number, dayId?: number) => {
-    setApproveRequestId(id);
-    setApproveDayId(dayId);
-    setApproveConfirmOpen(true);
-  };
-
-  const confirmApprove = () => {
-    if (approveRequestId !== null) {
-      if (approveDayId) {
-        approveMutation.mutate({ id: approveRequestId, dayId: approveDayId });
-      } else {
-        approveMutation.mutate({ id: approveRequestId });
-      }
-      setApproveConfirmOpen(false);
-      setApproveRequestId(null);
-      setApproveDayId(undefined);
+  const handleEditClick = (request: any) => {
+    // Find the original request from pendingRequests (not expanded)
+    const originalRequest = pendingRequests.find((r: any) => r.id === request.id);
+    if (originalRequest) {
+      setSelectedRequest(originalRequest);
+      setIsModalOpen(true);
     }
   };
 
-  const handleReject = (id: number, dayId?: number) => {
-    setRejectRequestId(id);
-    setRejectDayId(dayId);
-    setRejectConfirmOpen(true);
+  const handleModalApprove = (requestId: number, selectedDayIds?: number[]) => {
+    approveMutation.mutate({ id: requestId, dayIds: selectedDayIds });
   };
 
-  const confirmReject = (comment: string) => {
-    if (rejectRequestId !== null) {
-      if (rejectDayId) {
-        rejectMutation.mutate({ id: rejectRequestId, dayId: rejectDayId, comment });
-      } else {
-        rejectMutation.mutate({ id: rejectRequestId, comment });
-      }
-      setRejectConfirmOpen(false);
-      setRejectRequestId(null);
-      setRejectDayId(undefined);
+  const handleModalReject = (requestId: number, selectedDayIds?: number[], reason?: string) => {
+    if (!reason) {
+      showError('Rejection reason is required');
+      return;
     }
+    rejectMutation.mutate({ id: requestId, dayIds: selectedDayIds, comment: reason });
   };
 
   const triggerSearch = () => {
@@ -181,78 +172,30 @@ const LeaveApprovalPage: React.FC = () => {
 
   const pendingRequests = pendingData?.requests || [];
 
-  // Helper function to get half day label
-  const getHalfDayLabel = (dayDate: string, dayType: string, request: any): string => {
-    if (dayType !== 'half') return '';
+  // Group requests by ID and show one row per request (not expanded by days)
+  const groupedPendingRequests = pendingRequests.map((request: any) => {
+    const pendingDays = request.leaveDays?.filter((day: any) => (day.status || 'pending') === 'pending') || [];
+    const approvedDays = request.leaveDays?.filter((day: any) => day.status === 'approved') || [];
+    const rejectedDays = request.leaveDays?.filter((day: any) => day.status === 'rejected') || [];
     
-    // Dates from backend are in YYYY-MM-DD format, compare directly
-    // Normalize to YYYY-MM-DD format for comparison
-    const normalizeDate = (dateStr: string) => {
-      if (!dateStr) return '';
-      // If already in YYYY-MM-DD format, return as is
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-      // If in DD/MM/YYYY format, convert to YYYY-MM-DD
-      if (dateStr.includes('/')) {
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-          return `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-      }
-      // Try to parse as date
-      try {
-        const d = new Date(dateStr + 'T12:00:00');
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      } catch {
-        return dateStr;
-      }
-    };
-    
-    const normalizedDayDate = normalizeDate(dayDate);
-    const normalizedStartDate = normalizeDate(request.startDate);
-    const normalizedEndDate = normalizeDate(request.endDate);
-    
-    // Check if this is the start date
-    if (normalizedDayDate === normalizedStartDate) {
-      if (request.startType === 'first_half') return ' (First Half)';
-      if (request.startType === 'second_half') return ' (Second Half)';
+    // Determine display status
+    let displayStatus = request.currentStatus;
+    if (approvedDays.length > 0 && pendingDays.length > 0) {
+      displayStatus = 'partially_approved';
+    } else if (approvedDays.length > 0 && pendingDays.length === 0) {
+      displayStatus = 'approved';
+    } else if (rejectedDays.length > 0 && pendingDays.length === 0) {
+      displayStatus = 'rejected';
     }
-    
-    // Check if this is the end date
-    if (normalizedDayDate === normalizedEndDate) {
-      if (request.endType === 'first_half') return ' (First Half)';
-      if (request.endType === 'second_half') return ' (Second Half)';
-    }
-    
-    // Fallback for half days where we can't determine which half
-    return ' (Half day)';
-  };
 
-  // Expand into day-wise rows for display (duplicate other columns per row) and show only pending days
-  const expandedPendingRequests = pendingRequests.flatMap((request: any) => {
-    if (!request.leaveDays || request.leaveDays.length === 0) {
-      return [request];
-    }
-    const pendingDays = request.leaveDays.filter((day: any) => (day.status || 'pending') === 'pending');
-    if (pendingDays.length === 0) {
-      return [];
-    }
-    return pendingDays.map((day: any) => {
-      const dayDate = formatDateSafe(day.date);
-      // Compare raw dates (YYYY-MM-DD format from backend) before formatting
-      const rawDayDate = day.date; // This is already in YYYY-MM-DD from backend
-      return {
-        ...request,
-        leaveDate: dayDate,
-        dayType: day.type,
-        leaveDayId: day.id,
-        dayStatus: day.status || 'pending',
-        halfDayLabel: getHalfDayLabel(rawDayDate, day.type, request)
-      };
-    });
-  });
+    return {
+      ...request,
+      displayStatus,
+      pendingDaysCount: pendingDays.length,
+      approvedDaysCount: approvedDays.length,
+      rejectedDaysCount: rejectedDays.length
+    };
+  }).filter((request: any) => request.pendingDaysCount > 0); // Only show requests with pending days
 
   if (pendingLoading || approvedLoading) {
     return (
@@ -313,7 +256,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         <div className="pending-requests-section">
           <div 
-            className={`requests-table-container ${expandedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+            className={`requests-table-container ${groupedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
             style={{ 
               pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
               opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
@@ -335,67 +278,55 @@ const LeaveApprovalPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-            {expandedPendingRequests.length === 0 ? (
+            {groupedPendingRequests.length === 0 ? (
               <tr>
                 <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>
                   No leaves applied
                 </td>
               </tr>
             ) : (
-              expandedPendingRequests.map((request: any, idx: number) => {
+              groupedPendingRequests.map((request: any, idx: number) => {
                 const isUpdating = updatingRequestIds.has(request.id);
+                const leaveDateRange = request.leaveDays && request.leaveDays.length > 0
+                  ? `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`
+                  : formatDateSafe(request.startDate);
                 return (
                 <tr 
-                  key={`${request.id}-${idx}`}
+                  key={request.id}
                   className={isUpdating ? 'updating-row' : ''}
                 >
                   <td>{idx + 1}</td>
                   <td>{request.empId}</td>
                   <td>{request.empName}</td>
                   <td>{formatDateSafe(request.appliedDate)}</td>
-                  <td>
-                    {request.leaveDate}
-                    {request.halfDayLabel || (request.dayType === 'half' ? ' (Half day)' : '')}
-                  </td>
+                  <td>{leaveDateRange}</td>
                   <td>{request.leaveType}</td>
                   <td>{request.noOfDays}</td>
                   <td>{request.leaveReason}</td>
                   <td>
-                    {request.currentStatus === 'pending' ? (
+                    {request.displayStatus === 'pending' ? (
                       <span className="status-badge status-applied">Applied</span>
-                    ) : request.currentStatus === 'approved' ? (
+                    ) : request.displayStatus === 'approved' ? (
                       <span className="status-badge status-approved">Approved</span>
-                    ) : request.currentStatus === 'rejected' ? (
+                    ) : request.displayStatus === 'rejected' ? (
                       <span className="status-badge status-rejected">Rejected</span>
-                    ) : request.currentStatus === 'partially_approved' ? (
+                    ) : request.displayStatus === 'partially_approved' ? (
                       <span className="status-badge status-partial">Partially Approved</span>
                     ) : (
-                      <span className="status-badge">{request.currentStatus}</span>
+                      <span className="status-badge">{request.displayStatus}</span>
                     )}
                   </td>
                   <td className="actions-cell">
                     <button
-                      className={`approve-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
-                      onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleApprove(request.id, request.leaveDayId)}
-                      title={isUpdating ? 'Updating...' : 'Approve'}
+                      className={`edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
+                      onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleEditClick(request)}
+                      title={isUpdating ? 'Updating...' : 'View Details & Approve/Reject'}
                       disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
                     >
-                      {isUpdating && approveRequestId === request.id ? (
+                      {isUpdating ? (
                         <span className="loading-spinner-small"></span>
                       ) : (
-                        '✓'
-                      )}
-                    </button>
-                    <button
-                      className={`reject-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
-                      onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleReject(request.id, request.leaveDayId)}
-                      title={isUpdating ? 'Updating...' : 'Reject'}
-                      disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
-                    >
-                      {isUpdating && rejectRequestId === request.id ? (
-                        <span className="loading-spinner-small"></span>
-                      ) : (
-                        '✗'
+                        <FaPencilAlt />
                       )}
                     </button>
                   </td>
@@ -475,35 +406,16 @@ const LeaveApprovalPage: React.FC = () => {
         </div>
       </div>
     </AppLayout>
-    <ConfirmationDialog
-      isOpen={approveConfirmOpen}
-      title="Approve Leave Request"
-      message="Are you sure you want to approve this leave request?"
-      confirmText="Approve"
-      cancelText="Cancel"
-      type="info"
-      isLoading={approveMutation.isLoading}
-      onConfirm={confirmApprove}
-      onCancel={() => {
-        setApproveConfirmOpen(false);
-        setApproveRequestId(null);
-        setApproveDayId(undefined);
+    <LeaveDetailsModal
+      isOpen={isModalOpen}
+      leaveRequest={selectedRequest}
+      onClose={() => {
+        setIsModalOpen(false);
+        setSelectedRequest(null);
       }}
-    />
-    <RejectCommentDialog
-      isOpen={rejectConfirmOpen}
-      title="Reject Leave Request"
-      message="Please provide a reason for rejection:"
-      confirmText="Reject"
-      cancelText="Cancel"
-      type="danger"
-      isLoading={rejectMutation.isLoading}
-      onConfirm={confirmReject}
-      onCancel={() => {
-        setRejectConfirmOpen(false);
-        setRejectRequestId(null);
-        setRejectDayId(undefined);
-      }}
+      onApprove={handleModalApprove}
+      onReject={handleModalReject}
+      isLoading={approveMutation.isLoading || rejectMutation.isLoading}
     />
     </>
   );

@@ -614,18 +614,20 @@
   pointer-events: none;
 }
 
+.action-icons-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .action-icon {
-  margin-right: 12px;
   cursor: pointer;
   font-size: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.action-icon:last-child {
-  margin-right: 0;
+  color: #3c6ff2;
 }
 
 .action-icon:hover:not(.disabled) {

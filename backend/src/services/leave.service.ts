@@ -565,7 +565,7 @@ export const getMyLeaveRequests = async (
 ) => {
   const offset = (page - 1) * limit;
   let query = `
-    SELECT id, applied_date, reason as leave_reason, start_date, end_date,
+    SELECT id, applied_date, reason as leave_reason, start_date, start_type, end_date, end_type,
            no_of_days, leave_type, current_status
     FROM leave_requests
     WHERE employee_id = $1
@@ -629,7 +629,9 @@ export const getMyLeaveRequests = async (
       appliedDate: formatDate(row.applied_date),
       leaveReason: row.leave_reason,
       startDate: formatDate(row.start_date),
+      startType: row.start_type || 'full',
       endDate: formatDate(row.end_date),
+      endType: row.end_type || 'full',
       noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
       leaveType: row.leave_type,
       currentStatus: displayStatus,
@@ -686,9 +688,9 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
 
   const row = result.rows[0];
   
-  // Allow editing pending or partially_approved requests (same as deletion)
-  if (row.current_status !== 'pending' && row.current_status !== 'partially_approved' && userRole !== 'super_admin') {
-    throw new Error('Only pending or partially approved leave requests can be edited');
+  // Allow editing only pending requests (employees cannot edit partially approved, approved, or rejected)
+  if (row.current_status !== 'pending' && userRole !== 'super_admin') {
+    throw new Error('Only pending leave requests can be edited');
   }
 
   // Helper function to format date without timezone conversion
@@ -745,10 +747,10 @@ export const updateLeaveRequest = async (
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
-  const canEdit = currentStatus === 'pending' || currentStatus === 'partially_approved';
+  const canEdit = currentStatus === 'pending';
 
   if (!canEdit) {
-    throw new Error('Only pending or partially approved leave requests can be edited');
+    throw new Error('Only pending leave requests can be edited');
   }
   if (userRole !== 'super_admin' && !belongsToUser) {
     throw new Error('You do not have permission to edit this leave request');
@@ -996,10 +998,10 @@ export const deleteLeaveRequest = async (requestId: number, userId: number) => {
     throw new Error('You do not have permission to delete this leave request');
   }
 
-  // Allow deletion if status is pending or partially_approved (user can delete their own requests)
+  // Allow deletion only if status is pending (employees cannot delete partially approved, approved, or rejected)
   const currentStatus = checkResult.rows[0].current_status;
-  if (currentStatus !== 'pending' && currentStatus !== 'partially_approved') {
-    throw new Error('Only pending or partially approved leave requests can be deleted');
+  if (currentStatus !== 'pending') {
+    throw new Error('Only pending leave requests can be deleted');
   }
 
   const { leave_type, no_of_days } = checkResult.rows[0];
@@ -1722,6 +1724,139 @@ export const approveLeaveDay = async (
   // Recalculate status only (no balance changes)
   await recalcLeaveRequestStatus(leaveRequestId);
   return { message: 'Leave day approved successfully' };
+};
+
+// Approve multiple leave days and auto-reject remaining pending days
+export const approveLeaveDays = async (
+  leaveRequestId: number,
+  dayIds: number[],
+  approverId: number,
+  approverRole: string,
+  comment?: string
+) => {
+  if (!dayIds || dayIds.length === 0) {
+    throw new Error('No days specified for approval');
+  }
+
+  const leaveResult = await pool.query(
+    `SELECT lr.*, u.reporting_manager_id, u.role as employee_role
+     FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     WHERE lr.id = $1`,
+    [leaveRequestId]
+  );
+
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+
+  const leave = leaveResult.rows[0];
+
+  if (leave.current_status === 'approved') {
+    throw new Error('Leave request is already approved');
+  }
+
+  // Auth: manager -> direct reports; HR -> employee/manager; super_admin -> all
+  if (approverRole === 'manager') {
+    if (leave.reporting_manager_id !== approverId) {
+      throw new Error('Not authorized to approve this leave');
+    }
+  } else if (approverRole === 'hr') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+      throw new Error('Not authorized to approve this leave');
+    }
+  } else if (approverRole !== 'super_admin') {
+    throw new Error('Not authorized to approve leaves');
+  }
+
+  // Get all pending days for this request
+  const allPendingDaysResult = await pool.query(
+    `SELECT id FROM leave_days 
+     WHERE leave_request_id = $1 
+     AND (day_status IS NULL OR day_status = 'pending')`,
+    [leaveRequestId]
+  );
+
+  const allPendingDayIds = allPendingDaysResult.rows.map(row => row.id);
+  const daysToApprove = dayIds.filter(id => allPendingDayIds.includes(id));
+  const daysToReject = allPendingDayIds.filter(id => !daysToApprove.includes(id));
+
+  if (daysToApprove.length === 0) {
+    throw new Error('No valid pending days to approve');
+  }
+
+  // Approve selected days
+  if (daysToApprove.length > 0) {
+    await pool.query(
+      `UPDATE leave_days
+       SET day_status = 'approved'
+       WHERE id = ANY($1::int[])
+       AND leave_request_id = $2
+       AND (day_status IS NULL OR day_status = 'pending')`,
+      [daysToApprove, leaveRequestId]
+    );
+  }
+
+  // Auto-reject remaining pending days
+  if (daysToReject.length > 0) {
+    await pool.query(
+      `UPDATE leave_days
+       SET day_status = 'rejected'
+       WHERE id = ANY($1::int[])
+       AND leave_request_id = $2
+       AND (day_status IS NULL OR day_status = 'pending')`,
+      [daysToReject, leaveRequestId]
+    );
+  }
+
+  // Mark role-specific approval fields
+  if (approverRole === 'manager') {
+    const updateResult = await pool.query(
+      `UPDATE leave_requests 
+       SET manager_approval_status = 'approved',
+           manager_approval_date = CURRENT_TIMESTAMP,
+           manager_approval_comment = $1,
+           manager_approved_by = $2
+       WHERE id = $3 
+         AND EXISTS (
+           SELECT 1 FROM users u 
+           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
+           AND u.reporting_manager_id = $2
+         )`,
+      [comment || null, approverId, leaveRequestId]
+    );
+    
+    if (updateResult.rowCount === 0) {
+      throw new Error('Not authorized to approve this leave');
+    }
+  } else if (approverRole === 'hr') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET hr_approval_status = 'approved',
+           hr_approval_date = CURRENT_TIMESTAMP,
+           hr_approval_comment = $1,
+           hr_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  } else if (approverRole === 'super_admin') {
+    await pool.query(
+      `UPDATE leave_requests 
+       SET super_admin_approval_status = 'approved',
+           super_admin_approval_date = CURRENT_TIMESTAMP,
+           super_admin_approval_comment = $1,
+           super_admin_approved_by = $2
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
+    );
+  }
+
+  // Recalculate status
+  await recalcLeaveRequestStatus(leaveRequestId);
+  
+  return { 
+    message: `Approved ${daysToApprove.length} day(s), rejected ${daysToReject.length} day(s)` 
+  };
 };
 
 export const rejectLeaveDay = async (
