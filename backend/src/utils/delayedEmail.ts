@@ -62,6 +62,7 @@ const sendLeaveStatusEmailAfterDelay = async (leaveRequestId: number): Promise<v
       `SELECT 
         lr.*,
         u.email as employee_email,
+        u.role as employee_role,
         u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
         COALESCE(
           CASE 
@@ -94,9 +95,16 @@ const sendLeaveStatusEmailAfterDelay = async (leaveRequestId: number): Promise<v
 
     const leave = leaveResult.rows[0];
     const employeeEmail = leave.employee_email;
+    const employeeRole = leave.employee_role;
     const employeeName = leave.employee_name || 'Employee';
     const approverName = leave.approver_name || 'System';
     const approverRole = leave.approver_role || 'system';
+
+    // Skip email if employee is super_admin
+    if (employeeRole === 'super_admin') {
+      logger.info(`Skipping approval email to employee ${employeeEmail} - super admin should not receive leave emails`);
+      return;
+    }
 
     if (!employeeEmail) {
       logger.warn(`Employee email not found for leave request ${leaveRequestId}`);

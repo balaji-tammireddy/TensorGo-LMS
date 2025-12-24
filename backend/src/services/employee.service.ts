@@ -155,6 +155,11 @@ export const createEmployee = async (employeeData: any) => {
   // Default password for newly created employees (if none explicitly provided)
   const passwordHash = await hashPassword(employeeData.password || 'tensorgo@2023');
 
+  // Super admin should not have a reporting manager
+  const role = employeeData.role || 'employee';
+  const reportingManagerId = role === 'super_admin' ? null : (employeeData.reportingManagerId || null);
+  const reportingManagerName = role === 'super_admin' ? null : (employeeData.reportingManagerName || null);
+
   const result = await pool.query(
     `INSERT INTO users (
       emp_id, email, password_hash, role, first_name, middle_name, last_name,
@@ -169,7 +174,7 @@ export const createEmployee = async (employeeData: any) => {
       empId,
       employeeData.email,
       passwordHash,
-      employeeData.role || 'employee',
+      role,
       employeeData.firstName,
       employeeData.middleName || null,
       employeeData.lastName || null,
@@ -189,8 +194,8 @@ export const createEmployee = async (employeeData: any) => {
       employeeData.panNumber ? String(employeeData.panNumber).slice(0, 10) : null,
       employeeData.currentAddress || null,
       employeeData.permanentAddress || null,
-      employeeData.reportingManagerId || null,
-      employeeData.reportingManagerName || null,
+      reportingManagerId,
+      reportingManagerName,
       employeeData.status || 'active'
     ]
   );
@@ -248,6 +253,18 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   );
   const isOnlyRoleUpdate = fieldsBeingUpdated.length === 1 && fieldsBeingUpdated[0] === 'role';
   const isRoleBeingUpdated = fieldsBeingUpdated.includes('role');
+  
+  // Super admin should not have a reporting manager
+  // If role is being changed to super_admin, clear reporting manager
+  // If role is already super_admin, prevent setting reporting manager
+  if (isRoleBeingUpdated && employeeData.role === 'super_admin') {
+    employeeData.reportingManagerId = null;
+    employeeData.reportingManagerName = null;
+  } else if (employeeRole === 'super_admin' && (employeeData.reportingManagerId !== undefined || employeeData.reportingManagerName !== undefined)) {
+    // If already super_admin and trying to set reporting manager, clear it
+    employeeData.reportingManagerId = null;
+    employeeData.reportingManagerName = null;
+  }
 
   // Prevent HR from editing super_admin users (except role updates)
   if (requesterRole === 'hr' && employeeRole === 'super_admin' && !isOnlyRoleUpdate) {

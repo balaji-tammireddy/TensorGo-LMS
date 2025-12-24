@@ -20,6 +20,7 @@ const LeaveApprovalPage: React.FC = () => {
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [rejectRequestId, setRejectRequestId] = useState<number | null>(null);
   const [rejectDayId, setRejectDayId] = useState<number | undefined>(undefined);
+  const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
@@ -54,6 +55,9 @@ const LeaveApprovalPage: React.FC = () => {
         ? leaveService.approveLeaveDay(id, dayId, comment)
         : leaveService.approveLeave(id, comment),
     {
+      onMutate: ({ id }) => {
+        setUpdatingRequestIds(prev => new Set(prev).add(id));
+      },
       onSuccess: () => {
         queryClient.invalidateQueries('pendingLeaves');
         queryClient.invalidateQueries('approvedLeaves');
@@ -61,6 +65,13 @@ const LeaveApprovalPage: React.FC = () => {
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to approve leave');
+      },
+      onSettled: (_, __, { id }) => {
+        setUpdatingRequestIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
       }
     }
   );
@@ -71,6 +82,9 @@ const LeaveApprovalPage: React.FC = () => {
         ? leaveService.rejectLeaveDay(id, dayId, comment)
         : leaveService.rejectLeave(id, comment),
     {
+      onMutate: ({ id }) => {
+        setUpdatingRequestIds(prev => new Set(prev).add(id));
+      },
       onSuccess: () => {
         queryClient.invalidateQueries('pendingLeaves');
         queryClient.invalidateQueries('approvedLeaves');
@@ -78,6 +92,13 @@ const LeaveApprovalPage: React.FC = () => {
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to reject leave');
+      },
+      onSettled: (_, __, { id }) => {
+        setUpdatingRequestIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
       }
     }
   );
@@ -291,7 +312,13 @@ const LeaveApprovalPage: React.FC = () => {
         </div>
 
         <div className="pending-requests-section">
-          <div className={`requests-table-container ${expandedPendingRequests.length > 3 ? 'scrollable' : ''}`}>
+          <div 
+            className={`requests-table-container ${expandedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+            style={{ 
+              pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
+              opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
+            }}
+          >
             <table className="requests-table">
               <thead>
                 <tr>
@@ -315,8 +342,13 @@ const LeaveApprovalPage: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              expandedPendingRequests.map((request: any, idx: number) => (
-                <tr key={`${request.id}-${idx}`}>
+              expandedPendingRequests.map((request: any, idx: number) => {
+                const isUpdating = updatingRequestIds.has(request.id);
+                return (
+                <tr 
+                  key={`${request.id}-${idx}`}
+                  className={isUpdating ? 'updating-row' : ''}
+                >
                   <td>{idx + 1}</td>
                   <td>{request.empId}</td>
                   <td>{request.empName}</td>
@@ -343,22 +375,33 @@ const LeaveApprovalPage: React.FC = () => {
                   </td>
                   <td className="actions-cell">
                     <button
-                      className="approve-btn"
-                      onClick={() => handleApprove(request.id, request.leaveDayId)}
-                      title="Approve"
+                      className={`approve-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
+                      onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleApprove(request.id, request.leaveDayId)}
+                      title={isUpdating ? 'Updating...' : 'Approve'}
+                      disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
                     >
-                      ✓
+                      {isUpdating && approveRequestId === request.id ? (
+                        <span className="loading-spinner-small"></span>
+                      ) : (
+                        '✓'
+                      )}
                     </button>
                     <button
-                      className="reject-btn"
-                      onClick={() => handleReject(request.id, request.leaveDayId)}
-                      title="Reject"
+                      className={`reject-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
+                      onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleReject(request.id, request.leaveDayId)}
+                      title={isUpdating ? 'Updating...' : 'Reject'}
+                      disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
                     >
-                      ✗
+                      {isUpdating && rejectRequestId === request.id ? (
+                        <span className="loading-spinner-small"></span>
+                      ) : (
+                        '✗'
+                      )}
                     </button>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
             </tbody>
           </table>
@@ -367,7 +410,13 @@ const LeaveApprovalPage: React.FC = () => {
 
         <div className="approved-requests-section">
           <h2>Recent Approved Requests</h2>
-          <div className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''}`}>
+          <div 
+            className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+            style={{ 
+              pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
+              opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
+            }}
+          >
             <table className="requests-table">
               <thead>
                 <tr>
@@ -389,8 +438,13 @@ const LeaveApprovalPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                approvedData.requests.map((request: any, idx: number) => (
-                  <tr key={request.id}>
+                approvedData.requests.map((request: any, idx: number) => {
+                  const isUpdating = updatingRequestIds.has(request.id);
+                  return (
+                  <tr 
+                    key={request.id}
+                    className={isUpdating ? 'updating-row' : ''}
+                  >
                     <td>{idx + 1}</td>
                     <td>{request.empId}</td>
                     <td>{request.empName}</td>
@@ -412,7 +466,8 @@ const LeaveApprovalPage: React.FC = () => {
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -427,6 +482,7 @@ const LeaveApprovalPage: React.FC = () => {
       confirmText="Approve"
       cancelText="Cancel"
       type="info"
+      isLoading={approveMutation.isLoading}
       onConfirm={confirmApprove}
       onCancel={() => {
         setApproveConfirmOpen(false);
@@ -441,6 +497,7 @@ const LeaveApprovalPage: React.FC = () => {
       confirmText="Reject"
       cancelText="Cancel"
       type="danger"
+      isLoading={rejectMutation.isLoading}
       onConfirm={confirmReject}
       onCancel={() => {
         setRejectConfirmOpen(false);
