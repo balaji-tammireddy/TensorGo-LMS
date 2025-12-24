@@ -473,6 +473,13 @@
 .requests-table-container {
   width: 100%;
   overflow-x: hidden;
+  transition: opacity 0.3s ease, pointer-events 0.3s ease;
+}
+
+.requests-table-container.updating {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.8;
 }
 
 .requests-table-container.scrollable {
@@ -611,15 +618,75 @@
   margin-right: 12px;
   cursor: pointer;
   font-size: 18px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .action-icon:last-child {
   margin-right: 0;
 }
 
-.action-icon:hover {
+.action-icon:hover:not(.disabled) {
   opacity: 0.7;
+  transform: scale(1.1);
+}
+
+.loading-spinner-small {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Table row transitions */
+.requests-table tbody tr {
+  transition: opacity 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
+}
+
+.requests-table tbody tr.updating-row {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+  pointer-events: none;
+  position: relative;
+}
+
+.requests-table tbody tr.updating-row::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(60, 111, 242, 0.1), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.requests-table-container {
+  transition: opacity 0.3s ease, pointer-events 0.3s ease;
+}
+
+.requests-table-container.updating {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.requests-table-container:has(.updating-row) {
+  position: relative;
 }
 
 /* Status Badges */

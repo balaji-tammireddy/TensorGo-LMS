@@ -14,6 +14,7 @@ const LeaveApplyPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { showSuccess, showError, showWarning, showInfo } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteRequestId, setDeleteRequestId] = useState<number | null>(null);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -245,6 +246,7 @@ const LeaveApplyPage: React.FC = () => {
         });
         setDoctorNoteFile(null);
         setEditingId(null);
+        setEditingRequestId(null);
       },
       onError: (error: any) => {
         console.error('Leave application error:', error);
@@ -386,7 +388,13 @@ const LeaveApplyPage: React.FC = () => {
   };
 
   const handleEdit = async (requestId: number) => {
+    // Prevent editing if any mutation is in progress
+    if (applyMutation.isLoading || deleteMutation.isLoading) {
+      return;
+    }
+    
     try {
+      setEditingRequestId(requestId);
       const request = await leaveService.getLeaveRequest(requestId);
       setFormData({
         leaveType: request.leaveType as 'casual' | 'sick' | 'lop' | 'permission',
@@ -405,6 +413,8 @@ const LeaveApplyPage: React.FC = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: any) {
       showError(error.response?.data?.error?.message || 'Failed to load leave request');
+    } finally {
+      setEditingRequestId(null);
     }
   };
 
@@ -755,7 +765,13 @@ const LeaveApplyPage: React.FC = () => {
         {/* Recent Leave Requests Section */}
         <div className="recent-requests-section">
           <h2>Recent Leave Requests</h2>
-          <div className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 5 ? 'scrollable' : ''}`}>
+          <div 
+            className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 5 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
+            style={{ 
+              pointerEvents: (applyMutation.isLoading || deleteMutation.isLoading) ? 'none' : 'auto',
+              opacity: (applyMutation.isLoading || deleteMutation.isLoading) ? 0.8 : 1
+            }}
+          >
             <table className="requests-table">
               <thead>
                 <tr>
@@ -784,8 +800,15 @@ const LeaveApplyPage: React.FC = () => {
                     const dateB = new Date(b.startDate + 'T12:00:00').getTime();
                     return dateA - dateB; // Ascending order (earliest dates first)
                   })
-                  .map((request: any, idx: number) => (
-                  <tr key={request.id}>
+                  .map((request: any, idx: number) => {
+                    const isUpdating = (applyMutation.isLoading && editingId === request.id) || 
+                                      (deleteMutation.isLoading && deleteRequestId === request.id) ||
+                                      editingRequestId === request.id;
+                    return (
+                  <tr 
+                    key={request.id}
+                    className={isUpdating ? 'updating-row' : ''}
+                  >
                     <td>{idx + 1}</td>
                     <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
                     <td>
@@ -837,24 +860,33 @@ const LeaveApplyPage: React.FC = () => {
                       {request.currentStatus === 'pending' && (
                         <>
                           <span 
-                            className={`action-icon ${applyMutation.isLoading ? 'disabled' : ''}`} 
-                            title="Edit" 
-                            onClick={() => !applyMutation.isLoading && handleEdit(request.id)}
+                            className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
+                            title={isUpdating ? 'Updating...' : 'Edit'} 
+                            onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
                           >
-                            <FaPencilAlt />
+                            {isUpdating && editingId === request.id ? (
+                              <span className="loading-spinner-small"></span>
+                            ) : (
+                              <FaPencilAlt />
+                            )}
                           </span>
                           <span 
-                            className={`action-icon ${deleteMutation.isLoading ? 'disabled' : ''}`} 
-                            title="Delete" 
-                            onClick={() => !deleteMutation.isLoading && handleDelete(request.id)}
+                            className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
+                            title={isUpdating ? 'Updating...' : 'Delete'} 
+                            onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
                           >
-                            <FaTrash />
+                            {isUpdating && deleteRequestId === request.id ? (
+                              <span className="loading-spinner-small"></span>
+                            ) : (
+                              <FaTrash />
+                            )}
                           </span>
                         </>
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
