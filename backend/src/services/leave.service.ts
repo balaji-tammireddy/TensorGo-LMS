@@ -82,6 +82,7 @@ export const applyLeave = async (
     endType: string;
     reason: string;
     timeForPermission?: { start?: string; end?: string };
+    doctorNote?: string;
   }
 ) => {
   try {
@@ -299,8 +300,8 @@ export const applyLeave = async (
       const leaveRequestResult = await client.query(
         `INSERT INTO leave_requests (
           employee_id, leave_type, start_date, start_type, end_date, end_type,
-          reason, no_of_days, time_for_permission_start, time_for_permission_end
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id`,
         [
           userId,
@@ -312,7 +313,8 @@ export const applyLeave = async (
           leaveData.reason,
           days,
           leaveData.timeForPermission?.start || null,
-          leaveData.timeForPermission?.end || null
+          leaveData.timeForPermission?.end || null,
+          leaveData.doctorNote || null
         ]
       );
 
@@ -566,7 +568,7 @@ export const getMyLeaveRequests = async (
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, applied_date, reason as leave_reason, start_date, start_type, end_date, end_type,
-           no_of_days, leave_type, current_status
+           no_of_days, leave_type, current_status, doctor_note
     FROM leave_requests
     WHERE employee_id = $1
   `;
@@ -636,6 +638,7 @@ export const getMyLeaveRequests = async (
       leaveType: row.leave_type,
       currentStatus: displayStatus,
       rejectionReason: row.manager_rejection_comment || row.hr_rejection_comment || row.super_admin_rejection_comment || null,
+      doctorNote: row.doctor_note || null,
       canEdit: row.current_status === 'pending',
       canDelete: row.current_status === 'pending',
       leaveDays: days.map(d => ({
@@ -669,12 +672,12 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     userRole === 'super_admin'
       ? `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
                 reason, time_for_permission_start, time_for_permission_end,
-                current_status, employee_id
+                current_status, employee_id, doctor_note
          FROM leave_requests
          WHERE id = $1`
       : `SELECT id, leave_type, start_date, start_type, end_date, end_type, 
             reason, time_for_permission_start, time_for_permission_end,
-            current_status, employee_id
+            current_status, employee_id, doctor_note
      FROM leave_requests
      WHERE id = $1 AND employee_id = $2`,
     userRole === 'super_admin' ? [requestId] : [requestId, userId]
@@ -688,10 +691,8 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
 
   const row = result.rows[0];
   
-  // Allow editing only pending requests (employees cannot edit partially approved, approved, or rejected)
-  if (row.current_status !== 'pending' && userRole !== 'super_admin') {
-    throw new Error('Only pending leave requests can be edited');
-  }
+  // Note: We allow viewing all requests regardless of status
+  // The edit/delete restrictions are handled in the update/delete functions
 
   // Helper function to format date without timezone conversion
   const formatDate = (date: Date | string): string => {
@@ -733,6 +734,7 @@ export const updateLeaveRequest = async (
     endType: string;
     reason: string;
     timeForPermission?: { start?: string; end?: string };
+    doctorNote?: string;
   }
 ) => {
   // Verify the request and authorization
@@ -934,8 +936,8 @@ export const updateLeaveRequest = async (
       `UPDATE leave_requests 
        SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5,
            reason = $6, no_of_days = $7, time_for_permission_start = $8, time_for_permission_end = $9,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $10`,
+           doctor_note = $10, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $11`,
       [
         leaveData.leaveType,
         startDateStr,
@@ -946,6 +948,7 @@ export const updateLeaveRequest = async (
         days,
         leaveData.timeForPermission?.start || null,
         leaveData.timeForPermission?.end || null,
+        leaveData.doctorNote || null,
         requestId
       ]
     );
@@ -1111,7 +1114,7 @@ export const getPendingLeaveRequests = async (
     SELECT DISTINCT lr.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
-           u.reporting_manager_id
+           lr.doctor_note, u.reporting_manager_id
     FROM leave_requests lr
     JOIN users u ON lr.employee_id = u.id
     WHERE 1=1
@@ -1184,6 +1187,7 @@ export const getPendingLeaveRequests = async (
         endDate: formatDate(row.end_date),
         startType: row.start_type,
         endType: row.end_type,
+        doctorNote: row.doctor_note || null,
         leaveDays: daysResult.rows.map(d => ({
             id: d.id,
             date: formatDate(d.leave_date),

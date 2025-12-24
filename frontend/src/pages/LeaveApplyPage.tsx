@@ -22,6 +22,7 @@ const LeaveApplyPage: React.FC = () => {
   const [viewRequest, setViewRequest] = useState<any | null>(null);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [doctorNoteFile, setDoctorNoteFile] = useState<File | null>(null);
+  const [existingDoctorNote, setExistingDoctorNote] = useState<string | null>(null);
   const doctorNoteInputRef = useRef<HTMLInputElement | null>(null);
   const [formData, setFormData] = useState({
     leaveType: 'casual' as 'casual' | 'sick' | 'lop' | 'permission',
@@ -83,7 +84,6 @@ const LeaveApplyPage: React.FC = () => {
     return total;
   };
 
-  const isSickLongLeave = formData.leaveType === 'sick' && computeRequestedDays() >= 3;
 
   // Check if requested dates overlap with existing leave requests
   const checkDateOverlap = (): string | null => {
@@ -181,10 +181,11 @@ const LeaveApplyPage: React.FC = () => {
 
   // Clear doctor note when not needed
   useEffect(() => {
-    if (formData.leaveType !== 'sick' || !isSickLongLeave) {
+    if (formData.leaveType !== 'sick') {
       setDoctorNoteFile(null);
+      setExistingDoctorNote(null);
     }
-  }, [formData.leaveType, isSickLongLeave]);
+  }, [formData.leaveType]);
 
   // When the leave spans a single day (start === end and not permission), force endType to follow startType
   useEffect(() => {
@@ -368,17 +369,20 @@ const LeaveApplyPage: React.FC = () => {
       };
     }
 
-    if (isSickLongLeave) {
-      if (!doctorNoteFile) {
-        showWarning('Doctor prescription is required for sick leave longer than 3 days.');
-        return;
-      }
-      try {
-        const noteBase64 = await readFileAsBase64(doctorNoteFile);
-        submitData.doctorNote = noteBase64;
-      } catch (err) {
-        showError('Failed to read doctor prescription file. Please try again.');
-        return;
+    // Upload doctor note if provided (optional for all sick leaves)
+    // If editing and no new file is uploaded, preserve existing doctor note
+    if (formData.leaveType === 'sick') {
+      if (doctorNoteFile) {
+        try {
+          const noteBase64 = await readFileAsBase64(doctorNoteFile);
+          submitData.doctorNote = noteBase64;
+        } catch (err) {
+          showError('Failed to read doctor prescription file. Please try again.');
+          return;
+        }
+      } else if (editingId && existingDoctorNote) {
+        // Preserve existing doctor note when editing without uploading new file
+        submitData.doctorNote = existingDoctorNote;
       }
     }
     
@@ -410,6 +414,7 @@ const LeaveApplyPage: React.FC = () => {
         timeForPermission: request.timeForPermission || { start: '', end: '' }
       });
       setDoctorNoteFile(null);
+      setExistingDoctorNote(request.doctorNote || null);
       setEditingId(requestId);
       // Scroll to form
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -441,6 +446,7 @@ const LeaveApplyPage: React.FC = () => {
         leaveReason: request.leaveReason,
         currentStatus: request.currentStatus,
         rejectionReason: request.rejectionReason,
+        doctorNote: request.doctorNote || null,
         leaveDays: request.leaveDays || []
       });
       setViewModalOpen(true);
@@ -685,7 +691,7 @@ const LeaveApplyPage: React.FC = () => {
             )}
               {formData.leaveType === 'sick' && (
                 <div className="form-group doctor-note-group">
-                  <label>Doctor Prescription{isSickLongLeave ? ' *' : ''}</label>
+                  <label>Doctor Prescription</label>
                   <input
                     ref={doctorNoteInputRef}
                     id="doctor-note-input"
@@ -693,14 +699,11 @@ const LeaveApplyPage: React.FC = () => {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setDoctorNoteFile(e.target.files?.[0] || null)}
-                    required={isSickLongLeave}
-                    disabled={!isSickLongLeave}
                   />
                   <button
                     type="button"
-                    className={`doctor-note-button${!isSickLongLeave ? ' doctor-note-button--disabled' : ''}`}
+                    className="doctor-note-button"
                     onClick={() => {
-                      if (!isSickLongLeave) return;
                       doctorNoteInputRef.current?.click();
                     }}
                   >
@@ -709,11 +712,6 @@ const LeaveApplyPage: React.FC = () => {
                   <div className="doctor-note-meta">
                     {doctorNoteFile && (
                       <span className="doctor-note-filename">{doctorNoteFile.name}</span>
-                    )}
-                    {isSickLongLeave && (
-                      <span className="doctor-note-helper">
-                        Required for sick leave longer than 3 days. Only image files are supported.
-                      </span>
                     )}
                   </div>
                 </div>

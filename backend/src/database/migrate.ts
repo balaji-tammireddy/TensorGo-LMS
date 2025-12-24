@@ -36,6 +36,12 @@ async function migrate() {
       ADD CONSTRAINT leave_requests_leave_type_check 
       CHECK (leave_type IN ('casual', 'sick', 'lop', 'permission'));
     `);
+
+    // Add doctor_note column for sick leave prescriptions (idempotent)
+    await pool.query(`
+      ALTER TABLE leave_requests
+      ADD COLUMN IF NOT EXISTS doctor_note TEXT;
+    `);
     
     // Insert default leave rules
     await pool.query(`

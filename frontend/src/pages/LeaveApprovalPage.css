@@ -155,6 +155,11 @@
   color: #000;
 }
 
+.status-pending {
+  background-color: #ffc107; /* Yellow */
+  color: #000;
+}
+
 .status-partial {
   background-color: #ff9800; /* Orange */
   color: #fff;

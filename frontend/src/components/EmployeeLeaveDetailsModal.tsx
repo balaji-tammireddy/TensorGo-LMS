@@ -23,6 +23,7 @@ interface EmployeeLeaveDetailsModalProps {
     leaveReason: string;
     currentStatus: string;
     rejectionReason?: string;
+    doctorNote?: string | null;
     leaveDays?: LeaveDay[];
   } | null;
   onClose: () => void;
@@ -135,6 +136,84 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
               <label>Leave Reason</label>
               <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
             </div>
+
+            {leaveRequest.leaveType === 'sick' && leaveRequest.doctorNote && (
+              <div className="leave-detail-item leave-detail-item-full">
+                <label>Doctor Prescription</label>
+                <div className="prescription-container">
+                  <button
+                    type="button"
+                    className="prescription-view-button"
+                    onClick={() => {
+                      const img = document.createElement('img');
+                      img.src = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
+                      img.style.maxWidth = '90vw';
+                      img.style.maxHeight = '90vh';
+                      img.style.objectFit = 'contain';
+                      img.style.cursor = 'default';
+                      img.onclick = (e) => e.stopPropagation();
+                      
+                      const closeButton = document.createElement('button');
+                      closeButton.innerHTML = '×';
+                      closeButton.style.position = 'absolute';
+                      closeButton.style.top = '20px';
+                      closeButton.style.right = '20px';
+                      closeButton.style.width = '40px';
+                      closeButton.style.height = '40px';
+                      closeButton.style.borderRadius = '50%';
+                      closeButton.style.border = 'none';
+                      closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                      closeButton.style.color = '#333';
+                      closeButton.style.fontSize = '28px';
+                      closeButton.style.fontWeight = 'bold';
+                      closeButton.style.cursor = 'pointer';
+                      closeButton.style.display = 'flex';
+                      closeButton.style.alignItems = 'center';
+                      closeButton.style.justifyContent = 'center';
+                      closeButton.style.zIndex = '10001';
+                      closeButton.style.transition = 'background-color 0.2s';
+                      closeButton.onmouseenter = () => {
+                        closeButton.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+                      };
+                      closeButton.onmouseleave = () => {
+                        closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                      };
+                      
+                      const closeOverlay = () => {
+                        if (document.body.contains(overlay)) {
+                          document.body.removeChild(overlay);
+                        }
+                      };
+                      
+                      closeButton.onclick = (e) => {
+                        e.stopPropagation();
+                        closeOverlay();
+                      };
+                      
+                      const overlay = document.createElement('div');
+                      overlay.style.position = 'fixed';
+                      overlay.style.top = '0';
+                      overlay.style.left = '0';
+                      overlay.style.right = '0';
+                      overlay.style.bottom = '0';
+                      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+                      overlay.style.display = 'flex';
+                      overlay.style.alignItems = 'center';
+                      overlay.style.justifyContent = 'center';
+                      overlay.style.zIndex = '10000';
+                      overlay.style.cursor = 'pointer';
+                      overlay.onclick = closeOverlay;
+                      
+                      overlay.appendChild(img);
+                      overlay.appendChild(closeButton);
+                      document.body.appendChild(overlay);
+                    }}
+                  >
+                    View Prescription
+                  </button>
+                </div>
+              </div>
+            )}
 
             {leaveRequest.rejectionReason && (
               <div className="leave-detail-item leave-detail-item-full">

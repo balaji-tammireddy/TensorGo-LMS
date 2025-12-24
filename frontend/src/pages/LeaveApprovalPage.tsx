@@ -305,7 +305,7 @@ const LeaveApprovalPage: React.FC = () => {
                   <td>{request.leaveReason}</td>
                   <td>
                     {request.displayStatus === 'pending' ? (
-                      <span className="status-badge status-applied">Applied</span>
+                      <span className="status-badge status-pending">Pending</span>
                     ) : request.displayStatus === 'approved' ? (
                       <span className="status-badge status-approved">Approved</span>
                     ) : request.displayStatus === 'rejected' ? (
@@ -385,7 +385,7 @@ const LeaveApprovalPage: React.FC = () => {
                     <td>{request.noOfDays}</td>
                     <td>
                     {request.leaveStatus === 'pending' ? (
-                      <span className="status-badge status-applied">Applied</span>
+                      <span className="status-badge status-pending">Pending</span>
                     ) : request.leaveStatus === 'approved' ? (
                         <span className="status-badge status-approved">Approved</span>
                       ) : request.leaveStatus === 'rejected' ? (
