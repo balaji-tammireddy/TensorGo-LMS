@@ -725,8 +725,28 @@ const LeaveApplyPage: React.FC = () => {
                 />
               </div>
               <div className="form-actions">
-                <button type="submit" className="submit-button">Submit</button>
-                <button type="button" onClick={handleClear} className="clear-button">Clear</button>
+                <button 
+                  type="submit" 
+                  className="submit-button"
+                  disabled={applyMutation.isLoading}
+                >
+                  {applyMutation.isLoading ? (
+                    <>
+                      <span className="loading-spinner"></span>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit'
+                  )}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleClear} 
+                  className="clear-button"
+                  disabled={applyMutation.isLoading}
+                >
+                  Clear
+                </button>
               </div>
             </div>
           </form>
@@ -816,10 +836,18 @@ const LeaveApplyPage: React.FC = () => {
                     <td>
                       {request.currentStatus === 'pending' && (
                         <>
-                          <span className="action-icon" title="Edit" onClick={() => handleEdit(request.id)}>
+                          <span 
+                            className={`action-icon ${applyMutation.isLoading ? 'disabled' : ''}`} 
+                            title="Edit" 
+                            onClick={() => !applyMutation.isLoading && handleEdit(request.id)}
+                          >
                             <FaPencilAlt />
                           </span>
-                          <span className="action-icon" title="Delete" onClick={() => handleDelete(request.id)}>
+                          <span 
+                            className={`action-icon ${deleteMutation.isLoading ? 'disabled' : ''}`} 
+                            title="Delete" 
+                            onClick={() => !deleteMutation.isLoading && handleDelete(request.id)}
+                          >
                             <FaTrash />
                           </span>
                         </>
@@ -840,6 +868,7 @@ const LeaveApplyPage: React.FC = () => {
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"
+        isLoading={deleteMutation.isLoading}
         onConfirm={confirmDelete}
         onCancel={() => {
           setDeleteConfirmOpen(false);

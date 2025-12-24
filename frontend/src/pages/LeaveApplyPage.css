@@ -404,14 +404,24 @@
   font-family: 'Poppins', sans-serif;
   font-size: 12px;
   white-space: nowrap;
-  width: 110px;
+  min-width: 110px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
-.submit-button:hover {
+.submit-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
+}
+
+.submit-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .clear-button {
@@ -425,14 +435,23 @@
   font-family: 'Poppins', sans-serif;
   font-size: 12px;
   white-space: nowrap;
-  width: 110px;
+  min-width: 110px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 6px 14px rgba(63, 81, 181, 0.12);
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
-.clear-button:hover {
+.clear-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(63, 81, 181, 0.16);
+}
+
+.clear-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Recent Requests Section */
@@ -580,6 +599,12 @@
 
 .reason-cell::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.action-icon.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .action-icon {

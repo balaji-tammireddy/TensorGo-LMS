@@ -339,9 +339,16 @@ const ProfilePage: React.FC = () => {
               <button
                 className="save-button"
                 onClick={handleSave}
-                disabled={updateMutation.isLoading}
+                disabled={updateMutation.isLoading || uploadPhotoMutation.isLoading || deletePhotoMutation.isLoading}
               >
-                Save Changes
+                {updateMutation.isLoading ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
               </button>
             )}
           </div>
@@ -917,6 +924,7 @@ const ProfilePage: React.FC = () => {
       confirmText="Delete"
       cancelText="Cancel"
       type="danger"
+      isLoading={deletePhotoMutation.isLoading}
       onConfirm={confirmDeletePhoto}
       onCancel={() => setDeletePhotoConfirmOpen(false)}
     />

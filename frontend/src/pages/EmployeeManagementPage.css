@@ -407,8 +407,13 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 100px;
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .modal-cancel-button:hover {
@@ -416,8 +421,14 @@
   box-shadow: 0 8px 18px rgba(63, 81, 181, 0.16);
 }
 
-.modal-save-button:hover {
+.modal-save-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
+}
+
+.modal-save-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 

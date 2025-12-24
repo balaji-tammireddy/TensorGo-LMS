@@ -252,7 +252,8 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.designation)) missingFields.push('Designation');
     if (isEmpty(newEmployee.department)) missingFields.push('Department');
     if (isEmpty(newEmployee.dateOfJoining)) missingFields.push('Date of Joining');
-    if (!newEmployee.reportingManagerId)
+    // Super admin should not have a reporting manager
+    if (!newEmployee.reportingManagerId && newEmployee.role !== 'super_admin')
       missingFields.push('Reporting Manager');
 
     // Document information
@@ -384,9 +385,10 @@ const EmployeeManagementPage: React.FC = () => {
         status: data.status || 'active',
         education,
         // Prefer explicitly stored reporting_manager_name; fall back to joined full name
+        // Super admin should not have a reporting manager
         reportingManagerName:
-          data.reporting_manager_name || data.reporting_manager_full_name || '',
-        reportingManagerId: data.reporting_manager_id || null
+          data.role === 'super_admin' ? '' : (data.reporting_manager_name || data.reporting_manager_full_name || ''),
+        reportingManagerId: data.role === 'super_admin' ? null : (data.reporting_manager_id || null)
       });
 
       setIsSameAddress(same);
@@ -621,12 +623,14 @@ const EmployeeManagementPage: React.FC = () => {
                       <select
                         value={newEmployee.role}
                         onChange={(e) => {
-                          // When role changes, reset reporting manager since it depends on role
+                          const newRole = e.target.value;
+                          // When role changes to/from super_admin, reset reporting manager
+                          // Super admin should not have a reporting manager
                           setNewEmployee({ 
                             ...newEmployee, 
-                            role: e.target.value,
-                            reportingManagerId: null,
-                            reportingManagerName: ''
+                            role: newRole,
+                            reportingManagerId: newRole === 'super_admin' ? null : newEmployee.reportingManagerId,
+                            reportingManagerName: newRole === 'super_admin' ? '' : newEmployee.reportingManagerName
                           });
                         }}
                         disabled={isViewMode || (isEditMode && user?.role !== 'hr' && user?.role !== 'super_admin')}
@@ -1136,40 +1140,42 @@ const EmployeeManagementPage: React.FC = () => {
                   </table>
                 </div>
 
-                <div className="employee-modal-section">
-                  <h3>Reporting Hierarchy</h3>
-                  <div className="employee-modal-field full-width">
-                    <label>
-                      Reporting Manager<span className="required-indicator">*</span>
-                    </label>
-                    {!newEmployee.role ? (
-                      <select disabled>
-                        <option value="">Please select role first</option>
-                      </select>
-                    ) : (
-                      <select
-                        value={newEmployee.reportingManagerId || ''}
-                        onChange={(e) => {
-                          const managerId = e.target.value ? parseInt(e.target.value) : null;
-                          const selectedManager = managersData?.find((m: any) => m.id === managerId);
-                          setNewEmployee({
-                            ...newEmployee,
-                            reportingManagerId: managerId,
-                            reportingManagerName: selectedManager?.name || ''
-                          });
-                        }}
-                        disabled={isViewMode}
-                      >
-                        <option value="">Select Reporting Manager</option>
-                        {managersData?.map((manager: any) => (
-                          <option key={manager.id} value={manager.id}>
-                            {manager.name} ({manager.empId})
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                {newEmployee.role !== 'super_admin' && (
+                  <div className="employee-modal-section">
+                    <h3>Reporting Hierarchy</h3>
+                    <div className="employee-modal-field full-width">
+                      <label>
+                        Reporting Manager<span className="required-indicator">*</span>
+                      </label>
+                      {!newEmployee.role ? (
+                        <select disabled>
+                          <option value="">Please select role first</option>
+                        </select>
+                      ) : (
+                        <select
+                          value={newEmployee.reportingManagerId || ''}
+                          onChange={(e) => {
+                            const managerId = e.target.value ? parseInt(e.target.value) : null;
+                            const selectedManager = managersData?.find((m: any) => m.id === managerId);
+                            setNewEmployee({
+                              ...newEmployee,
+                              reportingManagerId: managerId,
+                              reportingManagerName: selectedManager?.name || ''
+                            });
+                          }}
+                          disabled={isViewMode}
+                        >
+                          <option value="">Select Reporting Manager</option>
+                          {managersData?.map((manager: any) => (
+                            <option key={manager.id} value={manager.id}>
+                              {manager.name} ({manager.empId})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="employee-modal-footer">
@@ -1204,8 +1210,16 @@ const EmployeeManagementPage: React.FC = () => {
                       type="button"
                       className="modal-save-button"
                       onClick={handleCreateEmployee}
+                      disabled={createMutation.isLoading || updateEmployeeMutation.isLoading}
                     >
-                      {isEditMode ? 'Save Changes' : 'Save'}
+                      {(createMutation.isLoading || updateEmployeeMutation.isLoading) ? (
+                        <>
+                          <span className="loading-spinner"></span>
+                          {isEditMode ? 'Saving...' : 'Saving...'}
+                        </>
+                      ) : (
+                        isEditMode ? 'Save Changes' : 'Save'
+                      )}
                     </button>
                   </>
                 )}

@@ -145,9 +145,13 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   min-width: 100px;
   font-family: 'Poppins', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .confirmation-dialog-button-cancel {
@@ -157,11 +161,17 @@
   box-shadow: 0 4px 10px rgba(63, 81, 181, 0.12);
 }
 
-.confirmation-dialog-button-cancel:hover {
+.confirmation-dialog-button-cancel:hover:not(:disabled) {
   background: linear-gradient(135deg, #cfd7ea 0%, #c3ccdd 100%);
   color: #203050;
   transform: translateY(-1px);
   box-shadow: 0 6px 14px rgba(63, 81, 181, 0.18);
+}
+
+.confirmation-dialog-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .confirmation-dialog-button-confirm {
@@ -174,7 +184,7 @@
   box-shadow: 0 6px 14px rgba(229, 57, 53, 0.22);
 }
 
-.confirm-danger:hover {
+.confirm-danger:hover:not(:disabled) {
   background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(229, 57, 53, 0.28);
@@ -186,7 +196,7 @@
   box-shadow: 0 6px 14px rgba(255, 152, 0, 0.22);
 }
 
-.confirm-warning:hover {
+.confirm-warning:hover:not(:disabled) {
   background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(255, 152, 0, 0.28);
@@ -198,7 +208,7 @@
   box-shadow: 0 6px 14px rgba(60, 111, 242, 0.22);
 }
 
-.confirm-info:hover {
+.confirm-info:hover:not(:disabled) {
   background: linear-gradient(135deg, #2951c8 0%, #1e3d8f 100%);
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);

@@ -11,6 +11,7 @@ interface ConfirmationDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   type?: 'danger' | 'warning' | 'info';
+  isLoading?: boolean;
 }
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -21,7 +22,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   cancelText = 'Cancel',
   onConfirm,
   onCancel,
-  type = 'danger'
+  type = 'danger',
+  isLoading = false
 }) => {
   if (!isOpen) return null;
 
@@ -44,14 +46,23 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           <button
             className="confirmation-dialog-button confirmation-dialog-button-cancel"
             onClick={onCancel}
+            disabled={isLoading}
           >
             {cancelText}
           </button>
           <button
             className={`confirmation-dialog-button confirmation-dialog-button-confirm confirm-${type}`}
             onClick={onConfirm}
+            disabled={isLoading}
           >
-            {confirmText}
+            {isLoading ? (
+              <>
+                <span className="loading-spinner"></span>
+                {confirmText}...
+              </>
+            ) : (
+              confirmText
+            )}
           </button>
         </div>
       </div>

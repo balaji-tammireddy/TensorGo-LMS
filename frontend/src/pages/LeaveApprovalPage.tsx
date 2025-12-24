@@ -343,18 +343,20 @@ const LeaveApprovalPage: React.FC = () => {
                   </td>
                   <td className="actions-cell">
                     <button
-                      className="approve-btn"
-                      onClick={() => handleApprove(request.id, request.leaveDayId)}
+                      className={`approve-btn ${approveMutation.isLoading ? 'disabled' : ''}`}
+                      onClick={() => !approveMutation.isLoading && handleApprove(request.id, request.leaveDayId)}
                       title="Approve"
+                      disabled={approveMutation.isLoading || rejectMutation.isLoading}
                     >
-                      ✓
+                      {approveMutation.isLoading ? '...' : '✓'}
                     </button>
                     <button
-                      className="reject-btn"
-                      onClick={() => handleReject(request.id, request.leaveDayId)}
+                      className={`reject-btn ${rejectMutation.isLoading ? 'disabled' : ''}`}
+                      onClick={() => !rejectMutation.isLoading && handleReject(request.id, request.leaveDayId)}
                       title="Reject"
+                      disabled={approveMutation.isLoading || rejectMutation.isLoading}
                     >
-                      ✗
+                      {rejectMutation.isLoading ? '...' : '✗'}
                     </button>
                   </td>
                 </tr>
@@ -427,6 +429,7 @@ const LeaveApprovalPage: React.FC = () => {
       confirmText="Approve"
       cancelText="Cancel"
       type="info"
+      isLoading={approveMutation.isLoading}
       onConfirm={confirmApprove}
       onCancel={() => {
         setApproveConfirmOpen(false);
@@ -441,6 +444,7 @@ const LeaveApprovalPage: React.FC = () => {
       confirmText="Reject"
       cancelText="Cancel"
       type="danger"
+      isLoading={rejectMutation.isLoading}
       onConfirm={confirmReject}
       onCancel={() => {
         setRejectConfirmOpen(false);

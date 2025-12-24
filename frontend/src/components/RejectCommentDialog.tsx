@@ -11,6 +11,7 @@ interface RejectCommentDialogProps {
   onConfirm: (comment: string) => void;
   onCancel: () => void;
   type?: 'danger' | 'warning' | 'info';
+  isLoading?: boolean;
 }
 
 const RejectCommentDialog: React.FC<RejectCommentDialogProps> = ({
@@ -21,7 +22,8 @@ const RejectCommentDialog: React.FC<RejectCommentDialogProps> = ({
   cancelText = 'Cancel',
   onConfirm,
   onCancel,
-  type = 'danger'
+  type = 'danger',
+  isLoading = false
 }) => {
   const [comment, setComment] = useState('');
 
@@ -55,21 +57,30 @@ const RejectCommentDialog: React.FC<RejectCommentDialogProps> = ({
             onChange={(e) => setComment(e.target.value)}
             rows={4}
             autoFocus
+            disabled={isLoading}
           />
         </div>
         <div className="reject-comment-dialog-footer">
           <button
             className="reject-comment-dialog-button reject-comment-dialog-button-cancel"
             onClick={onCancel}
+            disabled={isLoading}
           >
             {cancelText}
           </button>
           <button
             className={`reject-comment-dialog-button reject-comment-dialog-button-confirm confirm-${type}`}
             onClick={handleConfirm}
-            disabled={!comment.trim()}
+            disabled={!comment.trim() || isLoading}
           >
-            {confirmText}
+            {isLoading ? (
+              <>
+                <span className="loading-spinner"></span>
+                {confirmText}...
+              </>
+            ) : (
+              confirmText
+            )}
           </button>
         </div>
       </div>

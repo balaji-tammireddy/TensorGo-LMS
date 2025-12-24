@@ -184,3 +184,12 @@
   background-color: #da190b;
 }
 
+.approve-btn.disabled,
+.reject-btn.disabled,
+.approve-btn:disabled,
+.reject-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
