@@ -98,6 +98,17 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
       });
     }
     const employeeId = parseInt(req.params.id);
+    
+    // Prevent super admin from deleting themselves
+    if (req.user?.id === employeeId) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Super Admin cannot delete themselves'
+        }
+      });
+    }
+    
     const result = await employeeService.deleteEmployee(employeeId);
     res.json(result);
   } catch (error: any) {
@@ -124,6 +135,16 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
 
     const employeeId = parseInt(req.params.id);
     const { leaveType, count } = req.body;
+
+    // Prevent Super Admin from adding leaves to themselves
+    if (req.user?.role === 'super_admin' && req.user?.id === employeeId) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Super Admin cannot add leaves to themselves'
+        }
+      });
+    }
 
     // HR cannot add leaves to themselves or super_admin users
     if (req.user?.role === 'hr') {
@@ -172,6 +193,16 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
         error: {
           code: 'BAD_REQUEST',
           message: 'Invalid leave type. Must be casual, sick, or lop'
+        }
+      });
+    }
+
+    // HR cannot add LOP leaves, only Super Admin can add LOP leaves
+    if (req.user?.role === 'hr' && leaveType === 'lop') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'HR cannot add LOP leaves. Only Super Admin can add LOP leaves'
         }
       });
     }

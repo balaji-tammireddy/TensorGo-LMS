@@ -255,7 +255,7 @@ const EmployeeManagementPage: React.FC = () => {
 
   const handleOpenAddEmployee = () => {
     const today = new Date().toISOString().split('T')[0];
-    setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
+      setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
     setIsSameAddress(false);
     setIsEditMode(false);
     setIsViewMode(false);
@@ -580,9 +580,9 @@ const EmployeeManagementPage: React.FC = () => {
 
   if (error) {
     const errorMessage = error?.response?.status === 403
-      ? 'You do not have permission to view this page. HR access required.'
-      : error?.response?.status === 429
-      ? 'Too many requests. Please try again later.'
+              ? 'You do not have permission to view this page. HR access required.'
+              : error?.response?.status === 429
+              ? 'Too many requests. Please try again later.'
       : 'Error loading data. Please try again.';
 
     const handleRetry = () => {
@@ -715,8 +715,9 @@ const EmployeeManagementPage: React.FC = () => {
                         <FaPencilAlt />
                         </span>
                       )}
-                      {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin */}
-                      {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) || user?.role === 'super_admin') && (
+                      {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
+                      {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) || 
+                        (user?.role === 'super_admin' && employee.id !== user.id)) && (
                         <span
                           className="action-icon"
                           title="Add Leaves"
@@ -726,7 +727,8 @@ const EmployeeManagementPage: React.FC = () => {
                           <FaCalendarPlus />
                         </span>
                       )}
-                      {user?.role === 'super_admin' && (
+                      {/* Super Admin can delete employees but not themselves */}
+                      {user?.role === 'super_admin' && employee.id !== user.id && (
                         <span
                           className="action-icon"
                           title="Delete"
@@ -1158,7 +1160,7 @@ const EmployeeManagementPage: React.FC = () => {
                             dateOfJoining: e.target.value
                           })
                         }
-                        disabled={isEditMode || isViewMode}
+                        disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
                       />
                     </div>
                     {isEditMode && (

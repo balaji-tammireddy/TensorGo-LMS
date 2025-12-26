@@ -3,6 +3,7 @@ import { FaTimes } from 'react-icons/fa';
 import { useQuery } from 'react-query';
 import * as employeeService from '../services/employeeService';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import './AddLeavesModal.css';
 
 interface AddLeavesModalProps {
@@ -26,6 +27,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   const [count, setCount] = useState<string>('');
   const [validationError, setValidationError] = useState<string>('');
   const { showWarning } = useToast();
+  const { user } = useAuth();
 
   // Fetch current leave balances
   const { data: balances, isLoading: balancesLoading } = useQuery(
@@ -138,42 +140,44 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           {balancesLoading ? (
             <div style={{ textAlign: 'center', padding: '20px' }}>Loading balances...</div>
           ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
-                <select
-                  id="leaveType"
-                  value={leaveType}
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
+              <select
+                id="leaveType"
+                value={leaveType}
                   onChange={handleLeaveTypeChange}
                   disabled={isLoading || balancesLoading}
-                  required
-                >
+                required
+              >
                   <option value="casual">Casual (Current: {balances?.casual || 0})</option>
                   <option value="sick">Sick (Current: {balances?.sick || 0})</option>
-                  <option value="lop">LOP (Current: {balances?.lop || 0})</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="count">Count <span className="required">*</span></label>
-                <input
-                  id="count"
-                  type="number"
-                  min="0.5"
+                  {user?.role === 'super_admin' && (
+                    <option value="lop">LOP (Current: {balances?.lop || 0})</option>
+                  )}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="count">Count <span className="required">*</span></label>
+              <input
+                id="count"
+                type="number"
+                min="0.5"
                   max={Math.min(99, maxAllowed > 0 ? maxAllowed : 0.5)}
-                  step="0.5"
-                  value={count}
+                step="0.5"
+                value={count}
                   onChange={handleCountChange}
                   disabled={isLoading || balancesLoading}
-                  placeholder="Enter leave count"
-                  required
-                />
-                <small className="help-text">Enter number of leaves (0.5 for half day, 1 for full day, etc.)</small>
+                placeholder="Enter leave count"
+                required
+              />
+              <small className="help-text">Enter number of leaves (0.5 for half day, 1 for full day, etc.)</small>
                 {validationError && (
                   <div style={{ color: '#f44336', fontSize: '12px', marginTop: '5px' }}>
                     {validationError}
                   </div>
                 )}
-              </div>
+            </div>
             <div className="modal-actions">
               <button type="button" className="cancel-button" onClick={handleClose} disabled={isLoading}>
                 Cancel

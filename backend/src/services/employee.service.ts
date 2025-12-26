@@ -252,10 +252,25 @@ export const createEmployee = async (employeeData: any) => {
 
   const userId = result.rows[0].id;
 
-  // Initialize leave balance (casual and sick start at 0, only LOP has default)
+  // Calculate all leave credits based on join date
+  // This includes:
+  // - Initial credits (given immediately on join date: before/after 15th)
+  // - Monthly credits (from next month onwards, following "next month credit" logic:
+  //   leaves for month M are credited on last working day of month M-1)
+  // - 3-year anniversary bonus (+3 casual, one-time, if anniversary has passed)
+  // - 5-year anniversary bonus (+5 casual, one-time, if anniversary has passed)
+  // - Year-end adjustments (applied at end of each calendar year: casual capped at 8, sick reset to 0)
+  const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
+  const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
+  
+  // Initialize leave balance with calculated credits
+  // Ensure casual balance doesn't exceed 99 limit
+  const casualBalance = Math.min(allCredits.casual, 99);
+  const sickBalance = Math.min(allCredits.sick, 99);
+  
   await pool.query(
-    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
-    [userId]
+    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
+    [userId, casualBalance, sickBalance]
   );
 
   // Insert education if provided
@@ -378,9 +393,10 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     allowedFields.push('role');
   }
 
-  // Only super_admin can update email
+  // Only super_admin can update email and date_of_joining
   if (requesterRole === 'super_admin') {
     allowedFields.push('email');
+    allowedFields.push('date_of_joining');
   }
 
   // Check if email is being updated and validate uniqueness
@@ -444,6 +460,43 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
 
   await pool.query(query, values);
+
+  // If joining date was updated, recalculate leave balances
+  if (employeeData.dateOfJoining && requesterRole === 'super_admin') {
+    const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
+    const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
+    
+    // Update leave balances with recalculated credits
+    // Ensure casual balance doesn't exceed 99 limit
+    const casualBalance = Math.min(allCredits.casual, 99);
+    const sickBalance = Math.min(allCredits.sick, 99);
+    
+    // Check if leave balance record exists
+    const balanceCheck = await pool.query(
+      'SELECT employee_id FROM leave_balances WHERE employee_id = $1',
+      [employeeId]
+    );
+    
+    if (balanceCheck.rows.length > 0) {
+      // Update existing balance
+      await pool.query(
+        `UPDATE leave_balances 
+         SET casual_balance = $1,
+             sick_balance = $2,
+             last_updated = CURRENT_TIMESTAMP,
+             updated_by = $3
+         WHERE employee_id = $4`,
+        [casualBalance, sickBalance, requesterId, employeeId]
+      );
+    } else {
+      // Create new balance record if it doesn't exist
+      await pool.query(
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
+         VALUES ($1, $2, $3, 10, $4)`,
+        [employeeId, casualBalance, sickBalance, requesterId]
+      );
+    }
+  }
 
   // Update education if provided
   if (employeeData.education) {
