@@ -25,15 +25,34 @@ router.delete('/request/:id', validateRequest(deleteLeaveSchema), leaveControlle
 router.get('/pending', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getPendingRequests);
 router.post('/:id/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveSchema), (req, res, next) => {
   console.log(`[ROUTE] POST /leave/${req.params.id}/approve - User: ${(req as any).user?.id}, Role: ${(req as any).user?.role}`);
+  console.log(`[ROUTE] Request body:`, req.body);
+  console.log(`[ROUTE] Request params:`, req.params);
   next();
 }, leaveController.approveLeave);
 router.post('/:id/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveSchema), (req, res, next) => {
   console.log(`[ROUTE] POST /leave/${req.params.id}/reject - User: ${(req as any).user?.id}, Role: ${(req as any).user?.role}`);
+  console.log(`[ROUTE] Request body:`, req.body);
+  console.log(`[ROUTE] Request params:`, req.params);
   next();
 }, leaveController.rejectLeave);
-router.post('/:id/day/:dayId/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveDaySchema), leaveController.approveLeaveDay);
-router.post('/:id/days/approve', authorizeRole('manager', 'hr', 'super_admin'), leaveController.approveLeaveDays);
-router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveDaySchema), leaveController.rejectLeaveDay);
+router.post('/:id/day/:dayId/approve', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(approveLeaveDaySchema), (req, res, next) => {
+  console.log(`[ROUTE] POST /leave/${req.params.id}/day/${req.params.dayId}/approve - User: ${(req as any).user?.id}, Role: ${(req as any).user?.role}`);
+  console.log(`[ROUTE] Request body:`, req.body);
+  console.log(`[ROUTE] Request params:`, req.params);
+  next();
+}, leaveController.approveLeaveDay);
+router.post('/:id/days/approve', authorizeRole('manager', 'hr', 'super_admin'), (req, res, next) => {
+  console.log(`[ROUTE] POST /leave/${req.params.id}/days/approve - User: ${(req as any).user?.id}, Role: ${(req as any).user?.role}`);
+  console.log(`[ROUTE] Request body:`, req.body);
+  console.log(`[ROUTE] Request params:`, req.params);
+  next();
+}, leaveController.approveLeaveDays);
+router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveDaySchema), (req, res, next) => {
+  console.log(`[ROUTE] POST /leave/${req.params.id}/day/${req.params.dayId}/reject - User: ${(req as any).user?.id}, Role: ${(req as any).user?.role}`);
+  console.log(`[ROUTE] Request body:`, req.body);
+  console.log(`[ROUTE] Request params:`, req.params);
+  next();
+}, leaveController.rejectLeaveDay);
 router.post('/:id/update-status', authorizeRole('hr', 'super_admin'), leaveController.updateLeaveStatus);
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 
