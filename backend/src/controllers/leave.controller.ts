@@ -182,6 +182,8 @@ export const rejectLeave = async (req: AuthRequest, res: Response) => {
 };
 
 export const approveLeaveDay = async (req: AuthRequest, res: Response) => {
+  console.log(`[CONTROLLER START] approveLeaveDay - Params:`, req.params, `Body:`, req.body, `User:`, req.user?.id);
+  logger.info(`[CONTROLLER] approveLeaveDay called - Leave ID: ${req.params.id}, Day ID: ${req.params.dayId}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
   try {
     const leaveRequestId = parseInt(req.params.id);
     const dayId = parseInt(req.params.dayId);
@@ -206,6 +208,8 @@ export const approveLeaveDay = async (req: AuthRequest, res: Response) => {
 };
 
 export const approveLeaveDays = async (req: AuthRequest, res: Response) => {
+  console.log(`[CONTROLLER START] approveLeaveDays - Params:`, req.params, `Body:`, req.body, `User:`, req.user?.id);
+  logger.info(`[CONTROLLER] approveLeaveDays called - Leave ID: ${req.params.id}, Day IDs: ${req.body.dayIds?.join(', ') || 'none'}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
   try {
     const leaveRequestId = parseInt(req.params.id);
     const { dayIds, comment } = req.body;
@@ -238,6 +242,8 @@ export const approveLeaveDays = async (req: AuthRequest, res: Response) => {
 };
 
 export const rejectLeaveDay = async (req: AuthRequest, res: Response) => {
+  console.log(`[CONTROLLER START] rejectLeaveDay - Params:`, req.params, `Body:`, req.body, `User:`, req.user?.id);
+  logger.info(`[CONTROLLER] rejectLeaveDay called - Leave ID: ${req.params.id}, Day ID: ${req.params.dayId}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
   try {
     const leaveRequestId = parseInt(req.params.id);
     const dayId = parseInt(req.params.dayId);

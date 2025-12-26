@@ -18,7 +18,7 @@ const sendDailyPendingLeaveReminders = async () => {
         u.email as manager_email,
         u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name
       FROM users u
-      WHERE u.role IN ('manager', 'hr', 'super_admin')
+      WHERE u.role IN ('manager', 'hr')
         AND u.status = 'active'
         AND EXISTS (
           SELECT 1 FROM leave_requests lr
@@ -144,16 +144,37 @@ const sendBirthdayWishes = async () => {
     const birthdayEmployees = birthdayEmployeesResult.rows;
     logger.info(`Found ${birthdayEmployees.length} employees with birthdays today`);
 
-    for (const employee of birthdayEmployees) {
-      try {
-        await sendBirthdayWishEmail(employee.email, {
-          employeeName: employee.employee_name,
-          employeeEmpId: employee.emp_id
-        });
+    if (birthdayEmployees.length > 0) {
+      // Get all active employees to send birthday wishes to
+      const allEmployeesResult = await pool.query(
+        `SELECT 
+          id,
+          email,
+          emp_id,
+          first_name || ' ' || COALESCE(last_name, '') as employee_name
+        FROM users
+        WHERE status = 'active'`
+      );
 
-        logger.info(`✅ Birthday wish sent to ${employee.email} (${employee.employee_name})`);
-      } catch (error: any) {
-        logger.error(`❌ Error sending birthday wish to ${employee.email}:`, error);
+      const allEmployees = allEmployeesResult.rows;
+      logger.info(`Sending birthday wishes to ${allEmployees.length} employees for ${birthdayEmployees.length} birthday(s) today`);
+
+      // Send birthday wishes to all employees for each birthday person
+      for (const birthdayEmployee of birthdayEmployees) {
+        for (const employee of allEmployees) {
+          try {
+            await sendBirthdayWishEmail(employee.email, {
+              employeeName: employee.employee_name,
+              employeeEmpId: employee.emp_id,
+              birthdayEmployeeName: birthdayEmployee.employee_name,
+              birthdayEmployeeEmpId: birthdayEmployee.emp_id
+            });
+
+            logger.info(`✅ Birthday wish sent to ${employee.email} for ${birthdayEmployee.employee_name}'s birthday`);
+          } catch (error: any) {
+            logger.error(`❌ Error sending birthday wish to ${employee.email}:`, error);
+          }
+        }
       }
     }
 

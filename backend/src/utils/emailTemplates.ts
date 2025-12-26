@@ -97,7 +97,7 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
@@ -181,7 +181,7 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
               <p style="margin: 0; color: #666666; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
@@ -283,6 +283,7 @@ export interface LeaveStatusEmailData {
   employeeName: string;
   employeeEmpId: string;
   recipientName: string;
+  recipientRole?: 'employee' | 'manager' | 'hr'; // To determine message type
   leaveType: string;
   startDate: string;
   startType: string;
@@ -320,17 +321,17 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leave ${statusDisplay} Notification</title>
+  <title>Leave Status Updated</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 30px 40px; background-color: ${statusColor}; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Request ${statusDisplay}</h1>
+            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Status Updated</h1>
             </td>
           </tr>
           
@@ -343,11 +344,11 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
               
               <div style="background-color: ${data.status === 'approved' ? '#d1fae5' : '#fee2e2'}; border-left: 4px solid ${statusColor}; padding: 20px; margin: 20px 0; border-radius: 4px;">
                 <p style="margin: 0; color: ${statusColor}; font-size: 32px; font-weight: 700; margin-bottom: 10px;">${statusIcon}</p>
-                <p style="margin: 0; color: ${statusColor}; font-size: 20px; font-weight: 600;">Your leave request has been ${statusDisplay.toLowerCase()}</p>
+                <p style="margin: 0; color: ${statusColor}; font-size: 20px; font-weight: 600;">Leave Status Updated</p>
               </div>
               
               <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Your leave application has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin'}).
+                Leave status has been updated. The leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin'}).
               </p>
               
               <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
@@ -404,7 +405,7 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
               <p style="margin: 0; color: #666666; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
@@ -435,11 +436,11 @@ const generateLeaveStatusEmailText = (data: LeaveStatusEmailData): string => {
   const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
 
   let text = `
-Leave Request ${statusDisplay}
+Leave Status Updated
 
 Dear ${data.recipientName},
 
-Your leave application has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).
+Leave status has been updated. The leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).
 
 Leave Details:
 - Employee Name: ${data.employeeName}
@@ -481,7 +482,11 @@ export const sendLeaveStatusEmail = async (
   const uniqueId = `${timestamp}${randomStr}`;
   
   const statusDisplay = data.status === 'approved' ? 'Approved' : 'Rejected';
-  const emailSubject = `Leave Request ${statusDisplay} - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
+  const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
+  
+  // Common subject for all recipients
+  const emailSubject = `Leave Status Updated - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
+  
   const emailHtml = generateLeaveStatusEmailHtml(data);
   const emailText = generateLeaveStatusEmailText(data);
 
@@ -521,7 +526,7 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
@@ -664,7 +669,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background-color: #10b981; border-radius: 8px 8px 0 0;">
@@ -815,7 +820,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background-color: #ef4444; border-radius: 8px 8px 0 0;">
@@ -861,7 +866,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
               <p style="margin: 0; color: #666666; font-size: 12px;">
                 This is an automated security email from TensorGo Leave Management System.
               </p>
@@ -960,7 +965,7 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background-color: #f59e0b; border-radius: 8px 8px 0 0;">
@@ -997,7 +1002,7 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
               <p style="margin: 0; color: #666666; font-size: 12px;">
                 This is an automated daily reminder from TensorGo Leave Management System.
               </p>
@@ -1070,6 +1075,8 @@ export const sendPendingLeaveReminderEmail = async (
 export interface BirthdayWishEmailData {
   employeeName: string;
   employeeEmpId: string;
+  birthdayEmployeeName?: string;
+  birthdayEmployeeEmpId?: string;
 }
 
 const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
@@ -1088,7 +1095,7 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
@@ -1100,14 +1107,21 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 18px; line-height: 1.6; font-weight: 600;">
                 Dear ${data.employeeName},
               </p>
+              ${data.birthdayEmployeeName ? `
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #92400e; font-size: 18px; font-weight: 600;">
+                  🎉 Today is ${data.birthdayEmployeeName}'s (${data.birthdayEmployeeEmpId}) birthday! 🎂
+                </p>
+              </div>
+              ` : ''}
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Wishing you a wonderful birthday filled with joy, happiness, and success!
+                ${data.birthdayEmployeeName ? `Let's join together to wish ${data.birthdayEmployeeName} a wonderful birthday filled with joy, happiness, and success!` : 'Wishing you a wonderful birthday filled with joy, happiness, and success!'}
               </p>
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.
+                ${data.birthdayEmployeeName ? `May this special day bring ${data.birthdayEmployeeName} countless reasons to smile and celebrate. We hope their year ahead is filled with new opportunities, achievements, and memorable moments.` : 'May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.'}
               </p>
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Thank you for being a valuable part of our team. Have a fantastic day!
+                ${data.birthdayEmployeeName ? `Thank you ${data.birthdayEmployeeName} for being a valuable part of our team. Have a fantastic day!` : 'Thank you for being a valuable part of our team. Have a fantastic day!'}
               </p>
               <p style="margin: 30px 0 0 0; color: #333333; font-size: 16px; line-height: 1.6;">
                 Warm regards,<br>
@@ -1116,7 +1130,7 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
               <p style="margin: 0; color: #666666; font-size: 12px;">
                 This is an automated birthday wish from TensorGo Leave Management System.
               </p>
@@ -1140,11 +1154,13 @@ const generateBirthdayWishEmailText = (data: BirthdayWishEmailData): string => {
 
 Dear ${data.employeeName},
 
-Wishing you a wonderful birthday filled with joy, happiness, and success!
+${data.birthdayEmployeeName ? `Today is ${data.birthdayEmployeeName}'s (${data.birthdayEmployeeEmpId}) birthday!` : ''}
 
-May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.
+${data.birthdayEmployeeName ? `Let's join together to wish ${data.birthdayEmployeeName} a wonderful birthday filled with joy, happiness, and success!` : 'Wishing you a wonderful birthday filled with joy, happiness, and success!'}
 
-Thank you for being a valuable part of our team. Have a fantastic day!
+${data.birthdayEmployeeName ? `May this special day bring ${data.birthdayEmployeeName} countless reasons to smile and celebrate. We hope their year ahead is filled with new opportunities, achievements, and memorable moments.` : 'May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.'}
+
+${data.birthdayEmployeeName ? `Thank you ${data.birthdayEmployeeName} for being a valuable part of our team. Have a fantastic day!` : 'Thank you for being a valuable part of our team. Have a fantastic day!'}
 
 Warm regards,
 TensorGo-LMS Team
@@ -1163,7 +1179,7 @@ export const sendBirthdayWishEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
   
-  const emailSubject = `🎉 Happy Birthday ${data.employeeName}! [Ref: ${uniqueId}]`;
+  const emailSubject = `🎉 ${data.birthdayEmployeeName ? `Happy Birthday ${data.birthdayEmployeeName}!` : `Happy Birthday ${data.employeeName}!`} [Ref: ${uniqueId}]`;
   const emailHtml = generateBirthdayWishEmailHtml(data);
   const emailText = generateBirthdayWishEmailText(data);
 
@@ -1223,7 +1239,7 @@ const generateLeaveCarryForwardEmailHtml = (data: LeaveCarryForwardEmailData): s
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
@@ -1377,7 +1393,7 @@ export const sendUrgentLeaveApplicationEmail = async (
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <td style="padding: 20px 0; background-color: #ffffff;">
         <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 30px 40px; background-color: #ef4444; border-radius: 8px 8px 0 0;">
@@ -1502,6 +1518,148 @@ Please do not reply to this email.
 
   return await sendEmail({
     to: managerEmail,
+    subject: emailSubject,
+    html: emailHtml,
+    text: emailText,
+  });
+};
+
+/**
+ * Email template for employee details update notification
+ */
+export interface EmployeeDetailsUpdateEmailData {
+  employeeName: string;
+  employeeEmpId: string;
+}
+
+/**
+ * Generate employee details update email HTML
+ */
+const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmailData): string => {
+  // Add unique identifier to prevent email threading
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Details Updated</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 20px 0; background-color: #ffffff;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Employee Details Updated</h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                Dear ${data.employeeName},
+              </p>
+              
+              <div style="background-color: #dbeafe; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #2563eb; font-size: 20px; font-weight: 600;">Your employee details have been updated</p>
+              </div>
+              
+              <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                Your employee profile details have been updated by HR or Super Admin. Please log in to your account to review the changes.
+              </p>
+              
+              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Employee Information:</h3>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee Name:</td>
+                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Employee ID:</td>
+                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+                Best regards,<br>
+                TensorGo-LMS
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #666666; font-size: 12px;">
+                This is an automated email from TensorGo Leave Management System.
+              </p>
+              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+                Please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+};
+
+/**
+ * Generate employee details update email plain text
+ */
+const generateEmployeeDetailsUpdateEmailText = (data: EmployeeDetailsUpdateEmailData): string => {
+  return `
+Employee Details Updated
+
+Dear ${data.employeeName},
+
+Your employee profile details have been updated by HR or Super Admin. Please log in to your account to review the changes.
+
+Employee Information:
+- Employee Name: ${data.employeeName}
+- Employee ID: ${data.employeeEmpId}
+
+Best regards,
+TensorGo-LMS
+
+---
+This is an automated email from TensorGo Leave Management System.
+Please do not reply to this email.
+  `;
+};
+
+/**
+ * Send employee details update email
+ */
+export const sendEmployeeDetailsUpdateEmail = async (
+  recipientEmail: string,
+  data: EmployeeDetailsUpdateEmailData
+): Promise<boolean> => {
+  // Add unique identifier to prevent email threading
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+  
+  const emailSubject = `Employee Details Updated - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
+  const emailHtml = generateEmployeeDetailsUpdateEmailHtml(data);
+  const emailText = generateEmployeeDetailsUpdateEmailText(data);
+
+  return await sendEmail({
+    to: recipientEmail,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
