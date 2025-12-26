@@ -308,7 +308,17 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
   const endTypeDisplay = formatDayType(data.endType);
   const statusDisplay = data.status === 'approved' ? 'Approved' : 'Rejected';
   const statusColor = data.status === 'approved' ? '#10b981' : '#ef4444';
-  const statusIcon = data.status === 'approved' ? '✓' : '✗';
+  const statusBgColor = data.status === 'approved' ? '#d1fae5' : '#fee2e2';
+  const headerColor = data.status === 'approved' ? '#10b981' : '#ef4444';
+  const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
+  
+  // Determine message based on recipient role
+  let mainMessage = '';
+  if (data.recipientRole === 'employee') {
+    mainMessage = `Your leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).`;
+  } else {
+    mainMessage = `Your team member's leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).`;
+  }
 
   // Add unique identifier to prevent email threading
   const timestamp = Date.now();
@@ -321,95 +331,100 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leave Status Updated</title>
+  <title>Leave Request ${statusDisplay}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <td style="padding: 20px 0; background-color: #f4f4f4;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
           <!-- Header -->
           <tr>
-            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Status Updated</h1>
+            <td style="padding: 35px 40px; background: linear-gradient(135deg, ${headerColor} 0%, ${data.status === 'approved' ? '#059669' : '#dc2626'} 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: 0.5px;">Leave Request ${statusDisplay}</h1>
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 25px 0; color: #1f2937; font-size: 16px; line-height: 1.6;">
                 Dear ${data.recipientName},
               </p>
               
-              <div style="background-color: ${data.status === 'approved' ? '#d1fae5' : '#fee2e2'}; border-left: 4px solid ${statusColor}; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: ${statusColor}; font-size: 32px; font-weight: 700; margin-bottom: 10px;">${statusIcon}</p>
-                <p style="margin: 0; color: ${statusColor}; font-size: 20px; font-weight: 600;">Leave Status Updated</p>
+              <!-- Status Banner -->
+              <div style="background: linear-gradient(135deg, ${statusBgColor} 0%, ${data.status === 'approved' ? '#a7f3d0' : '#fecaca'} 100%); border-left: 5px solid ${statusColor}; padding: 25px; margin: 25px 0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: ${statusColor}; font-size: 22px; font-weight: 700; margin-bottom: 5px;">Leave Request ${statusDisplay}</p>
+                <p style="margin: 0; color: #374151; font-size: 14px; font-weight: 500;">${mainMessage}</p>
               </div>
               
-              <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Leave status has been updated. The leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin'}).
-              </p>
-              
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Leave Details:</h3>
+              <!-- Leave Details Card -->
+              <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #2563eb; padding: 25px; margin: 25px 0; border-radius: 8px;">
+                <h3 style="margin: 0 0 20px 0; color: #2563eb; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Leave Details</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee Name:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; width: 38%; font-weight: 500; vertical-align: top;">Employee Name:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Employee ID:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Employee ID:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Leave Type:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Leave Type:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Start Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${startDateDisplay} (${startTypeDisplay})</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Start Date:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${startDateDisplay} <span style="color: #6b7280; font-weight: 400;">(${startTypeDisplay})</span></td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">End Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${endDateDisplay} (${endTypeDisplay})</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">End Date:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${endDateDisplay} <span style="color: #6b7280; font-weight: 400;">(${endTypeDisplay})</span></td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Number of Days:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Number of Days:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Reason:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.reason}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Reason:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; line-height: 1.5;">${data.reason}</td>
                   </tr>
                   ${data.comment ? `
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">${data.status === 'approved' ? 'Approval' : 'Rejection'} Comment:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.comment}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">${data.status === 'approved' ? 'Approval' : 'Rejection'} Comment:</td>
+                    <td style="padding: 10px 0; color: #111827; font-size: 14px; line-height: 1.5; background-color: #ffffff; padding: 12px; border-radius: 6px; border-left: 3px solid ${statusColor};">${data.comment}</td>
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Status:</td>
-                    <td style="padding: 8px 0; color: ${statusColor}; font-size: 14px; font-weight: 600;">${statusDisplay}</td>
+                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Status:</td>
+                    <td style="padding: 10px 0;">
+                      <span style="display: inline-block; background-color: ${statusBgColor}; color: ${statusColor}; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${statusDisplay}</span>
+                    </td>
                   </tr>
                 </table>
               </div>
               
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <!-- Approver Info -->
+              <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 18px 20px; margin: 25px 0; border-radius: 6px;">
+                <p style="margin: 0; color: #0c4a6e; font-size: 13px; line-height: 1.6;">
+                  <strong>Approved by:</strong> ${data.approverName} (${approverRoleDisplay})
+                </p>
+              </div>
+              
+              <p style="margin: 30px 0 0 0; color: #374151; font-size: 15px; line-height: 1.6;">
                 Best regards,<br>
-                TensorGo-LMS
+                <strong style="color: #111827;">TensorGo-LMS Team</strong>
               </p>
             </td>
           </tr>
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
-                This is an automated email from TensorGo Leave Management System.
-              </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+            <td style="padding: 25px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.6; text-align: left;">
+                This is an automated email from TensorGo Leave Management System.<br>
                 Please do not reply to this email.
               </p>
             </td>
@@ -434,32 +449,43 @@ const generateLeaveStatusEmailText = (data: LeaveStatusEmailData): string => {
   const endTypeDisplay = formatDayType(data.endType);
   const statusDisplay = data.status === 'approved' ? 'Approved' : 'Rejected';
   const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
+  
+  // Determine message based on recipient role
+  let mainMessage = '';
+  if (data.recipientRole === 'employee') {
+    mainMessage = `Your leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).`;
+  } else {
+    mainMessage = `Your team member's leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).`;
+  }
 
   let text = `
-Leave Status Updated
+Leave Request ${statusDisplay}
+========================================
 
 Dear ${data.recipientName},
 
-Leave status has been updated. The leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).
+${mainMessage}
 
-Leave Details:
-- Employee Name: ${data.employeeName}
-- Employee ID: ${data.employeeEmpId}
-- Leave Type: ${leaveTypeDisplay}
-- Start Date: ${startDateDisplay} (${startTypeDisplay})
-- End Date: ${endDateDisplay} (${endTypeDisplay})
-- Number of Days: ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}
-- Reason: ${data.reason}
+LEAVE DETAILS:
+----------------------------------------
+Employee Name: ${data.employeeName}
+Employee ID: ${data.employeeEmpId}
+Leave Type: ${leaveTypeDisplay}
+Start Date: ${startDateDisplay} (${startTypeDisplay})
+End Date: ${endDateDisplay} (${endTypeDisplay})
+Number of Days: ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}
+Reason: ${data.reason}
 `;
 
   if (data.comment) {
-    text += `- ${statusDisplay} Comment: ${data.comment}\n`;
+    text += `${data.status === 'approved' ? 'Approval' : 'Rejection'} Comment: ${data.comment}\n`;
   }
 
-  text += `- Status: ${statusDisplay}
+  text += `Status: ${statusDisplay}
+Approved by: ${data.approverName} (${approverRoleDisplay})
 
 Best regards,
-TensorGo-LMS
+TensorGo-LMS Team
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -484,8 +510,8 @@ export const sendLeaveStatusEmail = async (
   const statusDisplay = data.status === 'approved' ? 'Approved' : 'Rejected';
   const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
   
-  // Common subject for all recipients
-  const emailSubject = `Leave Status Updated - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
+  // Subject line based on status
+  const emailSubject = `Leave Request ${statusDisplay} - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
   
   const emailHtml = generateLeaveStatusEmailHtml(data);
   const emailText = generateLeaveStatusEmailText(data);
@@ -1734,7 +1760,6 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
               </p>
               
               <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #f59e0b; font-size: 32px; font-weight: 700; margin-bottom: 10px;">↻</p>
                 <p style="margin: 0; color: #f59e0b; font-size: 20px; font-weight: 600;">Leave Type Converted from LOP to Casual</p>
               </div>
               
