@@ -2,7 +2,7 @@ import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
-import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail } from '../utils/emailTemplates';
+import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail, sendLopToCasualConversionEmail } from '../utils/emailTemplates';
 
 // Local date formatter to avoid timezone shifts
 const formatDate = (date: Date | string): string => {
@@ -1040,15 +1040,27 @@ export const convertLeaveRequestLopToCasual = async (
     throw new Error('Only HR and Super Admin can convert leave types');
   }
 
-  // Get leave request details
+  // Get leave request details with employee, approver, manager, and HR information
   const leaveResult = await pool.query(
-    `SELECT lr.id, lr.employee_id, lr.leave_type, lr.no_of_days, lr.current_status,
-            u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-            u.email as employee_email
+    `SELECT 
+      lr.id, lr.employee_id, lr.leave_type, lr.no_of_days, lr.current_status,
+      lr.start_date, lr.start_type, lr.end_date, lr.end_type, lr.reason,
+      u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+      u.email as employee_email,
+      u.emp_id as employee_emp_id,
+      u.reporting_manager_id,
+      approver.first_name || ' ' || COALESCE(approver.last_name, '') as converter_name,
+      manager.email as manager_email,
+      manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+      hr.email as hr_email,
+      hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN users approver ON approver.id = $2
+     LEFT JOIN users manager ON u.reporting_manager_id = manager.id
+     LEFT JOIN users hr ON manager.reporting_manager_id = hr.id
      WHERE lr.id = $1`,
-    [requestId]
+    [requestId, userId]
   );
 
   if (leaveResult.rows.length === 0) {
@@ -1056,6 +1068,19 @@ export const convertLeaveRequestLopToCasual = async (
   }
 
   const leave = leaveResult.rows[0];
+
+  logger.info(`[CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
+  logger.info(`[CONVERT LOP TO CASUAL] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}`);
+  logger.info(`[CONVERT LOP TO CASUAL] Leave data:`, {
+    employee_id: leave.employee_id,
+    employee_name: leave.employee_name,
+    employee_email: leave.employee_email,
+    employee_emp_id: leave.employee_emp_id,
+    leave_type: leave.leave_type,
+    no_of_days: leave.no_of_days,
+    hr_email: leave.hr_email,
+    hr_name: leave.hr_name
+  });
 
   // Only allow conversion from LOP to Casual
   if (leave.leave_type !== 'lop') {
@@ -1146,6 +1171,106 @@ export const convertLeaveRequestLopToCasual = async (
       `Employee: ${leave.employee_name}, Days: ${noOfDays}. ` +
       `Balances: LOP ${currentLop} → ${newLopBalance} (refunded), Casual ${currentCasual} → ${newCasualBalance} (deducted)`
     );
+
+    // ========== SEND EMAIL NOTIFICATIONS ==========
+    logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LOP TO CASUAL CONVERSION ==========`);
+    logger.info(`[EMAIL] Request ID: ${requestId}, Converter ID: ${userId}, Converter Role: ${userRole}`);
+    
+    const emailData = {
+      employeeName: leave.employee_name || 'Employee',
+      employeeEmpId: leave.employee_emp_id || '',
+      leaveType: 'casual', // After conversion
+      startDate: leave.start_date,
+      startType: leave.start_type || 'full',
+      endDate: leave.end_date,
+      endType: leave.end_type || 'full',
+      noOfDays: noOfDays,
+      reason: leave.reason || '',
+      converterName: leave.converter_name || 'Converter',
+      converterRole: userRole,
+      previousLopBalance: currentLop,
+      newLopBalance: newLopBalance,
+      previousCasualBalance: currentCasual,
+      newCasualBalance: newCasualBalance
+    };
+
+    // Send email notifications based on converter role
+    logger.info(`[EMAIL] Converter role: ${userRole}, Employee email: ${leave.employee_email || 'NO EMAIL'}, HR email: ${leave.hr_email || 'NO EMAIL'}`);
+    
+    if (userRole === 'hr') {
+      // HR converts → Employee gets email
+      logger.info(`[EMAIL] HR conversion - sending email to employee: ${leave.employee_email || 'NO EMAIL'}`);
+      if (leave.employee_email) {
+        try {
+          logger.info(`[EMAIL] Calling sendLopToCasualConversionEmail with data:`, {
+            recipientEmail: leave.employee_email,
+            employeeName: emailData.employeeName,
+            employeeEmpId: emailData.employeeEmpId,
+            noOfDays: emailData.noOfDays
+          });
+          const emailResult = await sendLopToCasualConversionEmail(leave.employee_email, {
+            ...emailData,
+            recipientName: leave.employee_name || 'Employee',
+            recipientRole: 'employee' as const
+          });
+          logger.info(`[EMAIL] ✅ Conversion email sent to employee: ${leave.employee_email}, Result: ${emailResult}`);
+        } catch (err: any) {
+          logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
+          logger.error(`[EMAIL] ❌ Error details:`, err.message, err.stack);
+        }
+      } else {
+        logger.warn(`[EMAIL] ⚠️ No employee email found, cannot send conversion email`);
+      }
+    } else if (userRole === 'super_admin') {
+      // Super Admin converts → HR and Employee get emails
+      logger.info(`[EMAIL] Super Admin conversion - sending emails to employee and HR`);
+      // Send to employee
+      if (leave.employee_email) {
+        try {
+          logger.info(`[EMAIL] Calling sendLopToCasualConversionEmail for employee with data:`, {
+            recipientEmail: leave.employee_email,
+            employeeName: emailData.employeeName,
+            employeeEmpId: emailData.employeeEmpId,
+            noOfDays: emailData.noOfDays
+          });
+          const emailResult = await sendLopToCasualConversionEmail(leave.employee_email, {
+            ...emailData,
+            recipientName: leave.employee_name || 'Employee',
+            recipientRole: 'employee' as const
+          });
+          logger.info(`[EMAIL] ✅ Conversion email sent to employee: ${leave.employee_email}, Result: ${emailResult}`);
+        } catch (err: any) {
+          logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
+          logger.error(`[EMAIL] ❌ Error details:`, err.message, err.stack);
+        }
+      } else {
+        logger.warn(`[EMAIL] ⚠️ No employee email found, cannot send conversion email`);
+      }
+      // Send to HR (if exists and different from employee)
+      if (leave.hr_email && leave.hr_email !== leave.employee_email) {
+        try {
+          logger.info(`[EMAIL] Calling sendLopToCasualConversionEmail for HR with data:`, {
+            recipientEmail: leave.hr_email,
+            employeeName: emailData.employeeName,
+            employeeEmpId: emailData.employeeEmpId,
+            noOfDays: emailData.noOfDays
+          });
+          const emailResult = await sendLopToCasualConversionEmail(leave.hr_email, {
+            ...emailData,
+            recipientName: leave.hr_name || 'HR',
+            recipientRole: 'hr' as const
+          });
+          logger.info(`[EMAIL] ✅ Conversion email sent to HR: ${leave.hr_email}, Result: ${emailResult}`);
+        } catch (err: any) {
+          logger.error(`[EMAIL] ❌ Error sending to HR:`, err);
+          logger.error(`[EMAIL] ❌ Error details:`, err.message, err.stack);
+        }
+      } else {
+        logger.warn(`[EMAIL] ⚠️ No HR email found or HR email same as employee email, skipping HR email`);
+      }
+    }
+
+    logger.info(`[EMAIL] ========== EMAIL NOTIFICATION COMPLETED FOR LOP TO CASUAL CONVERSION ==========`);
 
     return {
       message: `Leave request converted from LOP to Casual successfully`,

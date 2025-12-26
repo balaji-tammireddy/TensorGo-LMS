@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
 import { format, parse, eachDayOfInterval } from 'date-fns';
+import ConfirmationDialog from './ConfirmationDialog';
 import './LeaveDetailsModal.css';
 
 interface LeaveDay {
@@ -61,6 +62,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const [rejectReason, setRejectReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [updatedLeaveReason, setUpdatedLeaveReason] = useState<string>('');
+  const [showConvertConfirmDialog, setShowConvertConfirmDialog] = useState(false);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -71,6 +73,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setRejectReason('');
       setSelectedStatus('');
       setUpdatedLeaveReason('');
+      setShowConvertConfirmDialog(false);
     } else if (isOpen && leaveRequest && isEditMode) {
       // Set initial status and reason when opening in edit mode
       setSelectedStatus(leaveRequest.currentStatus);
@@ -600,14 +603,12 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
             >
               Close
             </button>
-            {leaveRequest.leaveType === 'lop' && (userRole === 'hr' || userRole === 'super_admin') && onConvertLopToCasual && (
+            {leaveRequest.leaveType === 'lop' && 
+             (userRole === 'hr' || userRole === 'super_admin') && 
+             onConvertLopToCasual && (
               <button
                 className="leave-details-modal-button leave-details-modal-button-convert"
-                onClick={() => {
-                  if (window.confirm(`Are you sure you want to convert this LOP leave request to Casual? This will:\n- Refund ${leaveRequest.noOfDays} day(s) to LOP balance\n- Deduct ${leaveRequest.noOfDays} day(s) from Casual balance`)) {
-                    onConvertLopToCasual(leaveRequest.id);
-                  }
-                }}
+                onClick={() => setShowConvertConfirmDialog(true)}
                 disabled={isLoading || isConverting}
                 title="Convert LOP to Casual"
               >
@@ -762,6 +763,28 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Convert LOP to Casual Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConvertConfirmDialog}
+        title="Convert LOP to Casual"
+        message={
+          leaveRequest
+            ? `Are you sure you want to convert this LOP leave request to Casual?\n\nThis will:\n• Refund ${leaveRequest.noOfDays} ${leaveRequest.noOfDays === 1 ? 'day' : 'days'} to LOP balance\n• Deduct ${leaveRequest.noOfDays} ${leaveRequest.noOfDays === 1 ? 'day' : 'days'} from Casual balance\n\n⚠️ This action cannot be undone.`
+            : ''
+        }
+        confirmText="Convert"
+        cancelText="Cancel"
+        onConfirm={() => {
+          if (onConvertLopToCasual && leaveRequest) {
+            onConvertLopToCasual(leaveRequest.id);
+          }
+          setShowConvertConfirmDialog(false);
+        }}
+        onCancel={() => setShowConvertConfirmDialog(false)}
+        type="warning"
+        isLoading={isConverting}
+      />
     </>
   );
 };
