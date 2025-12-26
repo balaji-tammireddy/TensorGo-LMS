@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import * as leaveService from '../services/leave.service';
+import { logger } from '../utils/logger';
 
 export const getBalances = async (req: AuthRequest, res: Response) => {
   try {
@@ -124,6 +125,8 @@ export const getPendingRequests = async (req: AuthRequest, res: Response) => {
 };
 
 export const approveLeave = async (req: AuthRequest, res: Response) => {
+  console.log(`[CONTROLLER START] approveLeave - Params:`, req.params, `Body:`, req.body, `User:`, req.user?.id);
+  logger.info(`[CONTROLLER] approveLeave called - Leave ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
   try {
     const leaveRequestId = parseInt(req.params.id);
     const { comment } = req.body;
@@ -146,6 +149,8 @@ export const approveLeave = async (req: AuthRequest, res: Response) => {
 };
 
 export const rejectLeave = async (req: AuthRequest, res: Response) => {
+  console.log(`[CONTROLLER START] rejectLeave - Params:`, req.params, `Body:`, req.body, `User:`, req.user?.id);
+  logger.info(`[CONTROLLER] rejectLeave called - Leave ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
   try {
     const leaveRequestId = parseInt(req.params.id);
     const { comment } = req.body;

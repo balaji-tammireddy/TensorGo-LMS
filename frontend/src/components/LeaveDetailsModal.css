@@ -515,7 +515,7 @@
   border-radius: 4px;
   font-size: 14px;
   font-family: inherit;
-  resize: vertical;
+  resize: none;
   min-height: 100px;
 }
 

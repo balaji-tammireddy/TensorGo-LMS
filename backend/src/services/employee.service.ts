@@ -1,5 +1,6 @@
 import { pool } from '../database/db';
 import { hashPassword } from './auth.service';
+import { logger } from '../utils/logger';
 
 export const getEmployees = async (
   page: number = 1,
@@ -308,6 +309,25 @@ export const createEmployee = async (employeeData: any) => {
     }
   }
 
+
+  // Send welcome email with credentials
+  try {
+    const { sendNewEmployeeCredentialsEmail } = await import('../utils/emailTemplates');
+    const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const temporaryPassword = employeeData.password || 'tensorgo@2023';
+    
+    await sendNewEmployeeCredentialsEmail(employeeData.email, {
+      employeeName: `${employeeData.firstName} ${employeeData.middleName || ''} ${employeeData.lastName || ''}`.trim(),
+      employeeEmpId: empId,
+      email: employeeData.email,
+      temporaryPassword: temporaryPassword,
+      loginUrl: loginUrl
+    });
+    logger.info(`✅ New employee credentials email sent to: ${employeeData.email}`);
+  } catch (emailError: any) {
+    // Log error but don't fail employee creation
+    logger.error(`❌ Error sending new employee credentials email:`, emailError);
+  }
 
   return { employeeId: userId, message: 'Employee created successfully' };
 };
@@ -665,6 +685,43 @@ export const addLeavesToEmployee = async (
     }
 
     await client.query('COMMIT');
+
+    // Send email notification to employee
+    try {
+      const { sendLeaveAllocationEmail } = await import('../utils/emailTemplates');
+      const employeeResult = await pool.query(
+        `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name, u.emp_id,
+                approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+         FROM users u
+         LEFT JOIN users approver ON approver.id = $1
+         WHERE u.id = $2`,
+        [updatedBy, employeeId]
+      );
+
+      if (employeeResult.rows.length > 0) {
+        const employee = employeeResult.rows[0];
+        const previousBalance = balanceCheck.rows.length > 0 
+          ? parseFloat(balanceCheck.rows[0][balanceColumn] || '0')
+          : 0;
+        const newBalance = previousBalance + count;
+
+        await sendLeaveAllocationEmail(employee.email, {
+          employeeName: employee.employee_name || 'Employee',
+          employeeEmpId: employee.emp_id || '',
+          leaveType: leaveType,
+          allocatedDays: count,
+          previousBalance: previousBalance,
+          newBalance: newBalance,
+          allocatedBy: employee.approver_name || 'HR/Admin',
+          allocationDate: new Date().toISOString().split('T')[0]
+        });
+        logger.info(`✅ Leave allocation email sent to employee: ${employee.email}`);
+      }
+    } catch (emailError: any) {
+      // Log error but don't fail leave allocation
+      logger.error(`❌ Error sending leave allocation email:`, emailError);
+    }
+
     return { message: `${count} ${leaveType} leave(s) added successfully` };
   } catch (error: any) {
     await client.query('ROLLBACK');

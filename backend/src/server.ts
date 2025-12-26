@@ -8,6 +8,7 @@ import path from 'path';
 import { errorHandler } from './middleware/error.middleware';
 import { logger } from './utils/logger';
 import { verifyEmailConnection } from './utils/email';
+import { initializeCronJobs } from './utils/cronJobs';
 
 import authRoutes from './routes/auth.routes';
 import leaveRoutes from './routes/leave.routes';
@@ -93,6 +94,9 @@ app.use((req, res) => {
     logger.error('❌ Email service connection failed', err);
   }
 })();
+
+// 🔹 Initialize cron jobs
+initializeCronJobs();
 
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);

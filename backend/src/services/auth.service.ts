@@ -103,6 +103,28 @@ export const changePassword = async (
     'UPDATE users SET password_hash = $1, must_change_password = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
     [newHash, userId]
   );
+
+  // Send security notification email
+  try {
+    const { sendPasswordChangeSecurityEmail } = await import('../utils/emailTemplates');
+    const userResult = await pool.query(
+      'SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as user_name FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length > 0) {
+      const user = userResult.rows[0];
+      await sendPasswordChangeSecurityEmail(user.email, {
+        userName: user.user_name || 'User',
+        changeTimestamp: new Date().toISOString(),
+        ipAddress: undefined // Can be added if IP is passed to the function
+      });
+      logger.info(`✅ Password change security email sent to: ${user.email}`);
+    }
+  } catch (emailError: any) {
+    // Log error but don't fail password change
+    logger.error(`❌ Error sending password change security email:`, emailError);
+  }
 };
 
 /**

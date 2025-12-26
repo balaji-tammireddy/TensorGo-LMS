@@ -630,8 +630,27 @@ const LeaveApplyPage: React.FC = () => {
         const errorDetails = error.response?.data?.error?.details;
         
         if (errorDetails && Array.isArray(errorDetails)) {
-          const detailMessages = errorDetails.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
-          showError(`${errorMessage}\n\n${detailMessages}`);
+          // Format field names to be user-friendly
+          const formatFieldName = (path: string[]): string => {
+            const field = path[path.length - 1]; // Get the last part (e.g., 'reason' from 'body.reason')
+            // Capitalize first letter and replace underscores with spaces
+            return field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
+          };
+          
+          // Remove duplicates and format messages
+          const uniqueMessages = new Map<string, string>();
+          errorDetails.forEach((d: any) => {
+            const fieldName = formatFieldName(d.path || []);
+            const message = d.message || '';
+            // Use field name + message as key to avoid duplicates
+            const key = `${fieldName}:${message}`;
+            if (!uniqueMessages.has(key)) {
+              uniqueMessages.set(key, `${fieldName}: ${message}`);
+            }
+          });
+          
+          const detailMessages = Array.from(uniqueMessages.values()).join('\n');
+          showError(detailMessages || errorMessage);
         } else {
           showError(errorMessage);
         }

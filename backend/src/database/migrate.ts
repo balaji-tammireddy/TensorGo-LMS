@@ -103,6 +103,21 @@ async function migrate() {
       }
     }
     
+    // Run urgent flag migration
+    try {
+      const urgentMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '003_add_urgent_flag_to_leave_requests.sql'),
+        'utf-8'
+      );
+      await pool.query(urgentMigrationFile);
+      console.log('Urgent flag migration completed');
+    } catch (urgentError: any) {
+      // If column already exists, that's fine
+      if (!urgentError.message.includes('already exists') && !urgentError.message.includes('duplicate')) {
+        console.warn('Urgent flag migration warning:', urgentError.message);
+      }
+    }
+    
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);

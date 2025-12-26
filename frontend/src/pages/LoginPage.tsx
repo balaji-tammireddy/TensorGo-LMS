@@ -65,11 +65,24 @@ const LoginPage: React.FC = () => {
         showWarning('Too many requests. Please try again later.');
       } else if (errorData?.details && Array.isArray(errorData.details)) {
         // Show validation details if available
-        const detailMessages = errorData.details.map((d: any) => {
-          const field = d.path?.join('.') || 'field';
-          return `${field}: ${d.message}`;
-        }).join(', ');
-        showError(`${errorData.message || 'Validation failed'}: ${detailMessages}`);
+        const formatFieldName = (path: string[]): string => {
+          const field = path[path.length - 1]; // Get the last part (e.g., 'email' from 'body.email')
+          return field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
+        };
+        
+        // Remove duplicates and format messages
+        const uniqueMessages = new Map<string, string>();
+        errorData.details.forEach((d: any) => {
+          const fieldName = formatFieldName(d.path || []);
+          const message = d.message || '';
+          const key = `${fieldName}:${message}`;
+          if (!uniqueMessages.has(key)) {
+            uniqueMessages.set(key, `${fieldName}: ${message}`);
+          }
+        });
+        
+        const detailMessages = Array.from(uniqueMessages.values()).join('\n');
+        showError(detailMessages || errorData.message || 'Validation failed');
       } else {
         showError(message);
       }

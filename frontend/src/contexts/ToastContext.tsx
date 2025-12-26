@@ -94,7 +94,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             onClick={() => removeToast(toast.id)}
           >
             {getToastIcon(toast.type)}
-            <span className="toast-message">{toast.message}</span>
+            <span className="toast-message" style={{ whiteSpace: 'pre-line' }}>{toast.message}</span>
             <button
               className="toast-close"
               onClick={(e) => {

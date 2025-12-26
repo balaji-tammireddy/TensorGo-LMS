@@ -2,7 +2,7 @@ import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
-import { sendLeaveApplicationEmail } from '../utils/emailTemplates';
+import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail } from '../utils/emailTemplates';
 
 // Local date formatter to avoid timezone shifts
 const formatDate = (date: Date | string): string => {
@@ -318,7 +318,7 @@ export const applyLeave = async (
     try {
       await client.query('BEGIN');
 
-      // Insert leave request
+      // Insert leave request (don't store urgent flag - it's only for email template)
       const leaveRequestResult = await client.query(
         `INSERT INTO leave_requests (
           employee_id, leave_type, start_date, start_type, end_date, end_type,
@@ -430,12 +430,17 @@ export const applyLeave = async (
       appliedDate: appliedDate
     };
 
+    // Determine if urgent: only if start date is today (same day application)
+    const isUrgent = startDate.getTime() === today.getTime();
+
     // Send email to reporting manager (if exists and has email)
     if (managerEmail && reportingManagerId) {
       try {
-        const emailSent = await sendLeaveApplicationEmail(managerEmail, emailData);
+        const emailSent = isUrgent
+          ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData)
+          : await sendLeaveApplicationEmail(managerEmail, emailData);
         if (emailSent) {
-          logger.info(`Leave application email sent to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+          logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
         } else {
           logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
         }
@@ -453,9 +458,11 @@ export const applyLeave = async (
           ...emailData,
           managerName: hrName || 'Manager'
         };
-        const emailSent = await sendLeaveApplicationEmail(hrEmail, hrEmailData);
+        const emailSent = isUrgent
+          ? await sendUrgentLeaveApplicationEmail(hrEmail, hrEmailData)
+          : await sendLeaveApplicationEmail(hrEmail, hrEmailData);
         if (emailSent) {
-          logger.info(`Leave application email sent to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
+          logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
         } else {
           logger.warn(`Failed to send leave application email to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
         }
@@ -1274,7 +1281,9 @@ export const approveLeave = async (
   approverRole: string,
   comment?: string
 ) => {
-  // Get leave request details with employee and approver information
+  logger.info(`[APPROVE LEAVE] Function called - Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Role: ${approverRole}`);
+  
+  // Get leave request details with employee, approver, manager, and HR information
   const leaveResult = await pool.query(
     `SELECT 
       lr.*, 
@@ -1282,10 +1291,17 @@ export const approveLeave = async (
       u.role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+      u.emp_id as employee_emp_id,
+      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      manager.email as manager_email,
+      manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+      hr.email as hr_email,
+      hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
      LEFT JOIN users approver ON approver.id = $2
+     LEFT JOIN users manager ON u.reporting_manager_id = manager.id
+     LEFT JOIN users hr ON manager.reporting_manager_id = hr.id
      WHERE lr.id = $1`,
     [leaveRequestId, approverId]
   );
@@ -1399,7 +1415,136 @@ export const approveLeave = async (
   }
 
   // Recalculate status
-  await recalcLeaveRequestStatus(leaveRequestId);
+  try {
+    await recalcLeaveRequestStatus(leaveRequestId);
+    logger.info(`[EMAIL DEBUG] Status recalculated successfully for leave request ${leaveRequestId}`);
+  } catch (recalcError: any) {
+    logger.error(`[EMAIL DEBUG] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
+    // Continue with email sending even if recalc fails
+  }
+
+  // Send email notifications based on approver role
+  try {
+    logger.info(`[EMAIL DEBUG] Starting email notification for leave approval. Request ID: ${leaveRequestId}, Approver Role: ${approverRole}`);
+    logger.info(`[EMAIL DEBUG] Leave data:`, {
+      employee_email: leave.employee_email,
+      employee_name: leave.employee_name,
+      employee_emp_id: leave.employee_emp_id,
+      manager_email: leave.manager_email,
+      manager_name: leave.manager_name,
+      hr_email: leave.hr_email,
+      hr_name: leave.hr_name
+    });
+
+    const emailData = {
+      employeeName: leave.employee_name || 'Employee',
+      employeeEmpId: leave.employee_emp_id || '',
+      recipientName: '',
+      leaveType: leave.leave_type,
+      startDate: leave.start_date,
+      startType: leave.start_type,
+      endDate: leave.end_date,
+      endType: leave.end_type,
+      noOfDays: parseFloat(leave.no_of_days),
+      reason: leave.reason,
+      approverName: leave.approver_name || 'Approver',
+      approverRole: approverRole,
+      comment: comment || null,
+      status: 'approved' as const
+    };
+
+    // Determine recipients based on approver role
+    if (approverRole === 'manager') {
+      // Manager approves → Employee gets email
+      if (leave.employee_email) {
+        emailData.recipientName = leave.employee_name || 'Employee';
+        logger.info(`[EMAIL DEBUG] Sending approval email to employee: ${leave.employee_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.employee_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave approval email sent to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave approval email to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.warn(`[EMAIL DEBUG] No employee email found for leave request ${leaveRequestId}`);
+      }
+    } else if (approverRole === 'hr') {
+      // HR approves → Manager and Employee get emails
+      // Send to employee
+      if (leave.employee_email) {
+        emailData.recipientName = leave.employee_name || 'Employee';
+        logger.info(`[EMAIL DEBUG] Sending approval email to employee: ${leave.employee_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.employee_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave approval email sent to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave approval email to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.warn(`[EMAIL DEBUG] No employee email found for leave request ${leaveRequestId}`);
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+        emailData.recipientName = leave.manager_name || 'Manager';
+        logger.info(`[EMAIL DEBUG] Sending approval email to manager: ${leave.manager_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.manager_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave approval email sent to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave approval email to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.info(`[EMAIL DEBUG] Skipping manager email - email: ${leave.manager_email}, same as employee: ${leave.manager_email === leave.employee_email}`);
+      }
+    } else if (approverRole === 'super_admin') {
+      // Super Admin approves → HR, Manager, and Employee get emails
+      // Send to employee
+      if (leave.employee_email) {
+        emailData.recipientName = leave.employee_name || 'Employee';
+        logger.info(`[EMAIL DEBUG] Sending approval email to employee: ${leave.employee_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.employee_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave approval email sent to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave approval email to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.warn(`[EMAIL DEBUG] No employee email found for leave request ${leaveRequestId}`);
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+        emailData.recipientName = leave.manager_name || 'Manager';
+        logger.info(`[EMAIL DEBUG] Sending approval email to manager: ${leave.manager_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.manager_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave approval email sent to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave approval email to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.info(`[EMAIL DEBUG] Skipping manager email - email: ${leave.manager_email}, same as employee: ${leave.manager_email === leave.employee_email}`);
+      }
+      // Send to HR (if exists and different from employee and manager)
+      if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
+        emailData.recipientName = leave.hr_name || 'HR';
+        logger.info(`[EMAIL DEBUG] Sending approval email to HR: ${leave.hr_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.hr_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave approval email sent to HR: ${leave.hr_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave approval email to HR: ${leave.hr_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.info(`[EMAIL DEBUG] Skipping HR email - email: ${leave.hr_email}, same as employee: ${leave.hr_email === leave.employee_email}, same as manager: ${leave.hr_email === leave.manager_email}`);
+      }
+    } else {
+      logger.warn(`[EMAIL DEBUG] Unknown approver role: ${approverRole}`);
+    }
+  } catch (emailError: any) {
+    // Don't fail the approval if email fails
+    logger.error(`❌ Error sending approval emails for leave request ${leaveRequestId}:`, emailError);
+    logger.error(`❌ Error stack:`, emailError.stack);
+  }
 
   return { message: 'Leave approved successfully' };
 };
@@ -1410,7 +1555,9 @@ export const rejectLeave = async (
   approverRole: string,
   comment: string
 ) => {
-  // Similar authorization check as approve - get employee and approver information
+  logger.info(`[REJECT LEAVE] Function called - Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Role: ${approverRole}`);
+  
+  // Similar authorization check as approve - get employee, approver, manager, and HR information
   const leaveResult = await pool.query(
     `SELECT 
       lr.*, 
@@ -1418,10 +1565,17 @@ export const rejectLeave = async (
       u.role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+      u.emp_id as employee_emp_id,
+      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      manager.email as manager_email,
+      manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+      hr.email as hr_email,
+      hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
      LEFT JOIN users approver ON approver.id = $2
+     LEFT JOIN users manager ON u.reporting_manager_id = manager.id
+     LEFT JOIN users hr ON manager.reporting_manager_id = hr.id
      WHERE lr.id = $1`,
     [leaveRequestId, approverId]
   );
@@ -1527,8 +1681,138 @@ export const rejectLeave = async (
     );
   }
 
+  // Recalculate status
+  try {
+    await recalcLeaveRequestStatus(leaveRequestId);
+    logger.info(`[EMAIL DEBUG] Status recalculated successfully for leave request ${leaveRequestId}`);
+  } catch (recalcError: any) {
+    logger.error(`[EMAIL DEBUG] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
+    // Continue with email sending even if recalc fails
+  }
 
-  await recalcLeaveRequestStatus(leaveRequestId);
+  // Send email notifications based on approver role
+  try {
+    logger.info(`[EMAIL DEBUG] Starting email notification for leave rejection. Request ID: ${leaveRequestId}, Approver Role: ${approverRole}`);
+    logger.info(`[EMAIL DEBUG] Leave data:`, {
+      employee_email: leave.employee_email,
+      employee_name: leave.employee_name,
+      employee_emp_id: leave.employee_emp_id,
+      manager_email: leave.manager_email,
+      manager_name: leave.manager_name,
+      hr_email: leave.hr_email,
+      hr_name: leave.hr_name
+    });
+
+    const emailData = {
+      employeeName: leave.employee_name || 'Employee',
+      employeeEmpId: leave.employee_emp_id || '',
+      recipientName: '',
+      leaveType: leave.leave_type,
+      startDate: leave.start_date,
+      startType: leave.start_type,
+      endDate: leave.end_date,
+      endType: leave.end_type,
+      noOfDays: parseFloat(leave.no_of_days),
+      reason: leave.reason,
+      approverName: leave.approver_name || 'Approver',
+      approverRole: approverRole,
+      comment: comment || null,
+      status: 'rejected' as const
+    };
+
+    // Determine recipients based on approver role
+    if (approverRole === 'manager') {
+      // Manager rejects → Employee gets email
+      if (leave.employee_email) {
+        emailData.recipientName = leave.employee_name || 'Employee';
+        logger.info(`[EMAIL DEBUG] Sending rejection email to employee: ${leave.employee_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.employee_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave rejection email sent to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave rejection email to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.warn(`[EMAIL DEBUG] No employee email found for leave request ${leaveRequestId}`);
+      }
+    } else if (approverRole === 'hr') {
+      // HR rejects → Manager and Employee get emails
+      // Send to employee
+      if (leave.employee_email) {
+        emailData.recipientName = leave.employee_name || 'Employee';
+        logger.info(`[EMAIL DEBUG] Sending rejection email to employee: ${leave.employee_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.employee_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave rejection email sent to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave rejection email to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.warn(`[EMAIL DEBUG] No employee email found for leave request ${leaveRequestId}`);
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+        emailData.recipientName = leave.manager_name || 'Manager';
+        logger.info(`[EMAIL DEBUG] Sending rejection email to manager: ${leave.manager_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.manager_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave rejection email sent to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave rejection email to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.info(`[EMAIL DEBUG] Skipping manager email - email: ${leave.manager_email}, same as employee: ${leave.manager_email === leave.employee_email}`);
+      }
+    } else if (approverRole === 'super_admin') {
+      // Super Admin rejects → HR, Manager, and Employee get emails
+      // Send to employee
+      if (leave.employee_email) {
+        emailData.recipientName = leave.employee_name || 'Employee';
+        logger.info(`[EMAIL DEBUG] Sending rejection email to employee: ${leave.employee_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.employee_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave rejection email sent to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave rejection email to employee: ${leave.employee_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.warn(`[EMAIL DEBUG] No employee email found for leave request ${leaveRequestId}`);
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+        emailData.recipientName = leave.manager_name || 'Manager';
+        logger.info(`[EMAIL DEBUG] Sending rejection email to manager: ${leave.manager_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.manager_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave rejection email sent to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave rejection email to manager: ${leave.manager_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.info(`[EMAIL DEBUG] Skipping manager email - email: ${leave.manager_email}, same as employee: ${leave.manager_email === leave.employee_email}`);
+      }
+      // Send to HR (if exists and different from employee and manager)
+      if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
+        emailData.recipientName = leave.hr_name || 'HR';
+        logger.info(`[EMAIL DEBUG] Sending rejection email to HR: ${leave.hr_email}`);
+        const emailSent = await sendLeaveStatusEmail(leave.hr_email, emailData);
+        if (emailSent) {
+          logger.info(`✅ Leave rejection email sent to HR: ${leave.hr_email} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`⚠️ Failed to send leave rejection email to HR: ${leave.hr_email} for leave request ${leaveRequestId}`);
+        }
+      } else {
+        logger.info(`[EMAIL DEBUG] Skipping HR email - email: ${leave.hr_email}, same as employee: ${leave.hr_email === leave.employee_email}, same as manager: ${leave.hr_email === leave.manager_email}`);
+      }
+    } else {
+      logger.warn(`[EMAIL DEBUG] Unknown approver role: ${approverRole}`);
+    }
+  } catch (emailError: any) {
+    // Don't fail the rejection if email fails
+    logger.error(`❌ Error sending rejection emails for leave request ${leaveRequestId}:`, emailError);
+    logger.error(`❌ Error stack:`, emailError.stack);
+  }
+
   return { message: 'Leave rejected successfully' };
 };
 
@@ -1999,10 +2283,8 @@ export const updateLeaveStatus = async (
       throw new Error('Super Admin has updated the status of this leave. You cannot update it now.');
     }
   } else if (lastUpdaterRole === 'hr') {
-    // If HR updated, manager cannot update, but super admin can
-    if (approverRole === 'manager') {
-      throw new Error('HR has updated the status of this leave. You cannot update it now.');
-    }
+    // If HR updated, both HR and super admin can update (manager check already done at function start)
+    // No additional check needed since approverRole is already restricted to 'hr' | 'super_admin'
   }
   // If manager updated (or no one updated yet), HR and super admin can update (already checked at function start)
 
@@ -2155,6 +2437,88 @@ export const updateLeaveStatus = async (
     await recalcLeaveRequestStatus(leaveRequestId);
   } else {
     throw new Error('Invalid status or missing required parameters');
+  }
+
+  // Send email notifications for status updates (approved/rejected)
+  if (newStatus === 'approved' || newStatus === 'rejected') {
+    try {
+      logger.info(`[EMAIL DEBUG] Starting email notification for updateLeaveStatus. Request ID: ${leaveRequestId}, Status: ${newStatus}, Approver Role: ${approverRole}`);
+      
+      // Get employee, manager, and HR information for emails
+      const emailResult = await pool.query(
+        `SELECT 
+          lr.*,
+          u.email as employee_email,
+          u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+          u.emp_id as employee_emp_id,
+          manager.email as manager_email,
+          manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+          hr.email as hr_email,
+          hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
+          approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+         FROM leave_requests lr
+         JOIN users u ON lr.employee_id = u.id
+         LEFT JOIN users approver ON approver.id = $2
+         LEFT JOIN users manager ON u.reporting_manager_id = manager.id
+         LEFT JOIN users hr ON manager.reporting_manager_id = hr.id
+         WHERE lr.id = $1`,
+        [leaveRequestId, approverId]
+      );
+
+      if (emailResult.rows.length > 0) {
+        const emailLeave = emailResult.rows[0];
+        const emailData = {
+          employeeName: emailLeave.employee_name || 'Employee',
+          employeeEmpId: emailLeave.employee_emp_id || '',
+          recipientName: '',
+          leaveType: emailLeave.leave_type,
+          startDate: emailLeave.start_date,
+          startType: emailLeave.start_type,
+          endDate: emailLeave.end_date,
+          endType: emailLeave.end_type,
+          noOfDays: parseFloat(emailLeave.no_of_days),
+          reason: emailLeave.reason,
+          approverName: emailLeave.approver_name || 'Approver',
+          approverRole: approverRole,
+          comment: newStatus === 'rejected' ? (rejectReason || null) : null,
+          status: newStatus as 'approved' | 'rejected'
+        };
+
+        // Determine recipients based on approver role (same logic as approve/reject)
+        if (approverRole === 'hr') {
+          // HR updates → Manager and Employee get emails
+          if (emailLeave.employee_email) {
+            emailData.recipientName = emailLeave.employee_name || 'Employee';
+            await sendLeaveStatusEmail(emailLeave.employee_email, emailData);
+            logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}`);
+          }
+          if (emailLeave.manager_email && emailLeave.manager_email !== emailLeave.employee_email) {
+            emailData.recipientName = emailLeave.manager_name || 'Manager';
+            await sendLeaveStatusEmail(emailLeave.manager_email, emailData);
+            logger.info(`✅ Leave ${newStatus} email sent to manager: ${emailLeave.manager_email}`);
+          }
+        } else if (approverRole === 'super_admin') {
+          // Super Admin updates → HR, Manager, and Employee get emails
+          if (emailLeave.employee_email) {
+            emailData.recipientName = emailLeave.employee_name || 'Employee';
+            await sendLeaveStatusEmail(emailLeave.employee_email, emailData);
+            logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}`);
+          }
+          if (emailLeave.manager_email && emailLeave.manager_email !== emailLeave.employee_email) {
+            emailData.recipientName = emailLeave.manager_name || 'Manager';
+            await sendLeaveStatusEmail(emailLeave.manager_email, emailData);
+            logger.info(`✅ Leave ${newStatus} email sent to manager: ${emailLeave.manager_email}`);
+          }
+          if (emailLeave.hr_email && emailLeave.hr_email !== emailLeave.employee_email && emailLeave.hr_email !== emailLeave.manager_email) {
+            emailData.recipientName = emailLeave.hr_name || 'HR';
+            await sendLeaveStatusEmail(emailLeave.hr_email, emailData);
+            logger.info(`✅ Leave ${newStatus} email sent to HR: ${emailLeave.hr_email}`);
+          }
+        }
+      }
+    } catch (emailError: any) {
+      logger.error(`❌ Error sending emails in updateLeaveStatus for leave request ${leaveRequestId}:`, emailError);
+    }
   }
 
   return { message: 'Leave status updated successfully' };
