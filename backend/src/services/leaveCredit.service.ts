@@ -1,6 +1,7 @@
 import { pool } from '../database/db';
 import { isLastWorkingDayOfMonth, hasCompleted3Years } from '../utils/leaveCredit';
 import { logger } from '../utils/logger';
+import { sendLeaveCarryForwardEmail } from '../utils/emailTemplates';
 
 /**
  * Credit monthly leaves to all active employees
@@ -237,7 +238,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
  * Process year-end leave balance adjustments
  * - Delete all unused sick leaves (reset to 0)
  * - Cap casual leaves at maximum 8 for carry forward (excess deleted)
- * - Reset LOP leaves to 0 (no carry forward) and credit yearly LOP (10 leaves)
+ * - Update LOP leaves to 10 at year-end (no carry forward, set to yearly credit of 10)
  * This runs at the end of each calendar year (last working day of December)
  */
 export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: number; errors: number }> => {
@@ -248,9 +249,9 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
   try {
     await client.query('BEGIN');
 
-    // Get all active employees with their leave balances
+    // Get all active employees with their leave balances and email
     const employeesResult = await client.query(`
-      SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+      SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
              COALESCE(lb.casual_balance, 0) as current_casual,
              COALESCE(lb.sick_balance, 0) as current_sick,
              COALESCE(lb.lop_balance, 0) as current_lop,
@@ -273,11 +274,10 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
         // Reset sick leaves to 0 (all unused sick leaves are deleted)
         const newSick = 0;
         
-        // Reset LOP leaves to 0 (no carry forward) and credit yearly LOP (10 leaves)
-        const yearlyLopCredit = 10;
-        const newLop = yearlyLopCredit;
+        // Set LOP leaves to 10 at year-end (no carry forward, reset to yearly credit of 10)
+        const newLop = 10;
         
-        // Only update if there are changes
+        // Update balances if there are changes
         if (currentCasual !== carryForwardCasual || currentSick !== newSick || currentLop !== newLop) {
           if (employee.balance_id) {
             await client.query(
@@ -291,12 +291,11 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
             );
             
             const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
-            const lopReset = currentLop > 0 ? currentLop : 0;
             logger.info(
               `Year-end adjustment for employee ${employee.emp_id} (${employee.name}): ` +
               `Casual: ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
               `Sick: ${currentSick} → 0 (all deleted), ` +
-              `LOP: ${currentLop} → ${newLop} (reset to 0, credited ${yearlyLopCredit} for new year)`
+              `LOP: ${currentLop} → 10 (updated to yearly credit of 10, no carry forward)`
             );
           } else {
             // Create balance record if it doesn't exist
@@ -308,6 +307,42 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           }
           
           adjusted++;
+        }
+        
+        // Send carry forward email notification to ALL employees (even if no changes)
+        // This ensures everyone receives notification about their carryforward status
+        try {
+          // Year-end adjustment runs on last working day of December
+          // So previousYear is the current year ending, newYear is the next year
+          const currentDate = new Date();
+          const previousYear = currentDate.getFullYear();
+          const newYear = previousYear + 1;
+          
+          // Prepare carry forward data
+          const carriedForwardLeaves: { casual?: number; sick?: number; lop?: number } = {};
+          if (carryForwardCasual > 0) {
+            carriedForwardLeaves.casual = carryForwardCasual;
+          }
+          // Sick leaves are not carried forward (reset to 0)
+          // LOP is not carried forward (set to 10, not from previous year)
+          
+          await sendLeaveCarryForwardEmail(employee.email, {
+            employeeName: employee.name,
+            employeeEmpId: employee.emp_id,
+            previousYear,
+            newYear,
+            carriedForwardLeaves,
+            newYearBalances: {
+              casual: carryForwardCasual,
+              sick: newSick,
+              lop: newLop
+            }
+          });
+          
+          logger.info(`✅ Carry forward email sent to ${employee.email} (${employee.name})`);
+        } catch (emailError: any) {
+          logger.error(`Failed to send carry forward email to ${employee.email}:`, emailError);
+          // Don't fail the entire process if email fails
         }
       } catch (error: any) {
         errors++;
@@ -346,17 +381,114 @@ export const isYearEnd = (): boolean => {
 };
 
 /**
+ * Send carryforward email notifications to all active employees
+ * This can be called manually by HR/Super Admin to send carryforward emails
+ * @param previousYear Optional previous year (defaults to current year - 1)
+ * @param newYear Optional new year (defaults to current year)
+ * @returns Promise with count of emails sent and errors
+ */
+export const sendCarryForwardEmailsToAll = async (
+  previousYear?: number,
+  newYear?: number
+): Promise<{ sent: number; errors: number }> => {
+  const client = await pool.connect();
+  let sent = 0;
+  let errors = 0;
+
+  try {
+    const currentDate = new Date();
+    const prevYear = previousYear || (currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear());
+    const nextYear = newYear || (currentDate.getMonth() === 0 ? currentDate.getFullYear() : currentDate.getFullYear() + 1);
+
+    // Get all active employees with their leave balances and email
+    const employeesResult = await client.query(`
+      SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+             COALESCE(lb.casual_balance, 0) as current_casual,
+             COALESCE(lb.sick_balance, 0) as current_sick,
+             COALESCE(lb.lop_balance, 0) as current_lop
+      FROM users u
+      LEFT JOIN leave_balances lb ON u.id = lb.employee_id
+      WHERE u.status = 'active'
+        AND u.role IN ('employee', 'manager', 'hr')
+        AND u.email IS NOT NULL
+        AND u.email != ''
+    `);
+
+    for (const employee of employeesResult.rows) {
+      try {
+        const currentCasual = parseFloat(employee.current_casual) || 0;
+        const currentSick = parseFloat(employee.current_sick) || 0;
+        const currentLop = parseFloat(employee.current_lop) || 0;
+        
+        // Cap casual leaves at 8 for carry forward (same logic as year-end)
+        const carryForwardCasual = Math.min(currentCasual, 8);
+        
+        // Prepare carry forward data
+        const carriedForwardLeaves: { casual?: number; sick?: number; lop?: number } = {};
+        if (carryForwardCasual > 0) {
+          carriedForwardLeaves.casual = carryForwardCasual;
+        }
+        // Sick leaves are not carried forward (reset to 0)
+        // LOP is not carried forward (set to 10, not from previous year)
+        
+        await sendLeaveCarryForwardEmail(employee.email, {
+          employeeName: employee.name,
+          employeeEmpId: employee.emp_id,
+          previousYear: prevYear,
+          newYear: nextYear,
+          carriedForwardLeaves,
+          newYearBalances: {
+            casual: carryForwardCasual,
+            sick: 0, // Sick leaves reset to 0
+            lop: 10  // LOP reset to 10
+          }
+        });
+        
+        logger.info(`✅ Carry forward email sent to ${employee.email} (${employee.name})`);
+        sent++;
+      } catch (emailError: any) {
+        errors++;
+        logger.error(`Failed to send carry forward email to ${employee.email}:`, emailError);
+      }
+    }
+
+    logger.info(`Carry forward emails sent: ${sent} successful, ${errors} errors`);
+    return { sent, errors };
+  } catch (error: any) {
+    logger.error('Error sending carry forward emails:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+/**
  * Check if it's the last working day and credit leaves for the NEXT month if needed
  * Also check for 3-year anniversaries and credit anniversary leaves
  * Process year-end adjustments at the end of December
- * This should be called daily (e.g., via cron job or scheduled task)
+ * This should be called daily at 8 PM (e.g., via cron job or scheduled task)
+ * 
+ * IMPORTANT: This function verifies it's 8 PM before processing leave credits
  * 
  * Note: Leaves for next month are credited on the last working day of current month
  * Example: On last working day of January, credit leaves for February
  */
 export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
   try {
-    // Check for 3-year and 5-year anniversaries first (runs daily)
+    // Verify it's 8 PM before processing leave credits
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Only allow processing between 8:00 PM and 8:59 PM
+    if (currentHour !== 20) {
+      logger.warn(`Leave credit check called at ${currentHour}:${currentMinute.toString().padStart(2, '0')}. Only runs at 8 PM. Skipping.`);
+      return;
+    }
+    
+    logger.info(`8 PM verified (${currentHour}:${currentMinute.toString().padStart(2, '0')}). Proceeding with leave credit checks...`);
+    
+    // Check for 3-year and 5-year anniversaries first (runs daily at 8 PM)
     await creditAnniversaryLeaves();
 
     // Check for monthly leave credit (only on last working day of current month)
@@ -377,14 +509,16 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
       
       logger.info(`Last working day of ${currentMonth}/${currentYear} detected. Crediting leaves for next month (${nextMonth}/${nextYear})...`);
       
-      // Check if leaves were already credited today by checking last_updated timestamp
-      // This prevents duplicate credits even if the function is called multiple times (e.g., hourly checks)
+      // Check if leaves were already credited today at 8 PM by checking last_updated timestamp
+      // This prevents duplicate credits even if the function is called multiple times
+      // We check for updates after 7:30 PM today to ensure it was credited at 8 PM
       const todayStr = today.toISOString().split('T')[0];
       const checkResult = await pool.query(
         `SELECT COUNT(*) as count 
          FROM leave_balances lb
          INNER JOIN users u ON lb.employee_id = u.id
          WHERE DATE(lb.last_updated) = $1 
+           AND EXTRACT(HOUR FROM lb.last_updated) >= 19
            AND u.status = 'active'
            AND u.role IN ('employee', 'manager', 'hr')
            AND lb.casual_balance >= 1 
@@ -392,11 +526,11 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
         [todayStr]
       );
 
-      // If any active employees have updated balances today with typical monthly credit values,
-      // assume already credited (threshold: 1 employee to be more strict)
-      // This ensures we don't credit multiple times even with hourly checks
+      // If any active employees have updated balances today after 7:30 PM with typical monthly credit values,
+      // assume already credited at 8 PM (threshold: 1 employee to be more strict)
+      // This ensures we don't credit multiple times even if the function is called multiple times
       if (parseInt(checkResult.rows[0].count) >= 1) {
-        logger.info(`Leaves for ${nextMonth}/${nextYear} already credited today (${checkResult.rows[0].count} active employees updated). Skipping to avoid double credit.`);
+        logger.info(`Leaves for ${nextMonth}/${nextYear} already credited today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double credit.`);
         return;
       }
 
@@ -405,6 +539,34 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
       logger.info(`Monthly leave credit for ${nextMonth}/${nextYear} completed: ${result.credited} employees credited, ${result.errors} errors`);
     } else {
       logger.debug('Not the last working day of the month. Skipping monthly leave credit.');
+    }
+
+    // Check for year-end adjustments (last working day of December)
+    // This should run AFTER monthly credits for December are applied
+    if (isYearEnd()) {
+      logger.info('Last working day of December detected. Processing year-end leave adjustments...');
+      
+      // Check if adjustments were already processed today
+      const today = new Date().toISOString().split('T')[0];
+      const checkResult = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM leave_balances lb
+         INNER JOIN users u ON lb.employee_id = u.id
+         WHERE DATE(lb.last_updated) = $1 
+           AND u.status = 'active'
+           AND u.role IN ('employee', 'manager', 'hr')
+           AND lb.sick_balance = 0`, // Check for sick_balance reset to 0
+        [today]
+      );
+
+      // If any active employees have sick balance = 0 updated today, assume already processed
+      if (parseInt(checkResult.rows[0].count) >= 1) {
+        logger.info(`Year-end adjustments appear to have been processed today (${checkResult.rows[0].count} active employees updated). Skipping to avoid double processing.`);
+      } else {
+        logger.info('Proceeding with year-end leave adjustments...');
+        const result = await processYearEndLeaveAdjustments();
+        logger.info(`Year-end adjustments completed: ${result.adjusted} employees adjusted, ${result.errors} errors`);
+      }
     }
   } catch (error: any) {
     logger.error('Error in checkAndCreditMonthlyLeaves:', error);

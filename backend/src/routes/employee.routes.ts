@@ -20,6 +20,8 @@ router.delete('/:id', authorizeRole('super_admin'), employeeController.deleteEmp
 router.post('/:id/leaves', employeeController.addLeavesToEmployee);
 // HR and Super Admin can view employee leave balances
 router.get('/:id/leave-balances', employeeController.getEmployeeLeaveBalances);
+// HR and Super Admin can send carryforward emails to all employees
+router.post('/send-carryforward-emails', employeeController.sendCarryForwardEmails);
 
 export default router;
 

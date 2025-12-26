@@ -51,8 +51,14 @@ export const initializeEmailService = (): nodemailer.Transporter | null => {
         pass: emailConfig.auth.pass,
       },
       tls: {
-        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
+        // Allow self-signed certificates and handle expired certificates by default
+        // This is important for development and some SMTP servers
+        // Set SMTP_REJECT_UNAUTHORIZED=true in .env to enforce strict certificate validation
+        // Default is false to allow expired/self-signed certificates
+        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'true' ? true : false,
       },
+      // For port 587 (TLS), use requireTLS
+      requireTLS: emailConfig.port === 587,
     });
 
     logger.info('✅ Email service initialized successfully');

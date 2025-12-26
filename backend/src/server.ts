@@ -102,48 +102,68 @@ app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
 });
 
-// Schedule daily check for monthly leave credit
-// Check every day at 6 AM to see if today is the last working day
+// Schedule daily check for monthly leave credit and year-end carry forward
+// Check every day at 8 PM to see if today is the last working day
+// IMPORTANT: Leaves are ONLY credited at 8 PM, never before
 const scheduleLeaveCreditCheck = () => {
-  // Run immediately on server start to check if it's the last working day
-  checkAndCreditMonthlyLeaves().catch(err => {
-    logger.error('Initial leave credit check failed:', err);
-  });
-
-  // Calculate milliseconds until next 6 AM
-  const getMillisecondsUntil6AM = () => {
+  // Calculate milliseconds until next 8 PM
+  const getMillisecondsUntil8PM = () => {
     const now = new Date();
-    const sixAM = new Date(now);
-    sixAM.setHours(6, 0, 0, 0); // 6 AM today
+    const eightPM = new Date(now);
+    eightPM.setHours(20, 0, 0, 0); // 8 PM today (20:00)
+    eightPM.setMinutes(0);
+    eightPM.setSeconds(0);
+    eightPM.setMilliseconds(0);
     
-    // If 6 AM has already passed today, schedule for tomorrow 6 AM
-    if (now >= sixAM) {
-      sixAM.setDate(sixAM.getDate() + 1);
+    // If 8 PM has already passed today, schedule for tomorrow 8 PM
+    if (now >= eightPM) {
+      eightPM.setDate(eightPM.getDate() + 1);
     }
     
-    return sixAM.getTime() - now.getTime();
+    const msUntil8PM = eightPM.getTime() - now.getTime();
+    logger.info(`Next leave credit check scheduled for ${eightPM.toISOString()} (in ${Math.round(msUntil8PM / 1000 / 60)} minutes)`);
+    return msUntil8PM;
   };
 
-  // Schedule first check at 6 AM
+  // Schedule first check at 8 PM
   const scheduleNextCheck = () => {
-    const msUntil6AM = getMillisecondsUntil6AM();
+    const msUntil8PM = getMillisecondsUntil8PM();
     
     setTimeout(() => {
-      // Check if today is the last working day
-      checkAndCreditMonthlyLeaves().catch(err => {
-        logger.error('Daily leave credit check failed:', err);
-      });
+      // Verify it's actually 8 PM before processing
+      const now = new Date();
+      const currentHour = now.getHours();
       
-      // Then check every 24 hours (once per day at 6 AM)
-      setInterval(() => {
+      if (currentHour === 20) {
+        // It's 8 PM, check if today is the last working day
+        logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
         checkAndCreditMonthlyLeaves().catch(err => {
           logger.error('Daily leave credit check failed:', err);
         });
+      } else {
+        logger.warn(`Scheduled check triggered at hour ${currentHour} (not 8 PM). Skipping leave credit.`);
+      }
+      
+      // Then check every 24 hours (once per day at 8 PM)
+      setInterval(() => {
+        const checkTime = new Date();
+        const checkHour = checkTime.getHours();
+        
+        if (checkHour === 20) {
+          // It's 8 PM, check if today is the last working day
+          logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
+          checkAndCreditMonthlyLeaves().catch(err => {
+            logger.error('Daily leave credit check failed:', err);
+          });
+        } else {
+          logger.warn(`Scheduled check triggered at hour ${checkHour} (not 8 PM). Skipping leave credit.`);
+        }
       }, 24 * 60 * 60 * 1000); // Check every 24 hours (once per day)
-    }, msUntil6AM);
+    }, msUntil8PM);
   };
 
   scheduleNextCheck();
+  logger.info('Monthly leave credit scheduler initialized. Will only run at 8 PM.');
 };
 
 // Start the scheduled task

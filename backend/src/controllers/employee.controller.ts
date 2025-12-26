@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import * as employeeService from '../services/employee.service';
+import { sendCarryForwardEmailsToAll } from '../services/leaveCredit.service';
 import { pool } from '../database/db';
 
 export const getEmployees = async (req: AuthRequest, res: Response) => {
@@ -239,6 +240,44 @@ export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) 
     const employeeId = parseInt(req.params.id);
     const balances = await employeeService.getEmployeeLeaveBalances(employeeId);
     res.json(balances);
+  } catch (error: any) {
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
+/**
+ * Send carryforward email notifications to all employees
+ * Only HR and Super Admin can trigger this
+ */
+export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) => {
+  try {
+    // Ensure only HR and super_admin can send carryforward emails
+    if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only HR and Super Admin can send carryforward emails'
+        }
+      });
+    }
+
+    // Optional: Allow specifying previous year and new year in query params
+    const previousYear = req.query.previousYear ? parseInt(req.query.previousYear as string) : undefined;
+    const newYear = req.query.newYear ? parseInt(req.query.newYear as string) : undefined;
+
+    const result = await sendCarryForwardEmailsToAll(previousYear, newYear);
+    
+    res.json({
+      success: true,
+      message: `Carryforward emails sent successfully`,
+      sent: result.sent,
+      errors: result.errors
+    });
   } catch (error: any) {
     res.status(500).json({
       error: {
