@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaCheck, FaTimesCircle } from 'react-icons/fa';
+import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
 import { format, parse, eachDayOfInterval } from 'date-fns';
 import './LeaveDetailsModal.css';
 
@@ -35,9 +35,11 @@ interface LeaveDetailsModalProps {
   onApprove: (requestId: number, selectedDayIds?: number[]) => void;
   onReject: (requestId: number, selectedDayIds?: number[], reason?: string) => void;
   onUpdate?: (requestId: number, status: string, selectedDayIds?: number[], rejectReason?: string, leaveReason?: string) => void;
+  onConvertLopToCasual?: (requestId: number) => void;
   isLoading?: boolean;
   isEditMode?: boolean;
   userRole?: string;
+  isConverting?: boolean;
 }
 
 const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
@@ -47,9 +49,11 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   onApprove,
   onReject,
   onUpdate,
+  onConvertLopToCasual,
   isLoading = false,
   isEditMode = false,
-  userRole
+  userRole,
+  isConverting = false
 }) => {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
@@ -592,10 +596,33 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
             <button
               className="leave-details-modal-button leave-details-modal-button-cancel"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={isLoading || isConverting}
             >
               Close
             </button>
+            {leaveRequest.leaveType === 'lop' && (userRole === 'hr' || userRole === 'super_admin') && onConvertLopToCasual && (
+              <button
+                className="leave-details-modal-button leave-details-modal-button-convert"
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to convert this LOP leave request to Casual? This will:\n- Refund ${leaveRequest.noOfDays} day(s) to LOP balance\n- Deduct ${leaveRequest.noOfDays} day(s) from Casual balance`)) {
+                    onConvertLopToCasual(leaveRequest.id);
+                  }
+                }}
+                disabled={isLoading || isConverting}
+                title="Convert LOP to Casual"
+              >
+                {isConverting ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Converting...
+                  </>
+                ) : (
+                  <>
+                    <FaExchangeAlt /> Convert to Casual
+                  </>
+                )}
+              </button>
+            )}
             {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
               <button
                 className="leave-details-modal-button leave-details-modal-button-approve"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
-import { useQuery } from 'react-query';
+import { FaTimes, FaExchangeAlt } from 'react-icons/fa';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import * as employeeService from '../services/employeeService';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,6 +38,16 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
       retry: false
     }
   );
+
+  // Debug logging
+  useEffect(() => {
+    if (isOpen && balances) {
+      console.log('AddLeavesModal - Balances:', balances);
+      console.log('AddLeavesModal - User role:', user?.role);
+      console.log('AddLeavesModal - LOP balance:', balances.lop);
+      console.log('AddLeavesModal - Should show conversion:', balances && balances.lop > 0 && (user?.role === 'hr' || user?.role === 'super_admin'));
+    }
+  }, [isOpen, balances, user?.role]);
 
   // Reset form when modal closes or employee changes
   useEffect(() => {
@@ -140,6 +150,41 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           {balancesLoading ? (
             <div style={{ textAlign: 'center', padding: '20px' }}>Loading balances...</div>
           ) : (
+          <>
+          {/* LOP to Casual Conversion Section - Always available for HR/Super Admin */}
+          {(user?.role === 'hr' || user?.role === 'super_admin') && (
+            <div style={{ 
+              marginBottom: '20px', 
+              padding: '15px', 
+              backgroundColor: '#e3f2fd', 
+              borderRadius: '8px',
+              border: '1px solid #90caf9'
+            }}>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#1976d2' }}>
+                Convert LOP to Casual
+              </h3>
+              <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
+                Current LOP Balance: <strong>{balances?.lop || 0}</strong> days
+                {balances && balances.lop < 0 && (
+                  <span style={{ color: '#f44336', marginLeft: '10px', fontSize: '12px' }}>
+                    (Negative balance)
+                  </span>
+                )}
+                {(!balances || balances.lop <= 0) && (
+                  <span style={{ color: '#ff9800', marginLeft: '10px', fontSize: '12px' }}>
+                    (Conversion allowed - LOP balance may go negative)
+                  </span>
+                )}
+              </p>
+              <ConvertLopToCasualSection 
+                employeeId={employeeId}
+                employeeName={employeeName}
+                currentLopBalance={balances?.lop || 0}
+                currentCasualBalance={balances?.casual || 0}
+                onClose={onClose}
+              />
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
@@ -191,8 +236,161 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
               </button>
             </div>
           </form>
+          </>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Separate component for LOP to Casual conversion
+interface ConvertLopToCasualSectionProps {
+  employeeId: number;
+  employeeName: string;
+  currentLopBalance: number;
+  currentCasualBalance: number;
+  onClose: () => void;
+}
+
+const ConvertLopToCasualSection: React.FC<ConvertLopToCasualSectionProps> = ({
+  employeeId,
+  employeeName,
+  currentLopBalance,
+  currentCasualBalance,
+  onClose
+}) => {
+  const [convertCount, setConvertCount] = useState<string>('');
+  const [validationError, setValidationError] = useState<string>('');
+  const { showSuccess, showError, showWarning } = useToast();
+  const queryClient = useQueryClient();
+
+  const convertMutation = useMutation(
+    (count: number) => employeeService.convertLopToCasual(employeeId, count),
+    {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(['employeeLeaveBalances', employeeId]);
+        queryClient.invalidateQueries('employees');
+        showSuccess(data.message || `${convertCount} LOP leave(s) converted to casual successfully!`);
+        setConvertCount('');
+        setValidationError('');
+        // Optionally close the modal after successful conversion
+        // onClose();
+      },
+      onError: (error: any) => {
+        showError(error.response?.data?.error?.message || 'Failed to convert LOP to casual');
+      }
+    }
+  );
+
+  const handleConvert = () => {
+    const countNum = parseFloat(convertCount);
+    
+    if (isNaN(countNum) || countNum <= 0) {
+      setValidationError('Please enter a valid number greater than 0');
+      return;
+    }
+
+    if (countNum > currentLopBalance) {
+      setValidationError(`Cannot convert ${countNum} LOP leaves. Available LOP balance: ${currentLopBalance}`);
+      return;
+    }
+
+    const newCasualTotal = currentCasualBalance + countNum;
+    if (newCasualTotal > 99) {
+      setValidationError(`Cannot convert ${countNum} LOP leaves. Current casual balance: ${currentCasualBalance}, Maximum limit: 99. Total would be: ${newCasualTotal}`);
+      return;
+    }
+
+    setValidationError('');
+    convertMutation.mutate(countNum);
+  };
+
+  const handleConvertCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const countNum = parseFloat(value);
+    
+    setConvertCount(value);
+    setValidationError('');
+
+    if (!isNaN(countNum) && countNum > 0) {
+      // Allow conversion even if LOP balance is insufficient (will go negative)
+      // Only check casual balance limit
+      const newCasualTotal = currentCasualBalance + countNum;
+      if (newCasualTotal > 99) {
+        setValidationError(`Total casual would exceed 99 (current: ${currentCasualBalance} + ${countNum} = ${newCasualTotal})`);
+      }
+      // Warn if LOP will go negative, but don't block
+      if (countNum > currentLopBalance) {
+        // Just a warning, not an error - conversion is allowed
+        console.warn(`Converting ${countNum} LOP leaves will result in negative LOP balance: ${currentLopBalance - countNum}`);
+      }
+    }
+  };
+
+  // Allow conversion up to 99-day casual limit (no LOP balance restriction)
+  const maxConvertible = 99 - currentCasualBalance;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <label htmlFor="convertCount" style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: '500' }}>
+            Convert Amount <span style={{ color: '#f44336' }}>*</span>
+          </label>
+          <input
+            id="convertCount"
+            type="number"
+            min="0.5"
+            max={maxConvertible}
+            step="0.5"
+            value={convertCount}
+            onChange={handleConvertCountChange}
+            disabled={convertMutation.isLoading}
+            placeholder={`Max: ${maxConvertible}`}
+            style={{
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+          />
+          {validationError && (
+            <div style={{ color: '#f44336', fontSize: '12px', marginTop: '5px' }}>
+              {validationError}
+            </div>
+          )}
+          <small style={{ display: 'block', marginTop: '5px', fontSize: '12px', color: '#666' }}>
+            Maximum: {maxConvertible} days (Limited by 99-day casual limit only)
+            {currentLopBalance <= 0 && (
+              <span style={{ display: 'block', marginTop: '3px', color: '#ff9800' }}>
+                Note: LOP balance will go negative if converted amount exceeds current balance
+              </span>
+            )}
+          </small>
+        </div>
+        <button
+          onClick={handleConvert}
+          disabled={convertMutation.isLoading || !convertCount || parseFloat(convertCount) <= 0 || !!validationError}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#1976d2',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: convertMutation.isLoading || !convertCount || parseFloat(convertCount) <= 0 || !!validationError ? 'not-allowed' : 'pointer',
+            opacity: convertMutation.isLoading || !convertCount || parseFloat(convertCount) <= 0 || !!validationError ? 0.6 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          <FaExchangeAlt />
+          {convertMutation.isLoading ? 'Converting...' : 'Convert'}
+        </button>
       </div>
     </div>
   );

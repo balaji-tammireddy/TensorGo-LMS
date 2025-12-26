@@ -164,3 +164,12 @@ export const updateLeaveStatus = async (
   return response.data;
 };
 
+/**
+ * Convert leave request from LOP to Casual
+ * Only HR and Super Admin can perform this conversion
+ */
+export const convertLeaveRequestLopToCasual = async (requestId: number) => {
+  const response = await api.post(`/leave/request/${requestId}/convert-lop-to-casual`);
+  return response.data;
+};
+

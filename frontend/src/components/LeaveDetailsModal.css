@@ -150,6 +150,48 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+.convert-lop-button {
+  margin-left: 12px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+.convert-lop-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #218838 0%, #1ea080 100%);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+  transform: translateY(-1px);
+}
+
+.convert-lop-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.convert-lop-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+}
+
+.convert-lop-button .loading-spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 .day-type-badge {
   font-size: 12px;
   color: #5a6c7d;
@@ -434,6 +476,19 @@
   background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(229, 57, 53, 0.28);
+}
+
+.leave-details-modal-button-convert {
+  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
+  color: #fff;
+  border: 1px solid #2951c8;
+  box-shadow: 0 6px 14px rgba(60, 111, 242, 0.22);
+}
+
+.leave-details-modal-button-convert:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2951c8 0%, #1e3d8f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
 }
 
 /* Reject Reason Dialog */

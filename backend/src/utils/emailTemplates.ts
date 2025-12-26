@@ -643,6 +643,7 @@ export interface LeaveAllocationEmailData {
   newBalance: number;
   allocatedBy: string;
   allocationDate: string;
+  conversionNote?: string; // Optional note for LOP to casual conversions
 }
 
 const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): string => {
@@ -706,6 +707,12 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
                     <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${allocationDateDisplay}</td>
                   </tr>
                 </table>
+                ${data.conversionNote ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #10b981;">
+                  <p style="margin: 0; color: #059669; font-size: 13px; font-weight: 600;">ℹ️ Conversion Note:</p>
+                  <p style="margin: 5px 0 0 0; color: #047857; font-size: 13px;">${data.conversionNote}</p>
+                </div>
+                ` : ''}
               </div>
               <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
                 Best regards,<br>
@@ -750,6 +757,7 @@ Allocation Details:
 - New Balance: ${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}
 - Allocated By: ${data.allocatedBy}
 - Allocation Date: ${allocationDateDisplay}
+${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}
 
 Best regards,
 TensorGo-LMS

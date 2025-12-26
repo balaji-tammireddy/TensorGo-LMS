@@ -69,3 +69,8 @@ export const getEmployeeLeaveBalances = async (employeeId: number) => {
   return response.data;
 };
 
+export const convertLopToCasual = async (employeeId: number, count: number) => {
+  const response = await api.post(`/employees/${employeeId}/convert-lop-to-casual`, { count });
+  return response.data;
+};
+

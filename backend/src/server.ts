@@ -137,9 +137,9 @@ const scheduleLeaveCreditCheck = () => {
       if (currentHour === 20) {
         // It's 8 PM, check if today is the last working day
         logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
-        checkAndCreditMonthlyLeaves().catch(err => {
-          logger.error('Daily leave credit check failed:', err);
-        });
+      checkAndCreditMonthlyLeaves().catch(err => {
+        logger.error('Daily leave credit check failed:', err);
+      });
       } else {
         logger.warn(`Scheduled check triggered at hour ${currentHour} (not 8 PM). Skipping leave credit.`);
       }
@@ -152,9 +152,9 @@ const scheduleLeaveCreditCheck = () => {
         if (checkHour === 20) {
           // It's 8 PM, check if today is the last working day
           logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
-          checkAndCreditMonthlyLeaves().catch(err => {
-            logger.error('Daily leave credit check failed:', err);
-          });
+        checkAndCreditMonthlyLeaves().catch(err => {
+          logger.error('Daily leave credit check failed:', err);
+        });
         } else {
           logger.warn(`Scheduled check triggered at hour ${checkHour} (not 8 PM). Skipping leave credit.`);
         }

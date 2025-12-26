@@ -20,6 +20,8 @@ router.get('/my-requests', leaveController.getMyRequests);
 router.get('/request/:id', leaveController.getLeaveRequest);
 router.put('/request/:id', validateRequest(updateLeaveSchema), leaveController.updateLeaveRequest);
 router.delete('/request/:id', validateRequest(deleteLeaveSchema), leaveController.deleteLeaveRequest);
+// HR and Super Admin can convert leave request from LOP to Casual
+router.post('/request/:id/convert-lop-to-casual', authorizeRole('hr', 'super_admin'), leaveController.convertLeaveRequestLopToCasual);
 
 // Approval routes (Manager, HR, Super Admin)
 router.get('/pending', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getPendingRequests);

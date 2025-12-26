@@ -137,6 +137,38 @@ const LeaveApprovalPage: React.FC = () => {
     rejectMutation.mutate({ id: requestId, dayIds: selectedDayIds, comment: reason });
   };
 
+  const convertLopToCasualMutation = useMutation(
+    (requestId: number) => leaveService.convertLeaveRequestLopToCasual(requestId),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('pendingLeaves');
+        queryClient.invalidateQueries('approvedLeaves');
+        queryClient.invalidateQueries('leaveBalances');
+        showSuccess('Leave request converted from LOP to Casual successfully!');
+        // Refresh the selected request to show updated leave type
+        if (selectedRequest) {
+          leaveService.getLeaveRequest(selectedRequest.id).then((updatedRequest) => {
+            setSelectedRequest({
+              ...selectedRequest,
+              leaveType: updatedRequest.leaveType
+            });
+          }).catch(() => {
+            // If refresh fails, just close modal
+            setIsModalOpen(false);
+            setSelectedRequest(null);
+          });
+        }
+      },
+      onError: (error: any) => {
+        showError(error.response?.data?.error?.message || 'Failed to convert leave request');
+      }
+    }
+  );
+
+  const handleConvertLopToCasual = (requestId: number) => {
+    convertLopToCasualMutation.mutate(requestId);
+  };
+
 
   const handleViewApprovedLeave = async (requestId: number) => {
     try {
@@ -608,7 +640,9 @@ const LeaveApprovalPage: React.FC = () => {
       onApprove={handleModalApprove}
       onReject={handleModalReject}
       onUpdate={handleUpdateStatus}
+      onConvertLopToCasual={handleConvertLopToCasual}
       isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading}
+      isConverting={convertLopToCasualMutation.isLoading}
       isEditMode={isEditMode}
       userRole={user?.role}
     />

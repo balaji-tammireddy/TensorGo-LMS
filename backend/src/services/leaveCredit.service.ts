@@ -235,11 +235,16 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
 };
 
 /**
- * Process year-end leave balance adjustments
- * - Delete all unused sick leaves (reset to 0)
- * - Cap casual leaves at maximum 8 for carry forward (excess deleted)
- * - Update LOP leaves to 10 at year-end (no carry forward, set to yearly credit of 10)
- * This runs at the end of each calendar year (last working day of December)
+ * Process year-end leave balance adjustments and add January leaves
+ * Step 1: Carry forward leaves
+ *   - Cap casual leaves at maximum 8 for carry forward (excess deleted)
+ *   - Delete all unused sick leaves (reset to 0)
+ *   - Update LOP leaves to 10 at year-end (no carry forward, set to yearly credit of 10)
+ * Step 2: Add January leaves
+ *   - Add 1 casual leave
+ *   - Add 0.5 sick leave
+ * Step 3: Update total in database
+ * This runs at the end of each calendar year (last working day of December at 8 PM)
  */
 export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: number; errors: number }> => {
   const client = await pool.connect();
@@ -268,17 +273,33 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
         const currentSick = parseFloat(employee.current_sick) || 0;
         const currentLop = parseFloat(employee.current_lop) || 0;
         
+        // ============================================
+        // STEP 1: CARRY FORWARD LEAVES
+        // ============================================
         // Cap casual leaves at 8 for carry forward (delete excess)
         const carryForwardCasual = Math.min(currentCasual, 8);
         
         // Reset sick leaves to 0 (all unused sick leaves are deleted)
-        const newSick = 0;
+        const afterCarryForwardSick = 0;
         
         // Set LOP leaves to 10 at year-end (no carry forward, reset to yearly credit of 10)
-        const newLop = 10;
+        const afterCarryForwardLop = 10;
         
-        // Update balances if there are changes
-        if (currentCasual !== carryForwardCasual || currentSick !== newSick || currentLop !== newLop) {
+        // ============================================
+        // STEP 2: ADD JANUARY LEAVES
+        // ============================================
+        // Add January monthly credits: +1 casual, +0.5 sick
+        const finalCasual = carryForwardCasual + 1;
+        const finalSick = afterCarryForwardSick + 0.5;
+        const finalLop = afterCarryForwardLop; // LOP stays at 10
+        
+        // Check if total would exceed 99 limit
+        if (finalCasual > 99) {
+          logger.warn(`Employee ${employee.emp_id} (${employee.name}) would exceed 99 casual leave limit after year-end. Current: ${currentCasual}, After carry forward: ${carryForwardCasual}, Final: ${finalCasual}. Skipping January credit.`);
+          // Still update with carry forward only
+          const finalCasualLimited = carryForwardCasual;
+          const finalSickLimited = afterCarryForwardSick;
+          
           if (employee.balance_id) {
             await client.query(
               `UPDATE leave_balances 
@@ -287,26 +308,85 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
                    lop_balance = $3,
                    last_updated = CURRENT_TIMESTAMP
                WHERE employee_id = $4`,
-              [carryForwardCasual, newSick, newLop, employee.id]
+              [finalCasualLimited, finalSickLimited, finalLop, employee.id]
             );
-            
-            const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
-            logger.info(
-              `Year-end adjustment for employee ${employee.emp_id} (${employee.name}): ` +
-              `Casual: ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
-              `Sick: ${currentSick} → 0 (all deleted), ` +
-              `LOP: ${currentLop} → 10 (updated to yearly credit of 10, no carry forward)`
+          } else {
+            await client.query(
+              `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance)
+               VALUES ($1, $2, $3, $4)`,
+              [employee.id, finalCasualLimited, finalSickLimited, finalLop]
+            );
+          }
+          
+          const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
+          logger.info(
+            `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
+            `Carry forward: Casual ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
+            `Sick ${currentSick} → 0 (all deleted), LOP ${currentLop} → 10. ` +
+            `January credit skipped (would exceed limit). Final: Casual ${finalCasualLimited}, Sick ${finalSickLimited}, LOP ${finalLop}`
+          );
+        } else if (finalSick > 99) {
+          logger.warn(`Employee ${employee.emp_id} (${employee.name}) would exceed 99 sick leave limit after year-end. Skipping January credit.`);
+          // Still update with carry forward only
+          const finalCasualLimited = carryForwardCasual;
+          const finalSickLimited = afterCarryForwardSick;
+          
+          if (employee.balance_id) {
+            await client.query(
+              `UPDATE leave_balances 
+               SET casual_balance = $1,
+                   sick_balance = $2,
+                   lop_balance = $3,
+                   last_updated = CURRENT_TIMESTAMP
+               WHERE employee_id = $4`,
+              [finalCasualLimited, finalSickLimited, finalLop, employee.id]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance)
+               VALUES ($1, $2, $3, $4)`,
+              [employee.id, finalCasualLimited, finalSickLimited, finalLop]
+            );
+          }
+          
+          const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
+          logger.info(
+            `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
+            `Carry forward: Casual ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
+            `Sick ${currentSick} → 0 (all deleted), LOP ${currentLop} → 10. ` +
+            `January credit skipped (would exceed limit). Final: Casual ${finalCasualLimited}, Sick ${finalSickLimited}, LOP ${finalLop}`
+          );
+        } else {
+          // ============================================
+          // STEP 3: UPDATE TOTAL IN DATABASE
+          // ============================================
+          if (employee.balance_id) {
+            await client.query(
+              `UPDATE leave_balances 
+               SET casual_balance = $1,
+                   sick_balance = $2,
+                   lop_balance = $3,
+                   last_updated = CURRENT_TIMESTAMP
+               WHERE employee_id = $4`,
+              [finalCasual, finalSick, finalLop, employee.id]
             );
           } else {
             // Create balance record if it doesn't exist
             await client.query(
               `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance)
                VALUES ($1, $2, $3, $4)`,
-              [employee.id, carryForwardCasual, newSick, newLop]
+              [employee.id, finalCasual, finalSick, finalLop]
             );
           }
           
-          adjusted++;
+          const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
+          logger.info(
+            `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
+            `Step 1 - Carry forward: Casual ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
+            `Sick ${currentSick} → 0 (all deleted), LOP ${currentLop} → 10. ` +
+            `Step 2 - January credit: +1 casual, +0.5 sick. ` +
+            `Step 3 - Final total: Casual ${finalCasual}, Sick ${finalSick}, LOP ${finalLop}`
+          );
         }
         
         // Send carry forward email notification to ALL employees (even if no changes)
@@ -326,6 +406,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           // Sick leaves are not carried forward (reset to 0)
           // LOP is not carried forward (set to 10, not from previous year)
           
+          // Use final balances (after carry forward + January credits) for email
           await sendLeaveCarryForwardEmail(employee.email, {
             employeeName: employee.name,
             employeeEmpId: employee.emp_id,
@@ -333,9 +414,9 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
             newYear,
             carriedForwardLeaves,
             newYearBalances: {
-              casual: carryForwardCasual,
-              sick: newSick,
-              lop: newLop
+              casual: finalCasual > 99 ? carryForwardCasual : finalCasual,
+              sick: finalSick > 99 ? afterCarryForwardSick : finalSick,
+              lop: finalLop
             }
           });
           
@@ -344,6 +425,8 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           logger.error(`Failed to send carry forward email to ${employee.email}:`, emailError);
           // Don't fail the entire process if email fails
         }
+        
+        adjusted++;
       } catch (error: any) {
         errors++;
         logger.error(`Failed to adjust year-end leaves for employee ${employee.emp_id}:`, error);
@@ -352,7 +435,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
 
     await client.query('COMMIT');
     if (adjusted > 0) {
-      logger.info(`Year-end leave adjustments completed. Adjusted: ${adjusted}, Errors: ${errors}`);
+      logger.info(`Year-end leave adjustments completed (carry forward + January credits). Adjusted: ${adjusted}, Errors: ${errors}`);
     }
     
     return { adjusted, errors };
@@ -491,10 +574,37 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
     // Check for 3-year and 5-year anniversaries first (runs daily at 8 PM)
     await creditAnniversaryLeaves();
 
-    // Check for monthly leave credit (only on last working day of current month)
-    // On last working day of month N, credit leaves for month N+1
-    // This should run BEFORE year-end adjustments so December credits are included
-    if (isLastWorkingDayOfMonth()) {
+    // Check for year-end adjustments (last working day of December)
+    // This runs FIRST and includes: Step 1 - Carry forward, Step 2 - January credits, Step 3 - Update total
+    if (isYearEnd()) {
+      logger.info('Last working day of December detected. Processing year-end adjustments (carry forward + January credits)...');
+      
+      // Check if adjustments were already processed today at 8 PM
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const checkResult = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM leave_balances lb
+         INNER JOIN users u ON lb.employee_id = u.id
+         WHERE DATE(lb.last_updated) = $1 
+           AND EXTRACT(HOUR FROM lb.last_updated) >= 19
+           AND u.status = 'active'
+           AND u.role IN ('employee', 'manager', 'hr')
+           AND lb.sick_balance >= 0.5`, // Check for January credit (sick should be 0.5 after year-end)
+        [todayStr]
+      );
+
+      // If any active employees have been updated today after 7:30 PM with January credits, assume already processed
+      if (parseInt(checkResult.rows[0].count) >= 1) {
+        logger.info(`Year-end adjustments (carry forward + January credits) appear to have been processed today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double processing.`);
+      } else {
+        logger.info('Proceeding with year-end leave adjustments (carry forward + January credits)...');
+        const result = await processYearEndLeaveAdjustments();
+        logger.info(`Year-end adjustments completed: ${result.adjusted} employees adjusted (carry forward + January credits), ${result.errors} errors`);
+      }
+    } else if (isLastWorkingDayOfMonth()) {
+      // Regular monthly credit (for months other than December)
+      // On last working day of month N, credit leaves for month N+1
       const today = new Date();
       const currentMonth = today.getMonth() + 1; // 1-indexed
       const currentYear = today.getFullYear();
@@ -531,42 +641,13 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
       // This ensures we don't credit multiple times even if the function is called multiple times
       if (parseInt(checkResult.rows[0].count) >= 1) {
         logger.info(`Leaves for ${nextMonth}/${nextYear} already credited today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double credit.`);
-        return;
+      } else {
+        logger.info(`Proceeding with monthly leave credit for ${nextMonth}/${nextYear}...`);
+        const result = await creditMonthlyLeaves();
+        logger.info(`Monthly leave credit for ${nextMonth}/${nextYear} completed: ${result.credited} employees credited, ${result.errors} errors`);
       }
-
-      logger.info(`Proceeding with monthly leave credit for ${nextMonth}/${nextYear}...`);
-      const result = await creditMonthlyLeaves();
-      logger.info(`Monthly leave credit for ${nextMonth}/${nextYear} completed: ${result.credited} employees credited, ${result.errors} errors`);
     } else {
       logger.debug('Not the last working day of the month. Skipping monthly leave credit.');
-    }
-
-    // Check for year-end adjustments (last working day of December)
-    // This should run AFTER monthly credits for December are applied
-    if (isYearEnd()) {
-      logger.info('Last working day of December detected. Processing year-end leave adjustments...');
-      
-      // Check if adjustments were already processed today
-      const today = new Date().toISOString().split('T')[0];
-      const checkResult = await pool.query(
-        `SELECT COUNT(*) as count 
-         FROM leave_balances lb
-         INNER JOIN users u ON lb.employee_id = u.id
-         WHERE DATE(lb.last_updated) = $1 
-           AND u.status = 'active'
-           AND u.role IN ('employee', 'manager', 'hr')
-           AND lb.sick_balance = 0`, // Check for sick_balance reset to 0
-        [today]
-      );
-
-      // If any active employees have sick balance = 0 updated today, assume already processed
-      if (parseInt(checkResult.rows[0].count) >= 1) {
-        logger.info(`Year-end adjustments appear to have been processed today (${checkResult.rows[0].count} active employees updated). Skipping to avoid double processing.`);
-      } else {
-        logger.info('Proceeding with year-end leave adjustments...');
-        const result = await processYearEndLeaveAdjustments();
-        logger.info(`Year-end adjustments completed: ${result.adjusted} employees adjusted, ${result.errors} errors`);
-      }
     }
   } catch (error: any) {
     logger.error('Error in checkAndCreditMonthlyLeaves:', error);

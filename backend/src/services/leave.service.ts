@@ -46,30 +46,35 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
 };
 
 export const getHolidays = async (year?: number) => {
-  let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
-  const params: any[] = [];
-  
-  // Ensure year is a valid number if provided
-  if (year !== undefined && year !== null && !isNaN(year)) {
-    const yearNum = parseInt(String(year), 10);
-    query += ' AND EXTRACT(YEAR FROM holiday_date) = $1';
-    params.push(yearNum);
-    logger.info(`Fetching holidays for year: ${yearNum}`);
-  } else {
-    logger.info('Fetching all active holidays (no year filter)');
+  try {
+    let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
+    const params: any[] = [];
+    
+    // Ensure year is a valid number if provided
+    if (year !== undefined && year !== null && !isNaN(year)) {
+      const yearNum = parseInt(String(year), 10);
+      query += ' AND EXTRACT(YEAR FROM holiday_date) = $1';
+      params.push(yearNum);
+      logger.info(`Fetching holidays for year: ${yearNum}`);
+    } else {
+      logger.info('Fetching all active holidays (no year filter)');
+    }
+    
+    query += ' ORDER BY holiday_date';
+    
+    const result = await pool.query(query, params);
+    
+    // Log for debugging
+    logger.info(`Fetched ${result.rows.length} holidays${year ? ` for year ${year}` : ''}`);
+    
+    return result.rows.map(row => ({
+      date: formatDate(row.holiday_date),
+      name: row.holiday_name
+    }));
+  } catch (error: any) {
+    logger.error('Error fetching holidays:', error);
+    throw new Error(`Failed to fetch holidays: ${error.message || error.toString()}`);
   }
-  
-  query += ' ORDER BY holiday_date';
-  
-  const result = await pool.query(query, params);
-  
-  // Log for debugging
-  logger.info(`Fetched ${result.rows.length} holidays${year ? ` for year ${year}` : ''}`);
-  
-  return result.rows.map(row => ({
-    date: formatDate(row.holiday_date),
-    name: row.holiday_name
-  }));
 };
 
 /**
@@ -81,15 +86,20 @@ export const getHolidays = async (year?: number) => {
  * in the database by authorized administrators only.
  */
 export const getLeaveRules = async () => {
-  const result = await pool.query(
-    'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
-  );
-  return result.rows.map(row => ({
-    leaveRequired: row.leave_required_max 
-      ? `${row.leave_required_min} to ${row.leave_required_max} days`
-      : `More Than ${row.leave_required_min} days`,
-    priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
-  }));
+  try {
+    const result = await pool.query(
+      'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
+    );
+    return result.rows.map(row => ({
+      leaveRequired: row.leave_required_max 
+        ? `${row.leave_required_min} to ${row.leave_required_max} days`
+        : `More Than ${row.leave_required_min} days`,
+      priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
+    }));
+  } catch (error: any) {
+    logger.error('Error fetching leave rules:', error);
+    throw new Error(`Failed to fetch leave rules: ${error.message || error.toString()}`);
+  }
 };
 
 export const applyLeave = async (
@@ -494,18 +504,19 @@ export const getMyLeaveRequests = async (
   status?: string,
   userRole?: string
 ) => {
-  const offset = (page - 1) * limit;
-  let query = `
-    SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
-           lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
-           lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-           lr.last_updated_by, lr.last_updated_by_role,
-           last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
-    FROM leave_requests lr
-    LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
-    WHERE lr.employee_id = $1
-  `;
-  const params: any[] = [userId];
+  try {
+    const offset = (page - 1) * limit;
+    let query = `
+      SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
+             lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
+             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+             lr.last_updated_by, lr.last_updated_by_role,
+             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+      FROM leave_requests lr
+      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+      WHERE lr.employee_id = $1
+    `;
+    const params: any[] = [userId];
   
   if (status) {
     query += ' AND current_status = $2';
@@ -607,14 +618,18 @@ export const getMyLeaveRequests = async (
     });
   }
 
-  return {
-    requests,
-    pagination: {
-      page,
-      limit,
-      total: parseInt(countResult.rows[0].count)
-    }
-  };
+    return {
+      requests,
+      pagination: {
+        page,
+        limit,
+        total: parseInt(countResult.rows[0].count)
+      }
+    };
+  } catch (error: any) {
+    logger.error('Error fetching my leave requests:', error);
+    throw new Error(`Failed to fetch leave requests: ${error.message || error.toString()}`);
+  }
 };
 
 export const getLeaveRequestById = async (requestId: number, userId: number, userRole?: string) => {
@@ -996,6 +1011,147 @@ export const updateLeaveRequest = async (
     throw error;
   } finally {
     // Always release the client connection
+    client.release();
+  }
+};
+
+/**
+ * Convert leave request from LOP to Casual
+ * Only HR and Super Admin can perform this conversion
+ * This will:
+ * 1. Change leave_type from 'lop' to 'casual'
+ * 2. Refund LOP balance (add back the days)
+ * 3. Deduct casual balance (if sufficient)
+ */
+export const convertLeaveRequestLopToCasual = async (
+  requestId: number,
+  userId: number,
+  userRole: string
+) => {
+  // Only HR and Super Admin can convert leave types
+  if (userRole !== 'hr' && userRole !== 'super_admin') {
+    throw new Error('Only HR and Super Admin can convert leave types');
+  }
+
+  // Get leave request details
+  const leaveResult = await pool.query(
+    `SELECT lr.id, lr.employee_id, lr.leave_type, lr.no_of_days, lr.current_status,
+            u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+            u.email as employee_email
+     FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     WHERE lr.id = $1`,
+    [requestId]
+  );
+
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+
+  const leave = leaveResult.rows[0];
+
+  // Only allow conversion from LOP to Casual
+  if (leave.leave_type !== 'lop') {
+    throw new Error('Can only convert LOP leave requests to Casual. Current leave type is not LOP.');
+  }
+
+  const employeeId = leave.employee_id;
+  const noOfDays = parseFloat(leave.no_of_days) || 0;
+
+  if (noOfDays <= 0) {
+    throw new Error('Invalid number of days in leave request');
+  }
+
+  // Get current balances
+  const balanceResult = await pool.query(
+    'SELECT casual_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
+    [employeeId]
+  );
+
+  let currentCasual = 0;
+  let currentLop = 0;
+
+  if (balanceResult.rows.length === 0) {
+    // Create balance record if it doesn't exist
+    await pool.query(
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 0)',
+      [employeeId]
+    );
+  } else {
+    currentCasual = parseFloat(balanceResult.rows[0].casual_balance || '0') || 0;
+    currentLop = parseFloat(balanceResult.rows[0].lop_balance || '0') || 0;
+  }
+
+  // Check if casual balance is sufficient after conversion
+  // When converting: refund LOP (add back), deduct Casual (subtract)
+  const newLopBalance = currentLop + noOfDays; // Refund LOP
+  const newCasualBalance = currentCasual - noOfDays; // Deduct Casual
+
+  // Check if casual balance would go negative
+  if (newCasualBalance < 0) {
+    throw new Error(`Insufficient casual balance. Current: ${currentCasual}, Required: ${noOfDays}`);
+  }
+
+  // Check if casual balance would exceed 99 days (shouldn't happen since we're deducting, but check anyway)
+  if (newCasualBalance > 99) {
+    throw new Error(`Cannot convert. Casual balance would exceed 99 days. Current: ${currentCasual}, After conversion: ${newCasualBalance}`);
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Update leave_type from LOP to Casual
+    await client.query(
+      `UPDATE leave_requests 
+       SET leave_type = 'casual',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [requestId]
+    );
+
+    // Update leave_days to reflect new leave type
+    await client.query(
+      `UPDATE leave_days 
+       SET leave_type = 'casual'
+       WHERE leave_request_id = $1`,
+      [requestId]
+    );
+
+    // Adjust balances:
+    // Refund LOP (add back the days that were deducted when leave was applied)
+    // Deduct Casual (subtract the days)
+    await client.query(
+      `UPDATE leave_balances 
+       SET lop_balance = $1,
+           casual_balance = $2,
+           last_updated = CURRENT_TIMESTAMP,
+           updated_by = $3
+       WHERE employee_id = $4`,
+      [newLopBalance, newCasualBalance, userId, employeeId]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info(
+      `Leave request ${requestId} converted from LOP to Casual by ${userRole} (user ${userId}). ` +
+      `Employee: ${leave.employee_name}, Days: ${noOfDays}. ` +
+      `Balances: LOP ${currentLop} → ${newLopBalance} (refunded), Casual ${currentCasual} → ${newCasualBalance} (deducted)`
+    );
+
+    return {
+      message: `Leave request converted from LOP to Casual successfully`,
+      previousLop: currentLop,
+      newLop: newLopBalance,
+      previousCasual: currentCasual,
+      newCasual: newCasualBalance
+    };
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    logger.error(`Failed to convert leave request ${requestId} from LOP to Casual:`, error);
+    throw error;
+  } finally {
     client.release();
   }
 };

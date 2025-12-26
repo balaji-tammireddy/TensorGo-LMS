@@ -288,3 +288,117 @@ export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) =>
   }
 };
 
+/**
+ * Convert LOP leaves to casual leaves
+ * Only HR and Super Admin can perform this conversion
+ * Conversion is only allowed if employee has LOP balance
+ */
+export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
+  try {
+    // Ensure only HR and super_admin can convert LOP to casual
+    if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only HR and Super Admin can convert LOP to casual leaves'
+        }
+      });
+    }
+
+    const employeeId = parseInt(req.params.id);
+    if (isNaN(employeeId)) {
+      return res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Invalid employee ID'
+        }
+      });
+    }
+
+    const { count } = req.body;
+
+    if (!count || count <= 0) {
+      return res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Count is required and must be greater than 0'
+        }
+      });
+    }
+
+    // Prevent Super Admin from converting leaves for themselves
+    if (req.user?.role === 'super_admin' && req.user?.id === employeeId) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Super Admin cannot convert leaves for themselves'
+        }
+      });
+    }
+
+    // HR cannot convert leaves for themselves or super_admin users
+    if (req.user?.role === 'hr') {
+      // Check if employee exists and get their role
+      const employeeCheckResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
+      if (employeeCheckResult.rows.length === 0) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Employee not found'
+          }
+        });
+      }
+
+      const employeeRole = employeeCheckResult.rows[0].role;
+      if (employeeRole === 'super_admin') {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'HR cannot convert leaves for Super Admin users'
+          }
+        });
+      }
+
+      if (employeeId === req.user.id) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'HR cannot convert leaves for themselves'
+          }
+        });
+      }
+    }
+
+    const result = await employeeService.convertLopToCasual(
+      employeeId,
+      parseFloat(count),
+      req.user!.id
+    );
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error: any) {
+    // Check if it's a validation error (400) or server error (500)
+    const isValidationError = error.message && (
+      error.message.includes('not found') ||
+      error.message.includes('required') ||
+      error.message.includes('Invalid') ||
+      error.message.includes('Insufficient') ||
+      error.message.includes('Cannot convert') ||
+      error.message.includes('no LOP balance')
+    );
+    
+    const statusCode = isValidationError ? 400 : 500;
+    const errorCode = isValidationError ? 'BAD_REQUEST' : 'SERVER_ERROR';
+    
+    res.status(statusCode).json({
+      error: {
+        code: errorCode,
+        message: error.message || 'An error occurred while converting LOP to casual leaves'
+      }
+    });
+  }
+};
+

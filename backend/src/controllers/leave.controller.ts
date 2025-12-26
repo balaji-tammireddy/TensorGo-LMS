@@ -383,3 +383,59 @@ export const deleteLeaveRequest = async (req: AuthRequest, res: Response) => {
   }
 };
 
+/**
+ * Convert leave request from LOP to Casual
+ * Only HR and Super Admin can perform this conversion
+ */
+export const convertLeaveRequestLopToCasual = async (req: AuthRequest, res: Response) => {
+  try {
+    // Ensure only HR and super_admin can convert leave types
+    if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only HR and Super Admin can convert leave types'
+        }
+      });
+    }
+
+    const requestId = parseInt(req.params.id);
+    if (isNaN(requestId)) {
+      return res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Invalid leave request ID'
+        }
+      });
+    }
+
+    const result = await leaveService.convertLeaveRequestLopToCasual(
+      requestId,
+      req.user!.id,
+      req.user!.role
+    );
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error: any) {
+    const isValidationError = error.message && (
+      error.message.includes('not found') ||
+      error.message.includes('not LOP') ||
+      error.message.includes('Insufficient') ||
+      error.message.includes('exceed')
+    );
+    
+    const statusCode = isValidationError ? 400 : 500;
+    const errorCode = isValidationError ? 'BAD_REQUEST' : 'SERVER_ERROR';
+    
+    res.status(statusCode).json({
+      error: {
+        code: errorCode,
+        message: error.message || 'An error occurred while converting leave request'
+      }
+    });
+  }
+};
+

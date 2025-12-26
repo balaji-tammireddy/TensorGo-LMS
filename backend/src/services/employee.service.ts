@@ -750,3 +750,133 @@ export const getEmployeeLeaveBalances = async (employeeId: number) => {
   };
 };
 
+/**
+ * Convert LOP leaves to casual leaves
+ * Only allowed if employee has LOP balance
+ * @param employeeId Employee ID
+ * @param count Number of LOP leaves to convert
+ * @param updatedBy User ID who is performing the conversion
+ * @returns Success message
+ */
+export const convertLopToCasual = async (
+  employeeId: number,
+  count: number,
+  updatedBy: number
+) => {
+  // Validate count
+  if (count <= 0) {
+    throw new Error('Conversion count must be greater than 0');
+  }
+
+  // Check if employee exists
+  const employeeCheck = await pool.query('SELECT id FROM users WHERE id = $1', [employeeId]);
+  if (employeeCheck.rows.length === 0) {
+    throw new Error('Employee not found');
+  }
+
+  // Get current leave balances
+  const balanceCheck = await pool.query(
+    'SELECT id, casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
+    [employeeId]
+  );
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Get or create balance record
+    let currentLop = 0;
+    let currentCasual = 0;
+
+    if (balanceCheck.rows.length === 0) {
+      // No balance record exists, create one with default values
+      await client.query(
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
+         VALUES ($1, 0, 0, 0, $2)`,
+        [employeeId, updatedBy]
+      );
+      currentLop = 0;
+      currentCasual = 0;
+    } else {
+      currentLop = parseFloat(balanceCheck.rows[0].lop_balance || '0') || 0;
+      currentCasual = parseFloat(balanceCheck.rows[0].casual_balance || '0') || 0;
+    }
+
+    // Validate parsed values
+    if (isNaN(currentLop) || isNaN(currentCasual)) {
+      throw new Error('Invalid leave balance data. Please contact administrator.');
+    }
+
+    // Allow conversion even if LOP balance is 0 or negative
+    // If LOP balance is insufficient, it will go negative (allowed)
+    // Calculate new balances (allow negative LOP)
+    const newLop = currentLop - count;
+    const newCasual = currentCasual + count;
+
+    // Check if casual balance would exceed maximum limit
+    if (newCasual > 99) {
+      throw new Error(`Cannot convert ${count} LOP leaves. Current casual balance: ${currentCasual}, Maximum limit: 99. Total would be: ${newCasual}`);
+    }
+
+    // Update balances
+    await client.query(
+      `UPDATE leave_balances 
+       SET casual_balance = $1,
+           lop_balance = $2,
+           last_updated = CURRENT_TIMESTAMP,
+           updated_by = $3
+       WHERE employee_id = $4`,
+      [newCasual, newLop, updatedBy, employeeId]
+    );
+
+    await client.query('COMMIT');
+
+    // Send email notification to employee
+    try {
+      const { sendLeaveAllocationEmail } = await import('../utils/emailTemplates');
+      const employeeResult = await pool.query(
+        `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name, u.emp_id,
+                approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+         FROM users u
+         LEFT JOIN users approver ON approver.id = $1
+         WHERE u.id = $2`,
+        [updatedBy, employeeId]
+      );
+
+      if (employeeResult.rows.length > 0) {
+        const employee = employeeResult.rows[0];
+
+        await sendLeaveAllocationEmail(employee.email, {
+          employeeName: employee.employee_name || 'Employee',
+          employeeEmpId: employee.emp_id || '',
+          leaveType: 'casual',
+          allocatedDays: count,
+          previousBalance: currentCasual,
+          newBalance: newCasual,
+          allocatedBy: employee.approver_name || 'HR/Admin',
+          allocationDate: new Date().toISOString().split('T')[0],
+          conversionNote: `${count} LOP leave(s) converted to casual leave(s). LOP balance: ${currentLop} → ${newLop}`
+        });
+        logger.info(`✅ LOP to casual conversion email sent to employee: ${employee.email}`);
+      }
+    } catch (emailError: any) {
+      // Log error but don't fail conversion
+      logger.error(`❌ Error sending conversion email:`, emailError);
+    }
+
+    return { 
+      message: `${count} LOP leave(s) converted to casual leave(s) successfully`,
+      previousLop: currentLop,
+      newLop: newLop,
+      previousCasual: currentCasual,
+      newCasual: newCasual
+    };
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    throw new Error(error.message || 'Failed to convert LOP to casual');
+  } finally {
+    client.release();
+  }
+};
+
