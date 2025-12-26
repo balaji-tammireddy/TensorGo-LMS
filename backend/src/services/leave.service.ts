@@ -2,6 +2,7 @@ import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
+import { sendLeaveApplicationEmail } from '../utils/emailTemplates';
 
 // Local date formatter to avoid timezone shifts
 const formatDate = (date: Date | string): string => {
@@ -137,12 +138,13 @@ export const applyLeave = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Cannot apply for past dates; today is allowed for sick and LOP
-    if (leaveData.leaveType === 'sick' || leaveData.leaveType === 'lop') {
+    // Validation: Cannot apply for past dates; today is allowed for sick, LOP, and permission
+    if (leaveData.leaveType === 'sick' || leaveData.leaveType === 'lop' || leaveData.leaveType === 'permission') {
       if (startDate < today) {
         throw new Error('Cannot apply for past dates.');
       }
     } else {
+      // Casual leaves cannot be applied for today or past dates
       if (startDate <= today) {
         throw new Error('Cannot apply for past dates or today.');
       }
@@ -388,6 +390,79 @@ export const applyLeave = async (
     } finally {
       // Always release the client connection
       client.release();
+    }
+
+    // Send email notifications after successful leave application
+    // Get applied date for email (format as YYYY-MM-DD)
+    const appliedDateResult = await pool.query(
+      'SELECT applied_date FROM leave_requests WHERE id = $1',
+      [leaveRequestId]
+    );
+    let appliedDate: string;
+    if (appliedDateResult.rows[0]?.applied_date) {
+      const appliedDateValue = appliedDateResult.rows[0].applied_date;
+      if (appliedDateValue instanceof Date) {
+        appliedDate = appliedDateValue.toISOString().split('T')[0];
+      } else if (typeof appliedDateValue === 'string') {
+        appliedDate = appliedDateValue.split('T')[0];
+      } else {
+        appliedDate = new Date(appliedDateValue).toISOString().split('T')[0];
+      }
+    } else {
+      appliedDate = new Date().toISOString().split('T')[0];
+    }
+
+    // Prepare email data
+    const emailData = {
+      employeeName,
+      employeeEmpId,
+      managerName: managerName || 'Manager',
+      leaveType: leaveData.leaveType,
+      startDate: startDateStr,
+      startType: leaveData.startType,
+      endDate: endDateStr,
+      endType: leaveData.endType,
+      noOfDays: days,
+      reason: leaveData.reason,
+      timeForPermissionStart: leaveData.timeForPermission?.start || null,
+      timeForPermissionEnd: leaveData.timeForPermission?.end || null,
+      doctorNote: leaveData.doctorNote || null,
+      appliedDate: appliedDate
+    };
+
+    // Send email to reporting manager (if exists and has email)
+    if (managerEmail && reportingManagerId) {
+      try {
+        const emailSent = await sendLeaveApplicationEmail(managerEmail, emailData);
+        if (emailSent) {
+          logger.info(`Leave application email sent to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+        }
+      } catch (emailError: any) {
+        // Don't fail the leave application if email fails
+        logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
+      }
+    }
+
+    // Send email to manager's reporting manager (if exists and has email)
+    if (hrEmail && hrId && managerEmail !== hrEmail) {
+      try {
+        // Update manager name for the second email
+        const hrEmailData = {
+          ...emailData,
+          managerName: hrName || 'Manager'
+        };
+        const emailSent = await sendLeaveApplicationEmail(hrEmail, hrEmailData);
+        if (emailSent) {
+          logger.info(`Leave application email sent to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
+        } else {
+          logger.warn(`Failed to send leave application email to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
+        }
+      } catch (emailError: any) {
+        // Don't fail the leave application if email fails
+        logger.error(`Error sending email to manager's reporting manager for leave request ${leaveRequestId}:`, emailError);
+      }
     }
 
     return { leaveRequestId, message: 'Leave request submitted successfully' };
