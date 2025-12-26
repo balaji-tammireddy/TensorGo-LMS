@@ -25,21 +25,18 @@ export interface LeaveBalance {
 }
 
 export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> => {
-  // Default casual leave balance is 12 for all roles
-  const defaultCasual = 12;
-
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [userId]
   );
 
   if (result.rows.length === 0) {
-    // Initialize balance if not exists
+    // Initialize balance if not exists (casual and sick start at 0, only LOP has default)
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, 6, 10)',
-      [userId, defaultCasual]
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
+      [userId]
     );
-    return { casual: defaultCasual, sick: 6, lop: 10 };
+    return { casual: 0, sick: 0, lop: 10 };
   }
 
   const balance = result.rows[0];

@@ -252,11 +252,10 @@ export const createEmployee = async (employeeData: any) => {
 
   const userId = result.rows[0].id;
 
-  // Initialize leave balance (casual = 12 for all roles)
-  const initialCasual = 12;
+  // Initialize leave balance (casual and sick start at 0, only LOP has default)
   await pool.query(
-    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, 6, 10)',
-    [userId, initialCasual]
+    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
+    [userId]
   );
 
   // Insert education if provided
