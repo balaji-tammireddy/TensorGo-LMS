@@ -30,3 +30,33 @@ export const logout = async (): Promise<void> => {
   localStorage.removeItem('refreshToken');
 };
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface VerifyOTPRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
+
+export const forgotPassword = async (data: ForgotPasswordRequest): Promise<{ message: string }> => {
+  const response = await api.post('/auth/forgot-password', data);
+  return response.data;
+};
+
+export const verifyOTP = async (data: VerifyOTPRequest): Promise<{ message: string }> => {
+  const response = await api.post('/auth/verify-otp', data);
+  return response.data;
+};
+
+export const resetPassword = async (data: ResetPasswordRequest): Promise<{ message: string }> => {
+  const response = await api.post('/auth/reset-password', data);
+  return response.data;
+};
+

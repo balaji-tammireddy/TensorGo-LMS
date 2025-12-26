@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
 import { validateRequest } from '../middleware/validate.middleware';
-import { loginSchema, refreshTokenSchema, changePasswordSchema } from '../validations/auth.schema';
+import { 
+  loginSchema, 
+  refreshTokenSchema, 
+  changePasswordSchema,
+  forgotPasswordSchema,
+  verifyOTPSchema,
+  resetPasswordSchema
+} from '../validations/auth.schema';
 import { authenticateToken } from '../middleware/auth.middleware';
 import rateLimit from 'express-rate-limit';
 
@@ -16,6 +23,32 @@ router.post(
   authenticateToken,
   validateRequest(changePasswordSchema),
   authController.changePassword
+);
+
+// Forgot password routes (with rate limiting)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // 3 requests per 15 minutes
+  message: 'Too many password reset requests. Please try again later.'
+});
+
+router.post(
+  '/forgot-password',
+  forgotPasswordLimiter,
+  validateRequest(forgotPasswordSchema),
+  authController.forgotPassword
+);
+
+router.post(
+  '/verify-otp',
+  validateRequest(verifyOTPSchema),
+  authController.verifyOTP
+);
+
+router.post(
+  '/reset-password',
+  validateRequest(resetPasswordSchema),
+  authController.resetPassword
 );
 
 export default router;

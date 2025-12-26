@@ -82,3 +82,63 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const forgotPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { email } = req.body;
+    await authService.requestPasswordReset(email);
+
+    // Always return success to prevent email enumeration
+    res.json({ 
+      message: 'If the email exists, an OTP has been sent to your registered email address.' 
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      error: {
+        code: 'FORGOT_PASSWORD_FAILED',
+        message: error.message || 'Failed to send password reset OTP'
+      }
+    });
+  }
+};
+
+export const verifyOTP = async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, otp } = req.body;
+    const isValid = await authService.verifyPasswordResetOTP(email, otp);
+
+    if (!isValid) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_OTP',
+          message: 'Invalid or expired OTP'
+        }
+      });
+    }
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'VERIFY_OTP_FAILED',
+        message: error.message || 'Failed to verify OTP'
+      }
+    });
+  }
+};
+
+export const resetPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    await authService.resetPasswordWithOTP(email, otp, newPassword);
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error: any) {
+    res.status(400).json({
+      error: {
+        code: 'RESET_PASSWORD_FAILED',
+        message: error.message || 'Failed to reset password'
+      }
+    });
+  }
+};
+

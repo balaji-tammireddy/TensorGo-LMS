@@ -88,6 +88,21 @@ async function migrate() {
     `);
     console.log(`Updated ${updateResult.rowCount} employee leave balance records (casual and sick set to 0)`);
     
+    // Run password reset OTP migration
+    try {
+      const otpMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '002_add_password_reset_otp.sql'),
+        'utf-8'
+      );
+      await pool.query(otpMigrationFile);
+      console.log('Password reset OTP table migration completed');
+    } catch (otpError: any) {
+      // If table already exists, that's fine
+      if (!otpError.message.includes('already exists')) {
+        console.warn('OTP migration warning:', otpError.message);
+      }
+    }
+    
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);
