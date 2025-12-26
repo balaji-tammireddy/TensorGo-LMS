@@ -1,9 +1,6 @@
 import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { sendEmail } from '../utils/email';
-import { generateLeaveApplicationEmail, generateLeaveStatusEmail } from '../utils/emailTemplates';
-import { scheduleLeaveStatusEmail, cancelScheduledEmail } from '../utils/delayedEmail';
 import { logger } from '../utils/logger';
 
 // Local date formatter to avoid timezone shifts
@@ -394,156 +391,6 @@ export const applyLeave = async (
     } finally {
       // Always release the client connection
       client.release();
-    }
-
-    // Prepare base email data
-    const baseEmailData = {
-      employeeName,
-      employeeEmpId,
-      leaveType: leaveData.leaveType,
-      startDate: startDateStr,
-      endDate: endDateStr,
-      reason: leaveData.reason,
-      noOfDays: days,
-      startType: leaveData.startType,
-      endType: leaveData.endType,
-      timeForPermission: leaveData.timeForPermission,
-    };
-
-    // Send emails based on employee role
-    if (employeeRole === 'employee') {
-      // Employee applies: send to manager and manager's HR
-      
-      // Send email notification to reporting manager (skip if manager is super_admin)
-      if (reportingManagerId && managerEmail && managerRole !== 'super_admin') {
-        try {
-          const emailData = {
-            ...baseEmailData,
-            recipientName: managerName || undefined,
-          };
-          const emailContent = generateLeaveApplicationEmail(emailData);
-          
-          const emailSent = await sendEmail({
-            to: managerEmail,
-            subject: emailContent.subject,
-            html: emailContent.html,
-            text: emailContent.text,
-          });
-
-          if (emailSent) {
-            logger.info(`Leave application email sent to manager ${managerEmail} for employee ${employeeName}`);
-          } else {
-            logger.warn(`Failed to send leave application email to manager ${managerEmail}`);
-          }
-        } catch (emailError: any) {
-          logger.error('Failed to send leave application email to manager:', emailError);
-        }
-      } else if (reportingManagerId && !managerEmail) {
-        logger.warn(`Reporting manager ID ${reportingManagerId} exists but has no email address`);
-      } else if (reportingManagerId && managerRole === 'super_admin') {
-        logger.info(`Skipping email to manager ${managerEmail} - super admin should not receive leave emails`);
-      }
-
-      // Send email notification to HR (manager's reporting manager) (skip if HR is super_admin)
-      if (hrId && hrEmail && hrRole !== 'super_admin') {
-        try {
-          const emailData = {
-            ...baseEmailData,
-            recipientName: hrName || undefined,
-          };
-          const emailContent = generateLeaveApplicationEmail(emailData);
-          
-          const emailSent = await sendEmail({
-            to: hrEmail,
-            subject: emailContent.subject,
-            html: emailContent.html,
-            text: emailContent.text,
-          });
-
-          if (emailSent) {
-            logger.info(`Leave application email sent to HR ${hrEmail} for employee ${employeeName}`);
-          } else {
-            logger.warn(`Failed to send leave application email to HR ${hrEmail}`);
-          }
-        } catch (emailError: any) {
-          logger.error('Failed to send leave application email to HR:', emailError);
-        }
-      } else if (hrId && hrRole === 'super_admin') {
-        logger.info(`Skipping email to HR ${hrEmail} - super admin should not receive leave emails`);
-      } else if (hrId && !hrEmail) {
-        logger.warn(`HR ID ${hrId} exists but has no email address`);
-      }
-    } else if (employeeRole === 'manager') {
-      // Manager applies: send to manager's HR only
-      if (hrId && hrEmail && hrRole !== 'super_admin') {
-        try {
-          const emailData = {
-            ...baseEmailData,
-            recipientName: hrName || undefined,
-          };
-          const emailContent = generateLeaveApplicationEmail(emailData);
-          
-          const emailSent = await sendEmail({
-            to: hrEmail,
-            subject: emailContent.subject,
-            html: emailContent.html,
-            text: emailContent.text,
-          });
-
-          if (emailSent) {
-            logger.info(`Leave application email sent to HR ${hrEmail} for manager ${employeeName}`);
-          } else {
-            logger.warn(`Failed to send leave application email to HR ${hrEmail}`);
-          }
-        } catch (emailError: any) {
-          logger.error('Failed to send leave application email to HR:', emailError);
-        }
-      } else if (hrId && hrRole === 'super_admin') {
-        logger.info(`Skipping email to HR ${hrEmail} - super admin should not receive leave emails`);
-      } else if (!hrId || !hrEmail) {
-        logger.warn(`Manager ${employeeName} has no reporting HR to notify`);
-      }
-    } else if (employeeRole === 'hr') {
-      // HR applies: send to super admin only
-      try {
-        const superAdminResult = await pool.query(
-          `SELECT id, email, first_name || ' ' || COALESCE(last_name, '') as name
-           FROM users
-           WHERE role = 'super_admin' AND status = 'active'`,
-          []
-        );
-
-        if (superAdminResult.rows.length === 0) {
-          logger.warn(`No active super admin found to notify for HR leave application from ${employeeName}`);
-        } else {
-          for (const superAdmin of superAdminResult.rows) {
-            try {
-              const emailData = {
-                ...baseEmailData,
-                recipientName: superAdmin.name || undefined,
-              };
-              const emailContent = generateLeaveApplicationEmail(emailData);
-              
-              const emailSent = await sendEmail({
-                to: superAdmin.email,
-                subject: emailContent.subject,
-                html: emailContent.html,
-                text: emailContent.text,
-              });
-
-              if (emailSent) {
-                logger.info(`Leave application email sent to super admin ${superAdmin.email} for HR ${employeeName}`);
-              } else {
-                logger.warn(`Failed to send leave application email to super admin ${superAdmin.email}`);
-              }
-            } catch (emailError: any) {
-              logger.error(`Failed to send leave application email to super admin ${superAdmin.email}:`, emailError);
-            }
-          }
-        }
-      } catch (error: any) {
-        logger.error('Failed to fetch super admin users for HR leave notification:', error);
-      }
     }
 
     return { leaveRequestId, message: 'Leave request submitted successfully' };
@@ -1101,9 +948,6 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
 
   const { leave_type, no_of_days } = checkResult.rows[0];
 
-  // Cancel any scheduled emails for this leave request
-  cancelScheduledEmail(requestId);
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1485,10 +1329,6 @@ export const approveLeave = async (
   // Recalculate status
   await recalcLeaveRequestStatus(leaveRequestId);
 
-
-  // Schedule delayed email (1 minute) to check final status and send appropriate email
-  scheduleLeaveStatusEmail(leaveRequestId, 1);
-
   return { message: 'Leave approved successfully' };
 };
 
@@ -1615,60 +1455,6 @@ export const rejectLeave = async (
     );
   }
 
-
-  // Cancel any scheduled approval email since leave is rejected
-  cancelScheduledEmail(leaveRequestId);
-
-  // Send rejection email immediately (no delay needed for rejections)
-  // Skip email if employee is super_admin
-  const employeeEmail = leaveResult.rows[0]?.employee_email;
-  const employeeName = leaveResult.rows[0]?.employee_name || 'Employee';
-  const employeeRole = leaveResult.rows[0]?.employee_role;
-  const approverName = leaveResult.rows[0]?.approver_name || (approverRole === 'manager' ? 'Manager' : approverRole === 'hr' ? 'HR' : 'Super Admin');
-  
-  if (employeeEmail && employeeRole !== 'super_admin') {
-    try {
-      // Format dates for display
-      const formatDateForEmail = (date: Date | string): string => {
-        const d = typeof date === 'string' ? new Date(date) : date;
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-
-      const emailData = {
-        employeeName,
-        employeeEmail,
-        leaveType: leave.leave_type,
-        startDate: formatDateForEmail(leave.start_date),
-        endDate: formatDateForEmail(leave.end_date),
-        noOfDays: parseFloat(leave.no_of_days) || 0,
-        status: 'rejected' as const,
-        approverName,
-        approverRole,
-        rejectionReason: comment,
-      };
-
-      const emailContent = generateLeaveStatusEmail(emailData);
-      const emailSent = await sendEmail({
-        to: employeeEmail,
-        subject: emailContent.subject,
-        html: emailContent.html,
-        text: emailContent.text,
-      });
-
-      if (emailSent) {
-        logger.info(`Leave rejection email sent to employee ${employeeEmail} for leave request ${leaveRequestId}`);
-      } else {
-        logger.warn(`Failed to send leave rejection email to employee ${employeeEmail}`);
-      }
-      } catch (emailError: any) {
-        logger.error('Failed to send leave rejection email to employee:', emailError);
-      }
-  } else if (employeeRole === 'super_admin') {
-    logger.info(`Skipping rejection email to employee ${employeeEmail} - super admin should not receive leave emails`);
-  }
 
   await recalcLeaveRequestStatus(leaveRequestId);
   return { message: 'Leave rejected successfully' };
@@ -2198,8 +1984,6 @@ export const updateLeaveStatus = async (
       );
     }
 
-    // Schedule email
-    scheduleLeaveStatusEmail(leaveRequestId, 1);
   } else if (newStatus === 'rejected') {
     // Reject all days
     await pool.query(
@@ -2242,31 +2026,6 @@ export const updateLeaveStatus = async (
       );
     }
 
-    // Send rejection email immediately
-    try {
-      const { generateLeaveStatusEmail } = await import('../utils/emailTemplates');
-      const { sendEmail } = await import('../utils/email');
-      
-      if (leave.employee_email && leave.employee_role !== 'super_admin') {
-        await sendEmail({
-          to: leave.employee_email,
-          subject: 'Leave Request Rejected',
-          html: generateLeaveStatusEmail({
-            employeeName: leave.employee_name,
-            leaveType: leave.leave_type,
-            startDate: leave.start_date,
-            endDate: leave.end_date,
-            status: 'rejected',
-            approverName: leave.approver_name,
-            approverRole: approverRole === 'hr' ? 'HR' : 'Super Admin',
-            rejectionReason: rejectReason || 'Status updated by HR/Super Admin'
-          }),
-          text: `Your leave request has been rejected.`
-        });
-      }
-    } catch (emailError: any) {
-      logger.warn('Failed to send rejection email:', emailError.message);
-    }
   } else if (newStatus === 'partially_approved' && selectedDayIds && selectedDayIds.length > 0) {
     // Approve selected days, reject remaining
     const allDayIds = allLeaveDays.map(d => d.id);
@@ -2322,9 +2081,6 @@ export const updateLeaveStatus = async (
 
     // Recalculate status
     await recalcLeaveRequestStatus(leaveRequestId);
-
-    // Schedule email
-    scheduleLeaveStatusEmail(leaveRequestId, 1);
   } else {
     throw new Error('Invalid status or missing required parameters');
   }
