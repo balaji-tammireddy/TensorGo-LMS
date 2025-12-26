@@ -4,6 +4,7 @@ import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import LeaveDetailsModal from '../components/LeaveDetailsModal';
+import ErrorDisplay from '../components/common/ErrorDisplay';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import { FaPencilAlt, FaEye } from 'react-icons/fa';
@@ -361,16 +362,24 @@ const LeaveApprovalPage: React.FC = () => {
   }
 
   if (pendingError || approvedError) {
+    const errorMessage = pendingError?.response?.status === 403 || approvedError?.response?.status === 403
+      ? 'You do not have permission to view this page'
+      : pendingError?.response?.status === 429 || approvedError?.response?.status === 429
+      ? 'Too many requests. Please try again later.'
+      : 'Error loading data. Please try again.';
+
+    const handleRetry = () => {
+      window.location.reload();
+    };
+
     return (
       <AppLayout>
         <div className="leave-approval-page">
-          <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
-            {pendingError?.response?.status === 403 || approvedError?.response?.status === 403
-              ? 'You do not have permission to view this page'
-              : pendingError?.response?.status === 429 || approvedError?.response?.status === 429
-              ? 'Too many requests. Please try again later.'
-              : 'Error loading data. Please try again.'}
-          </div>
+          <ErrorDisplay 
+            message={errorMessage}
+            onRetry={handleRetry}
+            showRetryButton={pendingError?.response?.status !== 403 && approvedError?.response?.status !== 403}
+          />
         </div>
       </AppLayout>
     );

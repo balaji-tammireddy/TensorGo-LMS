@@ -4,6 +4,7 @@ import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import ErrorDisplay from '../components/common/ErrorDisplay';
 import * as profileService from '../services/profileService';
 import './ProfilePage.css';
 
@@ -427,15 +428,23 @@ const ProfilePage: React.FC = () => {
   }
 
   if (error) {
+    const errorMessage = error?.response?.status === 429
+      ? 'Too many requests. Please try again later.'
+      : 'Error loading profile. Please try again.';
+
+    const handleRetry = () => {
+      window.location.reload();
+    };
+
     return (
       <>
       <AppLayout>
         <div className="profile-page">
-          <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
-            {error?.response?.status === 429
-              ? 'Too many requests. Please try again later.'
-              : 'Error loading profile. Please try again.'}
-          </div>
+          <ErrorDisplay 
+            message={errorMessage}
+            onRetry={handleRetry}
+            showRetryButton={true}
+          />
         </div>
       </AppLayout>
       </>

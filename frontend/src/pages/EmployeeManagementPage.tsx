@@ -4,6 +4,7 @@ import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import AddLeavesModal from '../components/AddLeavesModal';
+import ErrorDisplay from '../components/common/ErrorDisplay';
 import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import { format } from 'date-fns';
@@ -578,16 +579,24 @@ const EmployeeManagementPage: React.FC = () => {
   }
 
   if (error) {
+    const errorMessage = error?.response?.status === 403
+      ? 'You do not have permission to view this page. HR access required.'
+      : error?.response?.status === 429
+      ? 'Too many requests. Please try again later.'
+      : 'Error loading data. Please try again.';
+
+    const handleRetry = () => {
+      window.location.reload();
+    };
+
     return (
       <AppLayout>
         <div className="employee-management-page">
-          <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
-            {error?.response?.status === 403
-              ? 'You do not have permission to view this page. HR access required.'
-              : error?.response?.status === 429
-              ? 'Too many requests. Please try again later.'
-              : 'Error loading data. Please try again.'}
-          </div>
+          <ErrorDisplay 
+            message={errorMessage}
+            onRetry={handleRetry}
+            showRetryButton={error?.response?.status !== 403}
+          />
         </div>
       </AppLayout>
     );

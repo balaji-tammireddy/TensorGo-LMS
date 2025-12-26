@@ -1,0 +1,209 @@
+/* Animated Error Display Component */
+.error-display-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px 20px;
+  animation: fadeInError 0.4s ease-in;
+}
+
+@keyframes fadeInError {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-content {
+  text-align: center;
+  max-width: 500px;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(244, 67, 54, 0.15);
+  border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+/* Animated Error Icon */
+.error-icon-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 24px;
+}
+
+.error-icon-circle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+  animation: errorIconBounce 0.6s ease-out;
+  z-index: 2;
+}
+
+@keyframes errorIconBounce {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.error-icon {
+  width: 100%;
+  height: 100%;
+  color: #f44336;
+  animation: errorIconShake 0.5s ease-in-out 0.6s;
+}
+
+@keyframes errorIconShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  75% {
+    transform: translateX(4px) rotate(2deg);
+  }
+}
+
+.error-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border: 3px solid rgba(244, 67, 54, 0.3);
+  border-radius: 50%;
+  animation: errorPulse 2s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes errorPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Error Text */
+.error-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+  animation: slideInUp 0.5s ease-out 0.3s both;
+}
+
+.error-message {
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+  animation: slideInUp 0.5s ease-out 0.4s both;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Retry Button */
+.error-retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+  animation: slideInUp 0.5s ease-out 0.5s both;
+}
+
+.error-retry-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+  background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+}
+
+.error-retry-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.retry-icon {
+  font-size: 18px;
+  display: inline-block;
+  animation: rotate 2s linear infinite;
+  animation-play-state: paused;
+}
+
+.error-retry-button:hover .retry-icon {
+  animation-play-state: running;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .error-content {
+    padding: 30px 20px;
+  }
+  
+  .error-icon-circle {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .error-pulse-ring {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .error-title {
+    font-size: 20px;
+  }
+  
+  .error-message {
+    font-size: 14px;
+  }
+}
+

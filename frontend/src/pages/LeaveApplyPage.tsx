@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
+import ErrorDisplay from '../components/common/ErrorDisplay';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { FaPencilAlt, FaTrash, FaEye } from 'react-icons/fa';
@@ -959,14 +960,22 @@ const LeaveApplyPage: React.FC = () => {
     const anyError: any =
       balancesError || holidaysError || rulesError || requestsError;
 
+    const errorMessage = anyError?.response?.status === 429
+      ? 'Too many requests. Please try again later.'
+      : 'Error loading data. Please try again.';
+
+    const handleRetry = () => {
+      window.location.reload();
+    };
+
     return (
       <AppLayout>
         <div className="leave-apply-page">
-          <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
-            {anyError?.response?.status === 429
-              ? 'Too many requests. Please try again later.'
-              : 'Error loading data. Please try again.'}
-          </div>
+          <ErrorDisplay 
+            message={errorMessage}
+            onRetry={handleRetry}
+            showRetryButton={true}
+          />
         </div>
       </AppLayout>
     );
