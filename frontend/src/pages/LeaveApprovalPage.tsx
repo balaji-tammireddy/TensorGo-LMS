@@ -334,7 +334,27 @@ const LeaveApprovalPage: React.FC = () => {
     return (
       <AppLayout>
         <div className="leave-approval-page">
-          <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+          <div className="skeleton-loader">
+            {/* Page Title Skeleton */}
+            <div className="skeleton-title"></div>
+            
+            {/* Search and Filter Bar Skeleton */}
+            <div className="skeleton-search-filter">
+              <div className="skeleton-input" style={{ width: '300px', height: '40px' }}></div>
+              <div className="skeleton-input" style={{ width: '150px', height: '40px' }}></div>
+            </div>
+            
+            {/* Table Section Skeleton */}
+            <div className="skeleton-card">
+              <div className="skeleton-header"></div>
+              <div className="skeleton-table">
+                <div className="skeleton-table-header"></div>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="skeleton-table-row" style={{ width: `${90 - index * 2}%` }}></div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </AppLayout>
     );

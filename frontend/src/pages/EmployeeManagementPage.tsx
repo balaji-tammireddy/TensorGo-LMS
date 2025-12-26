@@ -156,7 +156,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   );
 
-  const { data: employeesData, error } = useQuery(
+  const { data: employeesData, isLoading: employeesLoading, error } = useQuery(
     ['employees', appliedSearch, statusFilter],
     () =>
       employeeService.getEmployees(
@@ -546,6 +546,36 @@ const EmployeeManagementPage: React.FC = () => {
   const getStatusColor = (status: string) => {
     return status === 'active' ? '#4caf50' : '#f44336';
   };
+
+  if (employeesLoading && !employeesData) {
+    return (
+      <AppLayout>
+        <div className="employee-management-page">
+          <div className="skeleton-loader">
+            {/* Page Title Skeleton */}
+            <div className="skeleton-title"></div>
+            
+            {/* Search and Filter Bar Skeleton */}
+            <div className="skeleton-search-filter">
+              <div className="skeleton-input" style={{ width: '300px', height: '40px' }}></div>
+              <div className="skeleton-input" style={{ width: '150px', height: '40px' }}></div>
+              <div className="skeleton-button" style={{ width: '150px', height: '40px' }}></div>
+            </div>
+            
+            {/* Table Section Skeleton */}
+            <div className="skeleton-card">
+              <div className="skeleton-table">
+                <div className="skeleton-table-header"></div>
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <div key={index} className="skeleton-table-row" style={{ width: `${92 - index * 1}%` }}></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (error) {
     return (

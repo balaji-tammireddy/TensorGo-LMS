@@ -377,7 +377,50 @@ const ProfilePage: React.FC = () => {
     return (
       <AppLayout>
         <div className="profile-page">
-          <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+          <div className="skeleton-loader">
+            {/* Header Skeleton */}
+            <div className="skeleton-profile-header">
+              <div className="skeleton-title"></div>
+              <div className="skeleton-button" style={{ width: '120px', height: '40px' }}></div>
+            </div>
+            
+            {/* Profile Picture Section Skeleton */}
+            <div className="skeleton-profile-picture-section">
+              <div className="skeleton-profile-photo"></div>
+              <div className="skeleton-buttons">
+                <div className="skeleton-button" style={{ width: '130px' }}></div>
+                <div className="skeleton-button" style={{ width: '100px' }}></div>
+              </div>
+            </div>
+            
+            {/* Form Sections Skeleton */}
+            <div className="skeleton-card">
+              <div className="skeleton-header"></div>
+              <div className="skeleton-form-grid">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="skeleton-input"></div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="skeleton-card">
+              <div className="skeleton-header"></div>
+              <div className="skeleton-form-grid">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="skeleton-input"></div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="skeleton-card">
+              <div className="skeleton-header"></div>
+              <div className="skeleton-form-grid">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="skeleton-input"></div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </AppLayout>
     );

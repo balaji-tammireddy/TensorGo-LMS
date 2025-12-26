@@ -244,3 +244,107 @@
   transition: opacity 0.3s ease;
 }
 
+/* Skeleton Loader Styles for Leave Approval Page */
+.skeleton-search-filter {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.skeleton-title {
+  height: 32px;
+  width: 250px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+.skeleton-header {
+  height: 20px;
+  width: 200px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-input {
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-table-header {
+  height: 16px;
+  width: 100%;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-table-row {
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+

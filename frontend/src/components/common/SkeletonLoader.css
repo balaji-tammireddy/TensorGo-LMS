@@ -1,0 +1,242 @@
+/* Professional Skeleton Loader - Reusable Component */
+.skeleton-loader {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Base Skeleton Elements */
+.skeleton-title {
+  height: 32px;
+  width: 300px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-header {
+  height: 20px;
+  width: 150px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-line {
+  height: 16px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Table Skeleton */
+.skeleton-table-header {
+  height: 16px;
+  width: 100%;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-table-row {
+  height: 12px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Form Skeleton */
+.skeleton-form-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.skeleton-input {
+  height: 44px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-textarea {
+  height: 60px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.skeleton-button {
+  height: 44px;
+  width: 110px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Profile Skeleton */
+.skeleton-profile-container {
+  display: flex;
+  gap: 30px;
+  margin-top: 20px;
+}
+
+.skeleton-profile-photo {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-profile-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Card Skeleton */
+.skeleton-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Stagger animation delays for more natural feel */
+.skeleton-line:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.skeleton-line:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.skeleton-line:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.skeleton-table-row:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.skeleton-table-row:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.skeleton-table-row:nth-child(3) {
+  animation-delay: 0.3s;
+}
+

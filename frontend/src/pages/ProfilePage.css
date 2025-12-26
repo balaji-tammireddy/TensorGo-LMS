@@ -308,3 +308,123 @@
   }
 }
 
+/* Skeleton Loader Styles for Profile Page */
+.skeleton-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.skeleton-profile-picture-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 30px;
+  padding: 20px 0;
+}
+
+.skeleton-profile-photo {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+.skeleton-title {
+  height: 32px;
+  width: 200px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-header {
+  height: 20px;
+  width: 180px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.skeleton-input {
+  height: 44px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-button {
+  height: 40px;
+  width: 120px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #e0e5f2 0%,
+    #f0f4fa 20%,
+    #e0e5f2 40%,
+    #e0e5f2 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-buttons {
+  display: flex;
+  gap: 10px;
+}
+

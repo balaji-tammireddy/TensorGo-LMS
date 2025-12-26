@@ -871,7 +871,85 @@ const LeaveApplyPage: React.FC = () => {
     return (
       <AppLayout>
         <div className="leave-apply-page">
-          <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+          {/* Skeleton Loader */}
+          <div className="skeleton-loader">
+            {/* Page Title Skeleton */}
+            <div className="skeleton-title"></div>
+            
+            {/* Top Sections Row Skeleton */}
+            <div className="top-sections-row">
+              {/* Leave Balances Skeleton */}
+              <div className="skeleton-card">
+                <div className="skeleton-header"></div>
+                <div className="skeleton-balances">
+                  <div className="skeleton-balance-item">
+                    <div className="skeleton-label"></div>
+                    <div className="skeleton-value"></div>
+                  </div>
+                  <div className="skeleton-separator"></div>
+                  <div className="skeleton-balance-item">
+                    <div className="skeleton-label"></div>
+                    <div className="skeleton-value"></div>
+                  </div>
+                  <div className="skeleton-separator"></div>
+                  <div className="skeleton-balance-item">
+                    <div className="skeleton-label"></div>
+                    <div className="skeleton-value"></div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Rules Skeleton */}
+              <div className="skeleton-card">
+                <div className="skeleton-header"></div>
+                <div className="skeleton-table">
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                </div>
+              </div>
+              
+              {/* Holidays Skeleton */}
+              <div className="skeleton-card">
+                <div className="skeleton-header"></div>
+                <div className="skeleton-holidays-controls"></div>
+                <div className="skeleton-table">
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Form Section Skeleton */}
+            <div className="skeleton-card skeleton-form">
+              <div className="skeleton-header"></div>
+              <div className="skeleton-form-grid">
+                <div className="skeleton-input"></div>
+                <div className="skeleton-input"></div>
+                <div className="skeleton-input"></div>
+                <div className="skeleton-input"></div>
+                <div className="skeleton-input"></div>
+                <div className="skeleton-input"></div>
+              </div>
+              <div className="skeleton-textarea"></div>
+              <div className="skeleton-buttons">
+                <div className="skeleton-button"></div>
+                <div className="skeleton-button"></div>
+              </div>
+            </div>
+            
+            {/* Requests Section Skeleton */}
+            <div className="skeleton-card">
+              <div className="skeleton-header"></div>
+              <div className="skeleton-table">
+                <div className="skeleton-table-header"></div>
+                <div className="skeleton-table-row"></div>
+                <div className="skeleton-table-row"></div>
+                <div className="skeleton-table-row"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </AppLayout>
     );
