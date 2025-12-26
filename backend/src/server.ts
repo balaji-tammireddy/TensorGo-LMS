@@ -7,7 +7,6 @@ import path from 'path';
 
 import { errorHandler } from './middleware/error.middleware';
 import { logger } from './utils/logger';
-import { verifyEmailConnection } from './utils/email';
 
 import authRoutes from './routes/auth.routes';
 import leaveRoutes from './routes/leave.routes';
@@ -76,18 +75,6 @@ app.use((req, res) => {
     logger.info(`✅ Supabase DB connected at ${res.rows[0].now}`);
   } catch (err) {
     logger.error('❌ Supabase DB connection failed', err);
-  }
-})();
-
-// 🔹 Email service connection test
-(async () => {
-  try {
-    const emailConnected = await verifyEmailConnection();
-    if (emailConnected) {
-      logger.info('✅ Email service connected and ready');
-    }
-  } catch (err) {
-    logger.error('❌ Email service connection failed', err);
   }
 })();
 
