@@ -40,7 +40,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           </button>
         </div>
         <div className="confirmation-dialog-body">
-          <p className="confirmation-dialog-message">{message}</p>
+          <p className="confirmation-dialog-message" style={{ whiteSpace: 'pre-line' }}>{message}</p>
         </div>
         <div className="confirmation-dialog-footer">
           <button
