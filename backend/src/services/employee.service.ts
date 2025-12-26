@@ -553,6 +553,30 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
+  // Send email notification if HR or Super Admin updated employee details
+  if ((requesterRole === 'hr' || requesterRole === 'super_admin') && !isOnlyRoleUpdate) {
+    try {
+      // Get employee details for email
+      const employeeResult = await pool.query(
+        `SELECT email, first_name || ' ' || COALESCE(last_name, '') as employee_name, emp_id 
+         FROM users WHERE id = $1`,
+        [employeeId]
+      );
+      
+      if (employeeResult.rows.length > 0 && employeeResult.rows[0].email) {
+        const { sendEmployeeDetailsUpdateEmail } = await import('../utils/emailTemplates');
+        await sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
+          employeeName: employeeResult.rows[0].employee_name || 'Employee',
+          employeeEmpId: employeeResult.rows[0].emp_id || ''
+        });
+        logger.info(`✅ Employee details update email sent to: ${employeeResult.rows[0].email}`);
+      }
+    } catch (emailError: any) {
+      // Log error but don't fail employee update
+      logger.error(`❌ Error sending employee details update email:`, emailError);
+    }
+  }
+
   return { message: 'Employee updated successfully' };
 };
 
