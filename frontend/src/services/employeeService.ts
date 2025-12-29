@@ -8,6 +8,7 @@ export interface Employee {
   joiningDate: string;
   status: string;
   role: string;
+  profilePhotoKey?: string; // OVHcloud object key (for signed URL generation)
 }
 
 export interface EmployeeListResponse {

@@ -15,7 +15,8 @@ export const getEmployees = async (
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
-           designation as position, date_of_joining as joining_date, status, role
+           designation as position, date_of_joining as joining_date, status, role,
+           profile_photo_url as profile_photo_key
     FROM users
     WHERE 1=1
   `;
@@ -84,7 +85,10 @@ export const getEmployees = async (
       position: row.position,
       joiningDate: row.joining_date.toISOString().split('T')[0],
       status: row.status,
-      role: row.role
+      role: row.role,
+      profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/') 
+        ? row.profile_photo_key 
+        : null
     })),
     pagination: {
       page,

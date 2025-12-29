@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
-import { uploadToOVH, deleteFromOVH, extractKeyFromUrl, getSignedUrlFromOVH } from '../utils/storage';
+import { uploadToOVH, deleteFromOVH, extractKeyFromUrl, getSignedUrlFromOVH, getPublicUrlFromOVH } from '../utils/storage';
 import { pool } from '../database/db';
 
 // Configure multer for file uploads
@@ -184,13 +184,18 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
 
 export const getPhotoSignedUrl = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] ========== REQUEST RECEIVED ==========`);
-  logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] User ID: ${req.user!.id}`);
+  
+  // Allow getting signed URL for any user (for viewing other users' profiles)
+  // Default to logged-in user if no userId provided
+  const targetUserId = req.query.userId ? parseInt(req.query.userId as string) : req.user!.id;
+  
+  logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Requested by User ID: ${req.user!.id}, Target User ID: ${targetUserId}`);
   
   try {
     // Get profile photo key directly from database
     const dbResult = await pool.query(
       'SELECT profile_photo_url FROM users WHERE id = $1',
-      [req.user!.id]
+      [targetUserId]
     );
     
     if (dbResult.rows.length === 0) {
@@ -226,22 +231,23 @@ export const getPhotoSignedUrl = async (req: AuthRequest, res: Response) => {
       });
     }
     
-    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Generating signed URL for OVHcloud key: ${profilePhotoKey}`);
+    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Generating public URL for OVHcloud key: ${profilePhotoKey}`);
     
-    // Generate signed URL (valid for 15 minutes)
-    const signedUrl = await getSignedUrlFromOVH(profilePhotoKey, 900);
+    // Generate public URL (permanent, no expiration)
+    const publicUrl = getPublicUrlFromOVH(profilePhotoKey);
     
-    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Signed URL generated successfully - User ID: ${req.user!.id}`);
+    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Public URL generated successfully - Target User ID: ${targetUserId}`);
     logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Key: ${profilePhotoKey}`);
-    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Signed URL: ${signedUrl.substring(0, 100)}... (truncated)`);
+    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Public URL: ${publicUrl}`);
     
-    return res.json({ signedUrl, expiresIn: 900 });
+    return res.json({ signedUrl: publicUrl, expiresIn: null }); // null means permanent
   } catch (error: any) {
     logger.error(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Error:`, error);
     logger.error(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Error details:`, {
       message: error.message,
       stack: error.stack,
-      userId: req.user!.id
+      requestedBy: req.user!.id,
+      targetUserId
     });
     res.status(400).json({
       error: {

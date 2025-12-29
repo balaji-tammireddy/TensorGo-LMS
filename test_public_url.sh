@@ -1,0 +1,13 @@
+#!/bin/bash
+echo "=== Testing Public Profile Photo URLs ==="
+echo ""
+echo "1. Make sure your backend server is running"
+echo "2. Upload a profile photo through the UI"
+echo "3. Check the browser Network tab for the response from /profile/photo/signed-url"
+echo "4. Copy the URL and test it in a new browser tab"
+echo ""
+echo "Expected URL format:"
+echo "https://s3.us-east-va.io.cloud.ovh.us/hr--lms/profile-photos/{userId}/{filename}"
+echo ""
+echo "To test from backend logs, run:"
+echo "tail -f backend/logs/combined.log | grep 'PUBLIC URL'"

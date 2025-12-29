@@ -42,13 +42,13 @@ export const uploadToOVH = async (
     // Read file from local filesystem
     const fileContent = fs.readFileSync(filePath);
     
-    // Upload to PRIVATE bucket (no ACL - bucket is private)
+    // Upload to PUBLIC bucket (ACL: public-read for direct access)
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: fileContent,
-      ContentType: contentType
-      // No ACL - bucket is private, access via signed URLs only
+      ContentType: contentType,
+      ACL: 'public-read' // Make object publicly accessible
     });
 
     await s3Client.send(command);
@@ -94,13 +94,13 @@ export const uploadBufferToOVH = async (
     
     logger.info(`[STORAGE] [UPLOAD BUFFER] Uploading buffer to OVHcloud: ${key}`);
     
-    // Upload to PRIVATE bucket (no ACL - bucket is private)
+    // Upload to PUBLIC bucket (ACL: public-read for direct access)
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
-      ContentType: contentType
-      // No ACL - bucket is private, access via signed URLs only
+      ContentType: contentType,
+      ACL: 'public-read' // Make object publicly accessible
     });
 
     await s3Client.send(command);
@@ -148,7 +148,34 @@ export const deleteFromOVH = async (key: string): Promise<void> => {
 };
 
 /**
+ * Get public URL for file access (permanent, no expiration)
+ * @param key - Object key (path in bucket)
+ * @returns Public URL that works from any device/network
+ */
+export const getPublicUrlFromOVH = (key: string): string => {
+  const endpoint = process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`;
+  const region = process.env.OVH_REGION || 'gra';
+  
+  // OVHcloud uses virtual-hosted style for public URLs
+  // Format: https://{bucket}.s3.{region}.cloud.ovh.net/{key}
+  // For us-east-va: https://{bucket}.s3.{region}.io.cloud.ovh.us/{key}
+  let publicUrl: string;
+  
+  if (region === 'us-east-va') {
+    // Special format for us-east-va region
+    publicUrl = `https://${BUCKET_NAME}.s3.${region}.io.cloud.ovh.us/${key}`;
+  } else {
+    // Standard format for other regions
+    publicUrl = `https://${BUCKET_NAME}.s3.${region}.cloud.ovh.net/${key}`;
+  }
+  
+  logger.info(`[STORAGE] [PUBLIC URL] Generated public URL: ${publicUrl}`);
+  return publicUrl;
+};
+
+/**
  * Get a signed URL for private file access (valid for 15 minutes by default)
+ * Note: Use getPublicUrlFromOVH() if objects are public
  * @param key - Object key (path in bucket)
  * @param expiresIn - URL expiration time in seconds (default: 900 = 15 minutes)
  * @returns Signed URL that works from any device/network
