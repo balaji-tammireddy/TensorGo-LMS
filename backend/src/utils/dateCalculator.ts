@@ -6,8 +6,9 @@ export interface LeaveDay {
 }
 
 /**
- * Calculate leave days between start and end dates (inclusive, excluding weekends)
+ * Calculate leave days between start and end dates (inclusive, excluding weekends and holidays)
  * Saturday (6) and Sunday (0) are excluded from the count
+ * Holidays from all years that the leave period spans are excluded
  */
 export async function calculateLeaveDays(
   startDate: Date,
@@ -21,6 +22,41 @@ export async function calculateLeaveDays(
     
     const currentDate = new Date(startDate);
     const end = new Date(endDate);
+    
+    // Get the years that the leave period spans (could be same year or across two years)
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+    
+    // Fetch holidays for all years that the leave spans
+    // If leave spans Dec 22, 2025 to Jan 5, 2026, we need holidays for both 2025 and 2026
+    let holidaysQuery: string;
+    let holidaysParams: number[];
+    
+    if (startYear === endYear) {
+      // Leave is within the same year
+      holidaysQuery = `SELECT holiday_date FROM holidays 
+                       WHERE is_active = true 
+                       AND EXTRACT(YEAR FROM holiday_date) = $1
+                       ORDER BY holiday_date`;
+      holidaysParams = [startYear];
+    } else {
+      // Leave spans across two years (e.g., Dec 2025 to Jan 2026)
+      holidaysQuery = `SELECT holiday_date FROM holidays 
+                       WHERE is_active = true 
+                       AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)
+                       ORDER BY holiday_date`;
+      holidaysParams = [startYear, endYear];
+    }
+    
+    const holidaysResult = await pool.query(holidaysQuery, holidaysParams);
+    
+    // Create a Set of holiday dates for quick lookup (format: YYYY-MM-DD)
+    const holidayDates = new Set<string>();
+    holidaysResult.rows.forEach((row: any) => {
+      const holidayDate = new Date(row.holiday_date);
+      const holidayDateStr = `${holidayDate.getFullYear()}-${String(holidayDate.getMonth() + 1).padStart(2, '0')}-${String(holidayDate.getDate()).padStart(2, '0')}`;
+      holidayDates.add(holidayDateStr);
+    });
     
     // Format dates for database query and comparison (reuse same variables)
     const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
@@ -39,6 +75,12 @@ export async function calculateLeaveDays(
       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
       const day = String(currentDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+      
+      // Skip holidays (check both current year and next year)
+      if (holidayDates.has(dateStr)) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        continue;
+      }
       
       // Compare using date strings to avoid time component issues
       if (dateStr === startDateStr && dateStr === endDateStr) {
