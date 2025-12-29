@@ -577,22 +577,25 @@ const LeaveApplyPage: React.FC = () => {
     }
   );
 
-  // Filter holidays by selected year on the client side as well (double-check)
+  // Filter holidays by selected year only (for display)
+  // Backend returns both years for leave calculations, but UI shows only selected year
   const holidays = React.useMemo(() => {
     if (!holidaysData || holidaysData.length === 0) return [];
     return holidaysData.filter((holiday: any) => {
       try {
         const holidayDate = new Date(holiday.date + 'T00:00:00');
         const holidayYear = holidayDate.getFullYear();
-        const matches = holidayYear === selectedYear;
-        if (!matches) {
-          console.warn(`[Frontend] Filtered out holiday: ${holiday.date} (year: ${holidayYear}, expected: ${selectedYear})`);
-        }
-        return matches;
+        // Show only holidays for the selected year in the UI
+        return holidayYear === selectedYear;
       } catch (error) {
         console.error(`[Frontend] Error parsing holiday date: ${holiday.date}`, error);
         return false;
       }
+    }).sort((a: any, b: any) => {
+      // Sort by date
+      const dateA = new Date(a.date + 'T00:00:00');
+      const dateB = new Date(b.date + 'T00:00:00');
+      return dateA.getTime() - dateB.getTime();
     });
   }, [holidaysData, selectedYear]);
   const { data: rules = [], isLoading: rulesLoading, error: rulesError } = useQuery(

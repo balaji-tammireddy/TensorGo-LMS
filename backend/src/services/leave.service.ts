@@ -61,14 +61,20 @@ export const getHolidays = async (year?: number) => {
     let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
     const params: any[] = [];
     
-    // Ensure year is a valid number if provided
+    // Always include current year and next year
     if (year !== undefined && year !== null && !isNaN(year)) {
       const yearNum = parseInt(String(year), 10);
-      query += ' AND EXTRACT(YEAR FROM holiday_date) = $1';
-      params.push(yearNum);
-      logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for year: ${yearNum}`);
+      const nextYear = yearNum + 1;
+      query += ' AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)';
+      params.push(yearNum, nextYear);
+      logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for year: ${yearNum} and next year: ${nextYear}`);
     } else {
-      logger.info(`[LEAVE] [GET HOLIDAYS] Fetching all active holidays (no year filter)`);
+      // If no year provided, get current year and next year
+      const currentYear = new Date().getFullYear();
+      const nextYear = currentYear + 1;
+      query += ' AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)';
+      params.push(currentYear, nextYear);
+      logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for current year: ${currentYear} and next year: ${nextYear}`);
     }
     
     query += ' ORDER BY holiday_date';
@@ -76,7 +82,10 @@ export const getHolidays = async (year?: number) => {
     const result = await pool.query(query, params);
     
     // Log for debugging
-    logger.info(`[LEAVE] [GET HOLIDAYS] Fetched ${result.rows.length} holidays${year ? ` for year ${year}` : ''}`);
+    const years = year !== undefined && year !== null && !isNaN(year) 
+      ? `${year} and ${year + 1}` 
+      : `${new Date().getFullYear()} and ${new Date().getFullYear() + 1}`;
+    logger.info(`[LEAVE] [GET HOLIDAYS] Fetched ${result.rows.length} holidays for years: ${years}`);
     
     return result.rows.map(row => ({
       date: formatDate(row.holiday_date),
