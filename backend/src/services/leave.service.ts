@@ -168,8 +168,25 @@ export const applyLeave = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Cannot apply for past dates; today is allowed for sick, LOP, and permission
-    if (leaveData.leaveType === 'sick' || leaveData.leaveType === 'lop' || leaveData.leaveType === 'permission') {
+    // Validation: Sick leave can be applied for past 3 days (including today) or from tomorrow onwards
+    // For future dates, can only apply from next day (not today)
+    if (leaveData.leaveType === 'sick') {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
+      
+      // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
+      // For future dates: only allow from tomorrow onwards (daysDifference >= 1)
+      if (daysDifference < -3) {
+        throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
+      }
+      if (daysDifference === 0 && startDate > today) {
+        // This shouldn't happen, but just in case
+        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or from tomorrow onwards.');
+      }
+      // daysDifference >= 1 is allowed (tomorrow onwards)
+      // daysDifference between -3 and 0 is allowed (past 3 days + today)
+    } else if (leaveData.leaveType === 'lop' || leaveData.leaveType === 'permission') {
+      // LOP and permission: today is allowed, but not past dates
       if (startDate < today) {
         throw new Error('Cannot apply for past dates.');
       }
@@ -182,10 +199,13 @@ export const applyLeave = async (
 
     // Validation: casual needs at least 3 days notice (block today + next two days)
     // LOP can be applied at any date except past dates (no advance notice required)
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
-    if (leaveData.leaveType === 'casual' && daysUntilStart < 3) {
-      throw new Error('Casual leaves must be applied at least 3 days in advance.');
+    // Sick leave validation is already handled above
+    if (leaveData.leaveType === 'casual') {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+      if (daysUntilStart < 3) {
+        throw new Error('Casual leaves must be applied at least 3 days in advance.');
+      }
     }
 
     // Validation: End date must be >= start date
@@ -847,8 +867,25 @@ export const updateLeaveRequest = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Cannot apply for past dates; today is allowed for sick and LOP
-    if (leaveData.leaveType === 'sick' || leaveData.leaveType === 'lop') {
+    // Validation: Sick leave can be applied for past 3 days (including today) or from tomorrow onwards
+    // For future dates, can only apply from next day (not today)
+    if (leaveData.leaveType === 'sick') {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
+      
+      // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
+      // For future dates: only allow from tomorrow onwards (daysDifference >= 1)
+      if (daysDifference < -3) {
+        throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
+      }
+      if (daysDifference === 0 && startDate > today) {
+        // This shouldn't happen, but just in case
+        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or from tomorrow onwards.');
+      }
+      // daysDifference >= 1 is allowed (tomorrow onwards)
+      // daysDifference between -3 and 0 is allowed (past 3 days + today)
+    } else if (leaveData.leaveType === 'lop') {
+      // LOP: today is allowed, but not past dates
       if (startDate < today) {
         throw new Error('Cannot apply for past dates.');
       }
