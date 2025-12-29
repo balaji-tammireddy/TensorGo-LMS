@@ -106,9 +106,14 @@ export const uploadPhoto = [
       
       if (useOVHCloud) {
         try {
-          // Upload to OVHcloud bucket - returns key, not URL
+          // Upload to OVHcloud bucket via S3 SDK - returns key, not URL
           const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Attempting OVHcloud upload with key: ${key}`);
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] File path: ${localFilePath}, MIME type: ${req.file.mimetype}`);
+          
           const photoKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
+          
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Successfully uploaded to OVHcloud: ${photoKey}`);
           
           // Delete local file after successful upload
           try {
@@ -121,6 +126,16 @@ export const uploadPhoto = [
           // Store only the key in database (not URL)
           photoUrl = photoKey;
         } catch (ovhError: any) {
+          // Log detailed error information
+          logger.error(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] OVHcloud upload failed:`, {
+            error: ovhError.message,
+            name: ovhError.name,
+            code: ovhError.Code,
+            requestId: ovhError.$metadata?.requestId,
+            httpStatusCode: ovhError.$metadata?.httpStatusCode,
+            key: `profile-photos/${req.user!.id}/${req.file.filename}`
+          });
+          
           // Fallback to local storage if OVHcloud upload fails
           logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] OVHcloud upload failed, falling back to local storage: ${ovhError.message}`);
           photoUrl = `/uploads/${req.file.filename}`;

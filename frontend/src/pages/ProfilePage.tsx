@@ -112,42 +112,67 @@ const ProfilePage: React.FC = () => {
   // Fetch signed URL when profile has a photoKey
   React.useEffect(() => {
     const fetchSignedUrl = async () => {
-      if (profile?.profilePhotoKey) {
+      // Check if profile has OVHcloud key (starts with 'profile-photos/')
+      const hasOVHKey = profile?.profilePhotoKey || 
+                       (profile?.profilePhotoUrl && profile.profilePhotoUrl.startsWith('profile-photos/'));
+      
+      if (hasOVHKey) {
         try {
           const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
           setPhotoSignedUrl(signedUrl);
-        } catch (err) {
+        } catch (err: any) {
           console.error('Failed to get signed URL:', err);
-          // Don't set to null immediately - try again after a short delay
-          setTimeout(async () => {
-            try {
-              const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
-              setPhotoSignedUrl(signedUrl);
-            } catch (retryErr) {
-              console.error('Failed to get signed URL on retry:', retryErr);
-              setPhotoSignedUrl(null);
-            }
-          }, 1000);
+          // If it's a 404, the photo might be stored locally, try using profilePhotoUrl
+          if (err.response?.status === 404 && profile?.profilePhotoUrl) {
+            setPhotoSignedUrl(profile.profilePhotoUrl);
+          } else {
+            // Retry after a short delay
+            setTimeout(async () => {
+              try {
+                const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+                setPhotoSignedUrl(signedUrl);
+              } catch (retryErr) {
+                console.error('Failed to get signed URL on retry:', retryErr);
+                // Final fallback to profilePhotoUrl if available
+                if (profile?.profilePhotoUrl) {
+                  setPhotoSignedUrl(profile.profilePhotoUrl);
+                } else {
+                  setPhotoSignedUrl(null);
+                }
+              }
+            }, 1000);
+          }
         }
-      } else if (profile?.profilePhotoUrl && !profile.profilePhotoUrl.startsWith('profile-photos/')) {
-        // Only use local file path if it's NOT an OVHcloud key
-        // If it starts with 'profile-photos/', it should have been set as profilePhotoKey
-        setPhotoSignedUrl(profile.profilePhotoUrl);
+      } else if (profile?.profilePhotoUrl) {
+        // Local file path - convert to full backend URL if it's a relative path
+        if (profile.profilePhotoUrl.startsWith('/uploads/')) {
+          // Use full backend URL for local uploads so they work on other devices
+          const backendUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+          setPhotoSignedUrl(`${backendUrl}${profile.profilePhotoUrl}`);
+        } else {
+          // Base64 or full URL - use as-is
+          setPhotoSignedUrl(profile.profilePhotoUrl);
+        }
       } else {
         setPhotoSignedUrl(null);
       }
     };
 
-    fetchSignedUrl();
-    
-    // Refresh signed URL every 14 minutes (before 15-minute expiration)
-    // This ensures the image stays visible without interruption
-    if (profile?.profilePhotoKey) {
-      const refreshInterval = setInterval(() => {
-        fetchSignedUrl();
-      }, 14 * 60 * 1000); // 14 minutes
+    if (profile) {
+      fetchSignedUrl();
       
-      return () => clearInterval(refreshInterval);
+      // Refresh signed URL every 14 minutes (before 15-minute expiration)
+      // This ensures the image stays visible without interruption
+      const hasOVHKey = profile?.profilePhotoKey || 
+                       (profile?.profilePhotoUrl && profile.profilePhotoUrl.startsWith('profile-photos/'));
+      
+      if (hasOVHKey) {
+        const refreshInterval = setInterval(() => {
+          fetchSignedUrl();
+        }, 14 * 60 * 1000); // 14 minutes
+        
+        return () => clearInterval(refreshInterval);
+      }
     }
   }, [profile]);
 
