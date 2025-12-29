@@ -23,29 +23,39 @@ export interface LeaveBalance {
 }
 
 export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> => {
+  logger.info(`[LEAVE] [GET LEAVE BALANCES] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [GET LEAVE BALANCES] User ID: ${userId}`);
+  
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [userId]
   );
 
   if (result.rows.length === 0) {
+    logger.info(`[LEAVE] [GET LEAVE BALANCES] No balance record found, initializing with defaults`);
     // Initialize balance if not exists (casual and sick start at 0, only LOP has default)
     await pool.query(
       'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
       [userId]
     );
+    logger.info(`[LEAVE] [GET LEAVE BALANCES] Balance initialized - Casual: 0, Sick: 0, LOP: 10`);
     return { casual: 0, sick: 0, lop: 10 };
   }
 
   const balance = result.rows[0];
-  return {
+  const balances = {
     casual: parseFloat(balance.casual_balance) || 0,
     sick: parseFloat(balance.sick_balance) || 0,
     lop: parseFloat(balance.lop_balance) || 0
   };
+  logger.info(`[LEAVE] [GET LEAVE BALANCES] Balances retrieved - Casual: ${balances.casual}, Sick: ${balances.sick}, LOP: ${balances.lop}`);
+  return balances;
 };
 
 export const getHolidays = async (year?: number) => {
+  logger.info(`[LEAVE] [GET HOLIDAYS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [GET HOLIDAYS] Year: ${year || 'all'}`);
+  
   try {
     let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
     const params: any[] = [];
@@ -55,9 +65,9 @@ export const getHolidays = async (year?: number) => {
       const yearNum = parseInt(String(year), 10);
       query += ' AND EXTRACT(YEAR FROM holiday_date) = $1';
       params.push(yearNum);
-      logger.info(`Fetching holidays for year: ${yearNum}`);
+      logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for year: ${yearNum}`);
     } else {
-      logger.info('Fetching all active holidays (no year filter)');
+      logger.info(`[LEAVE] [GET HOLIDAYS] Fetching all active holidays (no year filter)`);
     }
     
     query += ' ORDER BY holiday_date';
@@ -65,14 +75,14 @@ export const getHolidays = async (year?: number) => {
     const result = await pool.query(query, params);
     
     // Log for debugging
-    logger.info(`Fetched ${result.rows.length} holidays${year ? ` for year ${year}` : ''}`);
+    logger.info(`[LEAVE] [GET HOLIDAYS] Fetched ${result.rows.length} holidays${year ? ` for year ${year}` : ''}`);
     
     return result.rows.map(row => ({
       date: formatDate(row.holiday_date),
       name: row.holiday_name
     }));
   } catch (error: any) {
-    logger.error('Error fetching holidays:', error);
+    logger.error(`[LEAVE] [GET HOLIDAYS] Error fetching holidays:`, error);
     throw new Error(`Failed to fetch holidays: ${error.message || error.toString()}`);
   }
 };
@@ -86,10 +96,15 @@ export const getHolidays = async (year?: number) => {
  * in the database by authorized administrators only.
  */
 export const getLeaveRules = async () => {
+  logger.info(`[LEAVE] [GET LEAVE RULES] ========== FUNCTION CALLED ==========`);
+  
   try {
+    logger.info(`[LEAVE] [GET LEAVE RULES] Fetching active leave rules`);
     const result = await pool.query(
       'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
     );
+    logger.info(`[LEAVE] [GET LEAVE RULES] Found ${result.rows.length} active leave rules`);
+    
     return result.rows.map(row => ({
       leaveRequired: row.leave_required_max 
         ? `${row.leave_required_min} to ${row.leave_required_max} days`
@@ -97,7 +112,7 @@ export const getLeaveRules = async () => {
       priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
     }));
   } catch (error: any) {
-    logger.error('Error fetching leave rules:', error);
+    logger.error(`[LEAVE] [GET LEAVE RULES] Error fetching leave rules:`, error);
     throw new Error(`Failed to fetch leave rules: ${error.message || error.toString()}`);
   }
 };
@@ -115,10 +130,14 @@ export const applyLeave = async (
     doctorNote?: string;
   }
 ) => {
+  logger.info(`[LEAVE] [APPLY LEAVE] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [APPLY LEAVE] User ID: ${userId}, Leave Type: ${leaveData.leaveType}, Start Date: ${leaveData.startDate}, End Date: ${leaveData.endDate}`);
+  
   try {
     // Parse dates in local timezone to avoid timezone shift issues
     // Create date objects from YYYY-MM-DD strings by parsing in local timezone
     if (!leaveData.startDate || !leaveData.endDate) {
+      logger.warn(`[LEAVE] [APPLY LEAVE] Missing start date or end date`);
       throw new Error('Start date and end date are required');
     }
     
@@ -387,6 +406,7 @@ export const applyLeave = async (
 
 
       await client.query('COMMIT');
+      logger.info(`[LEAVE] [APPLY LEAVE] Transaction committed successfully - Leave Request ID: ${leaveRequestId}`);
     } catch (error: any) {
       // Rollback transaction - wrap in try-catch to handle already-aborted transactions
       try {
@@ -402,25 +422,9 @@ export const applyLeave = async (
       client.release();
     }
 
-    // Send email notifications after successful leave application
-    // Get applied date for email (format as YYYY-MM-DD)
-    const appliedDateResult = await pool.query(
-      'SELECT applied_date FROM leave_requests WHERE id = $1',
-      [leaveRequestId]
-    );
-    let appliedDate: string;
-    if (appliedDateResult.rows[0]?.applied_date) {
-      const appliedDateValue = appliedDateResult.rows[0].applied_date;
-      if (appliedDateValue instanceof Date) {
-        appliedDate = appliedDateValue.toISOString().split('T')[0];
-      } else if (typeof appliedDateValue === 'string') {
-        appliedDate = appliedDateValue.split('T')[0];
-      } else {
-        appliedDate = new Date(appliedDateValue).toISOString().split('T')[0];
-      }
-    } else {
-      appliedDate = new Date().toISOString().split('T')[0];
-    }
+    // Return response immediately - don't wait for emails
+    // Send email notifications asynchronously (fire and forget)
+    const appliedDate = new Date().toISOString().split('T')[0]; // Use current date, no need for extra query
 
     // Prepare email data
     const emailData = {
@@ -443,52 +447,60 @@ export const applyLeave = async (
     // Determine if urgent: only if start date is today (same day application)
     const isUrgent = startDate.getTime() === today.getTime();
 
-    // Send email notifications based on employee role
+    // Send email notifications asynchronously (don't await - fire and forget)
+    // This allows the API to return immediately while emails are sent in the background
     // For employees: Send to reporting manager and manager's manager (HR)
     // For managers: Send to their reporting manager (HR/Super Admin) and HR's manager (Super Admin)
     // For HR: Send to their reporting manager (Super Admin)
     // For Super Admin: Send to their reporting manager (if exists)
 
-    // Send email to reporting manager (if exists and has email)
+    // Send email to reporting manager (if exists and has email) - ASYNC
     if (managerEmail && reportingManagerId) {
-      try {
-        const emailSent = isUrgent
-          ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData)
-          : await sendLeaveApplicationEmail(managerEmail, emailData);
-        if (emailSent) {
-          logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to reporting manager (${managerRole || 'Manager'}): ${managerEmail} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
-        } else {
-          logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+      // Fire and forget - don't await
+      (async () => {
+        try {
+          const emailSent = isUrgent
+            ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData)
+            : await sendLeaveApplicationEmail(managerEmail, emailData);
+          if (emailSent) {
+            logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to reporting manager (${managerRole || 'Manager'}): ${managerEmail} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
+          } else {
+            logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+          }
+        } catch (emailError: any) {
+          // Don't fail the leave application if email fails
+          logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
         }
-      } catch (emailError: any) {
-        // Don't fail the leave application if email fails
-        logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
-      }
+      })().catch(err => logger.error(`[LEAVE] [APPLY LEAVE] Unhandled error in async email send:`, err));
     }
 
-    // Send email to manager's reporting manager (if exists and has email)
+    // Send email to manager's reporting manager (if exists and has email) - ASYNC
     // This handles: Employee → Manager → HR, Manager → HR → Super Admin, HR → Super Admin
     if (hrEmail && hrId && managerEmail !== hrEmail) {
-      try {
-        // Update manager name for the second email
-        const hrEmailData = {
-          ...emailData,
-          managerName: hrName || (hrRole === 'hr' ? 'HR' : hrRole === 'super_admin' ? 'Super Admin' : 'Manager')
-        };
-        const emailSent = isUrgent
-          ? await sendUrgentLeaveApplicationEmail(hrEmail, hrEmailData)
-          : await sendLeaveApplicationEmail(hrEmail, hrEmailData);
-        if (emailSent) {
-          logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to manager's reporting manager (${hrRole || 'HR'}): ${hrEmail} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
-        } else {
-          logger.warn(`Failed to send leave application email to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
+      // Fire and forget - don't await
+      (async () => {
+        try {
+          // Update manager name for the second email
+          const hrEmailData = {
+            ...emailData,
+            managerName: hrName || (hrRole === 'hr' ? 'HR' : hrRole === 'super_admin' ? 'Super Admin' : 'Manager')
+          };
+          const emailSent = isUrgent
+            ? await sendUrgentLeaveApplicationEmail(hrEmail, hrEmailData)
+            : await sendLeaveApplicationEmail(hrEmail, hrEmailData);
+          if (emailSent) {
+            logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to manager's reporting manager (${hrRole || 'HR'}): ${hrEmail} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
+          } else {
+            logger.warn(`Failed to send leave application email to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
+          }
+        } catch (emailError: any) {
+          // Don't fail the leave application if email fails
+          logger.error(`Error sending email to manager's reporting manager for leave request ${leaveRequestId}:`, emailError);
         }
-      } catch (emailError: any) {
-        // Don't fail the leave application if email fails
-        logger.error(`Error sending email to manager's reporting manager for leave request ${leaveRequestId}:`, emailError);
-      }
+      })().catch(err => logger.error(`[LEAVE] [APPLY LEAVE] Unhandled error in async email send:`, err));
     }
 
+    logger.info(`[LEAVE] [APPLY LEAVE] Leave application completed successfully - Leave Request ID: ${leaveRequestId}, Emails queued for async sending`);
     return { leaveRequestId, message: 'Leave request submitted successfully' };
   } catch (error: any) {
     console.error('Error in applyLeave:', error);
@@ -511,6 +523,9 @@ export const getMyLeaveRequests = async (
   status?: string,
   userRole?: string
 ) => {
+  logger.info(`[LEAVE] [GET MY LEAVE REQUESTS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [GET MY LEAVE REQUESTS] User ID: ${userId}, Page: ${page}, Limit: ${limit}, Status: ${status || 'all'}, Role: ${userRole || 'none'}`);
+  
   try {
     const offset = (page - 1) * limit;
     let query = `
@@ -634,13 +649,17 @@ export const getMyLeaveRequests = async (
       }
     };
   } catch (error: any) {
-    logger.error('Error fetching my leave requests:', error);
+    logger.error(`[LEAVE] [GET MY LEAVE REQUESTS] Error fetching my leave requests:`, error);
     throw new Error(`Failed to fetch leave requests: ${error.message || error.toString()}`);
   }
 };
 
 export const getLeaveRequestById = async (requestId: number, userId: number, userRole?: string) => {
+  logger.info(`[LEAVE] [GET LEAVE REQUEST BY ID] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [GET LEAVE REQUEST BY ID] Request ID: ${requestId}, User ID: ${userId}, User Role: ${userRole || 'none'}`);
+  
   if (isNaN(requestId) || requestId <= 0) {
+    logger.warn(`[LEAVE] [GET LEAVE REQUEST BY ID] Invalid leave request ID: ${requestId}`);
     throw new Error('Invalid leave request ID');
   }
 
@@ -767,6 +786,8 @@ export const updateLeaveRequest = async (
     doctorNote?: string;
   }
 ) => {
+  logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}, Leave Type: ${leaveData.leaveType}, Start: ${leaveData.startDate}, End: ${leaveData.endDate}`);
   // Verify the request and authorization
   const checkResult = await pool.query(
     'SELECT current_status, employee_id FROM leave_requests WHERE id = $1',
@@ -1035,8 +1056,12 @@ export const convertLeaveRequestLopToCasual = async (
   userId: number,
   userRole: string
 ) => {
+  logger.info(`[LEAVE] [CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [CONVERT LOP TO CASUAL] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}`);
+  
   // Only HR and Super Admin can convert leave types
   if (userRole !== 'hr' && userRole !== 'super_admin') {
+    logger.warn(`[LEAVE] [CONVERT LOP TO CASUAL] Unauthorized attempt - User ID: ${userId}, Role: ${userRole}`);
     throw new Error('Only HR and Super Admin can convert leave types');
   }
 
@@ -1297,15 +1322,21 @@ export const convertLeaveRequestLopToCasual = async (
 };
 
 export const deleteLeaveRequest = async (requestId: number, userId: number, userRole?: string) => {
+  logger.info(`[LEAVE] [DELETE LEAVE REQUEST] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole || 'none'}`);
+  
   // Verify the request
+  logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Verifying leave request exists`);
   const checkResult = await pool.query(
     'SELECT current_status, employee_id, leave_type, no_of_days FROM leave_requests WHERE id = $1',
     [requestId]
   );
 
   if (checkResult.rows.length === 0) {
+    logger.warn(`[LEAVE] [DELETE LEAVE REQUEST] Leave request not found - Request ID: ${requestId}`);
     throw new Error('Leave request not found');
   }
+  logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Leave request found - Status: ${checkResult.rows[0].current_status}, Employee ID: ${checkResult.rows[0].employee_id}`);
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
@@ -1416,7 +1447,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
       // Transaction might already be aborted, log but don't throw
       logger.warn('Error during rollback (transaction may already be aborted):', rollbackError.message);
     }
-    logger.error(`Error deleting leave request ${requestId}:`, error);
+    logger.error(`[LEAVE] [DELETE LEAVE REQUEST] Error deleting leave request ${requestId}:`, error);
     throw new Error(error.message || 'Failed to delete leave request');
   } finally {
     // Always release the client connection
@@ -1432,6 +1463,9 @@ export const getPendingLeaveRequests = async (
   search?: string,
   filter?: string
 ) => {
+  logger.info(`[LEAVE] [GET PENDING LEAVE REQUESTS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [GET PENDING LEAVE REQUESTS] Approver ID: ${approverId}, Role: ${approverRole}, Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, Filter: ${filter || 'none'}`);
+  
   const offset = (page - 1) * limit;
   
   // Build query based on role
@@ -3366,8 +3400,12 @@ export const updateLeaveStatus = async (
   rejectReason?: string,
   leaveReason?: string
 ) => {
+  logger.info(`[LEAVE] [UPDATE LEAVE STATUS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Role: ${approverRole}, New Status: ${newStatus}, Selected Day IDs: ${selectedDayIds?.join(', ') || 'none'}`);
+  
   // Only HR and Super Admin can use this function
   if (approverRole !== 'hr' && approverRole !== 'super_admin') {
+    logger.warn(`[LEAVE] [UPDATE LEAVE STATUS] Unauthorized attempt - Approver ID: ${approverId}, Role: ${approverRole}`);
     throw new Error('Not authorized to update leave status');
   }
 
@@ -3734,6 +3772,9 @@ export const getApprovedLeaves = async (
   limit: number = 10,
   userRole?: string
 ) => {
+  logger.info(`[LEAVE] [GET APPROVED LEAVES] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE] [GET APPROVED LEAVES] Page: ${page}, Limit: ${limit}, User Role: ${userRole || 'none'}`);
+  
   const offset = (page - 1) * limit;
   
   const result = await pool.query(

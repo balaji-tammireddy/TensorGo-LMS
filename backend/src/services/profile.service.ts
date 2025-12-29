@@ -1,6 +1,9 @@
 import { pool } from '../database/db';
+import { logger } from '../utils/logger';
 
 export const getProfile = async (userId: number) => {
+  logger.info(`[PROFILE] [GET PROFILE] ========== FUNCTION CALLED ==========`);
+  logger.info(`[PROFILE] [GET PROFILE] User ID: ${userId}`);
   const result = await pool.query(
     `SELECT u.*, 
             rm.id as reporting_manager_id, 
@@ -13,9 +16,11 @@ export const getProfile = async (userId: number) => {
   );
 
   if (result.rows.length === 0) {
+    logger.warn(`[PROFILE] [GET PROFILE] User not found - User ID: ${userId}`);
     throw new Error('User not found');
   }
 
+  logger.info(`[PROFILE] [GET PROFILE] User found, fetching education records`);
   const user = result.rows[0];
 
   // Get education
@@ -23,6 +28,7 @@ export const getProfile = async (userId: number) => {
     'SELECT * FROM education WHERE employee_id = $1',
     [userId]
   );
+  logger.info(`[PROFILE] [GET PROFILE] Found ${educationResult.rows.length} education records`);
 
   return {
     personalInfo: {
@@ -74,8 +80,13 @@ export const getProfile = async (userId: number) => {
 };
 
 export const updateProfile = async (userId: number, profileData: any) => {
+  logger.info(`[PROFILE] [UPDATE PROFILE] ========== FUNCTION CALLED ==========`);
+  logger.info(`[PROFILE] [UPDATE PROFILE] User ID: ${userId}`);
+  logger.info(`[PROFILE] [UPDATE PROFILE] Sections to update: ${Object.keys(profileData).join(', ')}`);
+  
   // Validate date of birth - employee must be at least 18 years old
   if (profileData.personalInfo?.dateOfBirth) {
+    logger.info(`[PROFILE] [UPDATE PROFILE] Validating date of birth`);
     const dob = new Date(profileData.personalInfo.dateOfBirth);
     const today = new Date();
     let age = today.getFullYear() - dob.getFullYear();
@@ -188,13 +199,18 @@ export const updateProfile = async (userId: number, profileData: any) => {
   }
 
   if (updates.length > 0) {
+    logger.info(`[PROFILE] [UPDATE PROFILE] Updating ${updates.length} fields in database`);
     values.push(userId);
     const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
     await pool.query(query, values);
+    logger.info(`[PROFILE] [UPDATE PROFILE] Database update completed successfully`);
+  } else {
+    logger.info(`[PROFILE] [UPDATE PROFILE] No fields to update in users table`);
   }
 
   // Update education
   if (profileData.education) {
+    logger.info(`[PROFILE] [UPDATE PROFILE] Updating ${profileData.education.length} education records`);
     for (const edu of profileData.education) {
       if (edu.level) {
         // Validate year if provided (must be between 1950 and 5 years from current year)
@@ -228,26 +244,38 @@ export const updateProfile = async (userId: number, profileData: any) => {
     }
   }
 
+  logger.info(`[PROFILE] [UPDATE PROFILE] Profile update completed successfully - User ID: ${userId}`);
   return { message: 'Profile updated successfully' };
 };
 
 export const updateProfilePhoto = async (userId: number, photoUrl: string) => {
+  logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] ========== FUNCTION CALLED ==========`);
+  logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] User ID: ${userId}, Photo URL: ${photoUrl}`);
+  
   await pool.query(
     'UPDATE users SET profile_photo_url = $1 WHERE id = $2',
     [photoUrl, userId]
   );
+  logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] Profile photo updated successfully - User ID: ${userId}`);
   return { photoUrl, message: 'Profile photo updated successfully' };
 };
 
 export const deleteProfilePhoto = async (userId: number) => {
+  logger.info(`[PROFILE] [DELETE PROFILE PHOTO] ========== FUNCTION CALLED ==========`);
+  logger.info(`[PROFILE] [DELETE PROFILE PHOTO] User ID: ${userId}`);
+  
   await pool.query(
     'UPDATE users SET profile_photo_url = NULL WHERE id = $1',
     [userId]
   );
+  logger.info(`[PROFILE] [DELETE PROFILE PHOTO] Profile photo deleted successfully - User ID: ${userId}`);
   return { message: 'Profile photo deleted successfully' };
 };
 
 export const getReportingManagers = async (search?: string, employeeRole?: string, excludeEmployeeId?: number) => {
+  logger.info(`[PROFILE] [GET REPORTING MANAGERS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
+  
   // Reporting manager rules:
   // - For managers, their reporting manager should be HR
   // - For HR, their reporting manager should be super admin
@@ -283,7 +311,10 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
 
   query += ' ORDER BY first_name LIMIT 20';
 
+  logger.info(`[PROFILE] [GET REPORTING MANAGERS] Querying database for target role: ${targetRole}`);
   const result = await pool.query(query, params);
+  logger.info(`[PROFILE] [GET REPORTING MANAGERS] Found ${result.rows.length} reporting managers`);
+  
   return {
     managers: result.rows.map(row => ({
       id: row.id,

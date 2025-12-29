@@ -3,8 +3,12 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import * as employeeService from '../services/employee.service';
 import { sendCarryForwardEmailsToAll } from '../services/leaveCredit.service';
 import { pool } from '../database/db';
+import { logger } from '../utils/logger';
 
 export const getEmployees = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] User ID: ${req.user!.id}, Role: ${req.user!.role}, Page: ${req.query.page || 1}, Limit: ${req.query.limit || 20}, Search: ${req.query.search || 'none'}`);
+  
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -13,8 +17,10 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
     const status = req.query.status as string | undefined;
 
     const result = await employeeService.getEmployees(page, limit, search, joiningDate, status);
+    logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] Retrieved ${result.employees.length} employees, Total: ${result.pagination.total}`);
     res.json(result);
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] Error:`, error);
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
@@ -25,11 +31,16 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
 };
 
 export const getEmployeeById = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEE BY ID] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEE BY ID] Employee ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
+  
   try {
     const employeeId = parseInt(req.params.id);
     const employee = await employeeService.getEmployeeById(employeeId);
+    logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEE BY ID] Employee retrieved successfully - Employee ID: ${employeeId}`);
     res.json({ employee });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEE BY ID] Error:`, error);
     res.status(404).json({
       error: {
         code: 'NOT_FOUND',
@@ -40,10 +51,15 @@ export const getEmployeeById = async (req: AuthRequest, res: Response) => {
 };
 
 export const getNextEmployeeId = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] User ID: ${req.user!.id}, Role: ${req.user!.role}`);
+  
   try {
     const nextId = await employeeService.getNextEmployeeId();
+    logger.info(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] Next employee ID: ${nextId}`);
     res.json({ nextEmployeeId: nextId });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] Error:`, error);
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
@@ -54,10 +70,15 @@ export const getNextEmployeeId = async (req: AuthRequest, res: Response) => {
 };
 
 export const createEmployee = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] User ID: ${req.user!.id}, Role: ${req.user!.role}, Employee ID: ${req.body.empId}, Email: ${req.body.email}`);
+  
   try {
     const result = await employeeService.createEmployee(req.body);
+    logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] Employee created successfully - Employee ID: ${result.employeeId}`);
     res.status(201).json(result);
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] Error:`, error);
     res.status(400).json({
       error: {
         code: 'VALIDATION_ERROR',
@@ -68,6 +89,9 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
 };
 
 export const updateEmployee = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [UPDATE EMPLOYEE] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Fields: ${Object.keys(req.body).join(', ')}`);
+  
   try {
     const employeeId = parseInt(req.params.id);
     const result = await employeeService.updateEmployee(
@@ -76,8 +100,10 @@ export const updateEmployee = async (req: AuthRequest, res: Response) => {
       req.user?.role,
       req.user?.id
     );
+    logger.info(`[CONTROLLER] [EMPLOYEE] [UPDATE EMPLOYEE] Employee updated successfully - Employee ID: ${employeeId}`);
     res.json(result);
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [UPDATE EMPLOYEE] Error:`, error);
     res.status(400).json({
       error: {
         code: 'UPDATE_ERROR',
@@ -88,9 +114,13 @@ export const updateEmployee = async (req: AuthRequest, res: Response) => {
 };
 
 export const deleteEmployee = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
+  
   try {
     // Ensure only super_admin can delete
     if (req.user?.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -102,6 +132,7 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
     
     // Prevent super admin from deleting themselves
     if (req.user?.id === employeeId) {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Super Admin attempted to delete themselves - User ID: ${req.user.id}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -111,8 +142,10 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
     }
     
     const result = await employeeService.deleteEmployee(employeeId);
+    logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee deleted successfully - Employee ID: ${employeeId}`);
     res.json(result);
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Error:`, error);
     res.status(400).json({
       error: {
         code: 'DELETE_ERROR',
@@ -123,9 +156,13 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
 };
 
 export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Leave Type: ${req.body.leaveType}, Count: ${req.body.count}`);
+  
   try {
     // Ensure only HR and super_admin can add leaves
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -214,8 +251,10 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
       parseFloat(count),
       req.user!.id
     );
+    logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Leaves added successfully - Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}`);
     res.json(result);
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Error:`, error);
     res.status(400).json({
       error: {
         code: 'BAD_REQUEST',
@@ -226,9 +265,13 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
 };
 
 export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
+  
   try {
     // Ensure only HR and super_admin can view employee leave balances
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -239,8 +282,10 @@ export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) 
 
     const employeeId = parseInt(req.params.id);
     const balances = await employeeService.getEmployeeLeaveBalances(employeeId);
+    logger.info(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] Balances retrieved - Employee ID: ${employeeId}, Casual: ${balances.casual}, Sick: ${balances.sick}, LOP: ${balances.lop}`);
     res.json(balances);
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] Error:`, error);
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
@@ -255,9 +300,13 @@ export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) 
  * Only HR and Super Admin can trigger this
  */
 export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Previous Year: ${req.query.previousYear || 'auto'}, New Year: ${req.query.newYear || 'auto'}`);
+  
   try {
     // Ensure only HR and super_admin can send carryforward emails
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -272,6 +321,7 @@ export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) =>
 
     const result = await sendCarryForwardEmailsToAll(previousYear, newYear);
     
+    logger.info(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] Emails sent successfully - Sent: ${result.sent}, Errors: ${result.errors}`);
     res.json({
       success: true,
       message: `Carryforward emails sent successfully`,
@@ -279,6 +329,7 @@ export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) =>
       errors: result.errors
     });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] Error:`, error);
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
@@ -294,9 +345,13 @@ export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) =>
  * Conversion is only allowed if employee has LOP balance
  */
 export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Count: ${req.body.count}`);
+  
   try {
     // Ensure only HR and super_admin can convert LOP to casual
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -307,6 +362,7 @@ export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
 
     const employeeId = parseInt(req.params.id);
     if (isNaN(employeeId)) {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Invalid employee ID: ${req.params.id}`);
       return res.status(400).json({
         error: {
           code: 'BAD_REQUEST',
@@ -318,6 +374,7 @@ export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
     const { count } = req.body;
 
     if (!count || count <= 0) {
+      logger.warn(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Invalid count: ${count}`);
       return res.status(400).json({
         error: {
           code: 'BAD_REQUEST',
@@ -375,11 +432,13 @@ export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
       req.user!.id
     );
     
+    logger.info(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Conversion successful - Employee ID: ${employeeId}, Count: ${count}`);
     res.json({
       success: true,
       ...result
     });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Error:`, error);
     // Check if it's a validation error (400) or server error (500)
     const isValidationError = error.message && (
       error.message.includes('not found') ||

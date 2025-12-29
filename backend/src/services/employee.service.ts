@@ -9,6 +9,9 @@ export const getEmployees = async (
   joiningDate?: string,
   status?: string
 ) => {
+  logger.info(`[EMPLOYEE] [GET EMPLOYEES] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}`);
+  
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
@@ -70,6 +73,8 @@ export const getEmployees = async (
   }
 
   const countResult = await pool.query(countQuery, countParams);
+  
+  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Found ${result.rows.length} employees, Total: ${countResult.rows[0].count}`);
 
   return {
     employees: result.rows.map(row => ({
@@ -90,7 +95,10 @@ export const getEmployees = async (
 };
 
 export const getNextEmployeeId = async (): Promise<string> => {
+  logger.info(`[EMPLOYEE] [GET NEXT EMPLOYEE ID] ========== FUNCTION CALLED ==========`);
+  
   // Get all employee IDs that are numeric and find the maximum
+  logger.info(`[EMPLOYEE] [GET NEXT EMPLOYEE ID] Querying database for maximum numeric employee ID`);
   const result = await pool.query(
     `SELECT emp_id FROM users 
      WHERE emp_id ~ '^[0-9]+$' 
@@ -111,6 +119,8 @@ export const getNextEmployeeId = async (): Promise<string> => {
 };
 
 export const getEmployeeById = async (employeeId: number) => {
+  logger.info(`[EMPLOYEE] [GET EMPLOYEE BY ID] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [GET EMPLOYEE BY ID] Employee ID: ${employeeId}`);
   const result = await pool.query(
     `SELECT u.*, 
             rm.id as reporting_manager_id, 
@@ -140,12 +150,17 @@ export const getEmployeeById = async (employeeId: number) => {
 };
 
 export const createEmployee = async (employeeData: any) => {
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}`);
+  
   // Employee ID must be provided by HR/Super Admin
   if (!employeeData.empId || !employeeData.empId.trim()) {
+    logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID is required`);
     throw new Error('Employee ID is required');
   }
   
   const empId = employeeData.empId.trim().toUpperCase();
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Normalized Employee ID: ${empId}`);
   
   // Validate employee ID length (max 6 characters)
   if (empId.length > 6) {
@@ -158,6 +173,7 @@ export const createEmployee = async (employeeData: any) => {
   }
 
   // Check if emp_id or email already exists
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Checking if employee ID or email already exists`);
   const existingResult = await pool.query(
     'SELECT id FROM users WHERE emp_id = $1 OR email = $2',
     [empId, employeeData.email]
@@ -170,12 +186,15 @@ export const createEmployee = async (employeeData: any) => {
       [existing.id]
     );
     if (existingCheck.rows[0].emp_id === empId) {
+      logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID already exists: ${empId}`);
       throw new Error('Employee ID already exists');
     }
     if (existingCheck.rows[0].email === employeeData.email) {
+      logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Email already exists: ${employeeData.email}`);
       throw new Error('Email already exists');
     }
   }
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID and email are unique`);
 
   // Validate date of birth - employee must be at least 18 years old
   if (employeeData.dateOfBirth) {
@@ -192,13 +211,16 @@ export const createEmployee = async (employeeData: any) => {
   }
 
   // Default password for newly created employees (if none explicitly provided)
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Hashing password`);
   const passwordHash = await hashPassword(employeeData.password || 'tensorgo@2023');
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Password hashed successfully`);
 
   // Super admin should not have a reporting manager
   const role = employeeData.role || 'employee';
   const reportingManagerId = role === 'super_admin' ? null : (employeeData.reportingManagerId || null);
   const reportingManagerName = role === 'super_admin' ? null : (employeeData.reportingManagerName || null);
 
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Inserting employee into database`);
   const result = await pool.query(
     `INSERT INTO users (
       emp_id, email, password_hash, role, first_name, middle_name, last_name,
@@ -252,8 +274,10 @@ export const createEmployee = async (employeeData: any) => {
   );
 
   const userId = result.rows[0].id;
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee created successfully with User ID: ${userId}`);
 
   // Calculate all leave credits based on join date
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Calculating leave credits for join date: ${employeeData.dateOfJoining}`);
   // This includes:
   // - Initial credits (given immediately on join date: before/after 15th)
   // - Monthly credits (from next month onwards, following "next month credit" logic:
@@ -269,10 +293,12 @@ export const createEmployee = async (employeeData: any) => {
   const casualBalance = Math.min(allCredits.casual, 99);
   const sickBalance = Math.min(allCredits.sick, 99);
   
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
   await pool.query(
     'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
     [userId, casualBalance, sickBalance]
   );
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
 
   // Insert education if provided
   if (employeeData.education) {
@@ -312,6 +338,7 @@ export const createEmployee = async (employeeData: any) => {
 
   // Send welcome email with credentials
   try {
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
     const { sendNewEmployeeCredentialsEmail } = await import('../utils/emailTemplates');
     const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const temporaryPassword = employeeData.password || 'tensorgo@2023';
@@ -323,21 +350,29 @@ export const createEmployee = async (employeeData: any) => {
       temporaryPassword: temporaryPassword,
       loginUrl: loginUrl
     });
-    logger.info(`✅ New employee credentials email sent to: ${employeeData.email}`);
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] New employee credentials email sent successfully to: ${employeeData.email}`);
   } catch (emailError: any) {
     // Log error but don't fail employee creation
-    logger.error(`❌ Error sending new employee credentials email:`, emailError);
+    logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Error sending new employee credentials email:`, emailError);
   }
 
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee creation completed successfully - User ID: ${userId}, Emp ID: ${empId}`);
   return { employeeId: userId, message: 'Employee created successfully' };
 };
 
 export const updateEmployee = async (employeeId: number, employeeData: any, requesterRole?: string, requesterId?: number) => {
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${employeeId}, Requester Role: ${requesterRole || 'none'}, Requester ID: ${requesterId || 'none'}`);
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Fields to update: ${Object.keys(employeeData).join(', ')}`);
+  
   // Check if employee exists and get their role
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
   const employeeCheck = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
+    logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
   }
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee found - Role: ${employeeCheck.rows[0].role}`);
 
   const employeeRole = employeeCheck.rows[0].role;
   
@@ -479,7 +514,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   values.push(employeeId);
   const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
 
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Executing update query with ${updates.length} fields`);
   await pool.query(query, values);
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Database update completed successfully`);
 
   // If joining date was updated, recalculate leave balances
   if (employeeData.dateOfJoining && requesterRole === 'super_admin') {
@@ -569,35 +606,45 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
           employeeEmpId: employeeResult.rows[0].emp_id || ''
         });
-        logger.info(`✅ Employee details update email sent to: ${employeeResult.rows[0].email}`);
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
       }
     } catch (emailError: any) {
       // Log error but don't fail employee update
-      logger.error(`❌ Error sending employee details update email:`, emailError);
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending employee details update email:`, emailError);
     }
   }
 
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee update completed successfully - Employee ID: ${employeeId}`);
   return { message: 'Employee updated successfully' };
 };
 
 export const deleteEmployee = async (employeeId: number) => {
+  logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${employeeId}`);
+  
   // Check if employee exists
+  logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Checking if employee exists`);
   const result = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
   if (result.rows.length === 0) {
+    logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
   }
 
   const employee = result.rows[0];
+  logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee found - Role: ${employee.role}`);
   
   // Prevent deletion of super_admin users
   if (employee.role === 'super_admin') {
+    logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Attempt to delete super admin user - Employee ID: ${employeeId}`);
     throw new Error('Cannot delete super admin users');
   }
 
   // Start transaction to delete all related data
+  logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Starting database transaction`);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Transaction started`);
 
     // Delete all related data in order (respecting foreign key constraints)
     // 1. Delete leave days (these are linked to leave requests)
@@ -620,12 +667,16 @@ export const deleteEmployee = async (employeeId: number) => {
     await client.query('UPDATE users SET updated_by = NULL WHERE updated_by = $1', [employeeId]);
 
     // 7. Finally, delete the user
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting user record`);
     await client.query('DELETE FROM users WHERE id = $1', [employeeId]);
 
     await client.query('COMMIT');
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Transaction committed successfully`);
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee and all related data deleted successfully - Employee ID: ${employeeId}`);
     return { message: 'Employee and all related data deleted successfully' };
   } catch (error: any) {
     await client.query('ROLLBACK');
+    logger.error(`[EMPLOYEE] [DELETE EMPLOYEE] Transaction rolled back - Error deleting employee:`, error);
     throw error;
   } finally {
     client.release();
@@ -638,8 +689,12 @@ export const addLeavesToEmployee = async (
   count: number,
   updatedBy: number
 ) => {
+  logger.info(`[EMPLOYEE] [ADD LEAVES] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [ADD LEAVES] Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}, Updated By: ${updatedBy}`);
+  
   // Validate leave type
   if (!['casual', 'sick', 'lop'].includes(leaveType)) {
+    logger.warn(`[EMPLOYEE] [ADD LEAVES] Invalid leave type: ${leaveType}`);
     throw new Error('Invalid leave type');
   }
 
@@ -761,22 +816,28 @@ export const addLeavesToEmployee = async (
 };
 
 export const getEmployeeLeaveBalances = async (employeeId: number) => {
+  logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] Employee ID: ${employeeId}`);
+  
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [employeeId]
   );
 
   if (result.rows.length === 0) {
+    logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] No balance record found, returning zero balances`);
     // Return zero balances if not found
     return { casual: 0, sick: 0, lop: 0 };
   }
 
   const balance = result.rows[0];
-  return {
+  const balances = {
     casual: parseFloat(balance.casual_balance) || 0,
     sick: parseFloat(balance.sick_balance) || 0,
     lop: parseFloat(balance.lop_balance) || 0
   };
+  logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] Balances retrieved - Casual: ${balances.casual}, Sick: ${balances.sick}, LOP: ${balances.lop}`);
+  return balances;
 };
 
 /**
@@ -792,18 +853,25 @@ export const convertLopToCasual = async (
   count: number,
   updatedBy: number
 ) => {
+  logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
+  logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Employee ID: ${employeeId}, Count: ${count}, Updated By: ${updatedBy}`);
+  
   // Validate count
   if (count <= 0) {
+    logger.warn(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Invalid count: ${count}`);
     throw new Error('Conversion count must be greater than 0');
   }
 
   // Check if employee exists
+  logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Checking if employee exists`);
   const employeeCheck = await pool.query('SELECT id FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
+    logger.warn(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
   }
 
   // Get current leave balances
+  logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Fetching current leave balances`);
   const balanceCheck = await pool.query(
     'SELECT id, casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [employeeId]
@@ -812,7 +880,9 @@ export const convertLopToCasual = async (
   const client = await pool.connect();
 
   try {
+    logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Starting database transaction`);
     await client.query('BEGIN');
+    logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Transaction started`);
 
     // Get or create balance record
     let currentLop = 0;

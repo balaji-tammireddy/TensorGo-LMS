@@ -2,8 +2,12 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import * as authService from '../services/auth.service';
 import { verifyToken, generateAccessToken } from '../utils/jwt';
+import { logger } from '../utils/logger';
 
 export const login = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [LOGIN] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [AUTH] [LOGIN] Email: ${req.body.email}`);
+  
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
@@ -16,11 +20,13 @@ export const login = async (req: AuthRequest, res: Response) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
+    logger.info(`[CONTROLLER] [AUTH] [LOGIN] Login successful - User ID: ${result.user.id}, Role: ${result.user.role}`);
     res.json({
       accessToken: result.accessToken,
       user: result.user
     });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [AUTH] [LOGIN] Login failed:`, error);
     res.status(401).json({
       error: {
         code: 'AUTH_FAILED',
@@ -31,6 +37,8 @@ export const login = async (req: AuthRequest, res: Response) => {
 };
 
 export const refresh = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [REFRESH] ========== REQUEST RECEIVED ==========`);
+  
   try {
     const { refreshToken } = req.body;
     const decoded = verifyToken(refreshToken);
@@ -41,8 +49,10 @@ export const refresh = async (req: AuthRequest, res: Response) => {
       role: decoded.role
     });
 
+    logger.info(`[CONTROLLER] [AUTH] [REFRESH] Token refreshed successfully - User ID: ${decoded.userId}`);
     res.json({ accessToken: newAccessToken });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [AUTH] [REFRESH] Token refresh failed:`, error);
     res.status(403).json({
       error: {
         code: 'INVALID_TOKEN',
@@ -53,13 +63,21 @@ export const refresh = async (req: AuthRequest, res: Response) => {
 };
 
 export const logout = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [LOGOUT] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [AUTH] [LOGOUT] User ID: ${req.user?.id || 'unknown'}`);
+  
   res.clearCookie('refreshToken');
+  logger.info(`[CONTROLLER] [AUTH] [LOGOUT] Logout successful`);
   res.json({ message: 'Logged out successfully' });
 };
 
 export const changePassword = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] User ID: ${req.user?.id || 'unknown'}`);
+  
   try {
     if (!req.user) {
+      logger.warn(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] User not authenticated`);
       return res.status(401).json({
         error: {
           code: 'UNAUTHORIZED',
@@ -71,8 +89,10 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     const { oldPassword, newPassword } = req.body;
     await authService.changePassword(req.user.id, oldPassword, newPassword);
 
+    logger.info(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] Password changed successfully - User ID: ${req.user.id}`);
     res.json({ message: 'Password updated successfully' });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] Password change failed:`, error);
     res.status(400).json({
       error: {
         code: 'CHANGE_PASSWORD_FAILED',
@@ -83,15 +103,20 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 };
 
 export const forgotPassword = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Email: ${req.body.email}`);
+  
   try {
     const { email } = req.body;
     await authService.requestPasswordReset(email);
 
+    logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Password reset request processed`);
     // Always return success to prevent email enumeration
     res.json({ 
       message: 'If the email exists, an OTP has been sent to your registered email address.' 
     });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Password reset request failed:`, error);
     res.status(500).json({
       error: {
         code: 'FORGOT_PASSWORD_FAILED',
@@ -102,11 +127,15 @@ export const forgotPassword = async (req: AuthRequest, res: Response) => {
 };
 
 export const verifyOTP = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [VERIFY OTP] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [AUTH] [VERIFY OTP] Email: ${req.body.email}`);
+  
   try {
     const { email, otp } = req.body;
     const isValid = await authService.verifyPasswordResetOTP(email, otp);
 
     if (!isValid) {
+      logger.warn(`[CONTROLLER] [AUTH] [VERIFY OTP] Invalid or expired OTP for email: ${email}`);
       return res.status(400).json({
         error: {
           code: 'INVALID_OTP',
@@ -115,8 +144,10 @@ export const verifyOTP = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    logger.info(`[CONTROLLER] [AUTH] [VERIFY OTP] OTP verified successfully`);
     res.json({ message: 'OTP verified successfully' });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [AUTH] [VERIFY OTP] OTP verification failed:`, error);
     res.status(400).json({
       error: {
         code: 'VERIFY_OTP_FAILED',
@@ -127,12 +158,17 @@ export const verifyOTP = async (req: AuthRequest, res: Response) => {
 };
 
 export const resetPassword = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [AUTH] [RESET PASSWORD] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [AUTH] [RESET PASSWORD] Email: ${req.body.email}`);
+  
   try {
     const { email, otp, newPassword } = req.body;
     await authService.resetPasswordWithOTP(email, otp, newPassword);
 
+    logger.info(`[CONTROLLER] [AUTH] [RESET PASSWORD] Password reset successfully`);
     res.json({ message: 'Password reset successfully' });
   } catch (error: any) {
+    logger.error(`[CONTROLLER] [AUTH] [RESET PASSWORD] Password reset failed:`, error);
     res.status(400).json({
       error: {
         code: 'RESET_PASSWORD_FAILED',

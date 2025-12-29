@@ -8,14 +8,19 @@ import { sendLeaveCarryForwardEmail } from '../utils/emailTemplates';
  * Credits 1 casual leave and 0.5 sick leave to each active employee
  */
 export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors: number }> => {
+  logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] ========== FUNCTION CALLED ==========`);
+  
   const client = await pool.connect();
   let credited = 0;
   let errors = 0;
 
   try {
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Starting database transaction`);
     await client.query('BEGIN');
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Transaction started`);
 
     // Get all active employees with their leave balances
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Fetching all active employees`);
     const employeesResult = await client.query(`
       SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
              COALESCE(lb.casual_balance, 0) as current_casual,
@@ -26,6 +31,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
       WHERE u.status = 'active'
         AND u.role IN ('employee', 'manager', 'hr')
     `);
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Found ${employeesResult.rows.length} active employees`);
 
     for (const employee of employeesResult.rows) {
       try {
@@ -64,20 +70,22 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
         }
 
         credited++;
-        logger.info(`Credited monthly leaves to employee ${employee.emp_id} (${employee.name}): +1 casual, +0.5 sick`);
+        logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Credited monthly leaves to employee ${employee.emp_id} (${employee.name}): +1 casual, +0.5 sick`);
       } catch (error: any) {
         errors++;
-        logger.error(`Failed to credit leaves for employee ${employee.emp_id}:`, error);
+        logger.error(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Failed to credit leaves for employee ${employee.emp_id}:`, error);
       }
     }
 
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Committing transaction`);
     await client.query('COMMIT');
-    logger.info(`Monthly leave credit completed. Credited: ${credited}, Errors: ${errors}`);
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Transaction committed successfully`);
+    logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Monthly leave credit completed. Credited: ${credited}, Errors: ${errors}`);
     
     return { credited, errors };
   } catch (error: any) {
     await client.query('ROLLBACK');
-    logger.error('Monthly leave credit transaction failed:', error);
+    logger.error(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Transaction rolled back - Monthly leave credit transaction failed:`, error);
     throw error;
   } finally {
     client.release();
@@ -89,15 +97,21 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
  * This should be called daily to check for anniversaries
  */
 export const creditAnniversaryLeaves = async (): Promise<{ credited: number; errors: number }> => {
+  logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] ========== FUNCTION CALLED ==========`);
+  
   const client = await pool.connect();
   let credited = 0;
   let errors = 0;
   const today = new Date();
+  logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Today's date: ${today.toISOString().split('T')[0]}`);
 
   try {
+    logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Starting database transaction`);
     await client.query('BEGIN');
+    logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Transaction started`);
 
     // Get all active employees with their join dates and leave balances
+    logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Fetching all active employees with join dates`);
     const employeesResult = await client.query(`
       SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
              u.date_of_joining,
@@ -108,6 +122,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
       WHERE u.status = 'active'
         AND u.role IN ('employee', 'manager', 'hr')
     `);
+    logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Found ${employeesResult.rows.length} active employees`);
 
     for (const employee of employeesResult.rows) {
       try {
@@ -212,22 +227,26 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
         }
 
         credited++;
-        logger.info(`Credited ${anniversaryType} anniversary leaves to employee ${employee.emp_id} (${employee.name}): +${anniversaryCredit} casual leaves`);
+        logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Credited ${anniversaryType} anniversary leaves to employee ${employee.emp_id} (${employee.name}): +${anniversaryCredit} casual leaves`);
       } catch (error: any) {
         errors++;
-        logger.error(`Failed to credit anniversary leaves for employee ${employee.emp_id}:`, error);
+        logger.error(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Failed to credit anniversary leaves for employee ${employee.emp_id}:`, error);
       }
     }
 
+    logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Committing transaction`);
     await client.query('COMMIT');
+    logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Transaction committed successfully`);
     if (credited > 0) {
-      logger.info(`Anniversary leave credit completed. Credited: ${credited}, Errors: ${errors}`);
+      logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Anniversary leave credit completed. Credited: ${credited}, Errors: ${errors}`);
+    } else {
+      logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] No anniversary credits to process today`);
     }
     
     return { credited, errors };
   } catch (error: any) {
     await client.query('ROLLBACK');
-    logger.error('Anniversary leave credit transaction failed:', error);
+    logger.error(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Transaction rolled back - Anniversary leave credit transaction failed:`, error);
     throw error;
   } finally {
     client.release();
@@ -247,14 +266,19 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
  * This runs at the end of each calendar year (last working day of December at 8 PM)
  */
 export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: number; errors: number }> => {
+  logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] ========== FUNCTION CALLED ==========`);
+  
   const client = await pool.connect();
   let adjusted = 0;
   let errors = 0;
 
   try {
+    logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Starting database transaction`);
     await client.query('BEGIN');
+    logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Transaction started`);
 
     // Get all active employees with their leave balances and email
+    logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Fetching all active employees with leave balances`);
     const employeesResult = await client.query(`
       SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
              COALESCE(lb.casual_balance, 0) as current_casual,
@@ -266,6 +290,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
       WHERE u.status = 'active'
         AND u.role IN ('employee', 'manager', 'hr')
     `);
+    logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Found ${employeesResult.rows.length} active employees`);
 
     for (const employee of employeesResult.rows) {
       try {
@@ -420,28 +445,30 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
             }
           });
           
-          logger.info(`✅ Carry forward email sent to ${employee.email} (${employee.name})`);
+          logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Carry forward email sent successfully to ${employee.email} (${employee.name})`);
         } catch (emailError: any) {
-          logger.error(`Failed to send carry forward email to ${employee.email}:`, emailError);
+          logger.error(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Failed to send carry forward email to ${employee.email}:`, emailError);
           // Don't fail the entire process if email fails
         }
         
         adjusted++;
       } catch (error: any) {
         errors++;
-        logger.error(`Failed to adjust year-end leaves for employee ${employee.emp_id}:`, error);
+        logger.error(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Failed to adjust year-end leaves for employee ${employee.emp_id}:`, error);
       }
     }
 
+    logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Committing transaction`);
     await client.query('COMMIT');
+    logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Transaction committed successfully`);
     if (adjusted > 0) {
-      logger.info(`Year-end leave adjustments completed (carry forward + January credits). Adjusted: ${adjusted}, Errors: ${errors}`);
+      logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Year-end leave adjustments completed (carry forward + January credits). Adjusted: ${adjusted}, Errors: ${errors}`);
     }
     
     return { adjusted, errors };
   } catch (error: any) {
     await client.query('ROLLBACK');
-    logger.error('Year-end leave adjustment transaction failed:', error);
+    logger.error(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Transaction rolled back - Year-end leave adjustment transaction failed:`, error);
     throw error;
   } finally {
     client.release();
@@ -452,14 +479,19 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
  * Check if it's the last working day of December (year-end)
  */
 export const isYearEnd = (): boolean => {
+  logger.info(`[LEAVE_CREDIT] [IS YEAR END] ========== FUNCTION CALLED ==========`);
   const today = new Date();
   const month = today.getMonth() + 1; // 1-indexed (December = 12)
   
+  logger.info(`[LEAVE_CREDIT] [IS YEAR END] Today: ${today.toISOString().split('T')[0]}, Month: ${month}`);
+  
   // Check if it's December and today is the last working day
   if (month === 12 && isLastWorkingDayOfMonth()) {
+    logger.info(`[LEAVE_CREDIT] [IS YEAR END] Year-end detected (December + last working day)`);
     return true;
   }
   
+  logger.info(`[LEAVE_CREDIT] [IS YEAR END] Not year-end`);
   return false;
 };
 
@@ -474,6 +506,9 @@ export const sendCarryForwardEmailsToAll = async (
   previousYear?: number,
   newYear?: number
 ): Promise<{ sent: number; errors: number }> => {
+  logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Previous Year: ${previousYear || 'auto'}, New Year: ${newYear || 'auto'}`);
+  
   const client = await pool.connect();
   let sent = 0;
   let errors = 0;
@@ -482,8 +517,10 @@ export const sendCarryForwardEmailsToAll = async (
     const currentDate = new Date();
     const prevYear = previousYear || (currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear());
     const nextYear = newYear || (currentDate.getMonth() === 0 ? currentDate.getFullYear() : currentDate.getFullYear() + 1);
+    logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Using years - Previous: ${prevYear}, New: ${nextYear}`);
 
     // Get all active employees with their leave balances and email
+    logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Fetching all active employees with email addresses`);
     const employeesResult = await client.query(`
       SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
              COALESCE(lb.casual_balance, 0) as current_casual,
@@ -496,6 +533,7 @@ export const sendCarryForwardEmailsToAll = async (
         AND u.email IS NOT NULL
         AND u.email != ''
     `);
+    logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Found ${employeesResult.rows.length} employees with email addresses`);
 
     for (const employee of employeesResult.rows) {
       try {
@@ -527,18 +565,18 @@ export const sendCarryForwardEmailsToAll = async (
           }
         });
         
-        logger.info(`✅ Carry forward email sent to ${employee.email} (${employee.name})`);
+        logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Carry forward email sent successfully to ${employee.email} (${employee.name})`);
         sent++;
       } catch (emailError: any) {
         errors++;
-        logger.error(`Failed to send carry forward email to ${employee.email}:`, emailError);
+        logger.error(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Failed to send carry forward email to ${employee.email}:`, emailError);
       }
     }
 
-    logger.info(`Carry forward emails sent: ${sent} successful, ${errors} errors`);
+    logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Carry forward emails sent: ${sent} successful, ${errors} errors`);
     return { sent, errors };
   } catch (error: any) {
-    logger.error('Error sending carry forward emails:', error);
+    logger.error(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Error sending carry forward emails:`, error);
     throw error;
   } finally {
     client.release();
@@ -557,27 +595,32 @@ export const sendCarryForwardEmailsToAll = async (
  * Example: On last working day of January, credit leaves for February
  */
 export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
+  logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] ========== FUNCTION CALLED ==========`);
+  
   try {
     // Verify it's 8 PM before processing leave credits
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
+    logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
+    
     // Only allow processing between 8:00 PM and 8:59 PM
     if (currentHour !== 20) {
-      logger.warn(`Leave credit check called at ${currentHour}:${currentMinute.toString().padStart(2, '0')}. Only runs at 8 PM. Skipping.`);
+      logger.warn(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Leave credit check called at ${currentHour}:${currentMinute.toString().padStart(2, '0')}. Only runs at 8 PM. Skipping.`);
       return;
     }
     
-    logger.info(`8 PM verified (${currentHour}:${currentMinute.toString().padStart(2, '0')}). Proceeding with leave credit checks...`);
+    logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] 8 PM verified (${currentHour}:${currentMinute.toString().padStart(2, '0')}). Proceeding with leave credit checks...`);
     
     // Check for 3-year and 5-year anniversaries first (runs daily at 8 PM)
+    logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Checking for anniversary credits`);
     await creditAnniversaryLeaves();
 
     // Check for year-end adjustments (last working day of December)
     // This runs FIRST and includes: Step 1 - Carry forward, Step 2 - January credits, Step 3 - Update total
     if (isYearEnd()) {
-      logger.info('Last working day of December detected. Processing year-end adjustments (carry forward + January credits)...');
+      logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Last working day of December detected. Processing year-end adjustments (carry forward + January credits)...`);
       
       // Check if adjustments were already processed today at 8 PM
       const today = new Date();
@@ -596,11 +639,11 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
 
       // If any active employees have been updated today after 7:30 PM with January credits, assume already processed
       if (parseInt(checkResult.rows[0].count) >= 1) {
-        logger.info(`Year-end adjustments (carry forward + January credits) appear to have been processed today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double processing.`);
+        logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Year-end adjustments (carry forward + January credits) appear to have been processed today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double processing.`);
       } else {
-        logger.info('Proceeding with year-end leave adjustments (carry forward + January credits)...');
+        logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Proceeding with year-end leave adjustments (carry forward + January credits)...`);
         const result = await processYearEndLeaveAdjustments();
-        logger.info(`Year-end adjustments completed: ${result.adjusted} employees adjusted (carry forward + January credits), ${result.errors} errors`);
+        logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Year-end adjustments completed: ${result.adjusted} employees adjusted (carry forward + January credits), ${result.errors} errors`);
       }
     } else if (isLastWorkingDayOfMonth()) {
       // Regular monthly credit (for months other than December)
@@ -617,12 +660,13 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
         nextYear = currentYear + 1;
       }
       
-      logger.info(`Last working day of ${currentMonth}/${currentYear} detected. Crediting leaves for next month (${nextMonth}/${nextYear})...`);
+      logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Last working day of ${currentMonth}/${currentYear} detected. Crediting leaves for next month (${nextMonth}/${nextYear})...`);
       
       // Check if leaves were already credited today at 8 PM by checking last_updated timestamp
       // This prevents duplicate credits even if the function is called multiple times
       // We check for updates after 7:30 PM today to ensure it was credited at 8 PM
       const todayStr = today.toISOString().split('T')[0];
+      logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Checking if leaves already credited today`);
       const checkResult = await pool.query(
         `SELECT COUNT(*) as count 
          FROM leave_balances lb
@@ -640,17 +684,17 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
       // assume already credited at 8 PM (threshold: 1 employee to be more strict)
       // This ensures we don't credit multiple times even if the function is called multiple times
       if (parseInt(checkResult.rows[0].count) >= 1) {
-        logger.info(`Leaves for ${nextMonth}/${nextYear} already credited today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double credit.`);
+        logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Leaves for ${nextMonth}/${nextYear} already credited today at 8 PM (${checkResult.rows[0].count} active employees updated). Skipping to avoid double credit.`);
       } else {
-        logger.info(`Proceeding with monthly leave credit for ${nextMonth}/${nextYear}...`);
+        logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Proceeding with monthly leave credit for ${nextMonth}/${nextYear}...`);
         const result = await creditMonthlyLeaves();
-        logger.info(`Monthly leave credit for ${nextMonth}/${nextYear} completed: ${result.credited} employees credited, ${result.errors} errors`);
+        logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Monthly leave credit for ${nextMonth}/${nextYear} completed: ${result.credited} employees credited, ${result.errors} errors`);
       }
     } else {
-      logger.debug('Not the last working day of the month. Skipping monthly leave credit.');
+      logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Not the last working day of the month. Skipping monthly leave credit.`);
     }
   } catch (error: any) {
-    logger.error('Error in checkAndCreditMonthlyLeaves:', error);
+    logger.error(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Error in checkAndCreditMonthlyLeaves:`, error);
   }
 };
 
