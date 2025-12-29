@@ -38,7 +38,7 @@ const LeaveApprovalPage: React.FC = () => {
   );
 
   const { data: approvedData, isLoading: approvedLoading, error: approvedError } = useQuery(
-    'approvedLeaves',
+    ['approvedLeaves'],
     () => leaveService.getApprovedLeaves(1, 10),
     {
       retry: false,
@@ -64,8 +64,8 @@ const LeaveApprovalPage: React.FC = () => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
       },
       onSuccess: () => {
-        queryClient.invalidateQueries('pendingLeaves');
-        queryClient.invalidateQueries('approvedLeaves');
+        queryClient.invalidateQueries(['pendingLeaves']);
+        queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave approved successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
@@ -97,8 +97,8 @@ const LeaveApprovalPage: React.FC = () => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
       },
       onSuccess: () => {
-        queryClient.invalidateQueries('pendingLeaves');
-        queryClient.invalidateQueries('approvedLeaves');
+        queryClient.invalidateQueries(['pendingLeaves']);
+        queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave rejected successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
@@ -141,9 +141,9 @@ const LeaveApprovalPage: React.FC = () => {
     (requestId: number) => leaveService.convertLeaveRequestLopToCasual(requestId),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries('pendingLeaves');
-        queryClient.invalidateQueries('approvedLeaves');
-        queryClient.invalidateQueries('leaveBalances');
+        queryClient.invalidateQueries(['pendingLeaves']);
+        queryClient.invalidateQueries(['approvedLeaves']);
+        queryClient.invalidateQueries(['leaveBalances']);
         showSuccess('Leave request converted from LOP to Casual successfully!');
         // Refresh the selected request to show updated leave type
         if (selectedRequest) {
@@ -273,8 +273,8 @@ const LeaveApprovalPage: React.FC = () => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
       },
       onSuccess: () => {
-        queryClient.invalidateQueries('pendingLeaves');
-        queryClient.invalidateQueries('approvedLeaves');
+        queryClient.invalidateQueries(['pendingLeaves']);
+        queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave status updated successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
