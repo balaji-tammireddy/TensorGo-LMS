@@ -118,10 +118,20 @@ const ProfilePage: React.FC = () => {
           setPhotoSignedUrl(signedUrl);
         } catch (err) {
           console.error('Failed to get signed URL:', err);
-          setPhotoSignedUrl(null);
+          // Don't set to null immediately - try again after a short delay
+          setTimeout(async () => {
+            try {
+              const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+              setPhotoSignedUrl(signedUrl);
+            } catch (retryErr) {
+              console.error('Failed to get signed URL on retry:', retryErr);
+              setPhotoSignedUrl(null);
+            }
+          }, 1000);
         }
-      } else if (profile?.profilePhotoUrl) {
-        // Local file path - use as-is
+      } else if (profile?.profilePhotoUrl && !profile.profilePhotoUrl.startsWith('profile-photos/')) {
+        // Only use local file path if it's NOT an OVHcloud key
+        // If it starts with 'profile-photos/', it should have been set as profilePhotoKey
         setPhotoSignedUrl(profile.profilePhotoUrl);
       } else {
         setPhotoSignedUrl(null);
@@ -534,21 +544,31 @@ const ProfilePage: React.FC = () => {
                 src={photoSignedUrl} 
                 alt="Profile" 
                 onError={async () => {
-                  // If image fails to load (expired URL), refresh it
+                  // If image fails to load (expired URL or CORS issue), refresh it
                   if (profile?.profilePhotoKey) {
                     try {
                       const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
                       setPhotoSignedUrl(signedUrl);
                     } catch (err) {
                       console.error('Failed to refresh signed URL:', err);
-                      setPhotoSignedUrl(null);
+                      // Retry once more after a delay
+                      setTimeout(async () => {
+                        try {
+                          const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+                          setPhotoSignedUrl(signedUrl);
+                        } catch (retryErr) {
+                          console.error('Failed to refresh signed URL on retry:', retryErr);
+                          setPhotoSignedUrl(null);
+                        }
+                      }, 2000);
                     }
                   } else {
                     setPhotoSignedUrl(null);
                   }
                 }} 
               />
-            ) : profile?.profilePhotoUrl ? (
+            ) : profile?.profilePhotoUrl && !profile.profilePhotoUrl.startsWith('profile-photos/') ? (
+              // Only show local URL if it's NOT an OVHcloud key
               <img src={profile.profilePhotoUrl} alt="Profile" />
             ) : (
               <div className="profile-placeholder">👤</div>

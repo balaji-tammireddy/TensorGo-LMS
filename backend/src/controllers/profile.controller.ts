@@ -210,29 +210,49 @@ export const getPhotoSignedUrl = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] User ID: ${req.user!.id}`);
   
   try {
-    const profile = await profileService.getProfile(req.user!.id);
-    const photoKey = (profile as any).profilePhotoKey;
+    // Get profile photo key directly from database
+    const dbResult = await pool.query(
+      'SELECT profile_photo_url FROM users WHERE id = $1',
+      [req.user!.id]
+    );
     
-    if (!photoKey) {
+    if (dbResult.rows.length === 0) {
       return res.status(404).json({
         error: {
           code: 'NOT_FOUND',
-          message: 'No profile photo found'
+          message: 'User not found'
+        }
+      });
+    }
+    
+    const profilePhotoUrl = dbResult.rows[0].profile_photo_url;
+    
+    // Check if it's an OVHcloud key (starts with 'profile-photos/')
+    if (!profilePhotoUrl || !profilePhotoUrl.startsWith('profile-photos/')) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'No OVHcloud profile photo found. Photo may be stored locally.'
         }
       });
     }
     
     // Generate signed URL (valid for 15 minutes)
-    const signedUrl = await getSignedUrlFromOVH(photoKey, 900);
+    const signedUrl = await getSignedUrlFromOVH(profilePhotoUrl, 900);
     
-    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Signed URL generated successfully - User ID: ${req.user!.id}`);
+    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Signed URL generated successfully - User ID: ${req.user!.id}, Key: ${profilePhotoUrl}`);
     res.json({ signedUrl, expiresIn: 900 });
   } catch (error: any) {
     logger.error(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Error:`, error);
+    logger.error(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Error details:`, {
+      message: error.message,
+      stack: error.stack,
+      userId: req.user!.id
+    });
     res.status(400).json({
       error: {
         code: 'SIGNED_URL_ERROR',
-        message: error.message
+        message: error.message || 'Failed to generate signed URL'
       }
     });
   }
