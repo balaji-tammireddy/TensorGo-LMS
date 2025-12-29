@@ -15,7 +15,8 @@
     "process-year-end": "tsx src/database/process_year_end_adjustments.ts",
     "migrate:photos": "tsx src/scripts/migrateProfilePhotosToOVH.ts",
     "make-photos-public": "tsx src/scripts/makePhotosPublic.ts",
-    "check-photo-access": "tsx src/scripts/checkAndFixPhotoAccess.ts"
+    "check-photo-access": "tsx src/scripts/checkAndFixPhotoAccess.ts",
+    "upload:login-image": "tsx src/scripts/uploadLoginImage.ts"
   },
   "keywords": [
     "hr",

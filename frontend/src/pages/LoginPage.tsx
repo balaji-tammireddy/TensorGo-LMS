@@ -192,9 +192,14 @@ const LoginPage: React.FC = () => {
         <div className="login-image-section">
           <div className="login-image-content">
             <img 
-              src="/uploads/portrait-professional-elegant-businessman.jpg" 
+              src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/portrait-professional-elegant-businessman.jpg" 
               alt="Professional Businessman"
               className="login-side-image"
+              onError={(e) => {
+                // Fallback to local image if OVHcloud URL fails
+                const target = e.target as HTMLImageElement;
+                target.src = '/uploads/portrait-professional-elegant-businessman.jpg';
+              }}
             />
           </div>
         </div>
