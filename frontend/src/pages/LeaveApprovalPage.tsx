@@ -360,14 +360,27 @@ const LeaveApprovalPage: React.FC = () => {
     const approvedDays = request.leaveDays?.filter((day: any) => day.status === 'approved') || [];
     const rejectedDays = request.leaveDays?.filter((day: any) => day.status === 'rejected') || [];
     
-    // Determine display status
+    // Determine display status - prioritize pending status if there are any pending days
     let displayStatus = request.currentStatus;
-    if (approvedDays.length > 0 && pendingDays.length > 0) {
-      displayStatus = 'partially_approved';
-    } else if (approvedDays.length > 0 && pendingDays.length === 0) {
-      displayStatus = 'approved';
-    } else if (rejectedDays.length > 0 && pendingDays.length === 0) {
-      displayStatus = 'rejected';
+    
+    // If there are pending days, status should be 'pending' or 'partially_approved', never 'rejected' or 'approved'
+    if (pendingDays.length > 0) {
+      if (approvedDays.length > 0) {
+        displayStatus = 'partially_approved';
+      } else {
+        displayStatus = 'pending';
+      }
+    } else {
+      // No pending days - determine final status
+      if (approvedDays.length > 0 && rejectedDays.length === 0) {
+        displayStatus = 'approved';
+      } else if (rejectedDays.length > 0 && approvedDays.length === 0) {
+        displayStatus = 'rejected';
+      } else if (approvedDays.length > 0 && rejectedDays.length > 0) {
+        displayStatus = 'partially_approved';
+      } else {
+        displayStatus = 'pending';
+      }
     }
 
     return {
@@ -580,7 +593,16 @@ const LeaveApprovalPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                approvedData.requests.map((request: any, idx: number) => {
+                approvedData.requests
+                  .filter((request: any) => {
+                    // Filter out any requests that still have pending days
+                    // This is a safety check in case backend filtering isn't perfect
+                    const hasPendingDays = request.leaveDays?.some((day: any) => 
+                      (day.status || 'pending') === 'pending'
+                    );
+                    return !hasPendingDays && request.leaveStatus !== 'pending';
+                  })
+                  .map((request: any, idx: number) => {
                   const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
                   const canEdit = request.canEdit && (user?.role === 'hr' || user?.role === 'super_admin');
                   return (

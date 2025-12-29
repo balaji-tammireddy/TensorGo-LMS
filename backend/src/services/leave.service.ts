@@ -1558,7 +1558,7 @@ export const getPendingLeaveRequests = async (
   
   // Build query based on role
   let query = `
-    SELECT DISTINCT lr.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+    SELECT DISTINCT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
@@ -1583,7 +1583,9 @@ export const getPendingLeaveRequests = async (
     query += ' AND u.reporting_manager_id = $1';
     params.push(approverId);
   } else if (approverRole === 'hr' || approverRole === 'super_admin') {
-    // HR and Super Admin can see ALL employee leave requests (no filter)
+    // HR and Super Admin can see ALL employee leave requests EXCEPT their own (no self-approval)
+    query += ' AND lr.employee_id != $1';
+    params.push(approverId);
   } else {
     return { requests: [], pagination: { page, limit, total: 0 } };
   }
@@ -1614,10 +1616,17 @@ export const getPendingLeaveRequests = async (
   const result = await pool.query(query, params);
 
   // Additional safeguard: Filter out any requests that don't belong to manager's direct reports
+  // Also filter out approver's own requests to prevent self-approval
   // This ensures data integrity even if query construction has issues
   const filteredRows = approverRole === 'manager' 
     ? result.rows.filter(row => row.reporting_manager_id === approverId)
-    : result.rows;
+    : result.rows.filter(row => {
+        // For HR and Super Admin, exclude their own requests (no self-approval)
+        if (approverRole === 'hr' || approverRole === 'super_admin') {
+          return row.employee_id !== approverId;
+        }
+        return true;
+      });
 
   // Get day-wise breakdown for each request
   const requestsWithDays = await Promise.all(
@@ -1700,7 +1709,9 @@ export const getPendingLeaveRequests = async (
     countQuery += ' AND u.reporting_manager_id = $1';
     countParams.push(approverId);
   } else if (approverRole === 'hr' || approverRole === 'super_admin') {
-    // HR and Super Admin can see ALL employee leave requests (no filter)
+    // HR and Super Admin can see ALL employee leave requests EXCEPT their own (no self-approval)
+    countQuery += ' AND lr.employee_id != $1';
+    countParams.push(approverId);
   }
 
   if (search) {
@@ -2936,6 +2947,18 @@ export const approveLeaveDays = async (
     // Continue with email sending even if recalc fails
   }
 
+  // Get the actual status after recalculation
+  const statusResult = await pool.query(
+    'SELECT current_status FROM leave_requests WHERE id = $1',
+    [leaveRequestId]
+  );
+  const actualStatus = statusResult.rows[0]?.current_status || 'pending';
+  const emailStatus: 'approved' | 'partially_approved' | 'rejected' = 
+    actualStatus === 'partially_approved' ? 'partially_approved' : 
+    actualStatus === 'approved' ? 'approved' : 'rejected';
+
+  logger.info(`[APPROVE LEAVE DAYS] Actual status after recalculation: ${actualStatus}, Email status: ${emailStatus}`);
+
   logger.info(`[EMAIL] ========== ABOUT TO SEND EMAIL NOTIFICATIONS FOR DAYS APPROVAL ==========`);
   logger.info(`[EMAIL] Leave object check:`, {
     has_employee_email: !!leave.employee_email,
@@ -2969,7 +2992,7 @@ export const approveLeaveDays = async (
           approverName: leave.approver_name || 'Approver',
           approverRole: approverRole,
           comment: comment || null,
-          status: 'approved' as const
+          status: emailStatus
         });
         logger.info(`[EMAIL] ✅ Days approval email sent to employee: ${leave.employee_email}`);
       } catch (err: any) {
@@ -2997,7 +3020,7 @@ export const approveLeaveDays = async (
           approverName: leave.approver_name || 'Approver',
           approverRole: approverRole,
           comment: comment || null,
-          status: 'approved' as const
+          status: emailStatus
         });
         logger.info(`[EMAIL] ✅ Days approval email sent to employee: ${leave.employee_email}`);
       } catch (err: any) {
@@ -3022,7 +3045,7 @@ export const approveLeaveDays = async (
           approverName: leave.approver_name || 'Approver',
           approverRole: approverRole,
           comment: comment || null,
-          status: 'approved' as const
+          status: emailStatus
         });
         logger.info(`[EMAIL] ✅ Days approval email sent to manager: ${leave.manager_email}`);
       } catch (err: any) {
@@ -3050,7 +3073,7 @@ export const approveLeaveDays = async (
           approverName: leave.approver_name || 'Approver',
           approverRole: approverRole,
           comment: comment || null,
-          status: 'approved' as const
+          status: emailStatus
         });
         logger.info(`[EMAIL] ✅ Days approval email sent to employee: ${leave.employee_email}`);
       } catch (err: any) {
@@ -3075,7 +3098,7 @@ export const approveLeaveDays = async (
           approverName: leave.approver_name || 'Approver',
           approverRole: approverRole,
           comment: comment || null,
-          status: 'approved' as const
+          status: emailStatus
         });
         logger.info(`[EMAIL] ✅ Days approval email sent to manager: ${leave.manager_email}`);
       } catch (err: any) {
@@ -3100,7 +3123,7 @@ export const approveLeaveDays = async (
           approverName: leave.approver_name || 'Approver',
           approverRole: approverRole,
           comment: comment || null,
-          status: 'approved' as const
+          status: emailStatus
         });
         logger.info(`[EMAIL] ✅ Days approval email sent to HR: ${leave.hr_email}`);
       } catch (err: any) {
@@ -3681,8 +3704,8 @@ export const updateLeaveStatus = async (
     throw new Error('Invalid status or missing required parameters');
   }
 
-  // Send email notifications for status updates (approved/rejected)
-  if (newStatus === 'approved' || newStatus === 'rejected') {
+  // Send email notifications for status updates (approved/partially_approved/rejected)
+  if (newStatus === 'approved' || newStatus === 'partially_approved' || newStatus === 'rejected') {
     try {
       logger.info(`[EMAIL DEBUG] Starting email notification for updateLeaveStatus. Request ID: ${leaveRequestId}, Status: ${newStatus}, Approver Role: ${approverRole}`);
       
@@ -3730,7 +3753,7 @@ export const updateLeaveStatus = async (
               approverName: emailLeave.approver_name || 'Approver',
               approverRole: approverRole,
               comment: newStatus === 'rejected' ? (rejectReason || null) : null,
-              status: newStatus as 'approved' | 'rejected'
+              status: newStatus as 'approved' | 'partially_approved' | 'rejected'
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, employeeEmailData);
             if (emailSent) {
@@ -3756,7 +3779,7 @@ export const updateLeaveStatus = async (
               approverName: emailLeave.approver_name || 'Approver',
               approverRole: approverRole,
               comment: newStatus === 'rejected' ? (rejectReason || null) : null,
-              status: newStatus as 'approved' | 'rejected'
+              status: newStatus as 'approved' | 'partially_approved' | 'rejected'
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.manager_email, managerEmailData);
             if (emailSent) {
@@ -3784,7 +3807,7 @@ export const updateLeaveStatus = async (
               approverName: emailLeave.approver_name || 'Approver',
               approverRole: approverRole,
               comment: newStatus === 'rejected' ? (rejectReason || null) : null,
-              status: newStatus as 'approved' | 'rejected'
+              status: newStatus as 'approved' | 'partially_approved' | 'rejected'
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, employeeEmailData);
             if (emailSent) {
@@ -3810,7 +3833,7 @@ export const updateLeaveStatus = async (
               approverName: emailLeave.approver_name || 'Approver',
               approverRole: approverRole,
               comment: newStatus === 'rejected' ? (rejectReason || null) : null,
-              status: newStatus as 'approved' | 'rejected'
+              status: newStatus as 'approved' | 'partially_approved' | 'rejected'
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.manager_email, managerEmailData);
             if (emailSent) {
@@ -3836,7 +3859,7 @@ export const updateLeaveStatus = async (
               approverName: emailLeave.approver_name || 'Approver',
               approverRole: approverRole,
               comment: newStatus === 'rejected' ? (rejectReason || null) : null,
-              status: newStatus as 'approved' | 'rejected'
+              status: newStatus as 'approved' | 'partially_approved' | 'rejected'
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.hr_email, hrEmailData);
             if (emailSent) {
@@ -3892,10 +3915,10 @@ export const getApprovedLeaves = async (
      LEFT JOIN leave_days ld ON ld.leave_request_id = lr.id
      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
      WHERE lr.current_status != 'pending'
-        OR EXISTS (
+        AND NOT EXISTS (
           SELECT 1 FROM leave_days ld2
           WHERE ld2.leave_request_id = lr.id 
-            AND (ld2.day_status = 'approved' OR ld2.day_status = 'rejected')
+            AND COALESCE(ld2.day_status, 'pending') = 'pending'
         )
      GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
@@ -3910,10 +3933,10 @@ export const getApprovedLeaves = async (
     `SELECT COUNT(DISTINCT lr.id)
      FROM leave_requests lr
      WHERE lr.current_status != 'pending'
-        OR EXISTS (
+        AND NOT EXISTS (
           SELECT 1 FROM leave_days ld2
           WHERE ld2.leave_request_id = lr.id 
-            AND (ld2.day_status = 'approved' OR ld2.day_status = 'rejected')
+            AND COALESCE(ld2.day_status, 'pending') = 'pending'
         )`
   );
 
@@ -3932,14 +3955,20 @@ export const getApprovedLeaves = async (
       const pendingDays = parseFloat(row.pending_days) || 0;
 
       let displayStatus = row.leave_status;
-      if (approvedDays > 0 && (rejectedDays > 0 || pendingDays > 0)) {
-        displayStatus = 'partially_approved';
-      } else if (approvedDays > 0 && rejectedDays === 0 && pendingDays === 0) {
-        displayStatus = 'approved';
-      } else if (rejectedDays > 0 && approvedDays === 0 && pendingDays === 0) {
-        displayStatus = 'rejected';
-      } else if (pendingDays > 0 && approvedDays === 0 && rejectedDays === 0) {
+      // Since we're filtering out requests with pending days, we should never have pendingDays > 0 here
+      // But we'll still calculate it correctly
+      if (pendingDays > 0) {
+        // This shouldn't happen due to the WHERE clause, but handle it just in case
         displayStatus = 'pending';
+      } else if (approvedDays > 0 && rejectedDays > 0) {
+        displayStatus = 'partially_approved';
+      } else if (approvedDays > 0 && rejectedDays === 0) {
+        displayStatus = 'approved';
+      } else if (rejectedDays > 0 && approvedDays === 0) {
+        displayStatus = 'rejected';
+      } else {
+        // Fallback to the database status
+        displayStatus = row.leave_status;
       }
 
       // Format leave date - show approved dates if available, otherwise show rejected dates, otherwise show full range
