@@ -6,8 +6,9 @@ import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
 import { uploadToOVH, deleteFromOVH, extractKeyFromUrl, getSignedUrlFromOVH } from '../utils/storage';
+import { pool } from '../database/db';
 
-// Configure multer for file uploads - same approach as medical certificates
+// Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = process.env.UPLOAD_DIR || './uploads';
@@ -84,6 +85,8 @@ export const uploadPhoto = [
     logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] ========== REQUEST RECEIVED ==========`);
     logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] User ID: ${req.user!.id}, File: ${req.file?.originalname || 'none'}`);
     
+    let localFilePath: string | null = null;
+    
     try {
       if (!req.file) {
         logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] No file uploaded`);
@@ -95,24 +98,18 @@ export const uploadPhoto = [
         });
       }
 
+      localFilePath = req.file.path;
+      
       // Check if OVHcloud is configured
       const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
       
       let photoUrl: string;
       
-      let localFilePath: string | null = null;
-      
       if (useOVHCloud) {
         try {
-          localFilePath = req.file.path;
-          // Upload to OVHcloud bucket - returns key (same approach as medical certificates)
+          // Upload to OVHcloud bucket - returns key, not URL
           const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
-          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Uploading to OVHcloud with key: ${key}`);
-          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] File path: ${localFilePath}, MIME type: ${req.file.mimetype}`);
-          
           const photoKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
-          
-          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Successfully uploaded to OVHcloud: ${photoKey}`);
           
           // Delete local file after successful upload
           try {
@@ -125,42 +122,18 @@ export const uploadPhoto = [
           // Store only the key in database (not URL)
           photoUrl = photoKey;
         } catch (ovhError: any) {
-          // Log detailed error information
-          logger.error(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] OVHcloud upload failed:`, {
-            error: ovhError.message,
-            name: ovhError.name,
-            code: ovhError.Code,
-            requestId: ovhError.$metadata?.requestId,
-            httpStatusCode: ovhError.$metadata?.httpStatusCode,
-            key: `profile-photos/${req.user!.id}/${req.file.filename}`
-          });
-          
-          // Clean up local file if upload failed
-          if (localFilePath && fs.existsSync(localFilePath)) {
-            try {
-              fs.unlinkSync(localFilePath);
-            } catch (deleteError: any) {
-              logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to clean up local file: ${deleteError.message}`);
-            }
-          }
-          
-          return res.status(500).json({
-            error: {
-              code: 'UPLOAD_ERROR',
-              message: `Failed to upload photo to OVHcloud: ${ovhError.message}`
-            }
-          });
+          // Fallback to local storage if OVHcloud upload fails
+          logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] OVHcloud upload failed, falling back to local storage: ${ovhError.message}`);
+          photoUrl = `/uploads/${req.file.filename}`;
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Using local storage as fallback`);
         }
       } else {
-        return res.status(500).json({
-          error: {
-            code: 'CONFIGURATION_ERROR',
-            message: 'OVHcloud is not configured. Please configure OVH_ACCESS_KEY, OVH_SECRET_KEY, and OVH_BUCKET_NAME'
-          }
-        });
+        // Fallback to local storage
+        photoUrl = `/uploads/${req.file.filename}`;
+        logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Using local storage (OVHcloud not configured)`);
       }
       
-      // Store key in database
+      // Store key (or local path) in database
       const result = await profileService.updateProfilePhoto(req.user!.id, photoUrl);
       logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Photo uploaded successfully - User ID: ${req.user!.id}, Photo Key: ${photoUrl}`);
       res.json(result);
