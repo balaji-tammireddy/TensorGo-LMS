@@ -208,7 +208,7 @@ export const applyLeave = [
         // Existing OVHcloud key - preserve it
         leaveData.doctorNote = req.body.doctorNote;
       } else if (req.body.doctorNote && req.body.doctorNote.startsWith('data:')) {
-        // Existing base64 - preserve it (backward compatibility)
+        // Existing base64 - preserve it (legacy support)
         leaveData.doctorNote = req.body.doctorNote;
       }
       
