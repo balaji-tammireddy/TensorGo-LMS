@@ -116,6 +116,7 @@ const ProfilePage: React.FC = () => {
       if (profile?.profilePhotoKey) {
         try {
           const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+          console.log('Profile photo URL received:', signedUrl);
           setPhotoSignedUrl(signedUrl);
           // No refresh needed - public URLs are permanent
         } catch (err) {
@@ -521,18 +522,24 @@ const ProfilePage: React.FC = () => {
             {photoSignedUrl ? (
               <img 
                 src={photoSignedUrl} 
-                alt="Profile" 
-                onError={async () => {
-                  // If image fails to load (expired URL), refresh it
+                alt="Profile"
+                onLoad={() => {
+                  console.log('✅ Profile image loaded successfully:', photoSignedUrl);
+                }}
+                onError={async (e) => {
+                  console.error('❌ Failed to load profile image. URL:', photoSignedUrl, 'Error:', e);
+                  // If image fails to load, try refreshing the URL
                   if (profile?.profilePhotoKey) {
                     try {
                       const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+                      console.log('🔄 Refreshing profile photo URL:', signedUrl);
                       setPhotoSignedUrl(signedUrl);
                     } catch (err) {
-                      console.error('Failed to refresh signed URL:', err);
+                      console.error('❌ Failed to refresh profile photo URL:', err);
                       setPhotoSignedUrl(null);
                     }
                   } else {
+                    console.warn('⚠️ No profilePhotoKey found, cannot refresh');
                     setPhotoSignedUrl(null);
                   }
                 }} 
