@@ -1116,7 +1116,7 @@ export const convertLeaveRequestLopToCasual = async (
 
   // Check if casual balance is sufficient after conversion
   // When converting: refund LOP (add back), deduct Casual (subtract)
-  const newLopBalance = currentLop + noOfDays; // Refund LOP
+  let newLopBalance = currentLop + noOfDays; // Refund LOP
   const newCasualBalance = currentCasual - noOfDays; // Deduct Casual
 
   // Check if casual balance would go negative
@@ -1127,6 +1127,14 @@ export const convertLeaveRequestLopToCasual = async (
   // Check if casual balance would exceed 99 days (shouldn't happen since we're deducting, but check anyway)
   if (newCasualBalance > 99) {
     throw new Error(`Cannot convert. Casual balance would exceed 99 days. Current: ${currentCasual}, After conversion: ${newCasualBalance}`);
+  }
+
+  // Ensure LOP balance never exceeds 10
+  if (newLopBalance > 10) {
+    logger.warn(
+      `LOP balance would exceed 10 after conversion. Current: ${currentLop}, Refunding: ${noOfDays}, Would be: ${newLopBalance}. Capping at 10.`
+    );
+    newLopBalance = 10;
   }
 
   const client = await pool.connect();
@@ -1349,12 +1357,44 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
             ? 'sick_balance'
             : 'lop_balance';
 
-        await client.query(
-          `UPDATE leave_balances 
-           SET ${balanceColumn} = ${balanceColumn} + $1
-           WHERE employee_id = $2`,
-          [daysToRefund, userId]
-        );
+        // For LOP, check if refund would exceed 10 and cap it
+        if (leave_type === 'lop') {
+          const currentBalanceResult = await client.query(
+            'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+            [userId]
+          );
+          const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+          const newLopBalance = currentLop + daysToRefund;
+          
+          if (newLopBalance > 10) {
+            const cappedRefund = 10 - currentLop;
+            if (cappedRefund > 0) {
+              await client.query(
+                `UPDATE leave_balances SET lop_balance = 10 WHERE employee_id = $1`,
+                [userId]
+              );
+              logger.warn(
+                `[DELETE LEAVE REQUEST] LOP balance would exceed 10. Current: ${currentLop}, Refunding: ${daysToRefund}, Would be: ${newLopBalance}. Capped at 10 (refunded ${cappedRefund} instead of ${daysToRefund}).`
+              );
+            } else {
+              logger.warn(
+                `[DELETE LEAVE REQUEST] LOP balance already at or above 10. Current: ${currentLop}. Cannot refund ${daysToRefund} days.`
+              );
+            }
+          } else {
+            await client.query(
+              `UPDATE leave_balances SET lop_balance = lop_balance + $1 WHERE employee_id = $2`,
+              [daysToRefund, userId]
+            );
+          }
+        } else {
+          await client.query(
+            `UPDATE leave_balances 
+             SET ${balanceColumn} = ${balanceColumn} + $1
+             WHERE employee_id = $2`,
+            [daysToRefund, userId]
+          );
+        }
       }
     }
 
@@ -2020,11 +2060,45 @@ export const rejectLeave = async (
         : leave.leave_type === 'sick'
         ? 'sick_balance'
         : 'lop_balance';
-    await pool.query(
-      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-      [refundDays, leave.employee_id]
-    );
-    logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
+    
+    // For LOP, check if refund would exceed 10 and cap it
+    if (leave.leave_type === 'lop') {
+      const currentBalanceResult = await pool.query(
+        'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+        [leave.employee_id]
+      );
+      const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+      const newLopBalance = currentLop + refundDays;
+      
+      if (newLopBalance > 10) {
+        const cappedRefund = 10 - currentLop;
+        if (cappedRefund > 0) {
+          await pool.query(
+            `UPDATE leave_balances SET lop_balance = 10 WHERE employee_id = $1`,
+            [leave.employee_id]
+          );
+          logger.warn(
+            `[REJECT LEAVE] LOP balance would exceed 10. Current: ${currentLop}, Refunding: ${refundDays}, Would be: ${newLopBalance}. Capped at 10 (refunded ${cappedRefund} instead of ${refundDays}).`
+          );
+        } else {
+          logger.warn(
+            `[REJECT LEAVE] LOP balance already at or above 10. Current: ${currentLop}. Cannot refund ${refundDays} days.`
+          );
+        }
+      } else {
+        await pool.query(
+          `UPDATE leave_balances SET lop_balance = lop_balance + $1 WHERE employee_id = $2`,
+          [refundDays, leave.employee_id]
+        );
+        logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
+      }
+    } else {
+      await pool.query(
+        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+        [refundDays, leave.employee_id]
+      );
+      logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
+    }
   }
 
   logger.info(`[REJECT LEAVE] About to recalculate status`);
@@ -3000,10 +3074,43 @@ export const rejectLeaveDay = async (
           : leave.leave_type === 'sick'
           ? 'sick_balance'
           : 'lop_balance';
-      await pool.query(
-        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-        [refund, leave.employee_id]
-      );
+      
+      // For LOP, check if refund would exceed 10 and cap it
+      if (leave.leave_type === 'lop') {
+        const currentBalanceResult = await pool.query(
+          'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+          [leave.employee_id]
+        );
+        const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+        const newLopBalance = currentLop + refund;
+        
+        if (newLopBalance > 10) {
+          const cappedRefund = 10 - currentLop;
+          if (cappedRefund > 0) {
+            await pool.query(
+              `UPDATE leave_balances SET lop_balance = 10 WHERE employee_id = $1`,
+              [leave.employee_id]
+            );
+            logger.warn(
+              `[REJECT LEAVE DAY] LOP balance would exceed 10. Current: ${currentLop}, Refunding: ${refund}, Would be: ${newLopBalance}. Capped at 10 (refunded ${cappedRefund} instead of ${refund}).`
+            );
+          } else {
+            logger.warn(
+              `[REJECT LEAVE DAY] LOP balance already at or above 10. Current: ${currentLop}. Cannot refund ${refund} days.`
+            );
+          }
+        } else {
+          await pool.query(
+            `UPDATE leave_balances SET lop_balance = lop_balance + $1 WHERE employee_id = $2`,
+            [refund, leave.employee_id]
+          );
+        }
+      } else {
+        await pool.query(
+          `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+          [refund, leave.employee_id]
+        );
+      }
     }
   }
 

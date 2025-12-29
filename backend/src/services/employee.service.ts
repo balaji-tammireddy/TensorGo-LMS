@@ -692,8 +692,13 @@ export const addLeavesToEmployee = async (
       const currentBalance = parseFloat(balanceCheck.rows[0][balanceColumn] || '0');
       const newTotal = currentBalance + count;
       
-      // Check if total would exceed maximum limit
-      if (newTotal > 99) {
+      // For LOP, check if it would exceed 10 (strict limit)
+      if (balanceColumn === 'lop_balance' && newTotal > 10) {
+        throw new Error(`Cannot add ${count} LOP leaves. Current LOP balance: ${currentBalance}, Maximum limit: 10. Total would be: ${newTotal}`);
+      }
+      
+      // Check if total would exceed maximum limit (99 for casual/sick)
+      if (balanceColumn !== 'lop_balance' && newTotal > 99) {
         throw new Error(`Cannot add ${count} leaves. Current balance: ${currentBalance}, Maximum limit: 99. Total would be: ${newTotal}`);
       }
       

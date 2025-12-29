@@ -51,6 +51,15 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS last_updated_by_role VARCHAR(20) CHECK (last_updated_by_role IN ('manager', 'hr', 'super_admin'));
     `);
     
+    // Ensure LOP balance never exceeds 10 (idempotent)
+    await pool.query(`
+      ALTER TABLE leave_balances
+      DROP CONSTRAINT IF EXISTS leave_balances_lop_balance_max_check;
+      ALTER TABLE leave_balances
+      ADD CONSTRAINT leave_balances_lop_balance_max_check
+      CHECK (lop_balance <= 10);
+    `);
+    
     // Leave rules insertion disabled - rules cannot be changed until explicitly enabled
     // await pool.query(`
     //   INSERT INTO leave_rules (leave_required_min, leave_required_max, prior_information_days, is_active)
