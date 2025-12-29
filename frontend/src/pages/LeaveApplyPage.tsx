@@ -1454,7 +1454,7 @@ const LeaveApplyPage: React.FC = () => {
                   className="clear-button"
                   disabled={applyMutation.isLoading}
                 >
-                  Clear
+                  Reset
                 </button>
               </div>
             </div>
