@@ -93,99 +93,100 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leave Application Notification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <td style="padding: 20px 0; background-color: #f5f5f5;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12); overflow: hidden;">
           <!-- Header -->
           <tr>
-            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Application Notification</h1>
+            <td style="padding: 32px 40px; background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">Leave Application Notification</h1>
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 Dear ${data.managerName},
               </p>
               
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 A new leave application has been submitted by ${data.employeeName} (${data.employeeEmpId}).
               </p>
               
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Leave Details:</h3>
+              <div style="background-color: #f8f9fc; border: 1px solid #d7deec; border-left: 4px solid #3c6ff2; padding: 24px; margin: 24px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 18px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">Leave Details</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee Name:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%; font-weight: 500; font-family: 'Poppins', sans-serif;">Employee Name:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.employeeName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Employee ID:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Employee ID:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.employeeEmpId}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Leave Type:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Leave Type:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${leaveTypeDisplay}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Start Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${startDateDisplay} (${startTypeDisplay})</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Start Date:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${startDateDisplay} (${startTypeDisplay})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">End Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${endDateDisplay} (${endTypeDisplay})</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">End Date:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${endDateDisplay} (${endTypeDisplay})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Number of Days:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Number of Days:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
                   </tr>
                   ${data.leaveType === 'permission' && data.timeForPermissionStart && data.timeForPermissionEnd ? `
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Time:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${formatTime(data.timeForPermissionStart)} - ${formatTime(data.timeForPermissionEnd)}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Time:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${formatTime(data.timeForPermissionStart)} - ${formatTime(data.timeForPermissionEnd)}</td>
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Reason:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.reason}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Reason:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.reason}</td>
                   </tr>
                   ${data.doctorNote && data.leaveType !== 'sick' ? `
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Doctor Note:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.doctorNote}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Doctor Note:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.doctorNote}</td>
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Applied Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${appliedDateDisplay}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">Applied Date:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${appliedDateDisplay}</td>
                   </tr>
                 </table>
               </div>
               
-              <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 20px 0 0 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 Please review and take appropriate action on the leave application.
               </p>
               
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 Best regards,<br>
-                TensorGo-LMS
+                <strong style="font-weight: 600;">TensorGo-LMS</strong>
               </p>
             </td>
           </tr>
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 24px 40px; background-color: #f8f9fc; border-top: 1px solid #e6e8f0; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #5a6c7d; font-size: 12px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #5a6c7d; font-size: 12px; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -332,98 +333,99 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leave Request ${statusDisplay}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td style="padding: 20px 0; background-color: #f4f4f4;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+      <td style="padding: 20px 0; background-color: #f5f5f5;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12); overflow: hidden;">
           <!-- Header -->
           <tr>
-            <td style="padding: 35px 40px; background: linear-gradient(135deg, ${headerColor} 0%, ${data.status === 'approved' ? '#059669' : '#dc2626'} 100%); border-radius: 12px 12px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: 0.5px;">Leave Request ${statusDisplay}</h1>
+            <td style="padding: 32px 40px; background: linear-gradient(135deg, ${headerColor} 0%, ${data.status === 'approved' ? '#059669' : '#dc2626'} 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">Leave Request ${statusDisplay}</h1>
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 25px 0; color: #1f2937; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 25px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 Dear ${data.recipientName},
               </p>
               
               <!-- Status Banner -->
-              <div style="background: linear-gradient(135deg, ${statusBgColor} 0%, ${data.status === 'approved' ? '#a7f3d0' : '#fecaca'} 100%); border-left: 5px solid ${statusColor}; padding: 25px; margin: 25px 0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <p style="margin: 0; color: ${statusColor}; font-size: 22px; font-weight: 700; margin-bottom: 5px;">Leave Request ${statusDisplay}</p>
-                <p style="margin: 0; color: #374151; font-size: 14px; font-weight: 500;">${mainMessage}</p>
+              <div style="background: linear-gradient(135deg, ${statusBgColor} 0%, ${data.status === 'approved' ? '#a7f3d0' : '#fecaca'} 100%); border-left: 5px solid ${statusColor}; padding: 24px; margin: 24px 0; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                <p style="margin: 0; color: ${statusColor}; font-size: 20px; font-family: 'Poppins', sans-serif; font-weight: 600; margin-bottom: 8px; font-family: 'Poppins', sans-serif;">Leave Request ${statusDisplay}</p>
+                <p style="margin: 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; font-family: 'Poppins', sans-serif;">${mainMessage}</p>
               </div>
               
               <!-- Leave Details Card -->
-              <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #2563eb; padding: 25px; margin: 25px 0; border-radius: 8px;">
-                <h3 style="margin: 0 0 20px 0; color: #2563eb; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Leave Details</h3>
+              <div style="background-color: #f8f9fc; border: 1px solid #d7deec; border-left: 4px solid #3c6ff2; padding: 24px; margin: 24px 0; border-radius: 10px;">
+                <h3 style="margin: 0 0 20px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">Leave Details</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; width: 38%; font-weight: 500; vertical-align: top;">Employee Name:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 38%; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Employee Name:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.employeeName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Employee ID:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Employee ID:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.employeeEmpId}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Leave Type:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Leave Type:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${leaveTypeDisplay}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Start Date:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${startDateDisplay} <span style="color: #6b7280; font-weight: 400;">(${startTypeDisplay})</span></td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Start Date:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${startDateDisplay} <span style="color: #4b5875; font-weight: 400;">(${startTypeDisplay})</span></td>
                   </tr>
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">End Date:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${endDateDisplay} <span style="color: #6b7280; font-weight: 400;">(${endTypeDisplay})</span></td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">End Date:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${endDateDisplay} <span style="color: #4b5875; font-weight: 400;">(${endTypeDisplay})</span></td>
                   </tr>
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Number of Days:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; font-weight: 600;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Number of Days:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: 'Poppins', sans-serif;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Reason:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; line-height: 1.5;">${data.reason}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Reason:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.5; font-family: 'Poppins', sans-serif;">${data.reason}</td>
                   </tr>
                   ${data.comment ? `
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">${data.status === 'approved' ? 'Approval' : 'Rejection'} Comment:</td>
-                    <td style="padding: 10px 0; color: #111827; font-size: 14px; line-height: 1.5; background-color: #ffffff; padding: 12px; border-radius: 6px; border-left: 3px solid ${statusColor};">${data.comment}</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">${data.status === 'approved' ? 'Approval' : 'Rejection'} Comment:</td>
+                    <td style="padding: 10px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.5; background-color: #ffffff; padding: 12px; border-radius: 8px; border-left: 3px solid ${statusColor}; font-family: 'Poppins', sans-serif;">${data.comment}</td>
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500; vertical-align: top;">Status:</td>
+                    <td style="padding: 10px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top; font-family: 'Poppins', sans-serif;">Status:</td>
                     <td style="padding: 10px 0;">
-                      <span style="display: inline-block; background-color: ${statusBgColor}; color: ${statusColor}; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${statusDisplay}</span>
+                      <span style="display: inline-block; background-color: ${statusBgColor}; color: ${statusColor}; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Poppins', sans-serif;">${statusDisplay}</span>
                     </td>
                   </tr>
                 </table>
               </div>
               
               <!-- Approver Info -->
-              <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 18px 20px; margin: 25px 0; border-radius: 6px;">
-                <p style="margin: 0; color: #0c4a6e; font-size: 13px; line-height: 1.6;">
-                  <strong>Approved by:</strong> ${data.approverName} (${approverRoleDisplay})
+              <div style="background-color: #e3ebf8; border-left: 4px solid #3c6ff2; padding: 18px 20px; margin: 24px 0; border-radius: 10px;">
+                <p style="margin: 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-family: 'Poppins', sans-serif;">
+                  <strong style="font-weight: 600;">Approved by:</strong> ${data.approverName} (${approverRoleDisplay})
                 </p>
               </div>
               
-              <p style="margin: 30px 0 0 0; color: #374151; font-size: 15px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 15px; line-height: 1.6; font-family: 'Poppins', sans-serif;">
                 Best regards,<br>
-                <strong style="color: #111827;">TensorGo-LMS Team</strong>
+                <strong style="font-weight: 600; color: #1f2a3d;">TensorGo-LMS Team</strong>
               </p>
             </td>
           </tr>
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 25px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
-              <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.6; text-align: left;">
+            <td style="padding: 24px 40px; background-color: #f8f9fc; border-top: 1px solid #e6e8f0; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #5a6c7d; font-size: 12px; font-family: 'Poppins', sans-serif; line-height: 1.6; text-align: left; font-family: 'Poppins', sans-serif;">
                 This is an automated email from TensorGo Leave Management System.<br>
                 Please do not reply to this email.
               </p>
@@ -548,60 +550,61 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to TensorGo LMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Welcome to TensorGo LMS</h1>
+            <td style="padding: 30px 40px; background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Welcome to TensorGo LMS</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.employeeName},
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Welcome to TensorGo Leave Management System! Your account has been created successfully.
               </p>
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Your Login Credentials:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #3c6ff2; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif;">Your Login Credentials:</h3>
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee ID:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Employee ID:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeEmpId}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Email:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.email}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Email:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.email}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Temporary Password:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600; font-family: monospace;">${data.temporaryPassword}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Temporary Password:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif; font-family: monospace;">${data.temporaryPassword}</td>
                   </tr>
                 </table>
               </div>
               <div style="margin: 30px 0;">
-                <a href="${data.loginUrl}" style="display: inline-block; padding: 12px 30px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">Login to Portal</a>
+                <a href="${data.loginUrl}" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-family: 'Poppins', sans-serif; box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);">Login to Portal</a>
               </div>
-              <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 20px 0 0 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 <strong>Important:</strong> Please change your password after your first login for security purposes.
               </p>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -691,51 +694,52 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leave Allocation Notification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background-color: #10b981; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Allocation Notification</h1>
+            <td style="padding: 30px 40px; background-color: #10b981; border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Leave Allocation Notification</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.employeeName},
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Additional leaves have been allocated to your account.
               </p>
-              <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #10b981; font-size: 18px;">Allocation Details:</h3>
+              <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #10b981; font-size: 18px; font-family: 'Poppins', sans-serif;">Allocation Details:</h3>
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Leave Type:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Leave Type:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${leaveTypeDisplay}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Days Allocated:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.allocatedDays} ${data.allocatedDays === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Days Allocated:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.allocatedDays} ${data.allocatedDays === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Previous Balance:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.previousBalance} ${data.previousBalance === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Previous Balance:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${data.previousBalance} ${data.previousBalance === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">New Balance:</td>
-                    <td style="padding: 8px 0; color: #10b981; font-size: 14px; font-weight: 600;">${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">New Balance:</td>
+                    <td style="padding: 8px 0; color: #10b981; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Allocated By:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.allocatedBy}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Allocated By:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${data.allocatedBy}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Allocation Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${allocationDateDisplay}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Allocation Date:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${allocationDateDisplay}</td>
                   </tr>
                 </table>
                 ${data.conversionNote ? `
@@ -745,18 +749,18 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
                 </div>
                 ` : ''}
               </div>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -842,61 +846,62 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Password Changed - Security Notification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background-color: #ef4444; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Security Notification</h1>
+            <td style="padding: 30px 40px; background-color: #ef4444; border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Security Notification</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 20px; margin: 20px 0; border-radius: 4px;">
+              <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 20px; margin: 20px 0; border-radius: 10px;">
                 <p style="margin: 0; color: #ef4444; font-size: 32px; font-weight: 700; margin-bottom: 10px;">🔒</p>
-                <p style="margin: 0; color: #ef4444; font-size: 20px; font-weight: 600;">Your Password Has Been Changed</p>
+                <p style="margin: 0; color: #ef4444; font-size: 20px; font-family: 'Poppins', sans-serif; font-weight: 600;">Your Password Has Been Changed</p>
               </div>
-              <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.userName},
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 This is a security notification to inform you that your password was successfully changed.
               </p>
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Change Details:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #3c6ff2; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif;">Change Details:</h3>
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Date & Time:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${changeDateDisplay}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Date & Time:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${changeDateDisplay}</td>
                   </tr>
                   ${data.ipAddress ? `
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">IP Address:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.ipAddress}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">IP Address:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.ipAddress}</td>
                   </tr>
                   ` : ''}
                 </table>
               </div>
-              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <p style="margin: 0; color: #92400e; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                   <strong>⚠️ Important:</strong> If you did not make this change, please contact your administrator immediately and change your password again.
                 </p>
               </div>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS Security Team
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated security email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -987,52 +992,53 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pending Leave Approvals Reminder</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background-color: #f59e0b; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Pending Leave Approvals Reminder</h1>
+            <td style="padding: 30px 40px; background-color: #f59e0b; border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Pending Leave Approvals Reminder</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.managerName},
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 You have <strong>${data.pendingLeaves.length}</strong> pending leave ${data.pendingLeaves.length === 1 ? 'request' : 'requests'} awaiting your approval.
               </p>
-              <div style="background-color: #f8f9fa; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #f59e0b; font-size: 18px;">Pending Leave Requests:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #f59e0b; font-size: 18px; font-family: 'Poppins', sans-serif;">Pending Leave Requests:</h3>
                 ${data.pendingLeaves.map((leave, index) => `
                 <div style="margin-bottom: ${index < data.pendingLeaves.length - 1 ? '20px' : '0'}; padding-bottom: ${index < data.pendingLeaves.length - 1 ? '20px' : '0'}; border-bottom: ${index < data.pendingLeaves.length - 1 ? '1px solid #e0e0e0' : 'none'};">
-                  <p style="margin: 0 0 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${leave.employeeName} (${leave.employeeEmpId})</p>
-                  <p style="margin: 0 0 4px 0; color: #666666; font-size: 13px;">Leave Type: ${formatLeaveType(leave.leaveType)}</p>
-                  <p style="margin: 0 0 4px 0; color: #666666; font-size: 13px;">Dates: ${formatDateForDisplay(leave.startDate)} to ${formatDateForDisplay(leave.endDate)}</p>
-                  <p style="margin: 0 0 4px 0; color: #666666; font-size: 13px;">Days: ${leave.noOfDays} ${leave.noOfDays === 1 ? 'day' : 'days'}</p>
+                  <p style="margin: 0 0 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${leave.employeeName} (${leave.employeeEmpId})</p>
+                  <p style="margin: 0 0 4px 0; color: #4b5875; font-size: 13px;">Leave Type: ${formatLeaveType(leave.leaveType)}</p>
+                  <p style="margin: 0 0 4px 0; color: #4b5875; font-size: 13px;">Dates: ${formatDateForDisplay(leave.startDate)} to ${formatDateForDisplay(leave.endDate)}</p>
+                  <p style="margin: 0 0 4px 0; color: #4b5875; font-size: 13px;">Days: ${leave.noOfDays} ${leave.noOfDays === 1 ? 'day' : 'days'}</p>
                   <p style="margin: 0; color: #f59e0b; font-size: 13px; font-weight: 600;">Pending for ${leave.daysPending} ${leave.daysPending === 1 ? 'day' : 'days'}</p>
                 </div>
                 `).join('')}
               </div>
-              <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 20px 0 0 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Please review and take appropriate action on these leave requests at your earliest convenience.
               </p>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated daily reminder from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -1117,50 +1123,51 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Happy Birthday!</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+            <td style="padding: 30px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 600;">🎉 Happy Birthday! 🎂</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 18px; line-height: 1.6; font-weight: 600;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 18px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-weight: 600;">
                 Dear ${data.employeeName},
               </p>
               ${data.birthdayEmployeeName ? `
-              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #92400e; font-size: 18px; font-weight: 600;">
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 10px;">
+                <p style="margin: 0; color: #92400e; font-size: 18px; font-family: 'Poppins', sans-serif; font-weight: 600;">
                   🎉 Today is ${data.birthdayEmployeeName}'s (${data.birthdayEmployeeEmpId}) birthday! 🎂
                 </p>
               </div>
               ` : ''}
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 ${data.birthdayEmployeeName ? `Let's join together to wish ${data.birthdayEmployeeName} a wonderful birthday filled with joy, happiness, and success!` : 'Wishing you a wonderful birthday filled with joy, happiness, and success!'}
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 ${data.birthdayEmployeeName ? `May this special day bring ${data.birthdayEmployeeName} countless reasons to smile and celebrate. We hope their year ahead is filled with new opportunities, achievements, and memorable moments.` : 'May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.'}
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 ${data.birthdayEmployeeName ? `Thank you ${data.birthdayEmployeeName} for being a valuable part of our team. Have a fantastic day!` : 'Thank you for being a valuable part of our team. Have a fantastic day!'}
               </p>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Warm regards,<br>
                 <strong>TensorGo-LMS Team</strong>
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated birthday wish from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -1261,62 +1268,63 @@ const generateLeaveCarryForwardEmailHtml = (data: LeaveCarryForwardEmailData): s
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leave Carry Forward Notification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Carry Forward Notification</h1>
+            <td style="padding: 30px 40px; background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Leave Carry Forward Notification</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.employeeName},
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Your leave balances from ${data.previousYear} have been carried forward to ${data.newYear}.
               </p>
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Carry Forward Details:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #3c6ff2; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif;">Carry Forward Details:</h3>
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Carried Forward:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${carriedForwardItems.join(', ') || 'None'}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Carried Forward:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${carriedForwardItems.join(', ') || 'None'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">New Year (${data.newYear}) Balances:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;"></td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">New Year (${data.newYear}) Balances:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;"></td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0 4px 20px; color: #666666; font-size: 13px;">Casual Leave:</td>
-                    <td style="padding: 4px 0; color: #333333; font-size: 13px; font-weight: 600;">${data.newYearBalances.casual} ${data.newYearBalances.casual === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 4px 0 4px 20px; color: #4b5875; font-size: 13px;">Casual Leave:</td>
+                    <td style="padding: 4px 0; color: #1f2a3d; font-size: 13px; font-weight: 600;">${data.newYearBalances.casual} ${data.newYearBalances.casual === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0 4px 20px; color: #666666; font-size: 13px;">Sick Leave:</td>
-                    <td style="padding: 4px 0; color: #333333; font-size: 13px; font-weight: 600;">${data.newYearBalances.sick} ${data.newYearBalances.sick === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 4px 0 4px 20px; color: #4b5875; font-size: 13px;">Sick Leave:</td>
+                    <td style="padding: 4px 0; color: #1f2a3d; font-size: 13px; font-weight: 600;">${data.newYearBalances.sick} ${data.newYearBalances.sick === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0 4px 20px; color: #666666; font-size: 13px;">LOP:</td>
-                    <td style="padding: 4px 0; color: #333333; font-size: 13px; font-weight: 600;">${data.newYearBalances.lop} ${data.newYearBalances.lop === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 4px 0 4px 20px; color: #4b5875; font-size: 13px;">LOP:</td>
+                    <td style="padding: 4px 0; color: #1f2a3d; font-size: 13px; font-weight: 600;">${data.newYearBalances.lop} ${data.newYearBalances.lop === 1 ? 'day' : 'days'}</td>
                   </tr>
                 </table>
               </div>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -1415,92 +1423,93 @@ export const sendUrgentLeaveApplicationEmail = async (
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>URGENT: Leave Application Notification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <tr>
-            <td style="padding: 30px 40px; background-color: #ef4444; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">🚨 URGENT: Leave Application</h1>
+            <td style="padding: 30px 40px; background-color: #ef4444; border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">🚨 URGENT: Leave Application</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <div style="background-color: #fee2e2; border: 2px solid #ef4444; padding: 15px; margin: 0 0 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #ef4444; font-size: 18px; font-weight: 700;">⚠️ URGENT REQUEST - REQUIRES IMMEDIATE ATTENTION</p>
+              <div style="background-color: #fee2e2; border: 2px solid #ef4444; padding: 15px; margin: 0 0 20px 0; border-radius: 10px;">
+                <p style="margin: 0; color: #ef4444; font-size: 18px; font-family: 'Poppins', sans-serif; font-weight: 700;">⚠️ URGENT REQUEST - REQUIRES IMMEDIATE ATTENTION</p>
               </div>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.managerName},
               </p>
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 An <strong>URGENT</strong> leave application has been submitted by ${data.employeeName} (${data.employeeEmpId}).
               </p>
-              <div style="background-color: #f8f9fa; border-left: 4px solid #ef4444; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #ef4444; font-size: 18px;">Leave Details:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #ef4444; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #ef4444; font-size: 18px; font-family: 'Poppins', sans-serif;">Leave Details:</h3>
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee Name:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Employee Name:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Employee ID:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Employee ID:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeEmpId}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Leave Type:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Leave Type:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${leaveTypeDisplay}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Start Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${startDateDisplay} (${startTypeDisplay})</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Start Date:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${startDateDisplay} (${startTypeDisplay})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">End Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${endDateDisplay} (${endTypeDisplay})</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">End Date:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${endDateDisplay} (${endTypeDisplay})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Number of Days:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Number of Days:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
                   </tr>
                   ${data.leaveType === 'permission' && data.timeForPermissionStart && data.timeForPermissionEnd ? `
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Time:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${formatTime(data.timeForPermissionStart)} - ${formatTime(data.timeForPermissionEnd)}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Time:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${formatTime(data.timeForPermissionStart)} - ${formatTime(data.timeForPermissionEnd)}</td>
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Reason:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.reason}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Reason:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${data.reason}</td>
                   </tr>
                   ${data.doctorNote && data.leaveType !== 'sick' ? `
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Doctor Note:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.doctorNote}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Doctor Note:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${data.doctorNote}</td>
                   </tr>
                   ` : ''}
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Applied Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${appliedDateDisplay}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Applied Date:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${appliedDateDisplay}</td>
                   </tr>
                 </table>
               </div>
-              <p style="margin: 20px 0 0 0; color: #ef4444; font-size: 14px; line-height: 1.6; font-weight: 600;">
+              <p style="margin: 20px 0 0 0; color: #ef4444; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-weight: 600;">
                 ⚠️ This is an URGENT request. Please review and take action as soon as possible.
               </p>
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -1574,50 +1583,51 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Employee Details Updated</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <!-- Header -->
           <tr>
-            <td style="padding: 30px 40px; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Employee Details Updated</h1>
+            <td style="padding: 30px 40px; background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Employee Details Updated</h1>
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.employeeName},
               </p>
               
-              <div style="background-color: #dbeafe; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #2563eb; font-size: 20px; font-weight: 600;">Your employee details have been updated</p>
+              <div style="background-color: #dbeafe; border-left: 4px solid #3c6ff2; padding: 20px; margin: 20px 0; border-radius: 10px;">
+                <p style="margin: 0; color: #3c6ff2; font-size: 20px; font-family: 'Poppins', sans-serif; font-weight: 600;">Your employee details have been updated</p>
               </div>
               
-              <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Your employee profile details have been updated by HR or Super Admin. Please log in to your account to review the changes.
               </p>
               
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Employee Information:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #3c6ff2; padding: 20px; margin: 20px 0; border-radius: 10px;">
+                <h3 style="margin: 0 0 15px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif;">Employee Information:</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee Name:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Employee Name:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Employee ID:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Employee ID:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeEmpId}</td>
                   </tr>
                 </table>
               </div>
               
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
@@ -1626,11 +1636,11 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #666666; font-size: 12px;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #4b5875; font-size: 12px;">
                 This is an automated email from TensorGo Leave Management System.
               </p>
-              <p style="margin: 8px 0 0 0; color: #666666; font-size: 12px;">
+              <p style="margin: 8px 0 0 0; color: #4b5875; font-size: 12px;">
                 Please do not reply to this email.
               </p>
             </td>
@@ -1739,85 +1749,86 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leave Type Converted</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="padding: 20px 0; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 35, 95, 0.12);">
           <!-- Header -->
           <tr>
-            <td style="padding: 30px 40px; background-color: #f59e0b; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Leave Type Converted</h1>
+            <td style="padding: 30px 40px; background-color: #f59e0b; border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600;">Leave Type Converted</h1>
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.recipientName},
               </p>
               
-              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #f59e0b; font-size: 20px; font-weight: 600;">Leave Type Converted from LOP to Casual</p>
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 10px;">
+                <p style="margin: 0; color: #f59e0b; font-size: 20px; font-family: 'Poppins', sans-serif; font-weight: 600;">Leave Type Converted from LOP to Casual</p>
               </div>
               
-              <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 20px 0; color: #1f2a3d; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Your leave request has been converted from LOP (Loss of Pay) to Casual Leave by ${data.converterName} (${converterRoleDisplay}).
               </p>
               
-              <div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #2563eb; font-size: 18px;">Leave Details:</h3>
+              <div style="background-color: #f8f9fc; border-left: 4px solid #3c6ff2; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #3c6ff2; font-size: 18px; font-family: 'Poppins', sans-serif;">Leave Details:</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">Employee Name:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeName}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">Employee Name:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Employee ID:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.employeeEmpId}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Employee ID:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.employeeEmpId}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Leave Type:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${leaveTypeDisplay}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Leave Type:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${leaveTypeDisplay}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Start Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${startDateDisplay} (${startTypeDisplay})</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Start Date:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${startDateDisplay} (${startTypeDisplay})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">End Date:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${endDateDisplay} (${endTypeDisplay})</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">End Date:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${endDateDisplay} (${endTypeDisplay})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Number of Days:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Number of Days:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Reason:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px;">${data.reason}</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Reason:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif;">${data.reason}</td>
                   </tr>
                 </table>
               </div>
               
-              <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: left;">
-                <h3 style="margin: 0 0 15px 0; color: #10b981; font-size: 18px;">Balance Changes:</h3>
+              <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 10px; text-align: left;">
+                <h3 style="margin: 0 0 15px 0; color: #10b981; font-size: 18px; font-family: 'Poppins', sans-serif;">Balance Changes:</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px; width: 40%;">LOP Balance:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.previousLopBalance} → ${data.newLopBalance} (Refunded ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; width: 40%;">LOP Balance:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.previousLopBalance} → ${data.newLopBalance} (Refunded ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #666666; font-size: 14px;">Casual Balance:</td>
-                    <td style="padding: 8px 0; color: #333333; font-size: 14px; font-weight: 600;">${data.previousCasualBalance} → ${data.newCasualBalance} (Deducted ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})</td>
+                    <td style="padding: 8px 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif;">Casual Balance:</td>
+                    <td style="padding: 8px 0; color: #1f2a3d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; font-family: 'Poppins', sans-serif;">${data.previousCasualBalance} → ${data.newCasualBalance} (Deducted ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})</td>
                   </tr>
                 </table>
               </div>
               
-              <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 20px 0 0 0; color: #4b5875; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
@@ -1826,7 +1837,7 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: left; border-top: 1px solid #e6e8f0;">
+            <td style="padding: 20px 40px; background-color: #f8f9fc; border-radius: 0 0 12px 12px; text-align: left; border-top: 1px solid #e6e8f0;">
               <p style="margin: 0; color: #8a9ba8; font-size: 12px; line-height: 1.5;">
                 This is an automated email from TensorGo Leave Management System.<br>
                 Please do not reply to this email.
