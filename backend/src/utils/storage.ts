@@ -203,7 +203,7 @@ export const getSignedUrlFromOVH = async (
 
 /**
  * Extract key from OVHcloud URL
- * @param url - Full URL from OVHcloud
+ * @param url - Full URL from OVHcloud (supports both virtual-hosted and path-style)
  * @returns Object key
  */
 export const extractKeyFromUrl = (url: string): string => {
@@ -213,17 +213,43 @@ export const extractKeyFromUrl = (url: string): string => {
       return url.replace(`${process.env.OVH_PUBLIC_URL}/`, '');
     }
     
-    // Extract key from standard OVHcloud URL
+    const region = process.env.OVH_REGION || 'gra';
+    
+    // Try virtual-hosted style first (current format)
+    // Format: https://{bucket}.s3.{region}.io.cloud.ovh.us/{key} or https://{bucket}.s3.{region}.cloud.ovh.net/{key}
+    if (region === 'us-east-va') {
+      const virtualHostedPattern = new RegExp(`https://${BUCKET_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.s3\\.${region}\\.io\\.cloud\\.ovh\\.us/(.+)`);
+      const match = url.match(virtualHostedPattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    } else {
+      const virtualHostedPattern = new RegExp(`https://${BUCKET_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.s3\\.${region}\\.cloud\\.ovh\\.net/(.+)`);
+      const match = url.match(virtualHostedPattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    
+    // Try path-style format (legacy)
     const endpoint = process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`;
-    const urlPattern = new RegExp(`${endpoint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/${BUCKET_NAME}/(.+)`);
-    const match = url.match(urlPattern);
+    const pathStylePattern = new RegExp(`${endpoint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/${BUCKET_NAME}/(.+)`);
+    const match = url.match(pathStylePattern);
     
     if (match && match[1]) {
       return match[1];
     }
     
-    // Fallback: try to extract from any URL format
+    // Fallback: try to extract from any URL format (get everything after last slash)
     const parts = url.split('/');
+    // Remove empty parts and get the key (everything after bucket name)
+    const keyParts = parts.filter(p => p && !p.includes('s3.') && !p.includes('cloud.ovh'));
+    const bucketIndex = keyParts.findIndex(p => p === BUCKET_NAME);
+    if (bucketIndex >= 0 && bucketIndex < keyParts.length - 1) {
+      return keyParts.slice(bucketIndex + 1).join('/');
+    }
+    
+    // Last resort: return filename only
     return parts[parts.length - 1];
   } catch (error: any) {
     logger.error(`[STORAGE] [EXTRACT KEY] Error extracting key from URL:`, error);
