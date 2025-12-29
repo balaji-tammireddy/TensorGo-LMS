@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
+import { uploadToOVH, deleteFromOVH, extractKeyFromUrl } from '../utils/storage';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -83,6 +84,8 @@ export const uploadPhoto = [
     logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] ========== REQUEST RECEIVED ==========`);
     logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] User ID: ${req.user!.id}, File: ${req.file?.originalname || 'none'}`);
     
+    let localFilePath: string | null = null;
+    
     try {
       if (!req.file) {
         logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] No file uploaded`);
@@ -94,13 +97,45 @@ export const uploadPhoto = [
         });
       }
 
-      // In production, upload to cloud storage (S3, etc.) and get URL
-      // For now, return relative path
-      const photoUrl = `/uploads/${req.file.filename}`;
+      localFilePath = req.file.path;
+      
+      // Check if OVHcloud is configured
+      const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
+      
+      let photoUrl: string;
+      
+      if (useOVHCloud) {
+        // Upload to OVHcloud bucket
+        const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
+        photoUrl = await uploadToOVH(localFilePath, key, req.file.mimetype);
+        
+        // Delete local file after successful upload
+        try {
+          fs.unlinkSync(localFilePath);
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Local file deleted: ${localFilePath}`);
+        } catch (deleteError: any) {
+          logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to delete local file: ${deleteError.message}`);
+        }
+      } else {
+        // Fallback to local storage
+        photoUrl = `/uploads/${req.file.filename}`;
+        logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Using local storage (OVHcloud not configured)`);
+      }
+      
       const result = await profileService.updateProfilePhoto(req.user!.id, photoUrl);
       logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Photo uploaded successfully - User ID: ${req.user!.id}, Photo URL: ${photoUrl}`);
       res.json(result);
     } catch (error: any) {
+      // Clean up local file if upload failed
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Cleaned up local file after error: ${localFilePath}`);
+        } catch (deleteError: any) {
+          logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to clean up local file: ${deleteError.message}`);
+        }
+      }
+      
       logger.error(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Error:`, error);
       res.status(400).json({
         error: {
@@ -117,7 +152,46 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] User ID: ${req.user!.id}`);
   
   try {
+    // Get current photo URL before deleting
+    const profile = await profileService.getProfile(req.user!.id);
+    const currentPhotoUrl = profile.photo_url;
+    
+    // Delete from database
     const result = await profileService.deleteProfilePhoto(req.user!.id);
+    
+    // Delete from OVHcloud if using cloud storage
+    if (currentPhotoUrl && process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME) {
+      try {
+        // Check if it's an OVHcloud URL
+        if (currentPhotoUrl.startsWith('http') && !currentPhotoUrl.startsWith('/uploads')) {
+          const key = extractKeyFromUrl(currentPhotoUrl);
+          await deleteFromOVH(key);
+          logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Photo deleted from OVHcloud: ${key}`);
+        } else {
+          // Local file - delete from filesystem
+          const localPath = path.resolve(process.env.UPLOAD_DIR || './uploads', path.basename(currentPhotoUrl));
+          if (fs.existsSync(localPath)) {
+            fs.unlinkSync(localPath);
+            logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Local file deleted: ${localPath}`);
+          }
+        }
+      } catch (deleteError: any) {
+        logger.warn(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Failed to delete file from storage: ${deleteError.message}`);
+        // Don't fail the request if file deletion fails
+      }
+    } else if (currentPhotoUrl && currentPhotoUrl.startsWith('/uploads')) {
+      // Delete local file
+      try {
+        const localPath = path.resolve(process.env.UPLOAD_DIR || './uploads', path.basename(currentPhotoUrl));
+        if (fs.existsSync(localPath)) {
+          fs.unlinkSync(localPath);
+          logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Local file deleted: ${localPath}`);
+        }
+      } catch (deleteError: any) {
+        logger.warn(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Failed to delete local file: ${deleteError.message}`);
+      }
+    }
+    
     logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Photo deleted successfully - User ID: ${req.user!.id}`);
     res.json(result);
   } catch (error: any) {
