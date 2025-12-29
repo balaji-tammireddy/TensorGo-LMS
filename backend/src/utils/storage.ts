@@ -31,17 +31,25 @@ export const uploadToOVH = async (
   contentType: string
 ): Promise<string> => {
   try {
+    // Validate configuration
+    if (!process.env.OVH_ACCESS_KEY || !process.env.OVH_SECRET_KEY || !BUCKET_NAME) {
+      throw new Error('OVHcloud configuration is incomplete. Please check OVH_ACCESS_KEY, OVH_SECRET_KEY, and OVH_BUCKET_NAME environment variables.');
+    }
+    
     logger.info(`[STORAGE] [UPLOAD] Uploading file to OVHcloud: ${key}`);
+    logger.info(`[STORAGE] [UPLOAD] Bucket: ${BUCKET_NAME}, Endpoint: ${process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`}`);
     
     // Read file from local filesystem
     const fileContent = fs.readFileSync(filePath);
     
+    // OVHcloud might not support ACL parameter, so we'll try without it first
+    // Public access is typically configured at the bucket level in OVHcloud
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: fileContent,
-      ContentType: contentType,
-      ACL: 'public-read' // Make file publicly accessible
+      ContentType: contentType
+      // Removed ACL: 'public-read' as OVHcloud handles public access via bucket policies
     });
 
     await s3Client.send(command);
@@ -79,7 +87,19 @@ export const uploadToOVH = async (
     return publicUrl;
   } catch (error: any) {
     logger.error(`[STORAGE] [UPLOAD] Error uploading file:`, error);
-    throw new Error(`Failed to upload file to OVHcloud: ${error.message}`);
+    
+    // Provide more detailed error messages
+    if (error.name === 'AccessDenied' || error.message?.includes('Access Denied')) {
+      logger.error(`[STORAGE] [UPLOAD] Access Denied - Check credentials and bucket permissions`);
+      throw new Error(`Access Denied: Please verify OVHcloud credentials (OVH_ACCESS_KEY, OVH_SECRET_KEY) and bucket permissions. Error: ${error.message}`);
+    }
+    
+    if (error.name === 'NoSuchBucket' || error.message?.includes('NoSuchBucket')) {
+      logger.error(`[STORAGE] [UPLOAD] Bucket not found: ${BUCKET_NAME}`);
+      throw new Error(`Bucket not found: ${BUCKET_NAME}. Please verify OVH_BUCKET_NAME environment variable.`);
+    }
+    
+    throw new Error(`Failed to upload file to OVHcloud: ${error.message || error.toString()}`);
   }
 };
 
@@ -96,14 +116,21 @@ export const uploadBufferToOVH = async (
   contentType: string
 ): Promise<string> => {
   try {
+    // Validate configuration
+    if (!process.env.OVH_ACCESS_KEY || !process.env.OVH_SECRET_KEY || !BUCKET_NAME) {
+      throw new Error('OVHcloud configuration is incomplete. Please check OVH_ACCESS_KEY, OVH_SECRET_KEY, and OVH_BUCKET_NAME environment variables.');
+    }
+    
     logger.info(`[STORAGE] [UPLOAD BUFFER] Uploading buffer to OVHcloud: ${key}`);
     
+    // OVHcloud might not support ACL parameter, so we'll try without it first
+    // Public access is typically configured at the bucket level in OVHcloud
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
-      ContentType: contentType,
-      ACL: 'public-read'
+      ContentType: contentType
+      // Removed ACL: 'public-read' as OVHcloud handles public access via bucket policies
     });
 
     await s3Client.send(command);
@@ -137,7 +164,19 @@ export const uploadBufferToOVH = async (
     return publicUrl;
   } catch (error: any) {
     logger.error(`[STORAGE] [UPLOAD BUFFER] Error uploading file:`, error);
-    throw new Error(`Failed to upload file to OVHcloud: ${error.message}`);
+    
+    // Provide more detailed error messages
+    if (error.name === 'AccessDenied' || error.message?.includes('Access Denied')) {
+      logger.error(`[STORAGE] [UPLOAD BUFFER] Access Denied - Check credentials and bucket permissions`);
+      throw new Error(`Access Denied: Please verify OVHcloud credentials (OVH_ACCESS_KEY, OVH_SECRET_KEY) and bucket permissions. Error: ${error.message}`);
+    }
+    
+    if (error.name === 'NoSuchBucket' || error.message?.includes('NoSuchBucket')) {
+      logger.error(`[STORAGE] [UPLOAD BUFFER] Bucket not found: ${BUCKET_NAME}`);
+      throw new Error(`Bucket not found: ${BUCKET_NAME}. Please verify OVH_BUCKET_NAME environment variable.`);
+    }
+    
+    throw new Error(`Failed to upload file to OVHcloud: ${error.message || error.toString()}`);
   }
 };
 

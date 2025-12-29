@@ -105,16 +105,23 @@ export const uploadPhoto = [
       let photoUrl: string;
       
       if (useOVHCloud) {
-        // Upload to OVHcloud bucket
-        const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
-        photoUrl = await uploadToOVH(localFilePath, key, req.file.mimetype);
-        
-        // Delete local file after successful upload
         try {
-          fs.unlinkSync(localFilePath);
-          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Local file deleted: ${localFilePath}`);
-        } catch (deleteError: any) {
-          logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to delete local file: ${deleteError.message}`);
+          // Upload to OVHcloud bucket
+          const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
+          photoUrl = await uploadToOVH(localFilePath, key, req.file.mimetype);
+          
+          // Delete local file after successful upload
+          try {
+            fs.unlinkSync(localFilePath);
+            logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Local file deleted: ${localFilePath}`);
+          } catch (deleteError: any) {
+            logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to delete local file: ${deleteError.message}`);
+          }
+        } catch (ovhError: any) {
+          // Fallback to local storage if OVHcloud upload fails
+          logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] OVHcloud upload failed, falling back to local storage: ${ovhError.message}`);
+          photoUrl = `/uploads/${req.file.filename}`;
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Using local storage as fallback`);
         }
       } else {
         // Fallback to local storage
