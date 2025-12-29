@@ -5,11 +5,25 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
-import { uploadToOVH, uploadBufferToOVH, deleteFromOVH, extractKeyFromUrl, getSignedUrlFromOVH } from '../utils/storage';
+import { uploadToOVH, deleteFromOVH, extractKeyFromUrl, getSignedUrlFromOVH } from '../utils/storage';
 
-// Configure multer for memory storage - upload directly to OVHcloud without saving to disk
+// Configure multer for file uploads - same approach as medical certificates
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req: AuthRequest, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `profile-${req.user!.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880') // 5MB default
   },
@@ -86,20 +100,27 @@ export const uploadPhoto = [
       
       let photoUrl: string;
       
+      let localFilePath: string | null = null;
+      
       if (useOVHCloud) {
         try {
-          // Generate unique filename
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-          const filename = `profile-${req.user!.id}-${uniqueSuffix}${path.extname(req.file.originalname)}`;
-          const key = `profile-photos/${req.user!.id}/${filename}`;
+          localFilePath = req.file.path;
+          // Upload to OVHcloud bucket - returns key (same approach as medical certificates)
+          const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Uploading to OVHcloud with key: ${key}`);
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] File path: ${localFilePath}, MIME type: ${req.file.mimetype}`);
           
-          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Uploading directly to OVHcloud with key: ${key}`);
-          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] File size: ${req.file.size} bytes, MIME type: ${req.file.mimetype}`);
-          
-          // Upload directly from memory buffer to OVHcloud - no local file saved
-          const photoKey = await uploadBufferToOVH(req.file.buffer, key, req.file.mimetype);
+          const photoKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
           
           logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Successfully uploaded to OVHcloud: ${photoKey}`);
+          
+          // Delete local file after successful upload
+          try {
+            fs.unlinkSync(localFilePath);
+            logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Local file deleted: ${localFilePath}`);
+          } catch (deleteError: any) {
+            logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to delete local file: ${deleteError.message}`);
+          }
           
           // Store only the key in database (not URL)
           photoUrl = photoKey;
@@ -111,10 +132,18 @@ export const uploadPhoto = [
             code: ovhError.Code,
             requestId: ovhError.$metadata?.requestId,
             httpStatusCode: ovhError.$metadata?.httpStatusCode,
-            key: `profile-photos/${req.user!.id}/${req.file.originalname}`
+            key: `profile-photos/${req.user!.id}/${req.file.filename}`
           });
           
-          // No fallback - OVHcloud is required
+          // Clean up local file if upload failed
+          if (localFilePath && fs.existsSync(localFilePath)) {
+            try {
+              fs.unlinkSync(localFilePath);
+            } catch (deleteError: any) {
+              logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to clean up local file: ${deleteError.message}`);
+            }
+          }
+          
           return res.status(500).json({
             error: {
               code: 'UPLOAD_ERROR',
@@ -136,7 +165,16 @@ export const uploadPhoto = [
       logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Photo uploaded successfully - User ID: ${req.user!.id}, Photo Key: ${photoUrl}`);
       res.json(result);
     } catch (error: any) {
-      // No local file to clean up - we upload directly from memory
+      // Clean up local file if upload failed
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+          logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Cleaned up local file after error: ${localFilePath}`);
+        } catch (deleteError: any) {
+          logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to clean up local file: ${deleteError.message}`);
+        }
+      }
+      
       logger.error(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Error:`, error);
       res.status(400).json({
         error: {
