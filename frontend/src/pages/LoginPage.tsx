@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { forgotPassword, verifyOTP, resetPassword } from '../services/authService';
-import { FaEye, FaEyeSlash, FaTimes } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaTimes, FaBriefcase } from 'react-icons/fa';
 import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
@@ -180,7 +180,12 @@ const LoginPage: React.FC = () => {
       <div className="login-container">
         {isInactive ? (
           <>
-            <h1>HR Leave Management System</h1>
+            <div className="login-header">
+              <div className="login-logo">
+                <FaBriefcase />
+              </div>
+              <h1>HR Leave Management System</h1>
+            </div>
             <div className="error-message" style={{ marginTop: 16 }}>
               You are no longer active employee of this organisation.
             </div>
@@ -197,11 +202,16 @@ const LoginPage: React.FC = () => {
           </>
         ) : (
           <>
-            <h1>HR Leave Management System</h1>
-            <p className="login-subtitle">Sign in to continue</p>
+            <div className="login-header">
+              <div className="login-logo">
+                <FaBriefcase />
+              </div>
+              <h1>HR Leave Management System</h1>
+              <p className="login-subtitle">Welcome back! Please sign in to continue</p>
+            </div>
             <form onSubmit={handleSubmit} className="login-form">
               <div className="form-group">
-                <label>Email</label>
+                <label>Email Address</label>
                 <input
                   type="email"
                   value={email}
