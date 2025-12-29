@@ -783,15 +783,11 @@ const LeaveApplyPage: React.FC = () => {
     // If editing and no new file is uploaded, preserve existing doctor note
     if (formData.leaveType === 'sick') {
       if (doctorNoteFile) {
-        try {
-          const noteBase64 = await readFileAsBase64(doctorNoteFile);
-          submitData.doctorNote = noteBase64;
-        } catch (err) {
-          showError('Failed to read doctor prescription file. Please try again.');
-          return;
-        }
+        // Send file directly - backend will handle upload to OVHcloud
+        submitData.doctorNote = doctorNoteFile;
       } else if (editingId && existingDoctorNote) {
         // Preserve existing doctor note when editing without uploading new file
+        // Could be OVHcloud key (medical-certificates/...) or base64 (data:...)
         submitData.doctorNote = existingDoctorNote;
       }
     }

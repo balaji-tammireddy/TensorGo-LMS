@@ -56,7 +56,7 @@ export interface ApplyLeaveData {
   endType: 'full' | 'half';
   reason: string;
   timeForPermission?: { start?: string; end?: string };
-  doctorNote?: string;
+  doctorNote?: string | File; // Can be File for upload or string for existing key/base64
 }
 
 export const getLeaveBalances = async (): Promise<LeaveBalance> => {
@@ -83,7 +83,36 @@ export const getLeaveRules = async (): Promise<LeaveRule[]> => {
 };
 
 export const applyLeave = async (data: ApplyLeaveData) => {
-  const response = await api.post('/leave/apply', data);
+  const formData = new FormData();
+  
+  // Add all fields except doctorNote
+  formData.append('leaveType', data.leaveType);
+  formData.append('startDate', data.startDate);
+  formData.append('startType', data.startType);
+  formData.append('endDate', data.endDate);
+  formData.append('endType', data.endType);
+  formData.append('reason', data.reason);
+  
+  if (data.timeForPermission) {
+    if (data.timeForPermission.start) formData.append('timeForPermission[start]', data.timeForPermission.start);
+    if (data.timeForPermission.end) formData.append('timeForPermission[end]', data.timeForPermission.end);
+  }
+  
+  // Handle doctorNote - if it's a File, append it; if it's a string (existing key/base64), append as is
+  if (data.doctorNote) {
+    if (data.doctorNote instanceof File) {
+      formData.append('doctorNote', data.doctorNote);
+    } else {
+      // Existing key or base64 - send as JSON field
+      formData.append('doctorNote', data.doctorNote);
+    }
+  }
+  
+  const response = await api.post('/leave/apply', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
   return response.data;
 };
 
@@ -139,7 +168,41 @@ export const getLeaveRequest = async (requestId: number) => {
 };
 
 export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData) => {
-  const response = await api.put(`/leave/request/${requestId}`, data);
+  const formData = new FormData();
+  
+  // Add all fields except doctorNote
+  formData.append('leaveType', data.leaveType);
+  formData.append('startDate', data.startDate);
+  formData.append('startType', data.startType);
+  formData.append('endDate', data.endDate);
+  formData.append('endType', data.endType);
+  formData.append('reason', data.reason);
+  
+  if (data.timeForPermission) {
+    if (data.timeForPermission.start) formData.append('timeForPermission[start]', data.timeForPermission.start);
+    if (data.timeForPermission.end) formData.append('timeForPermission[end]', data.timeForPermission.end);
+  }
+  
+  // Handle doctorNote - if it's a File, append it; if it's a string (existing key/base64), append as is
+  if (data.doctorNote) {
+    if (data.doctorNote instanceof File) {
+      formData.append('doctorNote', data.doctorNote);
+    } else {
+      // Existing key or base64 - send as JSON field
+      formData.append('doctorNote', data.doctorNote);
+    }
+  }
+  
+  const response = await api.put(`/leave/request/${requestId}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  return response.data;
+};
+
+export const getMedicalCertificateSignedUrl = async (requestId: number): Promise<{ signedUrl: string; expiresIn: number | null }> => {
+  const response = await api.get(`/leave/request/${requestId}/medical-certificate/signed-url`);
   return response.data;
 };
 

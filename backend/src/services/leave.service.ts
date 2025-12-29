@@ -2,6 +2,7 @@ import { pool } from '../database/db';
 import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
+import { deleteFromOVH } from '../utils/storage';
 import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail, sendLopToCasualConversionEmail } from '../utils/emailTemplates';
 
 // Local date formatter to avoid timezone shifts
@@ -1328,7 +1329,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
   // Verify the request
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Verifying leave request exists`);
   const checkResult = await pool.query(
-    'SELECT current_status, employee_id, leave_type, no_of_days FROM leave_requests WHERE id = $1',
+    'SELECT current_status, employee_id, leave_type, no_of_days, doctor_note FROM leave_requests WHERE id = $1',
     [requestId]
   );
 
@@ -1429,6 +1430,18 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
       }
     }
 
+
+    // Delete medical certificate from OVHcloud if it exists
+    const doctorNote = checkResult.rows[0].doctor_note;
+    if (doctorNote && doctorNote.startsWith('medical-certificates/')) {
+      try {
+        await deleteFromOVH(doctorNote);
+        logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Medical certificate deleted from OVHcloud: ${doctorNote}`);
+      } catch (deleteError: any) {
+        logger.warn(`[LEAVE] [DELETE LEAVE REQUEST] Failed to delete medical certificate from OVHcloud: ${deleteError.message}`);
+        // Don't fail the request if file deletion fails
+      }
+    }
 
     // Delete leave days first (foreign key constraint)
     await client.query('DELETE FROM leave_days WHERE leave_request_id = $1', [requestId]);

@@ -1,5 +1,6 @@
 import { pool } from '../database/db';
 import { logger } from '../utils/logger';
+import { getSignedUrlFromOVH } from '../utils/storage';
 
 export const getProfile = async (userId: number) => {
   logger.info(`[PROFILE] [GET PROFILE] ========== FUNCTION CALLED ==========`);
@@ -75,7 +76,14 @@ export const getProfile = async (userId: number) => {
             empId: user.reporting_manager_emp_id || null
           }
         : null,
-    profilePhotoUrl: user.profile_photo_url
+    // If profile_photo_url is a key (starts with 'profile-photos/'), generate signed URL
+    // Otherwise, it's a local path, return as-is
+    profilePhotoUrl: user.profile_photo_url && user.profile_photo_url.startsWith('profile-photos/')
+      ? null // Will be generated on-demand via API endpoint
+      : user.profile_photo_url,
+    profilePhotoKey: user.profile_photo_url && user.profile_photo_url.startsWith('profile-photos/')
+      ? user.profile_photo_url
+      : null
   };
 };
 

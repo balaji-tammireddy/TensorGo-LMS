@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
-import { uploadToOVH, deleteFromOVH, extractKeyFromUrl } from '../utils/storage';
+import { uploadToOVH, deleteFromOVH, extractKeyFromUrl, getSignedUrlFromOVH } from '../utils/storage';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -106,9 +106,9 @@ export const uploadPhoto = [
       
       if (useOVHCloud) {
         try {
-          // Upload to OVHcloud bucket
+          // Upload to OVHcloud bucket - returns key, not URL
           const key = `profile-photos/${req.user!.id}/${req.file.filename}`;
-          photoUrl = await uploadToOVH(localFilePath, key, req.file.mimetype);
+          const photoKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
           
           // Delete local file after successful upload
           try {
@@ -117,6 +117,9 @@ export const uploadPhoto = [
           } catch (deleteError: any) {
             logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Failed to delete local file: ${deleteError.message}`);
           }
+          
+          // Store only the key in database (not URL)
+          photoUrl = photoKey;
         } catch (ovhError: any) {
           // Fallback to local storage if OVHcloud upload fails
           logger.warn(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] OVHcloud upload failed, falling back to local storage: ${ovhError.message}`);
@@ -129,8 +132,9 @@ export const uploadPhoto = [
         logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Using local storage (OVHcloud not configured)`);
       }
       
+      // Store key (or local path) in database
       const result = await profileService.updateProfilePhoto(req.user!.id, photoUrl);
-      logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Photo uploaded successfully - User ID: ${req.user!.id}, Photo URL: ${photoUrl}`);
+      logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Photo uploaded successfully - User ID: ${req.user!.id}, Photo Key: ${photoUrl}`);
       res.json(result);
     } catch (error: any) {
       // Clean up local file if upload failed
@@ -159,37 +163,26 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] User ID: ${req.user!.id}`);
   
   try {
-    // Get current photo URL before deleting
+    // Get current photo key/URL before deleting
     const profile = await profileService.getProfile(req.user!.id);
-    const currentPhotoUrl = profile.photo_url;
+    const currentPhotoKey = (profile as any).profilePhotoKey || profile.profilePhotoUrl;
     
     // Delete from database
     const result = await profileService.deleteProfilePhoto(req.user!.id);
     
-    // Delete from OVHcloud if using cloud storage
-    if (currentPhotoUrl && process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME) {
+    // Delete from OVHcloud if using cloud storage (key starts with 'profile-photos/')
+    if (currentPhotoKey && currentPhotoKey.startsWith('profile-photos/')) {
       try {
-        // Check if it's an OVHcloud URL
-        if (currentPhotoUrl.startsWith('http') && !currentPhotoUrl.startsWith('/uploads')) {
-          const key = extractKeyFromUrl(currentPhotoUrl);
-          await deleteFromOVH(key);
-          logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Photo deleted from OVHcloud: ${key}`);
-        } else {
-          // Local file - delete from filesystem
-          const localPath = path.resolve(process.env.UPLOAD_DIR || './uploads', path.basename(currentPhotoUrl));
-          if (fs.existsSync(localPath)) {
-            fs.unlinkSync(localPath);
-            logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Local file deleted: ${localPath}`);
-          }
-        }
+        await deleteFromOVH(currentPhotoKey);
+        logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Photo deleted from OVHcloud: ${currentPhotoKey}`);
       } catch (deleteError: any) {
-        logger.warn(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Failed to delete file from storage: ${deleteError.message}`);
+        logger.warn(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Failed to delete file from OVHcloud: ${deleteError.message}`);
         // Don't fail the request if file deletion fails
       }
-    } else if (currentPhotoUrl && currentPhotoUrl.startsWith('/uploads')) {
+    } else if (currentPhotoKey && currentPhotoKey.startsWith('/uploads')) {
       // Delete local file
       try {
-        const localPath = path.resolve(process.env.UPLOAD_DIR || './uploads', path.basename(currentPhotoUrl));
+        const localPath = path.resolve(process.env.UPLOAD_DIR || './uploads', path.basename(currentPhotoKey));
         if (fs.existsSync(localPath)) {
           fs.unlinkSync(localPath);
           logger.info(`[CONTROLLER] [PROFILE] [DELETE PHOTO] Local file deleted: ${localPath}`);
@@ -206,6 +199,39 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
     res.status(400).json({
       error: {
         code: 'DELETE_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
+export const getPhotoSignedUrl = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] User ID: ${req.user!.id}`);
+  
+  try {
+    const profile = await profileService.getProfile(req.user!.id);
+    const photoKey = (profile as any).profilePhotoKey;
+    
+    if (!photoKey) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'No profile photo found'
+        }
+      });
+    }
+    
+    // Generate signed URL (valid for 15 minutes)
+    const signedUrl = await getSignedUrlFromOVH(photoKey, 900);
+    
+    logger.info(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Signed URL generated successfully - User ID: ${req.user!.id}`);
+    res.json({ signedUrl, expiresIn: 900 });
+  } catch (error: any) {
+    logger.error(`[CONTROLLER] [PROFILE] [GET PHOTO SIGNED URL] Error:`, error);
+    res.status(400).json({
+      error: {
+        code: 'SIGNED_URL_ERROR',
         message: error.message
       }
     });

@@ -2,6 +2,12 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import * as leaveService from '../services/leave.service';
 import { logger } from '../utils/logger';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { uploadToOVH, getSignedUrlFromOVH, deleteFromOVH } from '../utils/storage';
+import { pool } from '../database/db';
+import { applyLeaveSchema, updateLeaveSchema } from '../validations/leave.schema';
 
 export const getBalances = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [LEAVE] [GET BALANCES] ========== REQUEST RECEIVED ==========`);
@@ -73,28 +79,167 @@ export const getRules = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const applyLeave = async (req: AuthRequest, res: Response) => {
-  logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] ========== REQUEST RECEIVED ==========`);
-  logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] User ID: ${req.user!.id}, Leave Type: ${req.body.leaveType}, Start: ${req.body.startDate}, End: ${req.body.endDate}`);
-  
-  try {
-    const result = await leaveService.applyLeave(req.user!.id, req.body);
-    logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Leave applied successfully - Leave Request ID: ${result.leaveRequestId}`);
-    res.status(201).json(result);
-  } catch (error: any) {
-    logger.error(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Error:`, error);
-    logger.error(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Error stack:`, error.stack);
-    logger.error(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Request body:`, req.body);
-    const statusCode = error.message?.includes('not found') || error.message?.includes('permission') ? 404 : 400;
-    res.status(statusCode).json({
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: error.message || 'Failed to apply leave',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      }
-    });
+// Configure multer for medical certificate uploads
+const medicalCertStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req: AuthRequest, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `medical-cert-${req.user!.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
   }
-};
+});
+
+const uploadMedicalCert = multer({
+  storage: medicalCertStorage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880') // 5MB default
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow images and PDFs
+    const allowedTypes = /jpeg|jpg|png|gif|pdf/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype) || file.mimetype === 'application/pdf';
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files (JPEG, PNG, GIF) and PDF files are allowed'));
+    }
+  }
+});
+
+export const applyLeave = [
+  uploadMedicalCert.single('doctorNote'),
+  async (req: AuthRequest, res: Response) => {
+    logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] ========== REQUEST RECEIVED ==========`);
+    logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] User ID: ${req.user!.id}, Leave Type: ${req.body.leaveType}, Start: ${req.body.startDate}, End: ${req.body.endDate}`);
+    
+    let localFilePath: string | null = null;
+    
+    try {
+      // Parse timeForPermission from FormData format (timeForPermission[start], timeForPermission[end])
+      const bodyData: any = { ...req.body };
+      if (req.body['timeForPermission[start]'] || req.body['timeForPermission[end]']) {
+        bodyData.timeForPermission = {
+          start: req.body['timeForPermission[start]'] || undefined,
+          end: req.body['timeForPermission[end]'] || undefined
+        };
+        delete bodyData['timeForPermission[start]'];
+        delete bodyData['timeForPermission[end]'];
+      }
+      
+      // Validate request data
+      const validationResult = applyLeaveSchema.safeParse({
+        body: bodyData
+      });
+      
+      if (!validationResult.success) {
+        const errorMessages = validationResult.error.errors.map(err => {
+          const field = err.path.join('.');
+          return `${field}: ${err.message}`;
+        });
+        
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: errorMessages.length === 1 
+              ? errorMessages[0] 
+              : `Validation failed: ${errorMessages.join(', ')}`,
+            details: validationResult.error.errors
+          }
+        });
+      }
+      
+      const leaveData = { ...bodyData };
+      
+      // Handle medical certificate file upload
+      if (req.file && req.body.leaveType === 'sick') {
+        localFilePath = req.file.path;
+        const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
+        
+        if (useOVHCloud) {
+          try {
+            // Upload to OVHcloud bucket - returns key
+            const key = `medical-certificates/${req.user!.id}/${req.file.filename}`;
+            const certificateKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
+            
+            // Delete local file after successful upload
+            try {
+              fs.unlinkSync(localFilePath);
+              logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Local medical cert file deleted: ${localFilePath}`);
+            } catch (deleteError: any) {
+              logger.warn(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Failed to delete local file: ${deleteError.message}`);
+            }
+            
+            // Store key instead of base64
+            leaveData.doctorNote = certificateKey;
+            logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Medical certificate uploaded to OVHcloud: ${certificateKey}`);
+          } catch (ovhError: any) {
+            // Fallback: convert to base64 if OVHcloud upload fails
+            logger.warn(`[CONTROLLER] [LEAVE] [APPLY LEAVE] OVHcloud upload failed, falling back to base64: ${ovhError.message}`);
+            const fileContent = fs.readFileSync(localFilePath);
+            leaveData.doctorNote = `data:${req.file.mimetype};base64,${fileContent.toString('base64')}`;
+            
+            // Clean up local file
+            try {
+              fs.unlinkSync(localFilePath);
+            } catch (deleteError: any) {
+              logger.warn(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Failed to clean up local file: ${deleteError.message}`);
+            }
+          }
+        } else {
+          // No OVHcloud configured - use base64
+          const fileContent = fs.readFileSync(localFilePath);
+          leaveData.doctorNote = `data:${req.file.mimetype};base64,${fileContent.toString('base64')}`;
+          
+          // Clean up local file
+          try {
+            fs.unlinkSync(localFilePath);
+          } catch (deleteError: any) {
+            logger.warn(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Failed to clean up local file: ${deleteError.message}`);
+          }
+        }
+      } else if (req.body.doctorNote && req.body.doctorNote.startsWith('medical-certificates/')) {
+        // Existing OVHcloud key - preserve it
+        leaveData.doctorNote = req.body.doctorNote;
+      } else if (req.body.doctorNote && req.body.doctorNote.startsWith('data:')) {
+        // Existing base64 - preserve it (backward compatibility)
+        leaveData.doctorNote = req.body.doctorNote;
+      }
+      
+      const result = await leaveService.applyLeave(req.user!.id, leaveData);
+      logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Leave applied successfully - Leave Request ID: ${result.leaveRequestId}`);
+      res.status(201).json(result);
+    } catch (error: any) {
+      // Clean up local file if upload failed
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+          logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Cleaned up local file after error: ${localFilePath}`);
+        } catch (deleteError: any) {
+          logger.warn(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Failed to clean up local file: ${deleteError.message}`);
+        }
+      }
+      
+      logger.error(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Error:`, error);
+      logger.error(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Error stack:`, error.stack);
+      logger.error(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Request body:`, req.body);
+      const statusCode = error.message?.includes('not found') || error.message?.includes('permission') ? 404 : 400;
+      res.status(statusCode).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message || 'Failed to apply leave',
+          details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }
+      });
+    }
+  }
+];
 
 export const getMyRequests = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [LEAVE] [GET MY REQUESTS] ========== REQUEST RECEIVED ==========`);
@@ -421,20 +566,222 @@ export const getLeaveRequest = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateLeaveRequest = async (req: AuthRequest, res: Response) => {
-  logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] ========== REQUEST RECEIVED ==========`);
-  logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Leave Type: ${req.body.leaveType || 'none'}`);
+export const updateLeaveRequest = [
+  uploadMedicalCert.single('doctorNote'),
+  async (req: AuthRequest, res: Response) => {
+    logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] ========== REQUEST RECEIVED ==========`);
+    logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Leave Type: ${req.body.leaveType || 'none'}`);
+    
+    let localFilePath: string | null = null;
+    
+    try {
+      const requestId = parseInt(req.params.id);
+      
+      // Parse timeForPermission from FormData format (timeForPermission[start], timeForPermission[end])
+      const bodyData: any = { ...req.body };
+      if (req.body['timeForPermission[start]'] || req.body['timeForPermission[end]']) {
+        bodyData.timeForPermission = {
+          start: req.body['timeForPermission[start]'] || undefined,
+          end: req.body['timeForPermission[end]'] || undefined
+        };
+        delete bodyData['timeForPermission[start]'];
+        delete bodyData['timeForPermission[end]'];
+      }
+      
+      // Validate request data
+      const validationResult = updateLeaveSchema.safeParse({
+        params: { id: req.params.id },
+        body: bodyData
+      });
+      
+      if (!validationResult.success) {
+        const errorMessages = validationResult.error.errors.map(err => {
+          const field = err.path.join('.');
+          return `${field}: ${err.message}`;
+        });
+        
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: errorMessages.length === 1 
+              ? errorMessages[0] 
+              : `Validation failed: ${errorMessages.join(', ')}`,
+            details: validationResult.error.errors
+          }
+        });
+      }
+      
+      const leaveData = { ...bodyData };
+      
+      // Handle medical certificate file upload
+      if (req.file && req.body.leaveType === 'sick') {
+        localFilePath = req.file.path;
+        const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
+        
+        if (useOVHCloud) {
+          try {
+            // Upload to OVHcloud bucket - returns key
+            const key = `medical-certificates/${req.user!.id}/${req.file.filename}`;
+            const certificateKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
+            
+            // Delete local file after successful upload
+            try {
+              fs.unlinkSync(localFilePath);
+              logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Local medical cert file deleted: ${localFilePath}`);
+            } catch (deleteError: any) {
+              logger.warn(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Failed to delete local file: ${deleteError.message}`);
+            }
+            
+            // Store key instead of base64
+            leaveData.doctorNote = certificateKey;
+            logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Medical certificate uploaded to OVHcloud: ${certificateKey}`);
+          } catch (ovhError: any) {
+            // Fallback: convert to base64 if OVHcloud upload fails
+            logger.warn(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] OVHcloud upload failed, falling back to base64: ${ovhError.message}`);
+            const fileContent = fs.readFileSync(localFilePath);
+            leaveData.doctorNote = `data:${req.file.mimetype};base64,${fileContent.toString('base64')}`;
+            
+            // Clean up local file
+            try {
+              fs.unlinkSync(localFilePath);
+            } catch (deleteError: any) {
+              logger.warn(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Failed to clean up local file: ${deleteError.message}`);
+            }
+          }
+        } else {
+          // No OVHcloud configured - use base64
+          const fileContent = fs.readFileSync(localFilePath);
+          leaveData.doctorNote = `data:${req.file.mimetype};base64,${fileContent.toString('base64')}`;
+          
+          // Clean up local file
+          try {
+            fs.unlinkSync(localFilePath);
+          } catch (deleteError: any) {
+            logger.warn(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Failed to clean up local file: ${deleteError.message}`);
+          }
+        }
+      } else if (req.body.doctorNote && req.body.doctorNote.startsWith('medical-certificates/')) {
+        // Existing OVHcloud key - preserve it
+        leaveData.doctorNote = req.body.doctorNote;
+      } else if (req.body.doctorNote && req.body.doctorNote.startsWith('data:')) {
+        // Existing base64 - preserve it (backward compatibility)
+        leaveData.doctorNote = req.body.doctorNote;
+      }
+      
+      const result = await leaveService.updateLeaveRequest(requestId, req.user!.id, req.user!.role, leaveData);
+      logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Leave request updated successfully - Request ID: ${requestId}`);
+      res.json(result);
+    } catch (error: any) {
+      // Clean up local file if upload failed
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+          logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Cleaned up local file after error: ${localFilePath}`);
+        } catch (deleteError: any) {
+          logger.warn(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Failed to clean up local file: ${deleteError.message}`);
+        }
+      }
+      
+      logger.error(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Error:`, error);
+      res.status(400).json({
+        error: {
+          code: 'UPDATE_FAILED',
+          message: error.message
+        }
+      });
+    }
+  }
+];
+
+export const getMedicalCertificateSignedUrl = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [LEAVE] [GET MEDICAL CERT SIGNED URL] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [LEAVE] [GET MEDICAL CERT SIGNED URL] Request ID: ${req.params.requestId}, User ID: ${req.user!.id}`);
   
   try {
-    const requestId = parseInt(req.params.id);
-    const result = await leaveService.updateLeaveRequest(requestId, req.user!.id, req.user!.role, req.body);
-    logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Leave request updated successfully - Request ID: ${requestId}`);
-    res.json(result);
+    const requestId = parseInt(req.params.requestId);
+    
+    // Get leave request to verify access and get certificate key
+    const leaveRequest = await leaveService.getLeaveRequestById(requestId, req.user!.id, req.user!.role);
+    
+    // Get full request details to check employee_id
+    const fullRequest = await leaveService.getMyLeaveRequests(req.user!.id, 1, 1000);
+    const request = fullRequest.requests.find((r: any) => r.id === requestId);
+    
+    if (!request) {
+      // Check if user is manager/hr/super_admin who can view any request
+      const isAuthorized = ['manager', 'hr', 'super_admin'].includes(req.user!.role);
+      if (!isAuthorized) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to access this medical certificate'
+          }
+        });
+      }
+    }
+    
+    // Get doctor note from database directly
+    const dbResult = await pool.query(
+      'SELECT doctor_note, employee_id FROM leave_requests WHERE id = $1',
+      [requestId]
+    );
+    
+    if (dbResult.rows.length === 0) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Leave request not found'
+        }
+      });
+    }
+    
+    const doctorNote = dbResult.rows[0].doctor_note;
+    const employeeId = dbResult.rows[0].employee_id;
+    
+    // Check permissions
+    const isOwner = employeeId === req.user!.id;
+    const isAuthorized = ['manager', 'hr', 'super_admin'].includes(req.user!.role);
+    
+    if (!isOwner && !isAuthorized) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to access this medical certificate'
+        }
+      });
+    }
+    
+    if (!doctorNote) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'No medical certificate found for this leave request'
+        }
+      });
+    }
+    
+    // Check if it's an OVHcloud key or base64
+    if (doctorNote.startsWith('medical-certificates/')) {
+      // Generate signed URL for OVHcloud key
+      const signedUrl = await getSignedUrlFromOVH(doctorNote, 900);
+      logger.info(`[CONTROLLER] [LEAVE] [GET MEDICAL CERT SIGNED URL] Signed URL generated successfully - Request ID: ${requestId}`);
+      res.json({ signedUrl, expiresIn: 900 });
+    } else if (doctorNote.startsWith('data:')) {
+      // Base64 - return as-is (backward compatibility)
+      res.json({ signedUrl: doctorNote, expiresIn: null });
+    } else {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_FORMAT',
+          message: 'Invalid medical certificate format'
+        }
+      });
+    }
   } catch (error: any) {
-    logger.error(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Error:`, error);
+    logger.error(`[CONTROLLER] [LEAVE] [GET MEDICAL CERT SIGNED URL] Error:`, error);
     res.status(400).json({
       error: {
-        code: 'UPDATE_FAILED',
+        code: 'SIGNED_URL_ERROR',
         message: error.message
       }
     });

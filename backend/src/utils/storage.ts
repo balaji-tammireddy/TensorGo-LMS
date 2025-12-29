@@ -19,11 +19,11 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.OVH_BUCKET_NAME || '';
 
 /**
- * Upload a file to OVHcloud bucket
+ * Upload a file to OVHcloud bucket (PRIVATE bucket - use signed URLs to access)
  * @param filePath - Local file path
  * @param key - Object key (path in bucket)
  * @param contentType - MIME type of the file
- * @returns Public URL of the uploaded file
+ * @returns Object key (store this in DB, use getSignedUrlFromOVH() to generate access URLs)
  */
 export const uploadToOVH = async (
   filePath: string,
@@ -42,49 +42,20 @@ export const uploadToOVH = async (
     // Read file from local filesystem
     const fileContent = fs.readFileSync(filePath);
     
-    // OVHcloud might not support ACL parameter, so we'll try without it first
-    // Public access is typically configured at the bucket level in OVHcloud
+    // Upload to PRIVATE bucket (no ACL - bucket is private)
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: fileContent,
       ContentType: contentType
-      // Removed ACL: 'public-read' as OVHcloud handles public access via bucket policies
+      // No ACL - bucket is private, access via signed URLs only
     });
 
     await s3Client.send(command);
     
-    // Construct public URL
-    // Alternative: If using custom domain, use that instead
-    if (process.env.OVH_PUBLIC_URL) {
-      const publicUrl = `${process.env.OVH_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
-      logger.info(`[STORAGE] [UPLOAD] File uploaded successfully: ${publicUrl}`);
-      return publicUrl;
-    }
-    
-    // OVHcloud public URL format: Use virtual-hosted style for public URLs
-    // Format: https://{bucket}.s3.{region}.cloud.ovh.net/{key}
-    // Extract region from endpoint or use configured region
-    const endpoint = process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`;
-    const region = process.env.OVH_REGION || 'gra';
-    
-    // For us-east-va region, the endpoint format is different
-    // Use virtual-hosted style: https://{bucket}.s3.{region}.cloud.ovh.net/{key}
-    // Or path-style: https://s3.{region}.cloud.ovh.net/{bucket}/{key}
-    // Try virtual-hosted style first (more common for public URLs)
-    let publicUrl: string;
-    
-    if (endpoint.includes('us-east-va')) {
-      // Special handling for us-east-va region
-      publicUrl = `https://${BUCKET_NAME}.s3.us-east-va.io.cloud.ovh.us/${key}`;
-    } else {
-      // Standard OVHcloud format
-      const cleanEndpoint = endpoint.replace(/\/$/, '').replace('https://s3.', '');
-      publicUrl = `https://${BUCKET_NAME}.s3.${cleanEndpoint}/${key}`;
-    }
-    
-    logger.info(`[STORAGE] [UPLOAD] File uploaded successfully: ${publicUrl}`);
-    return publicUrl;
+    // Return only the key - signed URLs will be generated on-demand via getSignedUrlFromOVH()
+    logger.info(`[STORAGE] [UPLOAD] File uploaded successfully. Key: ${key}`);
+    return key;
   } catch (error: any) {
     logger.error(`[STORAGE] [UPLOAD] Error uploading file:`, error);
     
@@ -108,7 +79,7 @@ export const uploadToOVH = async (
  * @param buffer - File buffer
  * @param key - Object key (path in bucket)
  * @param contentType - MIME type of the file
- * @returns Public URL of the uploaded file
+ * @returns Object key (store this in DB, use getSignedUrlFromOVH() to generate access URLs)
  */
 export const uploadBufferToOVH = async (
   buffer: Buffer,
@@ -123,45 +94,20 @@ export const uploadBufferToOVH = async (
     
     logger.info(`[STORAGE] [UPLOAD BUFFER] Uploading buffer to OVHcloud: ${key}`);
     
-    // OVHcloud might not support ACL parameter, so we'll try without it first
-    // Public access is typically configured at the bucket level in OVHcloud
+    // Upload to PRIVATE bucket (no ACL - bucket is private)
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
       ContentType: contentType
-      // Removed ACL: 'public-read' as OVHcloud handles public access via bucket policies
+      // No ACL - bucket is private, access via signed URLs only
     });
 
     await s3Client.send(command);
     
-    // Construct public URL
-    // Alternative: If using custom domain
-    if (process.env.OVH_PUBLIC_URL) {
-      const publicUrl = `${process.env.OVH_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
-      logger.info(`[STORAGE] [UPLOAD BUFFER] File uploaded successfully: ${publicUrl}`);
-      return publicUrl;
-    }
-    
-    // OVHcloud public URL format: Use virtual-hosted style for public URLs
-    // Format: https://{bucket}.s3.{region}.cloud.ovh.net/{key}
-    const endpoint = process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`;
-    const region = process.env.OVH_REGION || 'gra';
-    
-    // For us-east-va region, the endpoint format is different
-    let publicUrl: string;
-    
-    if (endpoint.includes('us-east-va')) {
-      // Special handling for us-east-va region
-      publicUrl = `https://${BUCKET_NAME}.s3.us-east-va.io.cloud.ovh.us/${key}`;
-    } else {
-      // Standard OVHcloud format
-      const cleanEndpoint = endpoint.replace(/\/$/, '').replace('https://s3.', '');
-      publicUrl = `https://${BUCKET_NAME}.s3.${cleanEndpoint}/${key}`;
-    }
-    
-    logger.info(`[STORAGE] [UPLOAD BUFFER] File uploaded successfully: ${publicUrl}`);
-    return publicUrl;
+    // Return only the key - signed URLs will be generated on-demand via getSignedUrlFromOVH()
+    logger.info(`[STORAGE] [UPLOAD BUFFER] File uploaded successfully. Key: ${key}`);
+    return key;
   } catch (error: any) {
     logger.error(`[STORAGE] [UPLOAD BUFFER] Error uploading file:`, error);
     
@@ -202,17 +148,17 @@ export const deleteFromOVH = async (key: string): Promise<void> => {
 };
 
 /**
- * Get a signed URL for private file access (valid for 1 hour)
+ * Get a signed URL for private file access (valid for 15 minutes by default)
  * @param key - Object key (path in bucket)
- * @param expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
- * @returns Signed URL
+ * @param expiresIn - URL expiration time in seconds (default: 900 = 15 minutes)
+ * @returns Signed URL that works from any device/network
  */
 export const getSignedUrlFromOVH = async (
   key: string,
-  expiresIn: number = 3600
+  expiresIn: number = 900 // 15 minutes default
 ): Promise<string> => {
   try {
-    logger.info(`[STORAGE] [SIGNED URL] Generating signed URL for: ${key}`);
+    logger.info(`[STORAGE] [SIGNED URL] Generating signed URL for: ${key}, expires in: ${expiresIn}s`);
     
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
@@ -220,7 +166,7 @@ export const getSignedUrlFromOVH = async (
     });
 
     const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
-    logger.info(`[STORAGE] [SIGNED URL] Signed URL generated successfully`);
+    logger.info(`[STORAGE] [SIGNED URL] Signed URL generated successfully (expires in ${expiresIn}s)`);
     return signedUrl;
   } catch (error: any) {
     logger.error(`[STORAGE] [SIGNED URL] Error generating signed URL:`, error);

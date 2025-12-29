@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { format } from 'date-fns';
+import * as leaveService from '../services/leaveService';
 import './LeaveDetailsModal.css';
 
 interface LeaveDay {
@@ -146,9 +147,30 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                   <button
                     type="button"
                     className="prescription-view-button"
-                    onClick={() => {
+                    onClick={async () => {
+                      let imageUrl: string;
+                      
+                      // Check if it's an OVHcloud key or base64
+                      if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('medical-certificates/')) {
+                        // Request signed URL from backend
+                        try {
+                          const { signedUrl } = await leaveService.getMedicalCertificateSignedUrl(leaveRequest.id);
+                          imageUrl = signedUrl;
+                        } catch (err) {
+                          console.error('Failed to get signed URL:', err);
+                          alert('Failed to load medical certificate. Please try again.');
+                          return;
+                        }
+                      } else if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('data:')) {
+                        // Base64 - use as-is
+                        imageUrl = leaveRequest.doctorNote;
+                      } else {
+                        // Fallback - try as base64
+                        imageUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
+                      }
+                      
                       const img = document.createElement('img');
-                      img.src = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
+                      img.src = imageUrl;
                       img.style.maxWidth = '90vw';
                       img.style.maxHeight = '90vh';
                       img.style.objectFit = 'contain';

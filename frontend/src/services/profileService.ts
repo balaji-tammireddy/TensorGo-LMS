@@ -43,6 +43,7 @@ export interface Profile {
     empId: string;
   };
   profilePhotoUrl?: string;
+  profilePhotoKey?: string; // OVHcloud object key (for signed URL generation)
 }
 
 export interface ReportingManager {
@@ -74,6 +75,11 @@ export const uploadProfilePhoto = async (file: File) => {
 
 export const deleteProfilePhoto = async () => {
   const response = await api.delete('/profile/photo');
+  return response.data;
+};
+
+export const getProfilePhotoSignedUrl = async (): Promise<{ signedUrl: string; expiresIn: number }> => {
+  const response = await api.get('/profile/photo/signed-url');
   return response.data;
 };
 

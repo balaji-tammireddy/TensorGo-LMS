@@ -26,6 +26,7 @@ const ProfilePage: React.FC = () => {
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [deletePhotoConfirmOpen, setDeletePhotoConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
 
   const sanitizeName = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '').slice(0, 25);
@@ -107,6 +108,38 @@ const ProfilePage: React.FC = () => {
       }
     }
   );
+
+  // Fetch signed URL when profile has a photoKey
+  React.useEffect(() => {
+    const fetchSignedUrl = async () => {
+      if (profile?.profilePhotoKey) {
+        try {
+          const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+          setPhotoSignedUrl(signedUrl);
+        } catch (err) {
+          console.error('Failed to get signed URL:', err);
+          setPhotoSignedUrl(null);
+        }
+      } else if (profile?.profilePhotoUrl) {
+        // Local file path - use as-is
+        setPhotoSignedUrl(profile.profilePhotoUrl);
+      } else {
+        setPhotoSignedUrl(null);
+      }
+    };
+
+    fetchSignedUrl();
+    
+    // Refresh signed URL every 14 minutes (before 15-minute expiration)
+    // This ensures the image stays visible without interruption
+    if (profile?.profilePhotoKey) {
+      const refreshInterval = setInterval(() => {
+        fetchSignedUrl();
+      }, 14 * 60 * 1000); // 14 minutes
+      
+      return () => clearInterval(refreshInterval);
+    }
+  }, [profile]);
 
   const updateMutation = useMutation(profileService.updateProfile, {
     onSuccess: (_data, variables: any) => {
@@ -496,7 +529,26 @@ const ProfilePage: React.FC = () => {
 
         <div className="profile-picture-section">
           <div className="profile-picture">
-            {profile?.profilePhotoUrl ? (
+            {photoSignedUrl ? (
+              <img 
+                src={photoSignedUrl} 
+                alt="Profile" 
+                onError={async () => {
+                  // If image fails to load (expired URL), refresh it
+                  if (profile?.profilePhotoKey) {
+                    try {
+                      const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
+                      setPhotoSignedUrl(signedUrl);
+                    } catch (err) {
+                      console.error('Failed to refresh signed URL:', err);
+                      setPhotoSignedUrl(null);
+                    }
+                  } else {
+                    setPhotoSignedUrl(null);
+                  }
+                }} 
+              />
+            ) : profile?.profilePhotoUrl ? (
               <img src={profile.profilePhotoUrl} alt="Profile" />
             ) : (
               <div className="profile-placeholder">👤</div>
@@ -510,7 +562,7 @@ const ProfilePage: React.FC = () => {
             >
               Change Photo
             </button>
-            {profile?.profilePhotoUrl && (
+            {(photoSignedUrl || profile?.profilePhotoUrl) && (
               <button
                 className="delete-photo-button"
                 onClick={handleDeletePhoto}

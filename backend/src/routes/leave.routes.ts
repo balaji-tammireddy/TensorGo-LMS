@@ -15,11 +15,14 @@ router.get('/balances', leaveController.getBalances);
 router.get('/holidays', leaveController.getHolidays);
 // IMPORTANT: Leave Rules is READ-ONLY. No POST/PUT/DELETE routes should ever be added for /rules
 router.get('/rules', leaveController.getRules);
-router.post('/apply', validateRequest(applyLeaveSchema), leaveController.applyLeave);
+// Note: applyLeave uses multer for file uploads, so validation is handled in the controller after FormData parsing
+router.post('/apply', leaveController.applyLeave);
 router.get('/my-requests', leaveController.getMyRequests);
 router.get('/request/:id', leaveController.getLeaveRequest);
-router.put('/request/:id', validateRequest(updateLeaveSchema), leaveController.updateLeaveRequest);
+// Note: updateLeaveRequest uses multer for file uploads, so validation is handled in the controller after FormData parsing
+router.put('/request/:id', leaveController.updateLeaveRequest);
 router.delete('/request/:id', validateRequest(deleteLeaveSchema), leaveController.deleteLeaveRequest);
+router.get('/request/:requestId/medical-certificate/signed-url', leaveController.getMedicalCertificateSignedUrl);
 // HR and Super Admin can convert leave request from LOP to Casual
 router.post('/request/:id/convert-lop-to-casual', authorizeRole('hr', 'super_admin'), leaveController.convertLeaveRequestLopToCasual);
 
