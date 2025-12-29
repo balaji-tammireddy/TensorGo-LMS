@@ -34,13 +34,18 @@ const LeaveApplyPage: React.FC = () => {
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
-  // For sick leave: allow past 3 days (including today) or from tomorrow onwards
-  // For future dates, can only apply from next day (not today)
+  // For sick leave: allow past 3 days (including today) or ONLY tomorrow for future dates
+  // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
   const minStartDate = formData.leaveType === 'casual'
     ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days for casual
     : formData.leaveType === 'sick'
     ? format(addDays(new Date(), -3), 'yyyy-MM-dd') // allow past 3 days for sick leave
     : todayStr; // LOP and permission can be applied for today
+  
+  // For sick leave: max date is tomorrow (only allow tomorrow for future dates)
+  const maxStartDate = formData.leaveType === 'sick'
+    ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // only allow tomorrow for future sick leave
+    : undefined; // no max date for other leave types
 
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
@@ -701,27 +706,52 @@ const LeaveApplyPage: React.FC = () => {
 
     const requestedDays = computeRequestedDays();
 
-    // Validation for sick leave: can apply for past 3 days (including today) or from tomorrow onwards
-    // For future dates, can only apply from next day (not today)
-    if (formData.leaveType === 'sick' && formData.startDate) {
-      const startDate = new Date(formData.startDate + 'T12:00:00');
+    // Validation for sick leave: can apply for past 3 days (including today) or ONLY tomorrow for future dates
+    // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
+    // Apply same restrictions to both start date and end date
+    if (formData.leaveType === 'sick') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      startDate.setHours(0, 0, 0, 0);
       
-      const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Check if date is more than 3 days in the past
-      if (daysDifference < -3) {
-        showWarning('Cannot apply sick leave for dates more than 3 days in the past.');
-        return;
+      // Validate start date
+      if (formData.startDate) {
+        const startDate = new Date(formData.startDate + 'T12:00:00');
+        startDate.setHours(0, 0, 0, 0);
+        
+        const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Check if date is more than 3 days in the past
+        if (daysDifference < -3) {
+          showWarning('Cannot apply sick leave for start dates more than 3 days in the past.');
+          return;
+        }
+        
+        // For future dates, ONLY allow tomorrow (daysDifference === 1)
+        if (daysDifference > 1) {
+          showWarning('For future dates, sick leave start date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+          return;
+        }
       }
       
-      // For future dates (including today), only allow from tomorrow onwards
-      // If daysDifference is 0 (today) and it's being selected as a future date, block it
-      // Actually, since we allow today for retroactive application, we need to check if it's a future selection
-      // The backend will handle this validation, but we can add a client-side check too
-      // For now, let the backend handle the validation
+      // Validate end date
+      if (formData.endDate) {
+        const endDate = new Date(formData.endDate + 'T12:00:00');
+        endDate.setHours(0, 0, 0, 0);
+        
+        const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Check if date is more than 3 days in the past
+        if (endDaysDifference < -3) {
+          showWarning('Cannot apply sick leave for end dates more than 3 days in the past.');
+          return;
+        }
+        
+        // For future dates, ONLY allow tomorrow (endDaysDifference === 1)
+        if (endDaysDifference > 1) {
+          showWarning('For future dates, sick leave end date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+          return;
+        }
+      }
     }
 
     // Client-side balance guard
@@ -1169,6 +1199,7 @@ const LeaveApplyPage: React.FC = () => {
                     type="date"
                     value={formData.startDate}
                     min={minStartDate}
+                    max={maxStartDate}
                     onChange={(e) => {
                       const newStartDate = e.target.value;
                       // Block weekends (Saturday and Sunday)
@@ -1210,6 +1241,8 @@ const LeaveApplyPage: React.FC = () => {
                       <input
                         type="date"
                         value={formData.endDate}
+                        min={minStartDate}
+                        max={maxStartDate}
                         onChange={(e) => {
                           const newEndDate = e.target.value;
                           // Block weekends (Saturday and Sunday)

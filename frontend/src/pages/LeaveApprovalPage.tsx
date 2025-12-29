@@ -437,7 +437,7 @@ const LeaveApprovalPage: React.FC = () => {
     <>
     <AppLayout>
       <div className="leave-approval-page">
-        <h1 className="page-title">Leave Requests</h1>
+        <h1 className="page-title">Pending Requests</h1>
 
         <div className="search-filter-bar">
           <div className="search-box">
@@ -550,7 +550,7 @@ const LeaveApprovalPage: React.FC = () => {
         </div>
 
         <div className="approved-requests-section">
-          <h2>Recent Approved Requests</h2>
+          <h2>Recent Leave Requests</h2>
           <div 
             className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
             style={{ 

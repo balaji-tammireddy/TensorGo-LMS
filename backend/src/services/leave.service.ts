@@ -168,22 +168,25 @@ export const applyLeave = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Sick leave can be applied for past 3 days (including today) or from tomorrow onwards
-    // For future dates, can only apply from next day (not today)
+    // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
+    // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
     if (leaveData.leaveType === 'sick') {
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
       
       // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
-      // For future dates: only allow from tomorrow onwards (daysDifference >= 1)
+      // For future dates: ONLY allow tomorrow (daysDifference === 1)
       if (daysDifference < -3) {
         throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
       }
+      if (daysDifference > 1) {
+        throw new Error('For future dates, sick leave can only be applied for tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+      }
       if (daysDifference === 0 && startDate > today) {
         // This shouldn't happen, but just in case
-        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or from tomorrow onwards.');
+        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or tomorrow only.');
       }
-      // daysDifference >= 1 is allowed (tomorrow onwards)
+      // daysDifference === 1 is allowed (tomorrow only)
       // daysDifference between -3 and 0 is allowed (past 3 days + today)
     } else if (leaveData.leaveType === 'lop' || leaveData.leaveType === 'permission') {
       // LOP and permission: today is allowed, but not past dates
@@ -211,6 +214,22 @@ export const applyLeave = async (
     // Validation: End date must be >= start date
     if (endDate < startDate) {
       throw new Error('End date must be greater than or equal to start date');
+    }
+
+    // Validation: For sick leave, end date has same restrictions as start date
+    // Can be applied for past 3 days (including today) or ONLY tomorrow for future dates
+    if (leaveData.leaveType === 'sick') {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / msPerDay);
+      
+      // Allow past 3 days: today - 3, today - 2, today - 1, today (endDaysDifference: -3, -2, -1, 0)
+      // For future dates: ONLY allow tomorrow (endDaysDifference === 1)
+      if (endDaysDifference < -3) {
+        throw new Error('Cannot apply sick leave for end dates more than 3 days in the past.');
+      }
+      if (endDaysDifference > 1) {
+        throw new Error('For future dates, sick leave end date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+      }
     }
 
     // Check for existing leaves on the requested dates (exclude rejected)
@@ -867,22 +886,25 @@ export const updateLeaveRequest = async (
       throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
     }
 
-    // Validation: Sick leave can be applied for past 3 days (including today) or from tomorrow onwards
-    // For future dates, can only apply from next day (not today)
+    // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
+    // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
     if (leaveData.leaveType === 'sick') {
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
       
       // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
-      // For future dates: only allow from tomorrow onwards (daysDifference >= 1)
+      // For future dates: ONLY allow tomorrow (daysDifference === 1)
       if (daysDifference < -3) {
         throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
       }
+      if (daysDifference > 1) {
+        throw new Error('For future dates, sick leave can only be applied for tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+      }
       if (daysDifference === 0 && startDate > today) {
         // This shouldn't happen, but just in case
-        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or from tomorrow onwards.');
+        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or tomorrow only.');
       }
-      // daysDifference >= 1 is allowed (tomorrow onwards)
+      // daysDifference === 1 is allowed (tomorrow only)
       // daysDifference between -3 and 0 is allowed (past 3 days + today)
     } else if (leaveData.leaveType === 'lop') {
       // LOP: today is allowed, but not past dates
@@ -906,6 +928,22 @@ export const updateLeaveRequest = async (
   // Validation: End date must be >= start date
   if (endDate < startDate) {
     throw new Error('End date must be greater than or equal to start date');
+  }
+
+  // Validation: For sick leave, end date has same restrictions as start date
+  // Can be applied for past 3 days (including today) or ONLY tomorrow for future dates
+  if (leaveData.leaveType === 'sick') {
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / msPerDay);
+    
+    // Allow past 3 days: today - 3, today - 2, today - 1, today (endDaysDifference: -3, -2, -1, 0)
+    // For future dates: ONLY allow tomorrow (endDaysDifference === 1)
+    if (endDaysDifference < -3) {
+      throw new Error('Cannot apply sick leave for end dates more than 3 days in the past.');
+    }
+    if (endDaysDifference > 1) {
+      throw new Error('For future dates, sick leave end date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+    }
   }
 
   // Check for existing leaves on the requested dates (exclude rejected and the request being updated)
