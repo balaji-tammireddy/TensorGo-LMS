@@ -1568,7 +1568,7 @@ const LeaveApplyPage: React.FC = () => {
                         >
                           <FaEye />
                         </span>
-                        {request.canEdit && request.canDelete && (
+                        {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
                           <>
                             <span 
                               className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
