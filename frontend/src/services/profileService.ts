@@ -78,7 +78,7 @@ export const deleteProfilePhoto = async () => {
   return response.data;
 };
 
-export const getProfilePhotoSignedUrl = async (): Promise<{ signedUrl: string; expiresIn: number }> => {
+export const getProfilePhotoSignedUrl = async (): Promise<{ signedUrl: string; expiresIn: number | null }> => {
   const response = await api.get('/profile/photo/signed-url');
   return response.data;
 };

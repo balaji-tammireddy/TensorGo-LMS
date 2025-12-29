@@ -12,7 +12,8 @@
     "credit-leaves": "tsx src/database/credit_leaves_now.ts",
     "reset-leave-balances": "tsx src/database/reset_leave_balances.ts",
     "credit-anniversary-leaves": "tsx src/database/credit_anniversary_leaves.ts",
-    "process-year-end": "tsx src/database/process_year_end_adjustments.ts"
+    "process-year-end": "tsx src/database/process_year_end_adjustments.ts",
+    "migrate:photos": "tsx src/scripts/migrateProfilePhotosToOVH.ts"
   },
   "keywords": [
     "hr",

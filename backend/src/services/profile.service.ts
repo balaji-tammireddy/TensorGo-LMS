@@ -76,11 +76,10 @@ export const getProfile = async (userId: number) => {
             empId: user.reporting_manager_emp_id || null
           }
         : null,
-    // If profile_photo_url is a key (starts with 'profile-photos/'), generate signed URL
-    // Otherwise, it's a local path, return as-is
-    profilePhotoUrl: user.profile_photo_url && user.profile_photo_url.startsWith('profile-photos/')
-      ? null // Will be generated on-demand via API endpoint
-      : user.profile_photo_url,
+    // Always use OVHcloud keys - no local URLs
+    // If profile_photo_url is an OVHcloud key (starts with 'profile-photos/'), return it as profilePhotoKey
+    // Otherwise, it's a legacy local path - return null (user needs to re-upload)
+    profilePhotoUrl: null, // Always null - use profilePhotoKey and signed URLs
     profilePhotoKey: user.profile_photo_url && user.profile_photo_url.startsWith('profile-photos/')
       ? user.profile_photo_url
       : null

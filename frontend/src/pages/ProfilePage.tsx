@@ -109,36 +109,32 @@ const ProfilePage: React.FC = () => {
     }
   );
 
-  // Fetch signed URL when profile has a photoKey
+  // Fetch signed URL when profile has a photoKey (OVHcloud only)
   React.useEffect(() => {
     const fetchSignedUrl = async () => {
+      // Only fetch signed URL if profile has an OVHcloud key
       if (profile?.profilePhotoKey) {
         try {
           const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
           setPhotoSignedUrl(signedUrl);
+          
+          // Refresh signed URL every 14 minutes (before 15-minute expiration)
+          // This ensures the image stays visible without interruption
+          const refreshInterval = setInterval(() => {
+            fetchSignedUrl();
+          }, 14 * 60 * 1000); // 14 minutes
+          
+          return () => clearInterval(refreshInterval);
         } catch (err) {
           console.error('Failed to get signed URL:', err);
           setPhotoSignedUrl(null);
         }
-      } else if (profile?.profilePhotoUrl) {
-        // Local file path - use as-is
-        setPhotoSignedUrl(profile.profilePhotoUrl);
       } else {
         setPhotoSignedUrl(null);
       }
     };
 
     fetchSignedUrl();
-    
-    // Refresh signed URL every 14 minutes (before 15-minute expiration)
-    // This ensures the image stays visible without interruption
-    if (profile?.profilePhotoKey) {
-      const refreshInterval = setInterval(() => {
-        fetchSignedUrl();
-      }, 14 * 60 * 1000); // 14 minutes
-      
-      return () => clearInterval(refreshInterval);
-    }
   }, [profile]);
 
   const updateMutation = useMutation(profileService.updateProfile, {
@@ -548,8 +544,6 @@ const ProfilePage: React.FC = () => {
                   }
                 }} 
               />
-            ) : profile?.profilePhotoUrl ? (
-              <img src={profile.profilePhotoUrl} alt="Profile" />
             ) : (
               <div className="profile-placeholder">👤</div>
             )}
@@ -562,7 +556,7 @@ const ProfilePage: React.FC = () => {
             >
               Change Photo
             </button>
-            {(photoSignedUrl || profile?.profilePhotoUrl) && (
+            {photoSignedUrl && (
               <button
                 className="delete-photo-button"
                 onClick={handleDeletePhoto}
