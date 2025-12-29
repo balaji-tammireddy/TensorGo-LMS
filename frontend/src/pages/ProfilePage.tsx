@@ -112,23 +112,30 @@ const ProfilePage: React.FC = () => {
   // Fetch public URL when profile has a photoKey (OVHcloud only)
   React.useEffect(() => {
     const fetchPublicUrl = async () => {
+      console.log('Profile data:', profile);
+      console.log('Profile photoKey:', profile?.profilePhotoKey);
+      
       // Only fetch public URL if profile has an OVHcloud key
       if (profile?.profilePhotoKey) {
         try {
+          console.log('Fetching public URL for profilePhotoKey:', profile.profilePhotoKey);
           const { signedUrl } = await profileService.getProfilePhotoSignedUrl();
-          console.log('Profile photo URL received:', signedUrl);
+          console.log('✅ Profile photo URL received:', signedUrl);
           setPhotoSignedUrl(signedUrl);
           // No refresh needed - public URLs are permanent
         } catch (err) {
-          console.error('Failed to get public URL:', err);
+          console.error('❌ Failed to get public URL:', err);
           setPhotoSignedUrl(null);
         }
       } else {
+        console.warn('⚠️ No profilePhotoKey found in profile:', profile);
         setPhotoSignedUrl(null);
       }
     };
 
-    fetchPublicUrl();
+    if (profile) {
+      fetchPublicUrl();
+    }
   }, [profile]);
 
   const updateMutation = useMutation(profileService.updateProfile, {
@@ -523,11 +530,13 @@ const ProfilePage: React.FC = () => {
               <img 
                 src={photoSignedUrl} 
                 alt="Profile"
+                style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
                 onLoad={() => {
-                  console.log('✅ Profile image loaded successfully:', photoSignedUrl);
+                  console.log('✅ Profile image loaded successfully. URL:', photoSignedUrl);
                 }}
                 onError={async (e) => {
                   console.error('❌ Failed to load profile image. URL:', photoSignedUrl, 'Error:', e);
+                  console.error('Image element:', e.target);
                   // If image fails to load, try refreshing the URL
                   if (profile?.profilePhotoKey) {
                     try {
