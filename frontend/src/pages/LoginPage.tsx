@@ -33,6 +33,16 @@ const LoginPage: React.FC = () => {
     logout().catch(() => {
       // Ignore errors - just clear local storage
     });
+    
+    // Prevent body scroll when login page is mounted
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // Cleanup: restore scroll when component unmounts
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
   }, [logout]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -177,84 +187,99 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="login-page">
-      <div className="login-container">
-        {isInactive ? (
-          <>
-            <div className="login-header">
-              <div className="login-logo">
-                <FaBriefcase />
-              </div>
-              <h1>HR Leave Management System</h1>
-            </div>
-            <div className="error-message" style={{ marginTop: 16 }}>
-              You are no longer active employee of this organisation.
-            </div>
-            <button
-              type="button"
-              className="login-button inactive-login-button"
-              onClick={() => {
-                setIsInactive(false);
-                setPassword('');
-              }}
-            >
-              Sign In as Different User
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="login-header">
-              <div className="login-logo">
-                <FaBriefcase />
-              </div>
-              <h1>HR Leave Management System</h1>
-              <p className="login-subtitle">Welcome back! Please sign in to continue</p>
-            </div>
-            <form onSubmit={handleSubmit} className="login-form">
-              <div className="form-group">
-                <label>Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="Enter your email"
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <div className="password-field">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    className="toggle-password"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                  </button>
+      <div className="login-wrapper">
+        {/* Left Section - Image/Visual */}
+        <div className="login-image-section">
+          <div className="login-image-content">
+            <img 
+              src="/uploads/portrait-professional-elegant-businessman.jpg" 
+              alt="Professional Businessman"
+              className="login-side-image"
+            />
+          </div>
+        </div>
+
+        {/* Right Section - Login Form */}
+        <div className="login-form-section">
+          <div className="login-container">
+            {isInactive ? (
+              <>
+                <div className="login-header">
+                  <div className="login-logo">
+                    <FaBriefcase />
+                  </div>
+                  <h1>HR Leave Management System</h1>
                 </div>
-              </div>
-              <div className="forgot-password-link">
+                <div className="error-message" style={{ marginTop: 16 }}>
+                  You are no longer active employee of this organisation.
+                </div>
                 <button
                   type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="forgot-password-button"
+                  className="login-button inactive-login-button"
+                  onClick={() => {
+                    setIsInactive(false);
+                    setPassword('');
+                  }}
                 >
-                  Forgot Password?
+                  Sign In as Different User
                 </button>
-              </div>
-              <button type="submit" disabled={loading} className="login-button">
-                {loading ? 'Logging in...' : 'Login'}
-              </button>
-            </form>
-          </>
-        )}
+              </>
+            ) : (
+              <>
+                <div className="login-header">
+                  <div className="login-logo">
+                    <FaBriefcase />
+                  </div>
+                  <h1>HR Leave Management System</h1>
+                </div>
+                <form onSubmit={handleSubmit} className="login-form">
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Password</label>
+                    <div className="password-field">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="Enter your password"
+                      />
+                      <button
+                        type="button"
+                        className="toggle-password"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
+                  </div>
+                  <button type="submit" disabled={loading} className="login-button">
+                    {loading ? 'Logging in...' : 'Sign In'}
+                  </button>
+                  <div className="forgot-password-link">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="forgot-password-button"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Forgot Password Modal */}

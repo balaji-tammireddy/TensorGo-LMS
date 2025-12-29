@@ -1433,7 +1433,8 @@ const LeaveApplyPage: React.FC = () => {
                   }
                   placeholder="Type reason..."
                   required
-                  rows={4}
+                  maxLength={100}
+                  rows={2}
                 />
               </div>
               <div className="form-actions">
