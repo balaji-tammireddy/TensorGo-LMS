@@ -30,6 +30,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     value ? new Date(value + 'T00:00:00') : undefined
   );
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<'bottom' | 'top'>('bottom');
 
   useEffect(() => {
     if (value) {
@@ -54,6 +56,103 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  // Calculate position to prevent clipping
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const updatePosition = () => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const popoverHeight = 300; // Approximate calendar height
+        
+        // Find the scrollable container (modal body or window)
+        let scrollableContainer: HTMLElement | null = containerRef.current;
+        while (scrollableContainer) {
+          const style = window.getComputedStyle(scrollableContainer);
+          if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+              style.overflow === 'auto' || style.overflow === 'scroll') {
+            break;
+          }
+          scrollableContainer = scrollableContainer.parentElement;
+        }
+        
+        const containerBounds = scrollableContainer 
+          ? scrollableContainer.getBoundingClientRect()
+          : { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth };
+        
+        const spaceBelow = containerBounds.bottom - containerRect.bottom - 8; // 8px offset
+        const spaceAbove = containerRect.top - containerBounds.top - 8; // 8px offset
+        
+        // Check if we need to position above
+        if (spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
+          setPosition('top');
+        } else {
+          setPosition('bottom');
+        }
+      };
+
+      // Initial calculation
+      updatePosition();
+
+      // Recalculate after a short delay to ensure popover is rendered
+      const timeoutId = setTimeout(updatePosition, 10);
+
+      // Recalculate on scroll and resize
+      const scrollableContainer = containerRef.current.closest('[style*="overflow"], .employee-modal-body, .leave-details-modal-body');
+      const scrollTarget = scrollableContainer || window;
+      
+      scrollTarget.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+
+      return () => {
+        clearTimeout(timeoutId);
+        scrollTarget.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [isOpen]);
+
+  // Scroll into view when opening if needed
+  useEffect(() => {
+    if (isOpen && containerRef.current && popoverRef.current) {
+      const scrollIntoView = () => {
+        if (!containerRef.current || !popoverRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const popoverRect = popoverRef.current.getBoundingClientRect();
+        
+        // Find the scrollable container
+        let scrollableContainer: HTMLElement | null = containerRef.current;
+        while (scrollableContainer) {
+          const style = window.getComputedStyle(scrollableContainer);
+          if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+              style.overflow === 'auto' || style.overflow === 'scroll') {
+            break;
+          }
+          scrollableContainer = scrollableContainer.parentElement;
+        }
+        
+        const containerBounds = scrollableContainer 
+          ? scrollableContainer.getBoundingClientRect()
+          : { top: 0, bottom: window.innerHeight };
+        
+        const spaceBelow = containerBounds.bottom - containerRect.bottom - 8;
+        const spaceAbove = containerRect.top - containerBounds.top - 8;
+        
+        // If popover is clipped, scroll the container into view
+        if (position === 'bottom' && spaceBelow < popoverRect.height) {
+          containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        } else if (position === 'top' && spaceAbove < popoverRect.height) {
+          containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        }
+      };
+      
+      // Delay to ensure popover is rendered
+      const timeoutId = setTimeout(scrollIntoView, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isOpen, position]);
 
   const handleSelect = (date: Date | undefined) => {
     if (date) {
@@ -102,25 +201,12 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           disabled={disabled}
           className="date-picker-input-field"
         />
-        <svg
-          className="date-picker-icon"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="16" y1="2" x2="16" y2="6"></line>
-          <line x1="8" y1="2" x2="8" y2="6"></line>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
-        </svg>
       </div>
       {isOpen && !disabled && (
-        <div className="date-picker-popover">
+        <div 
+          ref={popoverRef}
+          className={cn('date-picker-popover', position === 'top' && 'date-picker-popover-top')}
+        >
           <Calendar
             mode="single"
             selected={selectedDate}

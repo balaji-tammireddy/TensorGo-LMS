@@ -64,6 +64,10 @@ const DropdownMenuContent = React.forwardRef<
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
+      side="bottom"
+      align="start"
+      collisionPadding={8}
+      avoidCollisions={true}
       className={cn(
         "dropdown-menu-content",
         className

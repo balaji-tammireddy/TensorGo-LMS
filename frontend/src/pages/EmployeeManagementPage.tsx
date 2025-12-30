@@ -670,8 +670,8 @@ const EmployeeManagementPage: React.FC = () => {
                   variant="outline" 
                   className="leave-type-dropdown-trigger"
                   style={{ 
-                    padding: '6px 10px',
-                    fontSize: '12px',
+                    padding: '10px 12px',
+                    fontSize: '14px',
                     fontFamily: 'Poppins, sans-serif',
                     border: '1px solid #dcdcdc',
                     borderRadius: '2px',
@@ -862,18 +862,20 @@ const EmployeeManagementPage: React.FC = () => {
                             style={{ 
                               width: '100%', 
                               justifyContent: 'space-between',
-                              padding: '6px 8px',
-                              fontSize: '12px',
+                              padding: '10px 12px',
+                              fontSize: '14px',
                               fontFamily: 'Poppins, sans-serif',
                               border: '1px solid #ddd',
                               borderRadius: '4px',
                               backgroundColor: 'transparent',
                               color: '#1f2a3d',
-                              height: 'auto'
+                              height: 'auto',
+                              minHeight: '42px',
+                              lineHeight: '1.5'
                             }}
                           >
                             <span>
-                              {newEmployee.role === '' ? 'Select role' : 
+                              {newEmployee.role === '' ? '' : 
                                newEmployee.role === 'super_admin' ? 'Super Admin' :
                                newEmployee.role === 'hr' ? 'HR' :
                                newEmployee.role.charAt(0).toUpperCase() + newEmployee.role.slice(1)}
@@ -882,20 +884,6 @@ const EmployeeManagementPage: React.FC = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="leave-type-dropdown-content">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              const newRole = '';
-                              setNewEmployee({ 
-                                ...newEmployee, 
-                                role: newRole,
-                                reportingManagerId: newRole === 'super_admin' ? null : newEmployee.reportingManagerId,
-                                reportingManagerName: newRole === 'super_admin' ? '' : newEmployee.reportingManagerName
-                              });
-                            }}
-                          >
-                            Select role
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           {(user?.role === 'super_admin'
                             ? ['employee', 'manager', 'hr', 'super_admin']
                             : user?.role === 'hr'
@@ -1087,27 +1075,23 @@ const EmployeeManagementPage: React.FC = () => {
                             style={{ 
                               width: '100%', 
                               justifyContent: 'space-between',
-                              padding: '6px 8px',
-                              fontSize: '12px',
+                              padding: '10px 12px',
+                              fontSize: '14px',
                               fontFamily: 'Poppins, sans-serif',
                               border: '1px solid #ddd',
                               borderRadius: '4px',
                               backgroundColor: 'transparent',
                               color: '#1f2a3d',
-                              height: 'auto'
+                              height: 'auto',
+                              minHeight: '42px',
+                              lineHeight: '1.5'
                             }}
                           >
-                            <span>{newEmployee.gender || 'Select'}</span>
+                            <span>{newEmployee.gender || ''}</span>
                             <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="leave-type-dropdown-content">
-                          <DropdownMenuItem
-                            onClick={() => setNewEmployee({ ...newEmployee, gender: '' })}
-                          >
-                            Select
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setNewEmployee({ ...newEmployee, gender: 'Male' })}
                           >
@@ -1141,27 +1125,23 @@ const EmployeeManagementPage: React.FC = () => {
                             style={{ 
                               width: '100%', 
                               justifyContent: 'space-between',
-                              padding: '6px 8px',
-                              fontSize: '12px',
+                              padding: '10px 12px',
+                              fontSize: '14px',
                               fontFamily: 'Poppins, sans-serif',
                               border: '1px solid #ddd',
                               borderRadius: '4px',
                               backgroundColor: 'transparent',
                               color: '#1f2a3d',
-                              height: 'auto'
+                              height: 'auto',
+                              minHeight: '42px',
+                              lineHeight: '1.5'
                             }}
                           >
-                            <span>{newEmployee.bloodGroup || 'Select'}</span>
+                            <span>{newEmployee.bloodGroup || ''}</span>
                             <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="leave-type-dropdown-content">
-                          <DropdownMenuItem
-                            onClick={() => setNewEmployee({ ...newEmployee, bloodGroup: '' })}
-                          >
-                            Select
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg, index) => (
                             <React.Fragment key={bg}>
                               <DropdownMenuItem
@@ -1188,27 +1168,23 @@ const EmployeeManagementPage: React.FC = () => {
                             style={{ 
                               width: '100%', 
                               justifyContent: 'space-between',
-                              padding: '6px 8px',
-                              fontSize: '12px',
+                              padding: '10px 12px',
+                              fontSize: '14px',
                               fontFamily: 'Poppins, sans-serif',
                               border: '1px solid #ddd',
                               borderRadius: '4px',
                               backgroundColor: 'transparent',
                               color: '#1f2a3d',
-                              height: 'auto'
+                              height: 'auto',
+                              minHeight: '42px',
+                              lineHeight: '1.5'
                             }}
                           >
-                            <span>{newEmployee.maritalStatus || 'Select'}</span>
+                            <span>{newEmployee.maritalStatus || ''}</span>
                             <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="leave-type-dropdown-content">
-                          <DropdownMenuItem
-                            onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: '' })}
-                          >
-                            Select
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Single' })}
                           >
@@ -1374,14 +1350,16 @@ const EmployeeManagementPage: React.FC = () => {
                               style={{ 
                                 width: '100%', 
                                 justifyContent: 'space-between',
-                                padding: '6px 8px',
-                                fontSize: '12px',
+                                padding: '10px 12px',
+                                fontSize: '14px',
                                 fontFamily: 'Poppins, sans-serif',
                                 border: '1px solid #ddd',
                                 borderRadius: '4px',
                                 backgroundColor: 'transparent',
                                 color: '#1f2a3d',
-                                height: 'auto'
+                                height: 'auto',
+                              minHeight: '42px',
+                              lineHeight: '1.5'
                               }}
                             >
                               <span>{newEmployee.status === 'active' ? 'Active' : 'Inactive'}</span>
@@ -1677,14 +1655,16 @@ const EmployeeManagementPage: React.FC = () => {
                               style={{ 
                                 width: '100%', 
                                 justifyContent: 'space-between',
-                                padding: '6px 8px',
-                                fontSize: '12px',
+                                padding: '10px 12px',
+                                fontSize: '14px',
                                 fontFamily: 'Poppins, sans-serif',
                                 border: '1px solid #ddd',
                                 borderRadius: '4px',
                                 backgroundColor: 'transparent',
                                 color: '#1f2a3d',
-                                height: 'auto'
+                                height: 'auto',
+                              minHeight: '42px',
+                              lineHeight: '1.5'
                               }}
                             >
                               <span>
@@ -1696,16 +1676,6 @@ const EmployeeManagementPage: React.FC = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent className="leave-type-dropdown-content">
-                            <DropdownMenuItem
-                              onClick={() => setNewEmployee({
-                                ...newEmployee,
-                                reportingManagerId: null,
-                                reportingManagerName: ''
-                              })}
-                            >
-                              Select Reporting Manager
-                            </DropdownMenuItem>
-                            {managersData && managersData.length > 0 && <DropdownMenuSeparator />}
                             {managersData?.map((manager: any, index: number) => (
                               <React.Fragment key={manager.id}>
                                 <DropdownMenuItem

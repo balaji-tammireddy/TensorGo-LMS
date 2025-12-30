@@ -321,13 +321,53 @@
 }
 
 .employee-modal-field input,
-.employee-modal-field select,
-.employee-modal-field textarea {
-  padding: 6px 8px;
-  border: 1px solid #dcdcdc;
-  border-radius: 2px;
-  font-size: 12px;
+.employee-modal-field select {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 42px;
   resize: none;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  box-sizing: border-box;
+}
+
+.employee-modal-field textarea {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 42px;
+  resize: vertical;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  box-sizing: border-box;
+}
+
+.employee-modal-field .date-picker-input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.employee-modal-field .date-picker-input-field {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 42px;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .same-address-checkbox {
