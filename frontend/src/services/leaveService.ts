@@ -207,8 +207,8 @@ export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData
     if (data.timeForPermission.end) formData.append('timeForPermission[end]', data.timeForPermission.end);
   }
   
-  if (data.doctorNote instanceof File) {
-    formData.append('doctorNote', data.doctorNote);
+    if (data.doctorNote instanceof File) {
+      formData.append('doctorNote', data.doctorNote);
   }
   
   const response = await api.put(`/leave/request/${requestId}`, formData, {

@@ -28,53 +28,53 @@ const AppRoutes: React.FC = () => {
         Loading...
       </div>
     }>
-      <Routes>
-        <Route
-          path="/login"
-          element={<LoginPage />}
-        />
-        <Route
-          path="/change-password"
-          element={
-            <ProtectedRoute>
-              <ChangePasswordPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leave-apply"
-          element={
-            <ProtectedRoute allowedRoles={['employee', 'manager', 'hr']}>
-              <LeaveApplyPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leave-approval"
-          element={
-            <ProtectedRoute allowedRoles={['manager', 'hr', 'super_admin']}>
-              <LeaveApprovalPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee-management"
-          element={
-            <ProtectedRoute allowedRoles={['hr', 'super_admin']}>
-              <EmployeeManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
+    <Routes>
+      <Route
+        path="/login"
+        element={<LoginPage />}
+      />
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leave-apply"
+        element={
+          <ProtectedRoute allowedRoles={['employee', 'manager', 'hr']}>
+            <LeaveApplyPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leave-approval"
+        element={
+          <ProtectedRoute allowedRoles={['manager', 'hr', 'super_admin']}>
+            <LeaveApprovalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/employee-management"
+        element={
+          <ProtectedRoute allowedRoles={['hr', 'super_admin']}>
+            <EmployeeManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+    </Routes>
     </Suspense>
   );
 };
