@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useEffect } from 'react';
 import { FaExclamationTriangle, FaTimes } from 'react-icons/fa';
 import './RejectCommentDialog.css';
 
@@ -14,7 +14,7 @@ interface RejectCommentDialogProps {
   isLoading?: boolean;
 }
 
-const RejectCommentDialog: React.FC<RejectCommentDialogProps> = ({
+const RejectCommentDialog: React.FC<RejectCommentDialogProps> = memo(({
   isOpen,
   title,
   message,
@@ -26,6 +26,13 @@ const RejectCommentDialog: React.FC<RejectCommentDialogProps> = ({
   isLoading = false
 }) => {
   const [comment, setComment] = useState('');
+
+  // Reset comment when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setComment('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -86,7 +93,9 @@ const RejectCommentDialog: React.FC<RejectCommentDialogProps> = ({
       </div>
     </div>
   );
-};
+});
+
+RejectCommentDialog.displayName = 'RejectCommentDialog';
 
 export default RejectCommentDialog;
 

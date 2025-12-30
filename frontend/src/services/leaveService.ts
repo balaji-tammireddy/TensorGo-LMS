@@ -71,9 +71,7 @@ export const getHolidays = async (year?: number): Promise<Holiday[]> => {
   }
   const queryString = params.toString();
   const url = queryString ? `/leave/holidays?${queryString}` : '/leave/holidays';
-  console.log(`[getHolidays] Calling API with year: ${year}, URL: ${url}`);
   const response = await api.get(url);
-  console.log(`[getHolidays] Received ${response.data.holidays?.length || 0} holidays`);
   return response.data.holidays;
 };
 
@@ -168,9 +166,35 @@ export const getLeaveRequest = async (requestId: number) => {
 };
 
 export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData) => {
-  const formData = new FormData();
+  // Check if we have a new file to upload
+  const hasNewFile = data.doctorNote instanceof File;
   
-  // Add all fields except doctorNote
+  // If no new file, use JSON for faster transmission
+  if (!hasNewFile) {
+    const jsonData: any = {
+      leaveType: data.leaveType,
+      startDate: data.startDate,
+      startType: data.startType,
+      endDate: data.endDate,
+      endType: data.endType,
+      reason: data.reason
+    };
+    
+    if (data.timeForPermission) {
+      jsonData.timeForPermission = data.timeForPermission;
+    }
+    
+    // If doctorNote is a string (existing key), include it
+    if (data.doctorNote && typeof data.doctorNote === 'string') {
+      jsonData.doctorNote = data.doctorNote;
+    }
+    
+    const response = await api.put(`/leave/request/${requestId}`, jsonData);
+    return response.data;
+  }
+  
+  // If we have a new file, use FormData
+  const formData = new FormData();
   formData.append('leaveType', data.leaveType);
   formData.append('startDate', data.startDate);
   formData.append('startType', data.startType);
@@ -183,14 +207,8 @@ export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData
     if (data.timeForPermission.end) formData.append('timeForPermission[end]', data.timeForPermission.end);
   }
   
-  // Handle doctorNote - if it's a File, append it; if it's a string (existing key/base64), append as is
-  if (data.doctorNote) {
-    if (data.doctorNote instanceof File) {
-      formData.append('doctorNote', data.doctorNote);
-    } else {
-      // Existing key or base64 - send as JSON field
-      formData.append('doctorNote', data.doctorNote);
-    }
+  if (data.doctorNote instanceof File) {
+    formData.append('doctorNote', data.doctorNote);
   }
   
   const response = await api.put(`/leave/request/${requestId}`, formData, {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
@@ -60,17 +60,43 @@ const LeaveApprovalPage: React.FC = () => {
       }
     },
     {
-      onMutate: ({ id }) => {
+      onMutate: async ({ id }) => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
+        // Cancel outgoing refetches
+        await queryClient.cancelQueries(['pendingLeaves']);
+        await queryClient.cancelQueries(['approvedLeaves']);
+        
+        // Snapshot for rollback
+        const previousPending = queryClient.getQueryData(['pendingLeaves']);
+        const previousApproved = queryClient.getQueryData(['approvedLeaves']);
+        
+        // Optimistically remove from pending list
+        queryClient.setQueryData(['pendingLeaves'], (old: any) => {
+          if (!old?.requests) return old;
+          return {
+            ...old,
+            requests: old.requests.filter((r: any) => r.id !== id)
+          };
+        });
+        
+        return { previousPending, previousApproved };
       },
-      onSuccess: () => {
+      onSuccess: (response, variables) => {
+        // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave approved successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
-      onError: (error: any) => {
+      onError: (error: any, variables, context) => {
+        // Rollback on error
+        if (context?.previousPending) {
+          queryClient.setQueryData(['pendingLeaves'], context.previousPending);
+        }
+        if (context?.previousApproved) {
+          queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
+        }
         showError(error.response?.data?.error?.message || 'Failed to approve leave');
       },
       onSettled: (_, __, { id }) => {
@@ -86,24 +112,50 @@ const LeaveApprovalPage: React.FC = () => {
   const rejectMutation = useMutation(
     ({ id, dayIds, comment }: { id: number; dayIds?: number[]; comment: string }) => {
       if (dayIds && dayIds.length > 0) {
-        // Reject multiple days sequentially
+        // Reject multiple days - use batch endpoint if available, otherwise parallel
         return Promise.all(dayIds.map(dayId => leaveService.rejectLeaveDay(id, dayId, comment)));
       } else {
         return leaveService.rejectLeave(id, comment);
       }
     },
     {
-      onMutate: ({ id }) => {
+      onMutate: async ({ id }) => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
+        // Cancel outgoing refetches
+        await queryClient.cancelQueries(['pendingLeaves']);
+        await queryClient.cancelQueries(['approvedLeaves']);
+        
+        // Snapshot for rollback
+        const previousPending = queryClient.getQueryData(['pendingLeaves']);
+        const previousApproved = queryClient.getQueryData(['approvedLeaves']);
+        
+        // Optimistically remove from pending list
+        queryClient.setQueryData(['pendingLeaves'], (old: any) => {
+          if (!old?.requests) return old;
+          return {
+            ...old,
+            requests: old.requests.filter((r: any) => r.id !== id)
+          };
+        });
+        
+        return { previousPending, previousApproved };
       },
       onSuccess: () => {
+        // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave rejected successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
-      onError: (error: any) => {
+      onError: (error: any, variables, context) => {
+        // Rollback on error
+        if (context?.previousPending) {
+          queryClient.setQueryData(['pendingLeaves'], context.previousPending);
+        }
+        if (context?.previousApproved) {
+          queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
+        }
         showError(error.response?.data?.error?.message || 'Failed to reject leave');
       },
       onSettled: (_, __, { id }) => {
@@ -140,26 +192,42 @@ const LeaveApprovalPage: React.FC = () => {
   const convertLopToCasualMutation = useMutation(
     (requestId: number) => leaveService.convertLeaveRequestLopToCasual(requestId),
     {
-      onSuccess: () => {
+      onMutate: async (requestId) => {
+        await queryClient.cancelQueries(['pendingLeaves']);
+        const previousPending = queryClient.getQueryData(['pendingLeaves']);
+        
+        // Optimistically update leave type in the list
+        queryClient.setQueryData(['pendingLeaves'], (old: any) => {
+          if (!old?.requests) return old;
+          return {
+            ...old,
+            requests: old.requests.map((r: any) => 
+              r.id === requestId ? { ...r, leaveType: 'casual' } : r
+            )
+          };
+        });
+        
+        return { previousPending };
+      },
+      onSuccess: (response, requestId) => {
+        // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         queryClient.invalidateQueries(['leaveBalances']);
         showSuccess('Leave request converted from LOP to Casual successfully!');
-        // Refresh the selected request to show updated leave type
-        if (selectedRequest) {
-          leaveService.getLeaveRequest(selectedRequest.id).then((updatedRequest) => {
-            setSelectedRequest({
-              ...selectedRequest,
-              leaveType: updatedRequest.leaveType
-            });
-          }).catch(() => {
-            // If refresh fails, just close modal
-            setIsModalOpen(false);
-            setSelectedRequest(null);
+        // Update selected request if modal is open
+        if (selectedRequest && selectedRequest.id === requestId) {
+          setSelectedRequest({
+            ...selectedRequest,
+            leaveType: 'casual'
           });
         }
       },
-      onError: (error: any) => {
+      onError: (error: any, requestId, context) => {
+        // Rollback on error
+        if (context?.previousPending) {
+          queryClient.setQueryData(['pendingLeaves'], context.previousPending);
+        }
         showError(error.response?.data?.error?.message || 'Failed to convert leave request');
       }
     }
@@ -269,10 +337,39 @@ const LeaveApprovalPage: React.FC = () => {
       return leaveService.updateLeaveStatus(id, status, dayIds, rejectReason, leaveReason);
     },
     {
-      onMutate: ({ id }) => {
+      onMutate: async ({ id, status }) => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
+        // Cancel outgoing refetches
+        await queryClient.cancelQueries(['pendingLeaves']);
+        await queryClient.cancelQueries(['approvedLeaves']);
+        
+        // Snapshot for rollback
+        const previousPending = queryClient.getQueryData(['pendingLeaves']);
+        const previousApproved = queryClient.getQueryData(['approvedLeaves']);
+        
+        // Optimistically update based on status
+        if (status === 'approved') {
+          queryClient.setQueryData(['pendingLeaves'], (old: any) => {
+            if (!old?.requests) return old;
+            return {
+              ...old,
+              requests: old.requests.filter((r: any) => r.id !== id)
+            };
+          });
+        } else if (status === 'rejected') {
+          queryClient.setQueryData(['pendingLeaves'], (old: any) => {
+            if (!old?.requests) return old;
+            return {
+              ...old,
+              requests: old.requests.filter((r: any) => r.id !== id)
+            };
+          });
+        }
+        
+        return { previousPending, previousApproved };
       },
       onSuccess: () => {
+        // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave status updated successfully!');
@@ -280,7 +377,14 @@ const LeaveApprovalPage: React.FC = () => {
         setSelectedRequest(null);
         setIsEditMode(false);
       },
-      onError: (error: any) => {
+      onError: (error: any, variables, context) => {
+        // Rollback on error
+        if (context?.previousPending) {
+          queryClient.setQueryData(['pendingLeaves'], context.previousPending);
+        }
+        if (context?.previousApproved) {
+          queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
+        }
         showError(error.response?.data?.error?.message || 'Failed to update leave status');
       },
       onSettled: (_, __, { id }) => {
@@ -298,26 +402,40 @@ const LeaveApprovalPage: React.FC = () => {
   };
 
 
-  const triggerSearch = () => {
+  // Debounce search input
+  useEffect(() => {
+    const term = searchInput.trim();
+    const timer = setTimeout(() => {
+      if (term.length >= 3) {
+        setSearch(term);
+      } else if (term.length === 0) {
+        setSearch('');
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const triggerSearch = useCallback(() => {
     const term = searchInput.trim();
     if (term.length >= 3) {
       setSearch(term);
     } else {
       setSearch('');
     }
-  };
+  }, [searchInput]);
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchInput('');
     setSearch('');
-  };
+  }, []);
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       triggerSearch();
     }
-  };
+  }, [triggerSearch]);
 
   const formatDateSafe = (value: Date | string | null | undefined) => {
     if (!value) return '';

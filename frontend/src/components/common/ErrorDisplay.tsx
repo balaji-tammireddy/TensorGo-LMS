@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import './ErrorDisplay.css';
 
 interface ErrorDisplayProps {
@@ -7,7 +7,7 @@ interface ErrorDisplayProps {
   showRetryButton?: boolean;
 }
 
-const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ 
+const ErrorDisplay: React.FC<ErrorDisplayProps> = memo(({ 
   message, 
   onRetry,
   showRetryButton = false 
@@ -46,7 +46,9 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       </div>
     </div>
   );
-};
+});
+
+ErrorDisplay.displayName = 'ErrorDisplay';
 
 export default ErrorDisplay;
 

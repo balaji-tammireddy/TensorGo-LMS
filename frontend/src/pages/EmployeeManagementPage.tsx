@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
@@ -177,6 +177,20 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
   );
+
+  // Debounce search input
+  useEffect(() => {
+    const term = searchInput.trim();
+    const timer = setTimeout(() => {
+      if (term.length >= 3) {
+        setAppliedSearch(term);
+      } else if (term.length === 0) {
+        setAppliedSearch(undefined);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const hasActiveFilters = Boolean(searchInput || statusFilter);
 

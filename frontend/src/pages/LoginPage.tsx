@@ -62,7 +62,6 @@ const LoginPage: React.FC = () => {
         navigate('/leave-apply');
       }
     } catch (err: any) {
-      console.error('Login error:', err);
       const status = err.response?.status;
       const errorData = err.response?.data?.error;
       const message = errorData?.message || err.message || 'Login failed';
