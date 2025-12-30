@@ -313,8 +313,7 @@
 }
 
 .form-group input,
-.form-group select,
-.form-group textarea {
+.form-group select {
   padding: 10px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -387,17 +386,24 @@
   opacity: 0.6;
 }
 
-.form-group textarea {
-  resize: none;
-  height: 44px;
-  padding: 10px 12px;
-  font-size: 12px;
-  width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-family: 'Poppins', sans-serif;
-  box-sizing: border-box;
-  line-height: 1.4;
+.form-group textarea,
+.reason-group textarea {
+  resize: none !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  font-family: 'Poppins', sans-serif !important;
+  background: transparent !important;
+  color: #1f2a3d !important;
 }
 
 .time-inputs {
@@ -501,7 +507,7 @@
 }
 
 .doctor-note-button {
-  padding: 8px 16px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
   color: #3a4a6b;
   border: 1px solid #c3ccdd;
@@ -510,10 +516,16 @@
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
   font-size: 12px;
+  height: 42px;
+  line-height: 1.2;
   width: fit-content;
   min-width: 160px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 4px 10px rgba(63, 81, 181, 0.12);
   transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-sizing: border-box;
 }
 
 .doctor-note-button:hover {
@@ -561,7 +573,7 @@
 
 .submit-button {
   padding: 10px 24px;
-  margin-top: 20px; /* increase to 12px or 16px if needed */
+  margin-top: 11px;
   background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: white;
   border: 1px solid #2951c8;
@@ -572,12 +584,15 @@
   font-size: 12px;
   white-space: nowrap;
   min-width: 110px;
+  height: 42px;
+  line-height: 1.2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
   transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  box-sizing: border-box;
 }
 
 
@@ -594,7 +609,7 @@
 
 .clear-button {
   padding: 10px 24px;
-  margin-top: 20px; /* increase to 12px or 16px if needed */
+  margin-top: 11px;
   background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
   color: #3a4a6b;
   border: 1px solid #c3ccdd;
@@ -605,11 +620,14 @@
   font-size: 12px;
   white-space: nowrap;
   min-width: 110px;
+  height: 42px;
+  line-height: 1.2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 14px rgba(63, 81, 181, 0.12);
   transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  box-sizing: border-box;
 }
 
 .clear-button:hover:not(:disabled) {
