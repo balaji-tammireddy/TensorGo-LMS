@@ -167,7 +167,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                   <Button 
                     variant="outline" 
                     className="leave-type-dropdown-trigger"
-                    disabled={isLoading || balancesLoading}
+                  disabled={isLoading || balancesLoading}
                     style={{ 
                       width: '100%', 
                       justifyContent: 'space-between',

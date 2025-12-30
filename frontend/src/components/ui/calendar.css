@@ -217,9 +217,12 @@
   font-weight: 600;
 }
 
+.rdp-day_outside {
+  visibility: hidden;
+}
+
 .rdp-day_outside .rdp-day_button {
-  color: #999;
-  opacity: 0.5;
+  display: none;
 }
 
 .rdp-day_disabled .rdp-day_button {

@@ -58,39 +58,39 @@ export const getHolidays = async (year?: number) => {
   logger.info(`[LEAVE] [GET HOLIDAYS] Year: ${year || 'all'}`);
   
   try {
-    let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
-    const params: any[] = [];
-    
+  let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
+  const params: any[] = [];
+  
     // Always include current year and next year
-    if (year !== undefined && year !== null && !isNaN(year)) {
-      const yearNum = parseInt(String(year), 10);
+  if (year !== undefined && year !== null && !isNaN(year)) {
+    const yearNum = parseInt(String(year), 10);
       const nextYear = yearNum + 1;
       query += ' AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)';
       params.push(yearNum, nextYear);
       logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for year: ${yearNum} and next year: ${nextYear}`);
-    } else {
+  } else {
       // If no year provided, get current year and next year
       const currentYear = new Date().getFullYear();
       const nextYear = currentYear + 1;
       query += ' AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)';
       params.push(currentYear, nextYear);
       logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for current year: ${currentYear} and next year: ${nextYear}`);
-    }
-    
-    query += ' ORDER BY holiday_date';
-    
-    const result = await pool.query(query, params);
-    
-    // Log for debugging
+  }
+  
+  query += ' ORDER BY holiday_date';
+  
+  const result = await pool.query(query, params);
+  
+  // Log for debugging
     const years = year !== undefined && year !== null && !isNaN(year) 
       ? `${year} and ${year + 1}` 
       : `${new Date().getFullYear()} and ${new Date().getFullYear() + 1}`;
     logger.info(`[LEAVE] [GET HOLIDAYS] Fetched ${result.rows.length} holidays for years: ${years}`);
-    
-    return result.rows.map(row => ({
-      date: formatDate(row.holiday_date),
-      name: row.holiday_name
-    }));
+  
+  return result.rows.map(row => ({
+    date: formatDate(row.holiday_date),
+    name: row.holiday_name
+  }));
   } catch (error: any) {
     logger.error(`[LEAVE] [GET HOLIDAYS] Error fetching holidays:`, error);
     throw new Error(`Failed to fetch holidays: ${error.message || error.toString()}`);
@@ -110,17 +110,17 @@ export const getLeaveRules = async () => {
   
   try {
     logger.info(`[LEAVE] [GET LEAVE RULES] Fetching active leave rules`);
-    const result = await pool.query(
-      'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
-    );
+  const result = await pool.query(
+    'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
+  );
     logger.info(`[LEAVE] [GET LEAVE RULES] Found ${result.rows.length} active leave rules`);
     
-    return result.rows.map(row => ({
-      leaveRequired: row.leave_required_max 
-        ? `${row.leave_required_min} to ${row.leave_required_max} days`
-        : `More Than ${row.leave_required_min} days`,
-      priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
-    }));
+  return result.rows.map(row => ({
+    leaveRequired: row.leave_required_max 
+      ? `${row.leave_required_min} to ${row.leave_required_max} days`
+      : `More Than ${row.leave_required_min} days`,
+    priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
+  }));
   } catch (error: any) {
     logger.error(`[LEAVE] [GET LEAVE RULES] Error fetching leave rules:`, error);
     throw new Error(`Failed to fetch leave rules: ${error.message || error.toString()}`);
@@ -213,10 +213,10 @@ export const applyLeave = async (
     // LOP can be applied at any date except past dates (no advance notice required)
     // Sick leave validation is already handled above
     if (leaveData.leaveType === 'casual') {
-      const msPerDay = 1000 * 60 * 60 * 24;
-      const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
       if (daysUntilStart < 3) {
-        throw new Error('Casual leaves must be applied at least 3 days in advance.');
+      throw new Error('Casual leaves must be applied at least 3 days in advance.');
       }
     }
 
@@ -507,19 +507,19 @@ export const applyLeave = async (
     if (managerEmail && reportingManagerId) {
       // Fire and forget - don't await
       (async () => {
-        try {
-          const emailSent = isUrgent
-            ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData)
-            : await sendLeaveApplicationEmail(managerEmail, emailData);
-          if (emailSent) {
+      try {
+        const emailSent = isUrgent
+          ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData)
+          : await sendLeaveApplicationEmail(managerEmail, emailData);
+        if (emailSent) {
             logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to reporting manager (${managerRole || 'Manager'}): ${managerEmail} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
-          } else {
-            logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
-          }
-        } catch (emailError: any) {
-          // Don't fail the leave application if email fails
-          logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
+        } else {
+          logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
         }
+      } catch (emailError: any) {
+        // Don't fail the leave application if email fails
+        logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
+      }
       })().catch(err => logger.error(`[LEAVE] [APPLY LEAVE] Unhandled error in async email send:`, err));
     }
 
@@ -528,24 +528,24 @@ export const applyLeave = async (
     if (hrEmail && hrId && managerEmail !== hrEmail) {
       // Fire and forget - don't await
       (async () => {
-        try {
-          // Update manager name for the second email
-          const hrEmailData = {
-            ...emailData,
+      try {
+        // Update manager name for the second email
+        const hrEmailData = {
+          ...emailData,
             managerName: hrName || (hrRole === 'hr' ? 'HR' : hrRole === 'super_admin' ? 'Super Admin' : 'Manager')
-          };
-          const emailSent = isUrgent
-            ? await sendUrgentLeaveApplicationEmail(hrEmail, hrEmailData)
-            : await sendLeaveApplicationEmail(hrEmail, hrEmailData);
-          if (emailSent) {
+        };
+        const emailSent = isUrgent
+          ? await sendUrgentLeaveApplicationEmail(hrEmail, hrEmailData)
+          : await sendLeaveApplicationEmail(hrEmail, hrEmailData);
+        if (emailSent) {
             logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to manager's reporting manager (${hrRole || 'HR'}): ${hrEmail} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
-          } else {
-            logger.warn(`Failed to send leave application email to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
-          }
-        } catch (emailError: any) {
-          // Don't fail the leave application if email fails
-          logger.error(`Error sending email to manager's reporting manager for leave request ${leaveRequestId}:`, emailError);
+        } else {
+          logger.warn(`Failed to send leave application email to manager's reporting manager: ${hrEmail} for leave request ${leaveRequestId}`);
         }
+      } catch (emailError: any) {
+        // Don't fail the leave application if email fails
+        logger.error(`Error sending email to manager's reporting manager for leave request ${leaveRequestId}:`, emailError);
+      }
       })().catch(err => logger.error(`[LEAVE] [APPLY LEAVE] Unhandled error in async email send:`, err));
     }
 
@@ -576,18 +576,18 @@ export const getMyLeaveRequests = async (
   logger.info(`[LEAVE] [GET MY LEAVE REQUESTS] User ID: ${userId}, Page: ${page}, Limit: ${limit}, Status: ${status || 'all'}, Role: ${userRole || 'none'}`);
   
   try {
-    const offset = (page - 1) * limit;
-    let query = `
-      SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
-             lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
-             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-             lr.last_updated_by, lr.last_updated_by_role,
-             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
-      FROM leave_requests lr
-      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
-      WHERE lr.employee_id = $1
-    `;
-    const params: any[] = [userId];
+  const offset = (page - 1) * limit;
+  let query = `
+    SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
+           lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
+           lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+           lr.last_updated_by, lr.last_updated_by_role,
+           last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+    FROM leave_requests lr
+    LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+    WHERE lr.employee_id = $1
+  `;
+  const params: any[] = [userId];
   
   if (status) {
     query += ' AND current_status = $2';
@@ -689,14 +689,14 @@ export const getMyLeaveRequests = async (
     });
   }
 
-    return {
-      requests,
-      pagination: {
-        page,
-        limit,
-        total: parseInt(countResult.rows[0].count)
-      }
-    };
+  return {
+    requests,
+    pagination: {
+      page,
+      limit,
+      total: parseInt(countResult.rows[0].count)
+    }
+  };
   } catch (error: any) {
     logger.error(`[LEAVE] [GET MY LEAVE REQUESTS] Error fetching my leave requests:`, error);
     throw new Error(`Failed to fetch leave requests: ${error.message || error.toString()}`);
@@ -1504,14 +1504,14 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
             );
           }
         } else {
-          await client.query(
-            `UPDATE leave_balances 
-             SET ${balanceColumn} = ${balanceColumn} + $1
-             WHERE employee_id = $2`,
-            [daysToRefund, userId]
-          );
-        }
+        await client.query(
+          `UPDATE leave_balances 
+           SET ${balanceColumn} = ${balanceColumn} + $1
+           WHERE employee_id = $2`,
+          [daysToRefund, userId]
+        );
       }
+    }
     }
 
 
@@ -1927,32 +1927,32 @@ export const approveLeave = async (
     if (leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.employee_email, {
-          employeeName: leave.employee_name || 'Employee',
-          employeeEmpId: leave.employee_emp_id || '',
+      employeeName: leave.employee_name || 'Employee',
+      employeeEmpId: leave.employee_emp_id || '',
           recipientName: leave.employee_name || 'Employee',
           recipientRole: 'employee' as const,
-          leaveType: leave.leave_type,
-          startDate: leave.start_date,
-          startType: leave.start_type,
-          endDate: leave.end_date,
-          endType: leave.end_type,
-          noOfDays: parseFloat(leave.no_of_days),
-          reason: leave.reason,
-          approverName: leave.approver_name || 'Approver',
-          approverRole: approverRole,
-          comment: comment || null,
-          status: 'approved' as const
+      leaveType: leave.leave_type,
+      startDate: leave.start_date,
+      startType: leave.start_type,
+      endDate: leave.end_date,
+      endType: leave.end_type,
+      noOfDays: parseFloat(leave.no_of_days),
+      reason: leave.reason,
+      approverName: leave.approver_name || 'Approver',
+      approverRole: approverRole,
+      comment: comment || null,
+      status: 'approved' as const
         });
         logger.info(`[EMAIL] ✅ Approval email sent to employee: ${leave.employee_email}`);
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
+        }
       }
-    }
-  } else if (approverRole === 'hr') {
-    // HR approves → Manager and Employee get emails
+    } else if (approverRole === 'hr') {
+      // HR approves → Manager and Employee get emails
     logger.info(`[EMAIL] HR approval - sending emails to employee and manager`);
-    // Send to employee
-    if (leave.employee_email) {
+      // Send to employee
+      if (leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.employee_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -1975,9 +1975,9 @@ export const approveLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
       }
-    }
-    // Send to manager (if exists and different from employee)
-    if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.manager_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2000,12 +2000,12 @@ export const approveLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to manager:`, err);
       }
-    }
-  } else if (approverRole === 'super_admin') {
-    // Super Admin approves → HR, Manager, and Employee get emails
+      }
+    } else if (approverRole === 'super_admin') {
+      // Super Admin approves → HR, Manager, and Employee get emails
     logger.info(`[EMAIL] Super Admin approval - sending emails to employee, manager, and HR`);
-    // Send to employee
-    if (leave.employee_email) {
+      // Send to employee
+      if (leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.employee_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2028,9 +2028,9 @@ export const approveLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
       }
-    }
-    // Send to manager (if exists and different from employee)
-    if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.manager_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2053,9 +2053,9 @@ export const approveLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to manager:`, err);
       }
-    }
-    // Send to HR (if exists and different from employee and manager)
-    if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
+      }
+      // Send to HR (if exists and different from employee and manager)
+      if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
       try {
         await sendLeaveStatusEmail(leave.hr_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2262,10 +2262,10 @@ export const rejectLeave = async (
         logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
       }
     } else {
-      await pool.query(
-        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-        [refundDays, leave.employee_id]
-      );
+    await pool.query(
+      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+      [refundDays, leave.employee_id]
+    );
       logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
     }
   }
@@ -2300,32 +2300,32 @@ export const rejectLeave = async (
     if (leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.employee_email, {
-          employeeName: leave.employee_name || 'Employee',
-          employeeEmpId: leave.employee_emp_id || '',
+      employeeName: leave.employee_name || 'Employee',
+      employeeEmpId: leave.employee_emp_id || '',
           recipientName: leave.employee_name || 'Employee',
           recipientRole: 'employee' as const,
-          leaveType: leave.leave_type,
-          startDate: leave.start_date,
-          startType: leave.start_type,
-          endDate: leave.end_date,
-          endType: leave.end_type,
-          noOfDays: parseFloat(leave.no_of_days),
-          reason: leave.reason,
-          approverName: leave.approver_name || 'Approver',
-          approverRole: approverRole,
-          comment: comment || null,
-          status: 'rejected' as const
+      leaveType: leave.leave_type,
+      startDate: leave.start_date,
+      startType: leave.start_type,
+      endDate: leave.end_date,
+      endType: leave.end_type,
+      noOfDays: parseFloat(leave.no_of_days),
+      reason: leave.reason,
+      approverName: leave.approver_name || 'Approver',
+      approverRole: approverRole,
+      comment: comment || null,
+      status: 'rejected' as const
         });
         logger.info(`[EMAIL] ✅ Rejection email sent to employee: ${leave.employee_email}`);
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
+        }
       }
-    }
-  } else if (approverRole === 'hr') {
-    // HR rejects → Manager and Employee get emails
+    } else if (approverRole === 'hr') {
+      // HR rejects → Manager and Employee get emails
     logger.info(`[EMAIL] HR rejection - sending emails to employee and manager`);
-    // Send to employee
-    if (leave.employee_email) {
+      // Send to employee
+      if (leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.employee_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2348,9 +2348,9 @@ export const rejectLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
       }
-    }
-    // Send to manager (if exists and different from employee)
-    if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.manager_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2373,12 +2373,12 @@ export const rejectLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to manager:`, err);
       }
-    }
-  } else if (approverRole === 'super_admin') {
-    // Super Admin rejects → HR, Manager, and Employee get emails
+      }
+    } else if (approverRole === 'super_admin') {
+      // Super Admin rejects → HR, Manager, and Employee get emails
     logger.info(`[EMAIL] Super Admin rejection - sending emails to employee, manager, and HR`);
-    // Send to employee
-    if (leave.employee_email) {
+      // Send to employee
+      if (leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.employee_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2401,9 +2401,9 @@ export const rejectLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to employee:`, err);
       }
-    }
-    // Send to manager (if exists and different from employee)
-    if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+      }
+      // Send to manager (if exists and different from employee)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
       try {
         await sendLeaveStatusEmail(leave.manager_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2426,9 +2426,9 @@ export const rejectLeave = async (
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending to manager:`, err);
       }
-    }
-    // Send to HR (if exists and different from employee and manager)
-    if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
+      }
+      // Send to HR (if exists and different from employee and manager)
+      if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
       try {
         await sendLeaveStatusEmail(leave.hr_email, {
           employeeName: leave.employee_name || 'Employee',
@@ -2651,7 +2651,7 @@ export const approveLeaveDay = async (
 
   // Recalculate status only (no balance changes)
   try {
-    await recalcLeaveRequestStatus(leaveRequestId);
+  await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[APPROVE LEAVE DAY] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
     logger.error(`[APPROVE LEAVE DAY] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
@@ -3004,7 +3004,7 @@ export const approveLeaveDays = async (
 
   // Recalculate status
   try {
-    await recalcLeaveRequestStatus(leaveRequestId);
+  await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[APPROVE LEAVE DAYS] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
     logger.error(`[APPROVE LEAVE DAYS] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
@@ -3329,10 +3329,10 @@ export const rejectLeaveDay = async (
           );
         }
       } else {
-        await pool.query(
-          `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-          [refund, leave.employee_id]
-        );
+      await pool.query(
+        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+        [refund, leave.employee_id]
+      );
       }
     }
   }
@@ -3393,7 +3393,7 @@ export const rejectLeaveDay = async (
 
   // Recalculate status
   try {
-    await recalcLeaveRequestStatus(leaveRequestId);
+  await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[REJECT LEAVE DAY] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
     logger.error(`[REJECT LEAVE DAY] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
@@ -3817,28 +3817,28 @@ export const updateLeaveStatus = async (
           // Send to employee
           if (emailLeave.employee_email) {
             const employeeEmailData = {
-              employeeName: emailLeave.employee_name || 'Employee',
-              employeeEmpId: emailLeave.employee_emp_id || '',
+          employeeName: emailLeave.employee_name || 'Employee',
+          employeeEmpId: emailLeave.employee_emp_id || '',
               recipientName: emailLeave.employee_name || 'Employee',
               recipientRole: 'employee' as const,
-              leaveType: emailLeave.leave_type,
-              startDate: emailLeave.start_date,
-              startType: emailLeave.start_type,
-              endDate: emailLeave.end_date,
-              endType: emailLeave.end_type,
-              noOfDays: parseFloat(emailLeave.no_of_days),
-              reason: emailLeave.reason,
-              approverName: emailLeave.approver_name || 'Approver',
-              approverRole: approverRole,
-              comment: newStatus === 'rejected' ? (rejectReason || null) : null,
+          leaveType: emailLeave.leave_type,
+          startDate: emailLeave.start_date,
+          startType: emailLeave.start_type,
+          endDate: emailLeave.end_date,
+          endType: emailLeave.end_type,
+          noOfDays: parseFloat(emailLeave.no_of_days),
+          reason: emailLeave.reason,
+          approverName: emailLeave.approver_name || 'Approver',
+          approverRole: approverRole,
+          comment: newStatus === 'rejected' ? (rejectReason || null) : null,
               status: newStatus as 'approved' | 'partially_approved' | 'rejected'
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, employeeEmailData);
             if (emailSent) {
-              logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}`);
+            logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}`);
             } else {
               logger.warn(`⚠️ Failed to send leave ${newStatus} email to employee: ${emailLeave.employee_email}`);
-            }
+          }
           }
           // Send to manager (if exists and different from employee)
           if (emailLeave.manager_email && emailLeave.manager_email !== emailLeave.employee_email) {
@@ -3861,7 +3861,7 @@ export const updateLeaveStatus = async (
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.manager_email, managerEmailData);
             if (emailSent) {
-              logger.info(`✅ Leave ${newStatus} email sent to manager: ${emailLeave.manager_email}`);
+            logger.info(`✅ Leave ${newStatus} email sent to manager: ${emailLeave.manager_email}`);
             } else {
               logger.warn(`⚠️ Failed to send leave ${newStatus} email to manager: ${emailLeave.manager_email}`);
             }
@@ -3889,10 +3889,10 @@ export const updateLeaveStatus = async (
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, employeeEmailData);
             if (emailSent) {
-              logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}`);
+            logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}`);
             } else {
               logger.warn(`⚠️ Failed to send leave ${newStatus} email to employee: ${emailLeave.employee_email}`);
-            }
+          }
           }
           // Send to manager (if exists and different from employee)
           if (emailLeave.manager_email && emailLeave.manager_email !== emailLeave.employee_email) {
@@ -3915,10 +3915,10 @@ export const updateLeaveStatus = async (
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.manager_email, managerEmailData);
             if (emailSent) {
-              logger.info(`✅ Leave ${newStatus} email sent to manager: ${emailLeave.manager_email}`);
+            logger.info(`✅ Leave ${newStatus} email sent to manager: ${emailLeave.manager_email}`);
             } else {
               logger.warn(`⚠️ Failed to send leave ${newStatus} email to manager: ${emailLeave.manager_email}`);
-            }
+          }
           }
           // Send to HR (if exists and different from employee and manager)
           if (emailLeave.hr_email && emailLeave.hr_email !== emailLeave.employee_email && emailLeave.hr_email !== emailLeave.manager_email) {
@@ -3941,7 +3941,7 @@ export const updateLeaveStatus = async (
             };
             const emailSent = await sendLeaveStatusEmail(emailLeave.hr_email, hrEmailData);
             if (emailSent) {
-              logger.info(`✅ Leave ${newStatus} email sent to HR: ${emailLeave.hr_email}`);
+            logger.info(`✅ Leave ${newStatus} email sent to HR: ${emailLeave.hr_email}`);
             } else {
               logger.warn(`⚠️ Failed to send leave ${newStatus} email to HR: ${emailLeave.hr_email}`);
             }

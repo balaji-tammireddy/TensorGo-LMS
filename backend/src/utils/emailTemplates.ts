@@ -1222,7 +1222,7 @@ export const sendPendingLeaveReminderEmail = async (
 
 export interface BirthdayWishEmailData {
   employeeName: string;
-  employeeEmpId: string;
+  employeeEmpId?: string;
   birthdayEmployeeName?: string;
   birthdayEmployeeEmpId?: string;
 }
@@ -1260,29 +1260,25 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
               <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
                 Dear ${data.employeeName},
               </p>
-              ${data.birthdayEmployeeName ? `
-              <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px 20px; margin: 0 0 28px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #92400e; font-size: 15px; font-family: 'Poppins', sans-serif; font-weight: 600; line-height: 1.5;">
-                  Today is ${data.birthdayEmployeeName}'s (${data.birthdayEmployeeEmpId}) birthday!
-                </p>
-              </div>
-              ` : ''}
               
               <!-- Message -->
-              <p style="margin: 0 0 20px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
-                ${data.birthdayEmployeeName ? `Let's join together to wish ${data.birthdayEmployeeName} a wonderful birthday filled with joy, happiness, and success!` : 'Wishing you a wonderful birthday filled with joy, happiness, and success!'}
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7; text-align: left;">
+                Warm wishes to you on your birthday.
               </p>
-              <p style="margin: 0 0 20px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
-                ${data.birthdayEmployeeName ? `May this special day bring ${data.birthdayEmployeeName} countless reasons to smile and celebrate. We hope their year ahead is filled with new opportunities, achievements, and memorable moments.` : 'May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.'}
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7; text-align: left;">
+                We value your contributions and commitment, and we appreciate the role you play in supporting our organization's goals. Your professionalism and dedication continue to make a positive impact.
               </p>
-              <p style="margin: 0 0 28px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
-                ${data.birthdayEmployeeName ? `Thank you ${data.birthdayEmployeeName} for being a valuable part of our team. Have a fantastic day!` : 'Thank you for being a valuable part of our team. Have a fantastic day!'}
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7; text-align: left;">
+                May the year ahead bring you continued success, good health, and personal fulfillment.
+              </p>
+              <p style="margin: 0 0 28px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7; text-align: left;">
+                We wish you a pleasant and memorable birthday.
               </p>
               
               <!-- Closing -->
-              <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
-                Warm regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+              <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7; text-align: left;">
+                Best regards,<br>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -1313,16 +1309,16 @@ Happy Birthday
 
 Dear ${data.employeeName},
 
-${data.birthdayEmployeeName ? `Today is ${data.birthdayEmployeeName}'s (${data.birthdayEmployeeEmpId}) birthday!` : ''}
+Warm wishes to you on your birthday.
 
-${data.birthdayEmployeeName ? `Let's join together to wish ${data.birthdayEmployeeName} a wonderful birthday filled with joy, happiness, and success!` : 'Wishing you a wonderful birthday filled with joy, happiness, and success!'}
+We value your contributions and commitment, and we appreciate the role you play in supporting our organization's goals. Your professionalism and dedication continue to make a positive impact.
 
-${data.birthdayEmployeeName ? `May this special day bring ${data.birthdayEmployeeName} countless reasons to smile and celebrate. We hope their year ahead is filled with new opportunities, achievements, and memorable moments.` : 'May this special day bring you countless reasons to smile and celebrate. We hope your year ahead is filled with new opportunities, achievements, and memorable moments.'}
+May the year ahead bring you continued success, good health, and personal fulfillment.
 
-${data.birthdayEmployeeName ? `Thank you ${data.birthdayEmployeeName} for being a valuable part of our team. Have a fantastic day!` : 'Thank you for being a valuable part of our team. Have a fantastic day!'}
+We wish you a pleasant and memorable birthday.
 
-Warm regards,
-TensorGo-LMS Team
+Best regards,
+TensorGo
 
 ---
 This is an automated birthday wish from TensorGo Leave Management System.
@@ -1331,19 +1327,21 @@ Please do not reply to this email.
 };
 
 export const sendBirthdayWishEmail = async (
-  employeeEmail: string,
-  data: BirthdayWishEmailData
+  birthdayEmployeeEmail: string,
+  data: BirthdayWishEmailData,
+  ccEmails?: string[]
 ): Promise<boolean> => {
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
   
-  const emailSubject = `Happy Birthday ${data.birthdayEmployeeName ? data.birthdayEmployeeName : data.employeeName}! [Ref: ${uniqueId}]`;
+  const emailSubject = `Happy Birthday ${data.employeeName}! [Ref: ${uniqueId}]`;
   const emailHtml = generateBirthdayWishEmailHtml(data);
   const emailText = generateBirthdayWishEmailText(data);
 
   return await sendEmail({
-    to: employeeEmail,
+    to: birthdayEmployeeEmail,
+    cc: ccEmails && ccEmails.length > 0 ? ccEmails : undefined,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,

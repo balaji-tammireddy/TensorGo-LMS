@@ -145,7 +145,7 @@ const sendBirthdayWishes = async () => {
     logger.info(`Found ${birthdayEmployees.length} employees with birthdays today`);
 
     if (birthdayEmployees.length > 0) {
-      // Get all active employees to send birthday wishes to
+      // Get all active employees for CC
       const allEmployeesResult = await pool.query(
         `SELECT 
           id,
@@ -157,23 +157,29 @@ const sendBirthdayWishes = async () => {
       );
 
       const allEmployees = allEmployeesResult.rows;
-      logger.info(`Sending birthday wishes to ${allEmployees.length} employees for ${birthdayEmployees.length} birthday(s) today`);
+      logger.info(`Sending birthday wishes for ${birthdayEmployees.length} birthday(s) today`);
 
-      // Send birthday wishes to all employees for each birthday person
+      // Send birthday wishes - one email per birthday person with all others CC'd
       for (const birthdayEmployee of birthdayEmployees) {
-        for (const employee of allEmployees) {
-          try {
-            await sendBirthdayWishEmail(employee.email, {
-              employeeName: employee.employee_name,
-              employeeEmpId: employee.emp_id,
-              birthdayEmployeeName: birthdayEmployee.employee_name,
-              birthdayEmployeeEmpId: birthdayEmployee.emp_id
-            });
+        try {
+          // Get CC list (all employees except the birthday person)
+          const ccEmails = allEmployees
+            .filter(emp => emp.email !== birthdayEmployee.email)
+            .map(emp => emp.email);
 
-            logger.info(`✅ Birthday wish sent to ${employee.email} for ${birthdayEmployee.employee_name}'s birthday`);
-          } catch (error: any) {
-            logger.error(`❌ Error sending birthday wish to ${employee.email}:`, error);
-          }
+          logger.info(`Sending birthday email to ${birthdayEmployee.email} with ${ccEmails.length} employees CC'd`);
+
+          await sendBirthdayWishEmail(
+            birthdayEmployee.email,
+            {
+              employeeName: birthdayEmployee.employee_name,
+            },
+            ccEmails
+          );
+
+          logger.info(`✅ Birthday wish sent to ${birthdayEmployee.email} with ${ccEmails.length} employees CC'd`);
+        } catch (error: any) {
+          logger.error(`❌ Error sending birthday wish to ${birthdayEmployee.email}:`, error);
         }
       }
     }
