@@ -271,16 +271,16 @@ const LoginPage: React.FC = () => {
                   <button type="submit" disabled={loading} className="login-button">
                     {loading ? 'Logging in...' : 'Sign In'}
                   </button>
-                  <div className="forgot-password-link">
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotPassword(true)}
-                      className="forgot-password-button"
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
                 </form>
+                <div className="forgot-password-link">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="forgot-password-button"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
               </>
             )}
           </div>

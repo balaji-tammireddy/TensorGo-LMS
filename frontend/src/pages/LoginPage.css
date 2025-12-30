@@ -99,7 +99,8 @@
   position: relative;
   z-index: 1;
   animation: slideUp 0.5s ease-out;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -173,7 +174,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden;
+  overflow: visible;
   flex: 1;
   min-height: 0;
 }
@@ -351,36 +352,46 @@
 /* Forgot Password Styles */
 .forgot-password-link {
   text-align: center;
-  margin-top: 16px;
+  margin-top: 12px;
   margin-bottom: 0;
   display: block;
   width: 100%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  padding-top: 4px;
 }
 
 .forgot-password-button {
   background: none;
   border: none;
   color: #4285f4;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 10px 16px;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
   transition: all 0.2s ease;
   border-radius: 6px;
   display: inline-block;
   width: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .forgot-password-button:hover {
   color: #357ae8;
-  background: rgba(66, 133, 244, 0.08);
+  background: rgba(66, 133, 244, 0.1);
   text-decoration: none;
 }
 
 .forgot-password-button:focus {
   outline: 2px solid rgba(66, 133, 244, 0.3);
   outline-offset: 2px;
+}
+
+.forgot-password-button:active {
+  transform: scale(0.98);
 }
 
 /* Forgot Password Modal */
