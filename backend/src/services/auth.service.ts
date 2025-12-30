@@ -253,12 +253,12 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
           
           <!-- Content -->
           <tr>
-            <td style="padding: 40px; text-align: center;">
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+            <td style="padding: 40px; text-align: left;">
+              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6; text-align: left;">
                 Dear ${userName},
               </p>
               
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6; text-align: left;">
                 You have requested to reset your password for your TensorGo-LMS account.
               </p>
               
@@ -267,15 +267,15 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
                 <p style="margin: 0; color: #2563eb; font-size: 32px; letter-spacing: 8px; font-family: 'Courier New', monospace;">${otp}</p>
               </div>
               
-              <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6; text-align: left;">
                 This OTP is valid for 10 minutes. Please enter this code to reset your password.
               </p>
               
-              <p style="margin: 20px 0 0 0; color: #ef4444; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 20px 0 0 0; color: #ef4444; font-size: 14px; line-height: 1.6; text-align: left;">
                 ⚠️ Security Notice: If you did not request this password reset, please ignore this email or contact your administrator immediately.
               </p>
               
-              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 30px 0 0 0; color: #333333; font-size: 14px; line-height: 1.6; text-align: left;">
                 Best regards,<br>
                 TensorGo-LMS
               </p>
