@@ -322,6 +322,35 @@
   font-family: 'Poppins', sans-serif;
 }
 
+.leave-type-dropdown-trigger {
+  width: 100% !important;
+  justify-content: space-between !important;
+  padding: 6px 8px !important;
+  font-size: 12px !important;
+  font-family: 'Poppins', sans-serif !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  background-color: transparent !important;
+  color: #1f2a3d !important;
+  height: auto !important;
+  font-weight: normal !important;
+}
+
+.leave-type-dropdown-trigger:hover {
+  background-color: #f8f9fc !important;
+  border-color: #4299e1 !important;
+}
+
+.leave-type-dropdown-content {
+  width: var(--radix-dropdown-menu-trigger-width) !important;
+  min-width: var(--radix-dropdown-menu-trigger-width) !important;
+}
+
+.time-dropdown-content {
+  width: var(--radix-dropdown-menu-trigger-width) !important;
+  min-width: var(--radix-dropdown-menu-trigger-width) !important;
+}
+
 .date-input-wrapper {
   position: relative;
   display: flex;

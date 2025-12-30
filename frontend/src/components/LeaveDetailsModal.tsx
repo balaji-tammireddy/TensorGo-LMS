@@ -3,6 +3,15 @@ import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
 import { format, parse, eachDayOfInterval } from 'date-fns';
 import ConfirmationDialog from './ConfirmationDialog';
 import { DatePicker } from './ui/date-picker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { Button } from './ui/button';
+import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import './LeaveDetailsModal.css';
 
@@ -333,32 +342,65 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
               <div className="leave-detail-item">
                 <label>Current Status</label>
                 {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
-                  <select
-                    value={selectedStatus}
-                    onChange={(e) => {
-                      setSelectedStatus(e.target.value);
-                      // Clear date selection when status changes
-                      if (e.target.value !== 'partially_approved') {
-                        setFromDate('');
-                        setToDate('');
-                      }
-                    }}
-                    className="status-dropdown"
-                    disabled={isLoading}
-                  >
-                    {isMultiDay ? (
-                      <>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="partially_approved">Partially Approved</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                      </>
-                    )}
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="leave-type-dropdown-trigger"
+                        disabled={isLoading}
+                        style={{ 
+                          padding: '6px 8px',
+                          fontSize: '12px',
+                          fontFamily: 'Poppins, sans-serif',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: '#1f2a3d',
+                          height: 'auto'
+                        }}
+                      >
+                        <span>
+                          {selectedStatus === 'approved' ? 'Approved' :
+                           selectedStatus === 'partially_approved' ? 'Partially Approved' :
+                           selectedStatus === 'rejected' ? 'Rejected' : selectedStatus}
+                        </span>
+                        <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="leave-type-dropdown-content">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedStatus('approved');
+                          setFromDate('');
+                          setToDate('');
+                        }}
+                      >
+                        Approved
+                      </DropdownMenuItem>
+                      {isMultiDay && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedStatus('partially_approved');
+                            }}
+                          >
+                            Partially Approved
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedStatus('rejected');
+                          setFromDate('');
+                          setToDate('');
+                        }}
+                      >
+                        Rejected
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
                   <div className="leave-detail-value">
                     <span className={`status-badge status-${getStatusLabel().toLowerCase().replace(' ', '-')}`}>

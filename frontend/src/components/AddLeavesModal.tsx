@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { useQuery } from 'react-query';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { Button } from './ui/button';
+import { ChevronDown } from 'lucide-react';
 import * as employeeService from '../services/employeeService';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -143,19 +152,57 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
-              <select
-                id="leaveType"
-                value={leaveType}
-                  onChange={handleLeaveTypeChange}
-                  disabled={isLoading || balancesLoading}
-                required
-              >
-                  <option value="casual">Casual (Current: {balances?.casual || 0})</option>
-                  <option value="sick">Sick (Current: {balances?.sick || 0})</option>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="leave-type-dropdown-trigger"
+                    disabled={isLoading || balancesLoading}
+                    style={{ 
+                      width: '100%', 
+                      justifyContent: 'space-between',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      fontFamily: 'Poppins, sans-serif',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      color: '#1f2a3d',
+                      height: 'auto'
+                    }}
+                  >
+                    <span>
+                      {leaveType === 'casual' ? `Casual (Current: ${balances?.casual || 0})` :
+                       leaveType === 'sick' ? `Sick (Current: ${balances?.sick || 0})` :
+                       `LOP (Current: ${balances?.lop || 0})`}
+                    </span>
+                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="leave-type-dropdown-content">
+                  <DropdownMenuItem
+                    onClick={() => handleLeaveTypeChange({ target: { value: 'casual' } } as any)}
+                  >
+                    Casual (Current: {balances?.casual || 0})
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleLeaveTypeChange({ target: { value: 'sick' } } as any)}
+                  >
+                    Sick (Current: {balances?.sick || 0})
+                  </DropdownMenuItem>
                   {user?.role === 'super_admin' && (
-                    <option value="lop">LOP (Current: {balances?.lop || 0})</option>
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => handleLeaveTypeChange({ target: { value: 'lop' } } as any)}
+                      >
+                        LOP (Current: {balances?.lop || 0})
+                      </DropdownMenuItem>
+                    </>
                   )}
-              </select>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="form-group">
               <label htmlFor="count">Count <span className="required">*</span></label>

@@ -1,0 +1,232 @@
+/* Dropdown Menu Content */
+.dropdown-menu-content {
+  min-width: 14rem;
+  background: #fff;
+  border: 1px solid #d7deec;
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 2000;
+  animation: dropdownFadeIn 0.15s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dropdown Menu Label */
+.dropdown-menu-label {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Dropdown Menu Separator */
+.dropdown-menu-separator {
+  height: 1px;
+  background: #e5e5e5;
+  margin: 0;
+  width: 100%;
+}
+
+/* Dropdown Menu Item */
+.dropdown-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1f2a3d;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease;
+  position: relative;
+}
+
+.dropdown-menu-item:hover,
+.dropdown-menu-item[data-highlighted] {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-item:focus {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.dropdown-menu-item:disabled:hover {
+  background: transparent;
+}
+
+/* Dropdown Menu Checkbox Item */
+.dropdown-menu-checkbox-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1f2a3d;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease;
+  position: relative;
+}
+
+.dropdown-menu-checkbox-item:hover,
+.dropdown-menu-checkbox-item[data-highlighted] {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-checkbox-item:focus {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-checkbox-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.dropdown-menu-checkbox-item:disabled:hover {
+  background: transparent;
+}
+
+.dropdown-menu-checkbox-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  border: 1px solid #d7deec;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.dropdown-menu-check-icon {
+  width: 14px;
+  height: 14px;
+  color: #fff;
+  stroke-width: 3;
+}
+
+/* When checked, show checkmark with blue background */
+.dropdown-menu-checkbox-item[data-state="checked"] .dropdown-menu-checkbox-indicator {
+  background: #4299e1;
+  border-color: #4299e1;
+}
+
+.dropdown-menu-checkbox-item[data-state="checked"] .dropdown-menu-check-icon {
+  color: #fff;
+}
+
+/* Dropdown Menu Radio Item */
+.dropdown-menu-radio-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1f2a3d;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease;
+  position: relative;
+}
+
+.dropdown-menu-radio-item:hover,
+.dropdown-menu-radio-item[data-highlighted] {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-radio-item:focus {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-radio-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.dropdown-menu-radio-icon {
+  width: 8px;
+  height: 8px;
+  color: #4299e1;
+  fill: #4299e1;
+}
+
+/* Dropdown Menu Sub Trigger */
+.dropdown-menu-subtrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1f2a3d;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease;
+}
+
+.dropdown-menu-subtrigger:hover,
+.dropdown-menu-subtrigger[data-highlighted] {
+  background: #f8f9fc;
+}
+
+.dropdown-menu-subtrigger-icon {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: #999;
+}
+
+/* Dropdown Menu Sub Content */
+.dropdown-menu-subcontent {
+  min-width: 14rem;
+  background: #fff;
+  border: 1px solid #d7deec;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 2001;
+}
+
+/* Dropdown Menu Shortcut */
+.dropdown-menu-shortcut {
+  margin-left: auto;
+  font-size: 12px;
+  color: #999;
+  letter-spacing: 0.5px;
+}
+
+/* Inset modifier */
+.dropdown-menu-inset {
+  padding-left: 24px;
+}
+
+/* Group spacing */
+.dropdown-menu-content > * + * {
+  margin-top: 2px;
+}
+

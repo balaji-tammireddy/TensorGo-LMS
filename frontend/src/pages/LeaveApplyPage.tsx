@@ -7,6 +7,15 @@ import ConfirmationDialog from '../components/ConfirmationDialog';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import { DatePicker } from '../components/ui/date-picker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Button } from '../components/ui/button';
+import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { FaPencilAlt, FaTrash, FaEye } from 'react-icons/fa';
@@ -1235,30 +1244,69 @@ const LeaveApplyPage: React.FC = () => {
             <div className="form-row-6">
               <div className="form-group">
                 <label>Leave Type</label>
-                <select
-                  value={formData.leaveType}
-                  onChange={(e) => {
-                    const newLeaveType = e.target.value as any;
-                    // For permission, set end date same as start date and force full day
-                    if (newLeaveType === 'permission') {
-                      setFormData({ 
-                        ...formData, 
-                        leaveType: newLeaveType,
-                        startType: 'full',
-                        endDate: formData.startDate || '',
-                        endType: 'full'
-                      });
-                    } else {
-                      setFormData({ ...formData, leaveType: newLeaveType });
-                    }
-                  }}
-                  required
-                >
-                  <option value="casual">Casual</option>
-                  <option value="sick">Sick</option>
-                  <option value="lop">LOP</option>
-                  <option value="permission">Permission</option>
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="leave-type-dropdown-trigger"
+                      style={{ 
+                        width: '100%', 
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        fontSize: '12px',
+                        fontFamily: 'Poppins, sans-serif',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        backgroundColor: 'transparent',
+                        color: '#1f2a3d',
+                        height: 'auto'
+                      }}
+                    >
+                      <span>{formData.leaveType === 'casual' ? 'Casual' : formData.leaveType === 'sick' ? 'Sick' : formData.leaveType === 'lop' ? 'LOP' : 'Permission'}</span>
+                      <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="leave-type-dropdown-content">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setFormData({ ...formData, leaveType: 'casual' });
+                      }}
+                    >
+                      Casual
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setFormData({ ...formData, leaveType: 'sick' });
+                      }}
+                    >
+                      Sick
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setFormData({ ...formData, leaveType: 'lop' });
+                      }}
+                    >
+                      LOP
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const newLeaveType = 'permission';
+                        setFormData({ 
+                          ...formData, 
+                          leaveType: newLeaveType,
+                          startType: 'full',
+                          endDate: formData.startDate || '',
+                          endType: 'full'
+                        });
+                      }}
+                    >
+                      Permission
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="form-group">
                 <label>Start Date</label>
@@ -1289,15 +1337,48 @@ const LeaveApplyPage: React.FC = () => {
               {formData.leaveType !== 'permission' && (
                 <div className="form-group">
                   <label>Start Type</label>
-                  <select
-                    value={formData.startType}
-                    onChange={(e) => setFormData({ ...formData, startType: e.target.value as any })}
-                    required
-                  >
-                    <option value="full">Full day</option>
-                    <option value="first_half">First half</option>
-                    <option value="second_half">Second half</option>
-                  </select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="leave-type-dropdown-trigger"
+                        style={{ 
+                          width: '100%', 
+                          justifyContent: 'space-between',
+                          padding: '6px 8px',
+                          fontSize: '12px',
+                          fontFamily: 'Poppins, sans-serif',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: '#1f2a3d',
+                          height: 'auto'
+                        }}
+                      >
+                        <span>{formData.startType === 'full' ? 'Full day' : formData.startType === 'first_half' ? 'First half' : 'Second half'}</span>
+                        <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="leave-type-dropdown-content">
+                      <DropdownMenuItem
+                        onClick={() => setFormData({ ...formData, startType: 'full' })}
+                      >
+                        Full day
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setFormData({ ...formData, startType: 'first_half' })}
+                      >
+                        First half
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setFormData({ ...formData, startType: 'second_half' })}
+                      >
+                        Second half
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
               {formData.leaveType !== 'permission' && (
@@ -1325,20 +1406,53 @@ const LeaveApplyPage: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>End Type</label>
-                    <select
-                      value={formData.endType}
-                      onChange={(e) => setFormData({ ...formData, endType: e.target.value as any })}
-                      required
-                      disabled={
-                        !!formData.startDate &&
-                        !!formData.endDate &&
-                        formData.startDate === formData.endDate
-                      }
-                    >
-                      <option value="full">Full day</option>
-                      <option value="first_half">First half</option>
-                      <option value="second_half">Second half</option>
-                    </select>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="leave-type-dropdown-trigger"
+                          disabled={
+                            !!formData.startDate &&
+                            !!formData.endDate &&
+                            formData.startDate === formData.endDate
+                          }
+                          style={{ 
+                            width: '100%', 
+                            justifyContent: 'space-between',
+                            padding: '6px 8px',
+                            fontSize: '12px',
+                            fontFamily: 'Poppins, sans-serif',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            backgroundColor: 'transparent',
+                            color: '#1f2a3d',
+                            height: 'auto'
+                          }}
+                        >
+                          <span>{formData.endType === 'full' ? 'Full day' : formData.endType === 'first_half' ? 'First half' : 'Second half'}</span>
+                          <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="leave-type-dropdown-content">
+                        <DropdownMenuItem
+                          onClick={() => setFormData({ ...formData, endType: 'full' })}
+                        >
+                          Full day
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setFormData({ ...formData, endType: 'first_half' })}
+                        >
+                          First half
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setFormData({ ...formData, endType: 'second_half' })}
+                        >
+                          Second half
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </>
             )}
@@ -1375,48 +1489,121 @@ const LeaveApplyPage: React.FC = () => {
                   <div className="time-inputs">
                     <div className="time-input-wrapper">
                       <div className="custom-time-picker">
-                        <select
-                          className="time-hour-select"
-                          value={(() => {
-                            const [hours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
-                            return String(hours);
-                          })()}
-                          onChange={(e) => {
-                            const selectedHour = Number(e.target.value);
-                            const [, currentMinutes] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
-                            const newStartTime = `${String(selectedHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
-                            
-                            // Validate and update
-                            handleStartTimeChange(newStartTime);
-                          }}
-                        >
-                          {Array.from({ length: 9 }, (_, i) => i + 10).map(hour => (
-                            <option key={hour} value={hour}>
-                              {String(hour).padStart(2, '0')}
-                            </option>
-                          ))}
-                        </select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="time-dropdown-trigger"
+                              style={{ 
+                                minWidth: '80px',
+                                justifyContent: 'space-between',
+                                padding: '10px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'Poppins, sans-serif',
+                                border: '1px solid #ddd',
+                                borderRadius: '6px',
+                                backgroundColor: 'white',
+                                color: '#1f2a3d',
+                                height: '44px'
+                              }}
+                            >
+                              <span>{String((() => {
+                                const [hours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                return hours;
+                              })()).padStart(2, '0')}</span>
+                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '4px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="time-dropdown-content">
+                            {Array.from({ length: 9 }, (_, i) => i + 10).map(hour => (
+                              <React.Fragment key={hour}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const selectedHour = hour;
+                                    const [, currentMinutes] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                    const newStartTime = `${String(selectedHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
+                                    handleStartTimeChange(newStartTime);
+                                  }}
+                                >
+                                  {String(hour).padStart(2, '0')}
+                                </DropdownMenuItem>
+                                {hour < 18 && <DropdownMenuSeparator />}
+                              </React.Fragment>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <span className="time-separator">:</span>
-                        <select
-                          className="time-minute-select"
-                          value={(() => {
-                            const [, minutes] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
-                            return String(minutes);
-                          })()}
-                          onChange={(e) => {
-                            const selectedMinute = Number(e.target.value);
-                            const [currentHours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
-                            const newStartTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
-                            
-                            // Validate and update
-                            handleStartTimeChange(newStartTime);
-                          }}
-                        >
-                          <option value="0">00</option>
-                          <option value="15">15</option>
-                          <option value="30">30</option>
-                          <option value="45">45</option>
-                        </select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="time-dropdown-trigger"
+                              style={{ 
+                                minWidth: '80px',
+                                justifyContent: 'space-between',
+                                padding: '10px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'Poppins, sans-serif',
+                                border: '1px solid #ddd',
+                                borderRadius: '6px',
+                                backgroundColor: 'white',
+                                color: '#1f2a3d',
+                                height: '44px'
+                              }}
+                            >
+                              <span>{String((() => {
+                                const [, minutes] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                return minutes;
+                              })()).padStart(2, '0')}</span>
+                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '4px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="time-dropdown-content">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 0;
+                                const [currentHours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                const newStartTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleStartTimeChange(newStartTime);
+                              }}
+                            >
+                              00
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 15;
+                                const [currentHours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                const newStartTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleStartTimeChange(newStartTime);
+                              }}
+                            >
+                              15
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 30;
+                                const [currentHours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                const newStartTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleStartTimeChange(newStartTime);
+                              }}
+                            >
+                              30
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 45;
+                                const [currentHours] = (formData.timeForPermission.start || '10:00').split(':').map(Number);
+                                const newStartTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleStartTimeChange(newStartTime);
+                              }}
+                            >
+                              45
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                       {/* Hidden input for form validation */}
                       <input
@@ -1428,48 +1615,121 @@ const LeaveApplyPage: React.FC = () => {
                     <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
                     <div className="time-input-wrapper">
                       <div className="custom-time-picker">
-                        <select
-                          className="time-hour-select"
-                          value={(() => {
-                            const [hours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
-                            return String(hours);
-                          })()}
-                          onChange={(e) => {
-                            const selectedHour = Number(e.target.value);
-                            const [, currentMinutes] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
-                            const newEndTime = `${String(selectedHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
-                            
-                            // Validate and update
-                            handleEndTimeChange(newEndTime);
-                          }}
-                        >
-                          {Array.from({ length: 10 }, (_, i) => i + 10).map(hour => (
-                            <option key={hour} value={hour}>
-                              {String(hour).padStart(2, '0')}
-                            </option>
-                          ))}
-                        </select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="time-dropdown-trigger"
+                              style={{ 
+                                minWidth: '80px',
+                                justifyContent: 'space-between',
+                                padding: '10px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'Poppins, sans-serif',
+                                border: '1px solid #ddd',
+                                borderRadius: '6px',
+                                backgroundColor: 'white',
+                                color: '#1f2a3d',
+                                height: '44px'
+                              }}
+                            >
+                              <span>{String((() => {
+                                const [hours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                return hours;
+                              })()).padStart(2, '0')}</span>
+                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '4px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="time-dropdown-content">
+                            {Array.from({ length: 10 }, (_, i) => i + 10).map(hour => (
+                              <React.Fragment key={hour}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const selectedHour = hour;
+                                    const [, currentMinutes] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                    const newEndTime = `${String(selectedHour).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
+                                    handleEndTimeChange(newEndTime);
+                                  }}
+                                >
+                                  {String(hour).padStart(2, '0')}
+                                </DropdownMenuItem>
+                                {hour < 19 && <DropdownMenuSeparator />}
+                              </React.Fragment>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <span className="time-separator">:</span>
-                        <select
-                          className="time-minute-select"
-                          value={(() => {
-                            const [, minutes] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
-                            return String(minutes);
-                          })()}
-                          onChange={(e) => {
-                            const selectedMinute = Number(e.target.value);
-                            const [currentHours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
-                            const newEndTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
-                            
-                            // Validate and update
-                            handleEndTimeChange(newEndTime);
-                          }}
-                        >
-                          <option value="0">00</option>
-                          <option value="15">15</option>
-                          <option value="30">30</option>
-                          <option value="45">45</option>
-                        </select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="time-dropdown-trigger"
+                              style={{ 
+                                minWidth: '80px',
+                                justifyContent: 'space-between',
+                                padding: '10px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'Poppins, sans-serif',
+                                border: '1px solid #ddd',
+                                borderRadius: '6px',
+                                backgroundColor: 'white',
+                                color: '#1f2a3d',
+                                height: '44px'
+                              }}
+                            >
+                              <span>{String((() => {
+                                const [, minutes] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                return minutes;
+                              })()).padStart(2, '0')}</span>
+                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '4px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="time-dropdown-content">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 0;
+                                const [currentHours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                const newEndTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleEndTimeChange(newEndTime);
+                              }}
+                            >
+                              00
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 15;
+                                const [currentHours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                const newEndTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleEndTimeChange(newEndTime);
+                              }}
+                            >
+                              15
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 30;
+                                const [currentHours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                const newEndTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleEndTimeChange(newEndTime);
+                              }}
+                            >
+                              30
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const selectedMinute = 45;
+                                const [currentHours] = (formData.timeForPermission.end || '12:00').split(':').map(Number);
+                                const newEndTime = `${String(currentHours).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+                                handleEndTimeChange(newEndTime);
+                              }}
+                            >
+                              45
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                       {/* Hidden input for form validation */}
                       <input

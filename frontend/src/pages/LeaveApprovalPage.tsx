@@ -5,6 +5,15 @@ import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import LeaveDetailsModal from '../components/LeaveDetailsModal';
 import ErrorDisplay from '../components/common/ErrorDisplay';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Button } from '../components/ui/button';
+import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import { FaPencilAlt, FaEye } from 'react-icons/fa';
@@ -586,12 +595,52 @@ const LeaveApprovalPage: React.FC = () => {
             )}
           </div>
           <div className="filter-box">
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="">All Types</option>
-              <option value="casual">Casual</option>
-              <option value="sick">Sick</option>
-              <option value="lop">LOP</option>
-            </select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="leave-type-dropdown-trigger"
+                  style={{ 
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    fontFamily: 'Poppins, sans-serif',
+                    border: '1px solid #dcdcdc',
+                    borderRadius: '2px',
+                    backgroundColor: '#ffffff',
+                    color: '#1f2a3d',
+                    height: 'auto'
+                  }}
+                >
+                  <span>{filter === '' ? 'All Types' : filter === 'casual' ? 'Casual' : filter === 'sick' ? 'Sick' : 'LOP'}</span>
+                  <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="leave-type-dropdown-content">
+                <DropdownMenuItem
+                  onClick={() => setFilter('')}
+                >
+                  All Types
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setFilter('casual')}
+                >
+                  Casual
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setFilter('sick')}
+                >
+                  Sick
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setFilter('lop')}
+                >
+                  LOP
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

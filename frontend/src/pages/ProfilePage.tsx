@@ -6,6 +6,15 @@ import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import { DatePicker } from '../components/ui/date-picker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Button } from '../components/ui/button';
+import { ChevronDown } from 'lucide-react';
 import * as profileService from '../services/profileService';
 import './ProfilePage.css';
 
@@ -764,62 +773,197 @@ const ProfilePage: React.FC = () => {
                 Gender
                 {isEditMode && <span className="required-indicator">*</span>}
               </label>
-              <select
-                value={formData.personalInfo?.gender || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  personalInfo: { ...formData.personalInfo, gender: e.target.value }
-                })}
-                disabled={!isEditMode}
-              >
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="leave-type-dropdown-trigger"
+                    disabled={!isEditMode}
+                    style={{ 
+                      width: '100%', 
+                      justifyContent: 'space-between',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      fontFamily: 'Poppins, sans-serif',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      color: '#1f2a3d',
+                      height: 'auto'
+                    }}
+                  >
+                    <span>{formData.personalInfo?.gender || 'Select'}</span>
+                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="leave-type-dropdown-content">
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, gender: '' }
+                    })}
+                  >
+                    Select
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, gender: 'Male' }
+                    })}
+                  >
+                    Male
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, gender: 'Female' }
+                    })}
+                  >
+                    Female
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, gender: 'Other' }
+                    })}
+                  >
+                    Other
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="form-group">
               <label>
                 Blood Group
                 {isEditMode && <span className="required-indicator">*</span>}
               </label>
-              <select
-                value={formData.personalInfo?.bloodGroup || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  personalInfo: { ...formData.personalInfo, bloodGroup: e.target.value }
-                })}
-                disabled={!isEditMode}
-              >
-                <option value="">Select</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="leave-type-dropdown-trigger"
+                    disabled={!isEditMode}
+                    style={{ 
+                      width: '100%', 
+                      justifyContent: 'space-between',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      fontFamily: 'Poppins, sans-serif',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      color: '#1f2a3d',
+                      height: 'auto'
+                    }}
+                  >
+                    <span>{formData.personalInfo?.bloodGroup || 'Select'}</span>
+                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="leave-type-dropdown-content">
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, bloodGroup: '' }
+                    })}
+                  >
+                    Select
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg, index) => (
+                    <React.Fragment key={bg}>
+                      <DropdownMenuItem
+                        onClick={() => setFormData({
+                          ...formData,
+                          personalInfo: { ...formData.personalInfo, bloodGroup: bg }
+                        })}
+                      >
+                        {bg}
+                      </DropdownMenuItem>
+                      {index < 7 && <DropdownMenuSeparator />}
+                    </React.Fragment>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="form-group">
               <label>
                 Marital Status
                 {isEditMode && <span className="required-indicator">*</span>}
               </label>
-              <select
-                value={formData.personalInfo?.maritalStatus || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  personalInfo: { ...formData.personalInfo, maritalStatus: e.target.value }
-                })}
-                disabled={!isEditMode}
-              >
-                <option value="">Select</option>
-                <option value="Single">Single</option>
-                <option value="Married">Married</option>
-                <option value="Divorced">Divorced</option>
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="leave-type-dropdown-trigger"
+                    disabled={!isEditMode}
+                    style={{ 
+                      width: '100%', 
+                      justifyContent: 'space-between',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      fontFamily: 'Poppins, sans-serif',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      color: '#1f2a3d',
+                      height: 'auto'
+                    }}
+                  >
+                    <span>{formData.personalInfo?.maritalStatus || 'Select'}</span>
+                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="leave-type-dropdown-content">
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, maritalStatus: '' }
+                    })}
+                  >
+                    Select
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, maritalStatus: 'Single' }
+                    })}
+                  >
+                    Single
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, maritalStatus: 'Married' }
+                    })}
+                  >
+                    Married
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, maritalStatus: 'Divorced' }
+                    })}
+                  >
+                    Divorced
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, maritalStatus: 'Widowed' }
+                    })}
+                  >
+                    Widowed
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="form-group">
               <label>

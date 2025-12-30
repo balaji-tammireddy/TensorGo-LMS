@@ -6,6 +6,15 @@ import ConfirmationDialog from '../components/ConfirmationDialog';
 import AddLeavesModal from '../components/AddLeavesModal';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import { DatePicker } from '../components/ui/date-picker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Button } from '../components/ui/button';
+import { ChevronDown } from 'lucide-react';
 import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import { format } from 'date-fns';
@@ -655,14 +664,46 @@ const EmployeeManagementPage: React.FC = () => {
             )}
           </div>
           <div className="filter-box">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="leave-type-dropdown-trigger"
+                  style={{ 
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    fontFamily: 'Poppins, sans-serif',
+                    border: '1px solid #dcdcdc',
+                    borderRadius: '2px',
+                    backgroundColor: '#ffffff',
+                    color: '#1f2a3d',
+                    height: 'auto'
+                  }}
+                >
+                  <span>{statusFilter === '' ? 'All Status' : statusFilter === 'active' ? 'Active' : 'Inactive'}</span>
+                  <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="leave-type-dropdown-content">
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('')}
+                >
+                  All Status
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('active')}
+                >
+                  Active
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('inactive')}
+                >
+                  Inactive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <button
             type="button"
@@ -812,37 +853,78 @@ const EmployeeManagementPage: React.FC = () => {
                       <label>
                         Role<span className="required-indicator">*</span>
                       </label>
-                      <select
-                        value={newEmployee.role}
-                        onChange={(e) => {
-                          const newRole = e.target.value;
-                          // When role changes to/from super_admin, reset reporting manager
-                          // Super admin should not have a reporting manager
-                          setNewEmployee({ 
-                            ...newEmployee, 
-                            role: newRole,
-                            reportingManagerId: newRole === 'super_admin' ? null : newEmployee.reportingManagerId,
-                            reportingManagerName: newRole === 'super_admin' ? '' : newEmployee.reportingManagerName
-                          });
-                        }}
-                        disabled={isViewMode || (isEditMode && user?.role !== 'hr' && user?.role !== 'super_admin')}
-                      >
-                        <option value="">Select role</option>
-                        {(user?.role === 'super_admin'
-                          ? ['employee', 'manager', 'hr', 'super_admin']
-                          : user?.role === 'hr'
-                          ? ['employee', 'manager', 'hr']
-                          : ['employee']
-                        ).map((role) => (
-                          <option key={role} value={role}>
-                            {role === 'super_admin'
-                              ? 'Super Admin'
-                              : role === 'hr'
-                              ? 'HR'
-                              : role.charAt(0).toUpperCase() + role.slice(1)}
-                          </option>
-                        ))}
-                      </select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="leave-type-dropdown-trigger"
+                            disabled={isViewMode || (isEditMode && user?.role !== 'hr' && user?.role !== 'super_admin')}
+                            style={{ 
+                              width: '100%', 
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              fontSize: '12px',
+                              fontFamily: 'Poppins, sans-serif',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              backgroundColor: 'transparent',
+                              color: '#1f2a3d',
+                              height: 'auto'
+                            }}
+                          >
+                            <span>
+                              {newEmployee.role === '' ? 'Select role' : 
+                               newEmployee.role === 'super_admin' ? 'Super Admin' :
+                               newEmployee.role === 'hr' ? 'HR' :
+                               newEmployee.role.charAt(0).toUpperCase() + newEmployee.role.slice(1)}
+                            </span>
+                            <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="leave-type-dropdown-content">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const newRole = '';
+                              setNewEmployee({ 
+                                ...newEmployee, 
+                                role: newRole,
+                                reportingManagerId: newRole === 'super_admin' ? null : newEmployee.reportingManagerId,
+                                reportingManagerName: newRole === 'super_admin' ? '' : newEmployee.reportingManagerName
+                              });
+                            }}
+                          >
+                            Select role
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {(user?.role === 'super_admin'
+                            ? ['employee', 'manager', 'hr', 'super_admin']
+                            : user?.role === 'hr'
+                            ? ['employee', 'manager', 'hr']
+                            : ['employee']
+                          ).map((role, index, array) => (
+                            <React.Fragment key={role}>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  const newRole = role;
+                                  setNewEmployee({ 
+                                    ...newEmployee, 
+                                    role: newRole,
+                                    reportingManagerId: newRole === 'super_admin' ? null : newEmployee.reportingManagerId,
+                                    reportingManagerName: newRole === 'super_admin' ? '' : newEmployee.reportingManagerName
+                                  });
+                                }}
+                              >
+                                {role === 'super_admin'
+                                  ? 'Super Admin'
+                                  : role === 'hr'
+                                  ? 'HR'
+                                  : role.charAt(0).toUpperCase() + role.slice(1)}
+                              </DropdownMenuItem>
+                              {index < array.length - 1 && <DropdownMenuSeparator />}
+                            </React.Fragment>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div className="employee-modal-field">
                       <label>
@@ -996,60 +1078,162 @@ const EmployeeManagementPage: React.FC = () => {
                       <label>
                         Gender<span className="required-indicator">*</span>
                       </label>
-                      <select
-                        value={newEmployee.gender}
-                        onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, gender: e.target.value })
-                        }
-                        disabled={isViewMode}
-                      >
-                        <option value="">Select</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="leave-type-dropdown-trigger"
+                            disabled={isViewMode}
+                            style={{ 
+                              width: '100%', 
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              fontSize: '12px',
+                              fontFamily: 'Poppins, sans-serif',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              backgroundColor: 'transparent',
+                              color: '#1f2a3d',
+                              height: 'auto'
+                            }}
+                          >
+                            <span>{newEmployee.gender || 'Select'}</span>
+                            <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="leave-type-dropdown-content">
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, gender: '' })}
+                          >
+                            Select
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, gender: 'Male' })}
+                          >
+                            Male
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, gender: 'Female' })}
+                          >
+                            Female
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, gender: 'Other' })}
+                          >
+                            Other
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div className="employee-modal-field">
                       <label>
                         Blood Group<span className="required-indicator">*</span>
                       </label>
-                      <select
-                        value={newEmployee.bloodGroup}
-                        onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, bloodGroup: e.target.value })
-                        }
-                        disabled={isViewMode}
-                      >
-                        <option value="">Select</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                      </select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="leave-type-dropdown-trigger"
+                            disabled={isViewMode}
+                            style={{ 
+                              width: '100%', 
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              fontSize: '12px',
+                              fontFamily: 'Poppins, sans-serif',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              backgroundColor: 'transparent',
+                              color: '#1f2a3d',
+                              height: 'auto'
+                            }}
+                          >
+                            <span>{newEmployee.bloodGroup || 'Select'}</span>
+                            <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="leave-type-dropdown-content">
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, bloodGroup: '' })}
+                          >
+                            Select
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg, index) => (
+                            <React.Fragment key={bg}>
+                              <DropdownMenuItem
+                                onClick={() => setNewEmployee({ ...newEmployee, bloodGroup: bg })}
+                              >
+                                {bg}
+                              </DropdownMenuItem>
+                              {index < 7 && <DropdownMenuSeparator />}
+                            </React.Fragment>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div className="employee-modal-field">
                       <label>
                         Marital Status<span className="required-indicator">*</span>
                       </label>
-                      <select
-                        value={newEmployee.maritalStatus}
-                        onChange={(e) =>
-                          setNewEmployee({
-                            ...newEmployee,
-                            maritalStatus: e.target.value
-                          })
-                        }
-                        disabled={isViewMode}
-                      >
-                        <option value="">Select</option>
-                        <option value="Single">Single</option>
-                        <option value="Married">Married</option>
-                        <option value="Divorced">Divorced</option>
-                      </select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="leave-type-dropdown-trigger"
+                            disabled={isViewMode}
+                            style={{ 
+                              width: '100%', 
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              fontSize: '12px',
+                              fontFamily: 'Poppins, sans-serif',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              backgroundColor: 'transparent',
+                              color: '#1f2a3d',
+                              height: 'auto'
+                            }}
+                          >
+                            <span>{newEmployee.maritalStatus || 'Select'}</span>
+                            <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="leave-type-dropdown-content">
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: '' })}
+                          >
+                            Select
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Single' })}
+                          >
+                            Single
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Married' })}
+                          >
+                            Married
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Divorced' })}
+                          >
+                            Divorced
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Widowed' })}
+                          >
+                            Widowed
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div className="employee-modal-field">
                       <label>
@@ -1182,18 +1366,48 @@ const EmployeeManagementPage: React.FC = () => {
                     {isEditMode && (
                       <div className="employee-modal-field">
                         <label>Status</label>
-                        <select
-                          value={newEmployee.status === 'active' ? 'active' : 'inactive'}
-                          onChange={(e) =>
-                            setNewEmployee({
-                              ...newEmployee,
-                              status: e.target.value === 'active' ? 'active' : 'resigned'
-                            })
-                          }
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="leave-type-dropdown-trigger"
+                              style={{ 
+                                width: '100%', 
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'Poppins, sans-serif',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                backgroundColor: 'transparent',
+                                color: '#1f2a3d',
+                                height: 'auto'
+                              }}
+                            >
+                              <span>{newEmployee.status === 'active' ? 'Active' : 'Inactive'}</span>
+                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="leave-type-dropdown-content">
+                            <DropdownMenuItem
+                              onClick={() => setNewEmployee({
+                                ...newEmployee,
+                                status: 'active'
+                              })}
+                            >
+                              Active
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setNewEmployee({
+                                ...newEmployee,
+                                status: 'resigned'
+                              })}
+                            >
+                              Inactive
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                   </div>
@@ -1433,30 +1647,83 @@ const EmployeeManagementPage: React.FC = () => {
                         Reporting Manager<span className="required-indicator">*</span>
                       </label>
                       {!newEmployee.role ? (
-                        <select disabled>
-                          <option value="">Please select role first</option>
-                        </select>
-                      ) : (
-                        <select
-                          value={newEmployee.reportingManagerId || ''}
-                          onChange={(e) => {
-                            const managerId = e.target.value ? parseInt(e.target.value) : null;
-                            const selectedManager = managersData?.find((m: any) => m.id === managerId);
-                            setNewEmployee({
-                              ...newEmployee,
-                              reportingManagerId: managerId,
-                              reportingManagerName: selectedManager?.name || ''
-                            });
+                        <Button 
+                          variant="outline" 
+                          className="leave-type-dropdown-trigger"
+                          disabled
+                          style={{ 
+                            width: '100%', 
+                            justifyContent: 'space-between',
+                            padding: '6px 8px',
+                            fontSize: '12px',
+                            fontFamily: 'Poppins, sans-serif',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            backgroundColor: 'transparent',
+                            color: '#1f2a3d',
+                            height: 'auto'
                           }}
-                          disabled={isViewMode}
                         >
-                          <option value="">Select Reporting Manager</option>
-                          {managersData?.map((manager: any) => (
-                            <option key={manager.id} value={manager.id}>
-                              {manager.name} ({manager.empId})
-                            </option>
-                          ))}
-                        </select>
+                          <span>Please select role first</span>
+                          <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                        </Button>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="leave-type-dropdown-trigger"
+                              disabled={isViewMode}
+                              style={{ 
+                                width: '100%', 
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'Poppins, sans-serif',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                backgroundColor: 'transparent',
+                                color: '#1f2a3d',
+                                height: 'auto'
+                              }}
+                            >
+                              <span>
+                                {newEmployee.reportingManagerName 
+                                  ? `${newEmployee.reportingManagerName} (${managersData?.find((m: any) => m.id === newEmployee.reportingManagerId)?.empId || ''})`
+                                  : 'Select Reporting Manager'}
+                              </span>
+                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="leave-type-dropdown-content">
+                            <DropdownMenuItem
+                              onClick={() => setNewEmployee({
+                                ...newEmployee,
+                                reportingManagerId: null,
+                                reportingManagerName: ''
+                              })}
+                            >
+                              Select Reporting Manager
+                            </DropdownMenuItem>
+                            {managersData && managersData.length > 0 && <DropdownMenuSeparator />}
+                            {managersData?.map((manager: any, index: number) => (
+                              <React.Fragment key={manager.id}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setNewEmployee({
+                                      ...newEmployee,
+                                      reportingManagerId: manager.id,
+                                      reportingManagerName: manager.name
+                                    });
+                                  }}
+                                >
+                                  {manager.name} ({manager.empId})
+                                </DropdownMenuItem>
+                                {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
+                              </React.Fragment>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </div>
