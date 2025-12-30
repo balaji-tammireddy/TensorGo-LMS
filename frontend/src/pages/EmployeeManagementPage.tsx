@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import AddLeavesModal from '../components/AddLeavesModal';
 import ErrorDisplay from '../components/common/ErrorDisplay';
+import { DatePicker } from '../components/ui/date-picker';
 import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import { format } from 'date-fns';
@@ -981,13 +982,14 @@ const EmployeeManagementPage: React.FC = () => {
                       <label>
                         Date of Birth<span className="required-indicator">*</span>
                       </label>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={newEmployee.dateOfBirth}
-                        onChange={(e) =>
-                          setNewEmployee({ ...newEmployee, dateOfBirth: e.target.value })
+                        onChange={(date) =>
+                          setNewEmployee({ ...newEmployee, dateOfBirth: date })
                         }
                         disabled={isViewMode}
+                        placeholder="Select date of birth"
+                        max={new Date().toISOString().split('T')[0]}
                       />
                     </div>
                     <div className="employee-modal-field">
@@ -1165,16 +1167,16 @@ const EmployeeManagementPage: React.FC = () => {
                       <label>
                         Date of Joining<span className="required-indicator">*</span>
                       </label>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={newEmployee.dateOfJoining}
-                        onChange={(e) =>
+                        onChange={(date) =>
                           setNewEmployee({
                             ...newEmployee,
-                            dateOfJoining: e.target.value
+                            dateOfJoining: date
                           })
                         }
                         disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
+                        placeholder="Select date of joining"
                       />
                     </div>
                     {isEditMode && (

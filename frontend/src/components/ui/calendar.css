@@ -1,0 +1,238 @@
+
+.rdp-calendar {
+  padding: 8px 4px 4px 4px;
+  background: white;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.rdp-months {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+.rdp-month {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  justify-content: space-between;
+  min-height: 100%;
+}
+
+.rdp-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  padding: 4px 0;
+  margin-bottom: 12px;
+  min-height: 28px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.rdp-caption-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2a3d;
+  font-family: 'Poppins', sans-serif;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) translateY(-15px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.rdp-nav {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.rdp-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #4299e1;
+  padding: 0;
+  flex-shrink: 0;
+  pointer-events: all;
+  margin: 0;
+  z-index: 2;
+}
+
+.rdp-button:hover:not([disabled]) {
+  background: #f0f4ff;
+  color: #2b6cb0;
+}
+
+.rdp-button:active:not([disabled]) {
+  transform: scale(0.9);
+}
+
+.rdp-button[disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.rdp-button_previous {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: auto;
+  pointer-events: all;
+}
+
+.rdp-button_next {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  pointer-events: all;
+}
+
+.rdp-icon {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2.5;
+}
+
+.rdp-month-grid {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 17px;
+  margin-bottom: 0;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.rdp-weekdays {
+  display: flex;
+  margin-bottom: 1px;
+  margin-top: 0;
+  gap: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rdp-weekday {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #666;
+  padding: 2px 0;
+  font-family: 'Poppins', sans-serif;
+  line-height: 1;
+  min-width: 0;
+}
+
+.rdp-week {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+  gap: 0;
+  box-sizing: border-box;
+}
+
+.rdp-day {
+  flex: 1;
+  position: relative;
+  text-align: center;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 1px;
+  box-sizing: border-box;
+}
+
+.rdp-day_button {
+  width: 100%;
+  height: 100%;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 30px;
+  max-height: 30px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  transition: all 0.2s ease;
+  font-weight: 400;
+  padding: 0;
+  line-height: 1;
+}
+
+.rdp-day_button:hover:not([disabled]) {
+  background: #f0f4ff;
+  color: #4299e1;
+}
+
+.rdp-day_selected .rdp-day_button {
+  background: #4299e1;
+  color: white;
+  font-weight: 600;
+}
+
+.rdp-day_selected .rdp-day_button:hover {
+  background: #2b6cb0;
+}
+
+.rdp-day_today .rdp-day_button {
+  background: #f0f4ff;
+  color: #4299e1;
+  font-weight: 600;
+}
+
+.rdp-day_outside .rdp-day_button {
+  color: #999;
+  opacity: 0.5;
+}
+
+.rdp-day_disabled .rdp-day_button {
+  opacity: 0.3;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.rdp-day_range_middle .rdp-day_button {
+  background: #e0e8ff;
+  color: #4299e1;
+}
+
+.rdp-day_hidden {
+  visibility: hidden;
+}

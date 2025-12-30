@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import ErrorDisplay from '../components/common/ErrorDisplay';
+import { DatePicker } from '../components/ui/date-picker';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { FaPencilAlt, FaTrash, FaEye } from 'react-icons/fa';
@@ -1261,30 +1262,29 @@ const LeaveApplyPage: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>Start Date</label>
-                <div className="date-input-wrapper">
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    min={minStartDate}
-                    max={maxStartDate}
-                    onChange={(e) => {
-                      const newStartDate = e.target.value;
-                      // Block weekends (Saturday and Sunday)
-                      if (isWeekend(newStartDate)) {
-                        showWarning('Cannot select Saturday or Sunday as start date. Please select a weekday.');
-                        return;
-                      }
-                      // For permission, update end date to match start date
-                      if (formData.leaveType === 'permission') {
-                        setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
-                      } else {
-                        setFormData({ ...formData, startDate: newStartDate });
-                      }
-                    }}
-                    required
-                    className="date-input"
-                  />
-                </div>
+                <DatePicker
+                  value={formData.startDate}
+                  onChange={(newStartDate) => {
+                    // Block weekends (Saturday and Sunday)
+                    if (isWeekend(newStartDate)) {
+                      showWarning('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+                      return;
+                    }
+                    // For permission, update end date to match start date
+                    if (formData.leaveType === 'permission') {
+                      setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
+                    } else {
+                      setFormData({ ...formData, startDate: newStartDate });
+                    }
+                  }}
+                  min={minStartDate}
+                  max={maxStartDate}
+                  placeholder="Select start date"
+                  disabledDates={(date) => {
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    return isWeekend(dateStr);
+                  }}
+                />
               </div>
               {formData.leaveType !== 'permission' && (
                 <div className="form-group">
@@ -1304,26 +1304,24 @@ const LeaveApplyPage: React.FC = () => {
                 <>
                   <div className="form-group">
                     <label>End Date</label>
-                    <div className="date-input-wrapper">
-                      <input
-                        type="date"
-                        value={formData.endDate}
-                        min={minStartDate}
-                        max={maxStartDate}
-                        onChange={(e) => {
-                          const newEndDate = e.target.value;
-                          // Block weekends (Saturday and Sunday)
-                          if (isWeekend(newEndDate)) {
-                            showWarning('Cannot select Saturday or Sunday as end date. Please select a weekday.');
-                            return;
-                          }
-                          setFormData({ ...formData, endDate: newEndDate });
-                        }}
-                        required
-                        min={formData.startDate || minStartDate}
-                        className="date-input"
-                      />
-                    </div>
+                    <DatePicker
+                      value={formData.endDate}
+                      onChange={(newEndDate) => {
+                        // Block weekends (Saturday and Sunday)
+                        if (isWeekend(newEndDate)) {
+                          showWarning('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+                          return;
+                        }
+                        setFormData({ ...formData, endDate: newEndDate });
+                      }}
+                      min={formData.startDate || minStartDate}
+                      max={maxStartDate}
+                      placeholder="Select end date"
+                      disabledDates={(date) => {
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        return isWeekend(dateStr);
+                      }}
+                    />
                   </div>
                   <div className="form-group">
                     <label>End Type</label>

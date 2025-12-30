@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import ErrorDisplay from '../components/common/ErrorDisplay';
+import { DatePicker } from '../components/ui/date-picker';
 import * as profileService from '../services/profileService';
 import './ProfilePage.css';
 
@@ -747,15 +748,15 @@ const ProfilePage: React.FC = () => {
                 Date of Birth
                 {isEditMode && <span className="required-indicator">*</span>}
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.personalInfo?.dateOfBirth || ''}
                 max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setFormData({
+                onChange={(date) => setFormData({
                   ...formData,
-                  personalInfo: { ...formData.personalInfo, dateOfBirth: e.target.value }
+                  personalInfo: { ...formData.personalInfo, dateOfBirth: date }
                 })}
                 disabled={!isEditMode}
+                placeholder="Select date of birth"
               />
             </div>
             <div className="form-group">
@@ -950,14 +951,14 @@ const ProfilePage: React.FC = () => {
                 Date of Joining
                 {isEditMode && <span className="required-indicator">*</span>}
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.employmentInfo?.dateOfJoining || ''}
-                onChange={(e) => setFormData({
+                onChange={(date) => setFormData({
                   ...formData,
-                  employmentInfo: { ...formData.employmentInfo, dateOfJoining: e.target.value }
+                  employmentInfo: { ...formData.employmentInfo, dateOfJoining: date }
                 })}
                 disabled
+                placeholder="Select date of joining"
               />
             </div>
           </div>

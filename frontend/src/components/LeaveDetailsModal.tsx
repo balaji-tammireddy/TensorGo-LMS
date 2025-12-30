@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
 import { format, parse, eachDayOfInterval } from 'date-fns';
 import ConfirmationDialog from './ConfirmationDialog';
+import { DatePicker } from './ui/date-picker';
 import * as leaveService from '../services/leaveService';
 import './LeaveDetailsModal.css';
 
@@ -181,9 +182,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     setToDate('');
   };
 
-  const handleFromDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newFromDate = e.target.value;
-    
+  const handleFromDateChange = (newFromDate: string) => {
     // Validate that the date is within available dates
     if (newFromDate && !availableDates.includes(newFromDate)) {
       return;
@@ -197,9 +196,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     }
   };
 
-  const handleToDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newToDate = e.target.value;
-    
+  const handleToDateChange = (newToDate: string) => {
     // Validate that the date is within available dates
     if (newToDate && !availableDates.includes(newToDate)) {
       return;
@@ -517,26 +514,24 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                     <div className="date-range-inputs">
                       <div className="date-range-input-group">
                         <label>From Date</label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={fromDate}
+                          onChange={handleFromDateChange}
                           min={minDate}
                           max={maxDate}
-                          onChange={handleFromDateChange}
                           disabled={isLoading}
-                          className="date-range-input"
+                          placeholder="Select from date"
                         />
                       </div>
                       <div className="date-range-input-group">
                         <label>To Date</label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={toDate}
+                          onChange={handleToDateChange}
                           min={fromDate || minDate}
                           max={maxDate}
-                          onChange={handleToDateChange}
                           disabled={isLoading || !fromDate}
-                          className="date-range-input"
+                          placeholder="Select to date"
                         />
                       </div>
                     </div>
@@ -571,38 +566,34 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                     <div className="date-range-inputs">
                       <div className="date-range-input-group">
                         <label>From Date</label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={fromDate}
                           min={convertToInputDate(leaveRequest.startDate)}
                           max={convertToInputDate(leaveRequest.endDate)}
-                          onChange={(e) => {
-                            const newFromDate = e.target.value;
+                          onChange={(newFromDate) => {
                             setFromDate(newFromDate);
                             if (toDate && newFromDate && toDate < newFromDate) {
                               setToDate('');
                             }
                           }}
                           disabled={isLoading}
-                          className="date-range-input"
+                          placeholder="Select from date"
                         />
                       </div>
                       <div className="date-range-input-group">
                         <label>To Date</label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={toDate}
                           min={fromDate || convertToInputDate(leaveRequest.startDate)}
                           max={convertToInputDate(leaveRequest.endDate)}
-                          onChange={(e) => {
-                            const newToDate = e.target.value;
+                          onChange={(newToDate) => {
                             if (fromDate && newToDate && newToDate < fromDate) {
                               return;
                             }
                             setToDate(newToDate);
                           }}
                           disabled={isLoading || !fromDate}
-                          className="date-range-input"
+                          placeholder="Select to date"
                         />
                       </div>
                     </div>
