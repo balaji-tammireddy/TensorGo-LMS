@@ -195,6 +195,7 @@ const LoginPage: React.FC = () => {
               src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/portrait-professional-elegant-businessman.jpg" 
               alt="Professional Businessman"
               className="login-side-image"
+              loading="eager"
               onError={(e) => {
                 // Fallback to local image if OVHcloud URL fails
                 const target = e.target as HTMLImageElement;
