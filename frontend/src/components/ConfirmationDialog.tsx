@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { FaExclamationTriangle, FaTimes } from 'react-icons/fa';
 import './ConfirmationDialog.css';
 
@@ -14,7 +14,7 @@ interface ConfirmationDialogProps {
   isLoading?: boolean;
 }
 
-const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
+const ConfirmationDialog: React.FC<ConfirmationDialogProps> = memo(({
   isOpen,
   title,
   message,
@@ -68,7 +68,9 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       </div>
     </div>
   );
-};
+});
+
+ConfirmationDialog.displayName = 'ConfirmationDialog';
 
 export default ConfirmationDialog;
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../contexts/AuthContext';
@@ -312,7 +312,8 @@ const LeaveApplyPage: React.FC = () => {
     });
   };
 
-  const computeRequestedDays = () => {
+  // Memoize expensive computation
+  const requestedDays = useMemo(() => {
     if (!formData.startDate || !formData.endDate) return 0;
     const start = new Date(`${formData.startDate}T00:00:00`);
     const end = new Date(`${formData.endDate}T00:00:00`);
@@ -337,90 +338,7 @@ const LeaveApplyPage: React.FC = () => {
       }
     });
     return total;
-  };
-
-
-  // Check if requested dates overlap with existing leave requests
-  const checkDateOverlap = (): string | null => {
-    if (!formData.startDate || !formData.endDate || !myRequests?.requests) {
-      return null;
-    }
-
-    const start = new Date(`${formData.startDate}T00:00:00`);
-    const end = new Date(`${formData.endDate}T00:00:00`);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return null;
-    }
-
-    const requestedDays = eachDayOfInterval({ start, end });
-    const startHalf = formData.startType !== 'full';
-    const endHalf = formData.endType !== 'full';
-
-    // Check each requested day against existing leave requests
-    for (const day of requestedDays) {
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-      if (isWeekend) continue; // Skip weekends
-
-      const isFirst = dayStr === formData.startDate;
-      const isLast = dayStr === formData.endDate;
-      const isHalfDay = (isFirst && startHalf) || (isLast && endHalf);
-      const requestedHalf = isFirst ? formData.startType : (isLast ? formData.endType : 'full');
-
-      // Check against existing requests (exclude the one being edited)
-      for (const request of myRequests.requests) {
-        // Skip rejected requests and the request being edited
-        if (request.currentStatus === 'rejected' || request.id === editingId) {
-          continue;
-        }
-
-        // Check if this day falls within the request's date range
-        const reqStart = new Date(`${request.startDate}T00:00:00`);
-        const reqEnd = new Date(`${request.endDate}T00:00:00`);
-        
-        if (day >= reqStart && day <= reqEnd) {
-          // Check leaveDays array if available (more accurate)
-          if (request.leaveDays && Array.isArray(request.leaveDays)) {
-            const existingDay = request.leaveDays.find((ld: any) => ld.date === dayStr);
-            if (existingDay) {
-              // Check status - block if approved, pending, or partially_approved (not rejected)
-              if (existingDay.status === 'approved' || existingDay.status === 'pending' || existingDay.status === 'partially_approved') {
-                // If existing leave is full day, block any new leave (full or half)
-                if (existingDay.type === 'full') {
-                  const statusText = existingDay.status === 'approved' ? 'approved' : 
-                                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                  return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
-                }
-                // If existing leave is half day
-                if (existingDay.type === 'half') {
-                  // Block if new request is full day
-                  if (!isHalfDay) {
-                    const statusText = existingDay.status === 'approved' ? 'approved' : 
-                                      existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                    return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
-                  }
-                  // If both are half days, block to prevent conflicts
-                  const statusText = existingDay.status === 'approved' ? 'approved' : 
-                                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                  return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
-                }
-              }
-            }
-          } else {
-            // Fallback: check date range overlap (less precise but better than nothing)
-            // If the request has approved or pending status, block the entire date range
-            if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
-              const statusText = request.currentStatus === 'approved' ? 'approved' : 
-                                request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
-              return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
-            }
-          }
-        }
-      }
-    }
-
-    return null;
-  };
+  }, [formData.startDate, formData.endDate, formData.startType, formData.endType]);
 
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -552,11 +470,16 @@ const LeaveApplyPage: React.FC = () => {
   const { data: balances, isLoading: balancesLoading, error: balancesError } = useQuery(
     'leaveBalances',
     leaveService.getLeaveBalances,
-    { retry: false, onError: (error: any) => {
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        window.location.href = '/login';
+    { 
+      retry: false,
+      staleTime: 1 * 60 * 1000, // Cache for 1 minute
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          window.location.href = '/login';
+        }
       }
-    }}
+    }
   );
 
 
@@ -564,10 +487,7 @@ const LeaveApplyPage: React.FC = () => {
   
   const { data: holidaysData = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
     ['holidays', selectedYear],
-    () => {
-      console.log(`[Frontend] Fetching holidays for year: ${selectedYear}`);
-      return leaveService.getHolidays(selectedYear);
-    },
+    () => leaveService.getHolidays(selectedYear),
     { 
       retry: false,
       staleTime: 0, // Always refetch when year changes
@@ -588,7 +508,6 @@ const LeaveApplyPage: React.FC = () => {
         // Show only holidays for the selected year in the UI
         return holidayYear === selectedYear;
       } catch (error) {
-        console.error(`[Frontend] Error parsing holiday date: ${holiday.date}`, error);
         return false;
       }
     }).sort((a: any, b: any) => {
@@ -605,13 +524,107 @@ const LeaveApplyPage: React.FC = () => {
   );
   const { data: myRequests, isLoading: requestsLoading, error: requestsError } = useQuery(
     'myLeaveRequests',
-    () => leaveService.getMyLeaveRequests(1, 100), // Fetch more requests to check overlaps
-    { retry: false, onError: (error: any) => {
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        window.location.href = '/login';
+    () => leaveService.getMyLeaveRequests(1, 50), // Reduced from 100 to 50 for faster loading
+    { 
+      retry: false,
+      staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          window.location.href = '/login';
+        }
       }
-    }}
+    }
   );
+
+  // Optimize date overlap check with memoization and early exits
+  const checkDateOverlap = useCallback((): string | null => {
+    if (!formData.startDate || !formData.endDate || !myRequests?.requests) {
+      return null;
+    }
+
+    const start = new Date(`${formData.startDate}T00:00:00`);
+    const end = new Date(`${formData.endDate}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return null;
+    }
+
+    // Pre-filter and pre-process existing requests for faster lookup
+    const activeRequests = myRequests.requests
+      .filter((r: any) => r.currentStatus !== 'rejected' && r.id !== editingId)
+      .map((r: any) => ({
+        ...r,
+        reqStart: new Date(`${r.startDate}T00:00:00`),
+        reqEnd: new Date(`${r.endDate}T00:00:00`),
+        leaveDaysMap: r.leaveDays && Array.isArray(r.leaveDays) 
+          ? new Map(r.leaveDays.map((ld: any) => [ld.date, ld]))
+          : null
+      }));
+
+    if (activeRequests.length === 0) return null;
+
+    const requestedDaysArray = eachDayOfInterval({ start, end });
+    const startHalf = formData.startType !== 'full';
+    const endHalf = formData.endType !== 'full';
+
+    // Check each requested day against existing leave requests
+    for (const day of requestedDaysArray) {
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+      if (isWeekend) continue; // Skip weekends
+
+      const isFirst = dayStr === formData.startDate;
+      const isLast = dayStr === formData.endDate;
+      const isHalfDay = (isFirst && startHalf) || (isLast && endHalf);
+
+      // Check against existing requests with optimized lookup
+      for (const request of activeRequests) {
+        // Quick date range check first (faster than day-by-day)
+        if (day < request.reqStart || day > request.reqEnd) {
+          continue;
+        }
+
+        // Check leaveDays array if available (more accurate)
+        if (request.leaveDaysMap) {
+          const existingDay = request.leaveDaysMap.get(dayStr);
+          if (existingDay) {
+            // Check status - block if approved, pending, or partially_approved (not rejected)
+            if (existingDay.status === 'approved' || existingDay.status === 'pending' || existingDay.status === 'partially_approved') {
+              // If existing leave is full day, block any new leave (full or half)
+              if (existingDay.type === 'full') {
+                const statusText = existingDay.status === 'approved' ? 'approved' : 
+                                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
+              }
+              // If existing leave is half day
+              if (existingDay.type === 'half') {
+                // Block if new request is full day
+                if (!isHalfDay) {
+                  const statusText = existingDay.status === 'approved' ? 'approved' : 
+                                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                  return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
+                }
+                // If both are half days, block to prevent conflicts
+                const statusText = existingDay.status === 'approved' ? 'approved' : 
+                                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
+              }
+            }
+          }
+        } else {
+          // Fallback: check date range overlap (less precise but better than nothing)
+          // If the request has approved or pending status, block the entire date range
+          if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
+            const statusText = request.currentStatus === 'approved' ? 'approved' : 
+                              request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
+            return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
+          }
+        }
+      }
+    }
+
+    return null;
+  }, [formData.startDate, formData.endDate, formData.startType, formData.endType, myRequests?.requests, editingId]);
 
   const applyMutation = useMutation(
     (data: { id?: number; data: any }) => 
@@ -619,9 +632,41 @@ const LeaveApplyPage: React.FC = () => {
         ? leaveService.updateLeaveRequest(data.id, data.data)
         : leaveService.applyLeave(data.data),
     {
-      onSuccess: (_, variables) => {
+      onMutate: async (variables) => {
+        // Cancel outgoing refetches
+        await queryClient.cancelQueries('myLeaveRequests');
+        await queryClient.cancelQueries('leaveBalances');
+        
+        // Snapshot previous values for rollback
+        const previousRequests = queryClient.getQueryData('myLeaveRequests');
+        const previousBalances = queryClient.getQueryData('leaveBalances');
+        
+        return { previousRequests, previousBalances };
+      },
+      onSuccess: (response, variables) => {
+        // Optimistically add/update request in the list immediately
+        if (response?.request) {
+          queryClient.setQueryData('myLeaveRequests', (old: any) => {
+            if (!old?.requests) return old;
+            const requests = [...old.requests];
+            if (variables.id) {
+              // Update existing
+              const index = requests.findIndex((r: any) => r.id === variables.id);
+              if (index !== -1) {
+                requests[index] = { ...requests[index], ...response.request };
+              }
+            } else {
+              // Add new at the beginning
+              requests.unshift(response.request);
+            }
+            return { ...old, requests };
+          });
+        }
+        
+        // Invalidate queries in background (non-blocking) for fresh data
         queryClient.invalidateQueries('leaveBalances');
         queryClient.invalidateQueries('myLeaveRequests');
+        
         showSuccess(variables.id ? 'Leave updated successfully!' : 'Leave applied successfully!');
         setFormData({
           leaveType: 'casual',
@@ -636,8 +681,15 @@ const LeaveApplyPage: React.FC = () => {
         setEditingId(null);
         setEditingRequestId(null);
       },
-      onError: (error: any) => {
-        console.error('Leave application error:', error);
+      onError: (error: any, variables, context) => {
+        // Rollback on error
+        if (context?.previousRequests) {
+          queryClient.setQueryData('myLeaveRequests', context.previousRequests);
+        }
+        if (context?.previousBalances) {
+          queryClient.setQueryData('leaveBalances', context.previousBalances);
+        }
+        
         const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to apply leave';
         const errorDetails = error.response?.data?.error?.details;
         
@@ -671,7 +723,23 @@ const LeaveApplyPage: React.FC = () => {
   );
 
   const deleteMutation = useMutation(leaveService.deleteLeaveRequest, {
+    onMutate: async (requestId) => {
+      await queryClient.cancelQueries('myLeaveRequests');
+      const previousRequests = queryClient.getQueryData('myLeaveRequests');
+      
+      // Optimistically remove from list
+      queryClient.setQueryData('myLeaveRequests', (old: any) => {
+        if (!old?.requests) return old;
+        return {
+          ...old,
+          requests: old.requests.filter((r: any) => r.id !== requestId)
+        };
+      });
+      
+      return { previousRequests };
+    },
     onSuccess: () => {
+      // Invalidate in background for fresh data
       queryClient.invalidateQueries('leaveBalances');
       queryClient.invalidateQueries('myLeaveRequests');
       showSuccess('Leave deleted successfully!');
@@ -690,7 +758,11 @@ const LeaveApplyPage: React.FC = () => {
       setDeleteConfirmOpen(false);
       setDeleteRequestId(null);
     },
-    onError: (error: any) => {
+    onError: (error: any, requestId, context) => {
+      // Rollback on error
+      if (context?.previousRequests) {
+        queryClient.setQueryData('myLeaveRequests', context.previousRequests);
+      }
       showError(error.response?.data?.error?.message || 'Failed to delete leave');
       setDeleteConfirmOpen(false);
       setDeleteRequestId(null);
@@ -707,29 +779,25 @@ const LeaveApplyPage: React.FC = () => {
       return;
     }
 
-    const requestedDays = computeRequestedDays();
+    // Use memoized requestedDays
 
     // Validation for sick leave: can apply for past 3 days (including today) or ONLY tomorrow for future dates
-    // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
-    // Apply same restrictions to both start date and end date
+    // Optimized with single date calculation
     if (formData.leaveType === 'sick') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const oneDayMs = 1000 * 60 * 60 * 24;
       
       // Validate start date
       if (formData.startDate) {
         const startDate = new Date(formData.startDate + 'T12:00:00');
         startDate.setHours(0, 0, 0, 0);
+        const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / oneDayMs);
         
-        const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
-        // Check if date is more than 3 days in the past
         if (daysDifference < -3) {
           showWarning('Cannot apply sick leave for start dates more than 3 days in the past.');
           return;
         }
-        
-        // For future dates, ONLY allow tomorrow (daysDifference === 1)
         if (daysDifference > 1) {
           showWarning('For future dates, sick leave start date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
           return;
@@ -740,16 +808,12 @@ const LeaveApplyPage: React.FC = () => {
       if (formData.endDate) {
         const endDate = new Date(formData.endDate + 'T12:00:00');
         endDate.setHours(0, 0, 0, 0);
+        const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / oneDayMs);
         
-        const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
-        // Check if date is more than 3 days in the past
         if (endDaysDifference < -3) {
           showWarning('Cannot apply sick leave for end dates more than 3 days in the past.');
           return;
         }
-        
-        // For future dates, ONLY allow tomorrow (endDaysDifference === 1)
         if (endDaysDifference > 1) {
           showWarning('For future dates, sick leave end date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
           return;

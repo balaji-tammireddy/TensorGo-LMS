@@ -514,6 +514,7 @@
 
 .submit-button {
   padding: 10px 24px;
+  margin-top: 20px; /* increase to 12px or 16px if needed */
   background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: white;
   border: 1px solid #2951c8;
@@ -532,6 +533,7 @@
   transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
+
 .submit-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
@@ -545,6 +547,7 @@
 
 .clear-button {
   padding: 10px 24px;
+  margin-top: 20px; /* increase to 12px or 16px if needed */
   background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
   color: #3a4a6b;
   border: 1px solid #c3ccdd;

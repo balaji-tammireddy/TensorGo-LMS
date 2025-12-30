@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import './SkeletonLoader.css';
 
 interface SkeletonLoaderProps {
@@ -7,7 +7,7 @@ interface SkeletonLoaderProps {
   showHeader?: boolean;
 }
 
-const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ 
+const SkeletonLoader: React.FC<SkeletonLoaderProps> = memo(({ 
   variant = 'page', 
   rows = 3,
   showHeader = true 
@@ -89,7 +89,9 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
       </div>
     </div>
   );
-};
+});
+
+SkeletonLoader.displayName = 'SkeletonLoader';
 
 export default SkeletonLoader;
 

@@ -1,16 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt } from 'react-icons/fa';
 import './Sidebar.css';
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC = memo(() => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const getRoleDisplayName = (role: string) => {
+  const getRoleDisplayName = useCallback((role: string) => {
     const roleMap: Record<string, string> = {
       employee: 'Employee',
       manager: 'Manager',
@@ -18,9 +18,9 @@ const Sidebar: React.FC = () => {
       super_admin: 'Super Admin'
     };
     return roleMap[role] || role;
-  };
+  }, []);
 
-  const getAvailableRoutes = () => {
+  const availableRoutes = useMemo(() => {
     if (!user) return [];
     
     const routes: Array<{ path: string; icon: React.ReactNode; label: string }> = [];
@@ -44,7 +44,7 @@ const Sidebar: React.FC = () => {
     routes.push({ path: '/profile', icon: <FaUser />, label: 'Profile' });
     
     return routes;
-  };
+  }, [user]);
 
   const userInitial = useMemo(() => {
     if (!user) return '';
@@ -52,15 +52,15 @@ const Sidebar: React.FC = () => {
     return source.trim().charAt(0).toUpperCase() || '';
   }, [user]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
   return (
     <div className="sidebar">
       <div className="sidebar-nav">
-        {getAvailableRoutes().map((route) => (
+        {availableRoutes.map((route) => (
           <div
             key={route.path}
             className={`nav-item ${location.pathname === route.path ? 'active' : ''}`}
@@ -89,7 +89,9 @@ const Sidebar: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';
 
 export default Sidebar;
 
