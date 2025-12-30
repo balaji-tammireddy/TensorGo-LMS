@@ -1269,7 +1269,20 @@ const LeaveApplyPage: React.FC = () => {
                   <DropdownMenuContent className="leave-type-dropdown-content">
                     <DropdownMenuItem
                       onClick={() => {
-                        setFormData({ ...formData, leaveType: 'casual' });
+                        setFormData({ 
+                          leaveType: 'casual',
+                          startDate: '',
+                          startType: 'full',
+                          endDate: '',
+                          endType: 'full',
+                          reason: '',
+                          timeForPermission: { start: '', end: '' }
+                        });
+                        setDoctorNoteFile(null);
+                        setExistingDoctorNote(null);
+                        if (doctorNoteInputRef.current) {
+                          doctorNoteInputRef.current.value = '';
+                        }
                       }}
                     >
                       Casual
@@ -1277,7 +1290,20 @@ const LeaveApplyPage: React.FC = () => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => {
-                        setFormData({ ...formData, leaveType: 'sick' });
+                        setFormData({ 
+                          leaveType: 'sick',
+                          startDate: '',
+                          startType: 'full',
+                          endDate: '',
+                          endType: 'full',
+                          reason: '',
+                          timeForPermission: { start: '', end: '' }
+                        });
+                        setDoctorNoteFile(null);
+                        setExistingDoctorNote(null);
+                        if (doctorNoteInputRef.current) {
+                          doctorNoteInputRef.current.value = '';
+                        }
                       }}
                     >
                       Sick
@@ -1285,7 +1311,20 @@ const LeaveApplyPage: React.FC = () => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => {
-                        setFormData({ ...formData, leaveType: 'lop' });
+                        setFormData({ 
+                          leaveType: 'lop',
+                          startDate: '',
+                          startType: 'full',
+                          endDate: '',
+                          endType: 'full',
+                          reason: '',
+                          timeForPermission: { start: '', end: '' }
+                        });
+                        setDoctorNoteFile(null);
+                        setExistingDoctorNote(null);
+                        if (doctorNoteInputRef.current) {
+                          doctorNoteInputRef.current.value = '';
+                        }
                       }}
                     >
                       LOP
@@ -1293,14 +1332,20 @@ const LeaveApplyPage: React.FC = () => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => {
-                        const newLeaveType = 'permission';
                         setFormData({ 
-                          ...formData, 
-                          leaveType: newLeaveType,
+                          leaveType: 'permission',
+                          startDate: '',
                           startType: 'full',
-                          endDate: formData.startDate || '',
-                          endType: 'full'
+                          endDate: '',
+                          endType: 'full',
+                          reason: '',
+                          timeForPermission: { start: '', end: '' }
                         });
+                        setDoctorNoteFile(null);
+                        setExistingDoctorNote(null);
+                        if (doctorNoteInputRef.current) {
+                          doctorNoteInputRef.current.value = '';
+                        }
                       }}
                     >
                       Permission
