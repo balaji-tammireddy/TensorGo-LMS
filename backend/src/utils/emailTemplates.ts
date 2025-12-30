@@ -742,8 +742,8 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
                 <tr>
                   <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
                     <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.3px;">Leave Allocation Notification</h1>
-                  </td>
-                </tr>
+            </td>
+          </tr>
                 <tr>
                   <td style="padding: 0; background-color: #059669;">
                     <div style="padding: 12px 40px; text-align: center;">
@@ -802,7 +802,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
                 <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #d1fae5;">
                   <p style="margin: 0 0 8px 0; color: #059669; font-size: 13px; font-weight: 600;">Conversion Note:</p>
                   <p style="margin: 0; color: #047857; font-size: 13px; line-height: 1.5;">${data.conversionNote}</p>
-                </div>
+              </div>
                 ` : ''}
               </div>
               
@@ -920,8 +920,8 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
                 <tr>
                   <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
                     <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.3px;">Security Notification</h1>
-                  </td>
-                </tr>
+            </td>
+          </tr>
                 <tr>
                   <td style="padding: 0; background-color: #dc2626;">
                     <div style="padding: 12px 40px; text-align: center;">
@@ -1095,8 +1095,8 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
                 <tr>
                   <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
                     <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.3px;">Pending Leave Approvals Reminder</h1>
-                  </td>
-                </tr>
+            </td>
+          </tr>
                 <tr>
                   <td style="padding: 0; background-color: #f59e0b;">
                     <div style="padding: 12px 40px; text-align: center;">
@@ -1582,8 +1582,8 @@ export const sendUrgentLeaveApplicationEmail = async (
                         </td>
                       </tr>
                     </table>
-                  </td>
-                </tr>
+            </td>
+          </tr>
                 <tr>
                   <td style="padding: 0; background-color: #3b82f6;">
                     <div style="padding: 12px 40px; text-align: center;">
@@ -2106,7 +2106,7 @@ TensorGo-LMS
 ---
 This is an automated email from TensorGo Leave Management System.
 Please do not reply to this email.
-`;
+  `;
 
   return text;
 };
