@@ -884,6 +884,20 @@ const LeaveApplyPage: React.FC = () => {
         return;
       }
       
+      // Validate that permission time is not in the past if start date is today
+      const isToday = formData.startDate === todayStr;
+      if (isToday) {
+        const now = new Date();
+        const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
+        const permissionStartTime = new Date();
+        permissionStartTime.setHours(startHours, startMinutes, 0, 0);
+        
+        if (permissionStartTime < now) {
+          showWarning('Cannot apply permission for past times. Please select a future time.');
+          return;
+        }
+      }
+      
       // Validate permission duration (max 2 hours)
       const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
       const [endHours, endMinutes] = formData.timeForPermission.end.split(':').map(Number);

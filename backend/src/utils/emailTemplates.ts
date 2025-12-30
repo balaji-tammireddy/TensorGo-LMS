@@ -262,7 +262,8 @@ Please do not reply to this email.
  */
 export const sendLeaveApplicationEmail = async (
   managerEmail: string,
-  data: LeaveApplicationEmailData
+  data: LeaveApplicationEmailData,
+  cc?: string | string[]
 ): Promise<boolean> => {
   // Add unique identifier to prevent email threading
   const timestamp = Date.now();
@@ -275,6 +276,7 @@ export const sendLeaveApplicationEmail = async (
 
   return await sendEmail({
     to: managerEmail,
+    cc,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -517,7 +519,8 @@ Please do not reply to this email.
  */
 export const sendLeaveStatusEmail = async (
   recipientEmail: string,
-  data: LeaveStatusEmailData
+  data: LeaveStatusEmailData,
+  cc?: string | string[]
 ): Promise<boolean> => {
   // Add unique identifier to prevent email threading
   const timestamp = Date.now();
@@ -535,6 +538,7 @@ export const sendLeaveStatusEmail = async (
 
   return await sendEmail({
     to: recipientEmail,
+    cc,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -1535,7 +1539,8 @@ export const sendLeaveCarryForwardEmail = async (
 
 export const sendUrgentLeaveApplicationEmail = async (
   managerEmail: string,
-  data: LeaveApplicationEmailData
+  data: LeaveApplicationEmailData,
+  cc?: string | string[]
 ): Promise<boolean> => {
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1739,6 +1744,7 @@ Reference ID: ${uniqueId}
 
   return await sendEmail({
     to: managerEmail,
+    cc,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -2116,7 +2122,8 @@ Please do not reply to this email.
  */
 export const sendLopToCasualConversionEmail = async (
   recipientEmail: string,
-  data: LopToCasualConversionEmailData
+  data: LopToCasualConversionEmailData,
+  cc?: string | string[]
 ): Promise<boolean> => {
   // Add unique identifier to prevent email threading
   const timestamp = Date.now();
@@ -2129,6 +2136,7 @@ export const sendLopToCasualConversionEmail = async (
 
   return await sendEmail({
     to: recipientEmail,
+    cc,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,

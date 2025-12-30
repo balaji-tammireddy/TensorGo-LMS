@@ -72,7 +72,6 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
-  const [updatedLeaveReason, setUpdatedLeaveReason] = useState<string>('');
   const [showConvertConfirmDialog, setShowConvertConfirmDialog] = useState(false);
 
   // Reset state when modal closes
@@ -83,12 +82,10 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setShowRejectDialog(false);
       setRejectReason('');
       setSelectedStatus('');
-      setUpdatedLeaveReason('');
       setShowConvertConfirmDialog(false);
     } else if (isOpen && leaveRequest && isEditMode) {
-      // Set initial status and reason when opening in edit mode
+      // Set initial status when opening in edit mode
       setSelectedStatus(leaveRequest.currentStatus);
-      setUpdatedLeaveReason(leaveRequest.leaveReason || '');
     }
   }, [isOpen, leaveRequest, isEditMode]);
 
@@ -165,7 +162,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     if (isEditMode && onUpdate) {
       // Edit mode - update status to rejected
       const allDayIds = allLeaveDates.map(day => day.id);
-      onUpdate(leaveRequest.id, 'rejected', allDayIds, rejectReason.trim(), updatedLeaveReason);
+      onUpdate(leaveRequest.id, 'rejected', allDayIds, rejectReason.trim(), undefined);
       setShowRejectDialog(false);
       setRejectReason('');
     } else if (isMultiDay && pendingDays.length > 0) {
@@ -412,18 +409,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
 
               <div className="leave-detail-item leave-detail-item-full">
                 <label>Leave Reason</label>
-                {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
-                  <textarea
-                    value={updatedLeaveReason}
-                    onChange={(e) => setUpdatedLeaveReason(e.target.value)}
-                    className="leave-reason-textarea"
-                    rows={4}
-                    placeholder="Enter leave reason..."
-                    disabled={isLoading}
-                  />
-                ) : (
-                  <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
-                )}
+                <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
               </div>
 
               {/* Rejection Reason - show only if rejected */}
@@ -703,14 +689,14 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         selectedDayIds.push(dayInfo.id);
                       }
                     });
-                    onUpdate(leaveRequest.id, selectedStatus, selectedDayIds, undefined, updatedLeaveReason);
+                    onUpdate(leaveRequest.id, selectedStatus, selectedDayIds, undefined, undefined);
                   } else if (selectedStatus === 'rejected') {
                     // For rejection, show dialog for reason
                     setShowRejectDialog(true);
                   } else {
                     // For approved, approve all days
                     const allDayIds = allLeaveDates.map(day => day.id);
-                    onUpdate(leaveRequest.id, selectedStatus, allDayIds, undefined, updatedLeaveReason);
+                    onUpdate(leaveRequest.id, selectedStatus, allDayIds, undefined, undefined);
                   }
                 }}
                 disabled={isLoading || selectedStatus === leaveRequest.currentStatus || (selectedStatus === 'partially_approved' && (!fromDate || !toDate))}

@@ -226,8 +226,8 @@ const LeaveApprovalPage: React.FC = () => {
         showSuccess('Leave request converted from LOP to Casual successfully!');
         // Update selected request if modal is open
         if (selectedRequest && selectedRequest.id === requestId) {
-          setSelectedRequest({
-            ...selectedRequest,
+            setSelectedRequest({
+              ...selectedRequest,
             leaveType: 'casual'
           });
         }
