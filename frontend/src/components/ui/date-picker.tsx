@@ -76,6 +76,14 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     return false;
   };
 
+  // Determine which month to show when calendar opens
+  // Priority: selectedDate > minDate > today
+  const getDefaultMonth = () => {
+    if (selectedDate) return selectedDate;
+    if (minDate) return minDate;
+    return new Date();
+  };
+
   return (
     <div ref={containerRef} className={cn('date-picker-container', className)}>
       <div
@@ -118,7 +126,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             selected={selectedDate}
             onSelect={handleSelect}
             disabled={isDateDisabled}
-            defaultMonth={selectedDate || new Date()}
+            defaultMonth={getDefaultMonth()}
             className="date-picker-calendar"
           />
         </div>
