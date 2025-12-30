@@ -782,8 +782,8 @@ const ProfilePage: React.FC = () => {
                     style={{ 
                       width: '100%', 
                       justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      fontSize: '12px',
+                      padding: '10px 12px',
+                      fontSize: '14px',
                       fontFamily: 'Poppins, sans-serif',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
@@ -792,20 +792,11 @@ const ProfilePage: React.FC = () => {
                       height: 'auto'
                     }}
                   >
-                    <span>{formData.personalInfo?.gender || 'Select'}</span>
+                    <span>{formData.personalInfo?.gender || ''}</span>
                     <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="leave-type-dropdown-content">
-                  <DropdownMenuItem
-                    onClick={() => setFormData({
-                      ...formData,
-                      personalInfo: { ...formData.personalInfo, gender: '' }
-                    })}
-                  >
-                    Select
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => setFormData({
                       ...formData,
@@ -849,8 +840,8 @@ const ProfilePage: React.FC = () => {
                     style={{ 
                       width: '100%', 
                       justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      fontSize: '12px',
+                      padding: '10px 12px',
+                      fontSize: '14px',
                       fontFamily: 'Poppins, sans-serif',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
@@ -859,20 +850,11 @@ const ProfilePage: React.FC = () => {
                       height: 'auto'
                     }}
                   >
-                    <span>{formData.personalInfo?.bloodGroup || 'Select'}</span>
+                    <span>{formData.personalInfo?.bloodGroup || ''}</span>
                     <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="leave-type-dropdown-content">
-                  <DropdownMenuItem
-                    onClick={() => setFormData({
-                      ...formData,
-                      personalInfo: { ...formData.personalInfo, bloodGroup: '' }
-                    })}
-                  >
-                    Select
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg, index) => (
                     <React.Fragment key={bg}>
                       <DropdownMenuItem
@@ -903,8 +885,8 @@ const ProfilePage: React.FC = () => {
                     style={{ 
                       width: '100%', 
                       justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      fontSize: '12px',
+                      padding: '10px 12px',
+                      fontSize: '14px',
                       fontFamily: 'Poppins, sans-serif',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
@@ -913,20 +895,11 @@ const ProfilePage: React.FC = () => {
                       height: 'auto'
                     }}
                   >
-                    <span>{formData.personalInfo?.maritalStatus || 'Select'}</span>
+                    <span>{formData.personalInfo?.maritalStatus || ''}</span>
                     <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="leave-type-dropdown-content">
-                  <DropdownMenuItem
-                    onClick={() => setFormData({
-                      ...formData,
-                      personalInfo: { ...formData.personalInfo, maritalStatus: '' }
-                    })}
-                  >
-                    Select
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => setFormData({
                       ...formData,

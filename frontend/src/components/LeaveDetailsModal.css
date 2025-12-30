@@ -359,6 +359,33 @@
   font-weight: 500;
 }
 
+.date-range-input-group .date-picker-input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.date-range-input-group .date-picker-input-field {
+  padding: 12px 16px;
+  border: 1px solid #d5ddf0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.date-range-input-group .date-picker-input:hover:not(.date-picker-input-disabled) {
+  border: none;
+  box-shadow: none;
+}
+
+.date-range-input-group .date-picker-input-open {
+  border: none;
+  box-shadow: none;
+}
+
 .date-range-input:focus {
   outline: none;
   border-color: #3c6ff2;

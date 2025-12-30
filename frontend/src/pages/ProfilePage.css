@@ -190,12 +190,52 @@
 }
 
 .form-group input,
-.form-group select,
+.form-group select {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 42px;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  box-sizing: border-box;
+}
+
 .form-group textarea {
-  padding: 6px 8px;
-  border: 1px solid #dcdcdc;
-  border-radius: 2px;
-  font-size: 12px;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 42px;
+  resize: vertical;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  box-sizing: border-box;
+}
+
+.form-group .date-picker-input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.form-group .date-picker-input-field {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 42px;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group input:disabled,
