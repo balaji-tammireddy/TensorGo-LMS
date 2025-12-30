@@ -28,8 +28,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = memo(({
   if (!isOpen) return null;
 
   return (
-    <div className="confirmation-dialog-overlay" onClick={onCancel}>
-      <div className="confirmation-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="confirmation-dialog-overlay">
+      <div className="confirmation-dialog">
         <div className="confirmation-dialog-header">
           <div className="confirmation-dialog-icon-wrapper">
             <FaExclamationTriangle className={`confirmation-dialog-icon icon-${type}`} />

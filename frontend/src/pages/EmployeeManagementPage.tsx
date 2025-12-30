@@ -1450,7 +1450,6 @@ const EmployeeManagementPage: React.FC = () => {
                       Permanent Address<span className="required-indicator">*</span>
                     </label>
                     <textarea
-                      rows={3}
                       value={newEmployee.permanentAddress}
                       onChange={(e) =>
                         setNewEmployee((prev: any) => ({
@@ -1469,7 +1468,6 @@ const EmployeeManagementPage: React.FC = () => {
                       Current Address<span className="required-indicator">*</span>
                     </label>
                     <textarea
-                      rows={3}
                       value={newEmployee.currentAddress}
                       onChange={(e) =>
                         setNewEmployee({

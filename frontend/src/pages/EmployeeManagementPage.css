@@ -348,8 +348,12 @@
   border-radius: 4px;
   font-size: 14px;
   line-height: 1.5;
-  min-height: 42px;
-  resize: vertical;
+  height: 84px;
+  min-height: 84px;
+  max-height: 84px;
+  resize: none !important;
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
   background: transparent;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;

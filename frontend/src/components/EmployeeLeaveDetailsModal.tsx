@@ -80,8 +80,8 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
   const pendingDays = leaveRequest.leaveDays?.filter(day => day.status === 'pending') || [];
 
   return (
-    <div className="leave-details-modal-overlay" onClick={onClose}>
-      <div className="leave-details-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="leave-details-modal-overlay">
+      <div className="leave-details-modal">
         <div className="leave-details-modal-header">
           <h2>Leave Request Details</h2>
           <button className="leave-details-modal-close" onClick={onClose}>

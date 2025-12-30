@@ -44,8 +44,8 @@ const RejectCommentDialog: React.FC<RejectCommentDialogProps> = memo(({
   };
 
   return (
-    <div className="reject-comment-dialog-overlay" onClick={onCancel}>
-      <div className="reject-comment-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="reject-comment-dialog-overlay">
+      <div className="reject-comment-dialog">
         <div className="reject-comment-dialog-header">
           <div className="reject-comment-dialog-icon-wrapper">
             <FaExclamationTriangle className={`reject-comment-dialog-icon icon-${type}`} />

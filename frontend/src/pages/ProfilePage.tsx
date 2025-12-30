@@ -1159,7 +1159,6 @@ const ProfilePage: React.FC = () => {
                 }));
               }}
               disabled={!isEditMode}
-              rows={4}
             />
           </div>
           <div className="form-group">
@@ -1177,7 +1176,6 @@ const ProfilePage: React.FC = () => {
                 }));
               }}
               disabled={!isEditMode || isSameAddress}
-              rows={4}
             />
             <div className="checkbox-group">
               <input

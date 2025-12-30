@@ -95,11 +95,18 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     onAdd(leaveType, countNum);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Prevent 'e', 'E', '+', '-' from being entered (allow '.' for decimals)
+    if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') {
+      e.preventDefault();
+    }
+  };
+
   const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
     
     // Only allow numbers and a single decimal point
-    // Remove any non-numeric characters except decimal point
+    // Remove any non-numeric characters except decimal point (including 'e', 'E', '+', '-')
     value = value.replace(/[^0-9.]/g, '');
     
     // Ensure only one decimal point
@@ -146,8 +153,8 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="add-leaves-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="add-leaves-modal">
         <div className="modal-header">
           <h2>Add Leaves</h2>
           <button className="close-button" onClick={handleClose} disabled={isLoading}>
@@ -224,6 +231,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                 step="0.5"
                 value={count}
                   onChange={handleCountChange}
+                  onKeyDown={handleKeyDown}
                   disabled={isLoading || balancesLoading}
                 placeholder="Enter leave count"
                 required
