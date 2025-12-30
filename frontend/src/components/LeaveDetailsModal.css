@@ -295,7 +295,7 @@
 
 .status-pending {
   background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
-  color: #000;
+  color: #fff;
   border: 1px solid #ffb300;
 }
 

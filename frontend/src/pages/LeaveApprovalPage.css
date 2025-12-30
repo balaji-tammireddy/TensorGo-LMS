@@ -152,12 +152,12 @@
 
 .status-applied {
   background-color: #ffc107; /* Yellow */
-  color: #000;
+  color: #fff;
 }
 
 .status-pending {
   background-color: #ffc107; /* Yellow */
-  color: #000;
+  color: #fff;
 }
 
 .status-partial {

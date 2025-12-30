@@ -1627,12 +1627,13 @@ export const getPendingLeaveRequests = async (
   // Additional safeguard: Filter out any requests that don't belong to manager's direct reports
   // Also filter out approver's own requests to prevent self-approval
   // This ensures data integrity even if query construction has issues
+  // Use Number() to handle type coercion (PostgreSQL may return strings)
   const filteredRows = approverRole === 'manager' 
-    ? result.rows.filter(row => row.reporting_manager_id === approverId)
+    ? result.rows.filter(row => Number(row.reporting_manager_id) === Number(approverId))
     : result.rows.filter(row => {
         // For HR and Super Admin, exclude their own requests (no self-approval)
         if (approverRole === 'hr' || approverRole === 'super_admin') {
-          return row.employee_id !== approverId;
+          return Number(row.employee_id) !== Number(approverId);
         }
         return true;
       });
@@ -1789,17 +1790,29 @@ export const approveLeave = async (
   }
 
   // Check authorization
+  // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
+  const employeeId = Number(leave.employee_id);
+  const approverIdNum = Number(approverId);
+  
   if (approverRole === 'manager') {
     // Managers can approve only their direct reports
-    if (leave.reporting_manager_id !== approverId) {
+    if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'hr') {
-    // HR can approve employee and manager leaves
+    // HR can approve employee and manager leaves, but NOT their own (no self-approval)
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot approve your own leave request');
+    }
     if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
       throw new Error('Not authorized to approve this leave');
     }
-  } else if (approverRole !== 'super_admin') {
+  } else if (approverRole === 'super_admin') {
+    // Super Admin can approve all leaves, but NOT their own (no self-approval)
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot approve your own leave request');
+    }
+  } else {
     throw new Error('Not authorized to approve leaves');
   }
 
@@ -2130,11 +2143,20 @@ export const rejectLeave = async (
   );
 
   // Check authorization (same as approve)
+  // CRITICAL: Prevent self-rejection for HR and super_admin
+  // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
+  const employeeId = Number(leave.employee_id);
+  const approverIdNum = Number(approverId);
+  
   if (approverRole === 'manager') {
-    if (leave.reporting_manager_id !== approverId) {
+    if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to reject this leave');
     }
   } else if (approverRole === 'hr') {
+    // HR cannot reject their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot reject your own leave request');
+    }
     const managerResult = await pool.query(
       'SELECT role FROM users WHERE id = $1',
       [leave.reporting_manager_id]
@@ -2142,7 +2164,12 @@ export const rejectLeave = async (
     if (managerResult.rows[0]?.role !== 'hr' && leave.employee_role !== 'manager') {
       throw new Error('Not authorized to reject this leave');
     }
-  } else if (approverRole !== 'super_admin') {
+  } else if (approverRole === 'super_admin') {
+    // Super Admin cannot reject their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot reject your own leave request');
+    }
+  } else {
     throw new Error('Not authorized to reject leaves');
   }
 
@@ -2526,15 +2553,29 @@ export const approveLeaveDay = async (
   }
 
   // Auth: manager -> direct reports; HR -> employee/manager; super_admin -> all
+  // CRITICAL: Prevent self-approval for HR and super_admin
+  // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
+  const employeeId = Number(leave.employee_id);
+  const approverIdNum = Number(approverId);
+  
   if (approverRole === 'manager') {
-    if (leave.reporting_manager_id !== approverId) {
+    if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'hr') {
+    // HR cannot approve their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot approve your own leave request');
+    }
     if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
       throw new Error('Not authorized to approve this leave');
     }
-  } else if (approverRole !== 'super_admin') {
+  } else if (approverRole === 'super_admin') {
+    // Super Admin cannot approve their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot approve your own leave request');
+    }
+  } else {
     throw new Error('Not authorized to approve leaves');
   }
 
@@ -2845,15 +2886,29 @@ export const approveLeaveDays = async (
   }
 
   // Auth: manager -> direct reports; HR -> employee/manager; super_admin -> all
+  // CRITICAL: Prevent self-approval for HR and super_admin
+  // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
+  const employeeId = Number(leave.employee_id);
+  const approverIdNum = Number(approverId);
+  
   if (approverRole === 'manager') {
-    if (leave.reporting_manager_id !== approverId) {
+    if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'hr') {
+    // HR cannot approve their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot approve your own leave request');
+    }
     if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
       throw new Error('Not authorized to approve this leave');
     }
-  } else if (approverRole !== 'super_admin') {
+  } else if (approverRole === 'super_admin') {
+    // Super Admin cannot approve their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot approve your own leave request');
+    }
+  } else {
     throw new Error('Not authorized to approve leaves');
   }
 
@@ -3189,15 +3244,29 @@ export const rejectLeaveDay = async (
   const leave = leaveResult.rows[0];
 
   // Auth: manager -> direct reports; HR -> employee/manager; super_admin -> all
+  // CRITICAL: Prevent self-rejection for HR and super_admin
+  // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
+  const employeeId = Number(leave.employee_id);
+  const approverIdNum = Number(approverId);
+  
   if (approverRole === 'manager') {
-    if (leave.reporting_manager_id !== approverId) {
+    if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to reject this leave');
     }
   } else if (approverRole === 'hr') {
+    // HR cannot reject their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot reject your own leave request');
+    }
     if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
       throw new Error('Not authorized to reject this leave');
     }
-  } else if (approverRole !== 'super_admin') {
+  } else if (approverRole === 'super_admin') {
+    // Super Admin cannot reject their own leave requests
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot reject your own leave request');
+    }
+  } else {
     throw new Error('Not authorized to reject leaves');
   }
 

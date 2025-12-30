@@ -668,7 +668,7 @@ const EmployeeManagementPage: React.FC = () => {
                 <th>Position</th>
                 <th>Joining Date</th>
                 <th>Status</th>
-                <th></th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
