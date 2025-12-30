@@ -25,6 +25,7 @@ const ProfilePage: React.FC = () => {
   const [initialFormData, setInitialFormData] = useState<any | null>(null);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [deletePhotoConfirmOpen, setDeletePhotoConfirmOpen] = useState(false);
+  const [showImagePopup, setShowImagePopup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
 
@@ -525,7 +526,7 @@ const ProfilePage: React.FC = () => {
         </div>
 
         <div className="profile-picture-section">
-          <div className="profile-picture">
+          <div className="profile-picture" onClick={() => photoSignedUrl && setShowImagePopup(true)} style={{ cursor: photoSignedUrl ? 'pointer' : 'default' }}>
             {photoSignedUrl ? (
               <img 
                 src={photoSignedUrl} 
@@ -1217,6 +1218,14 @@ const ProfilePage: React.FC = () => {
       onConfirm={confirmDeletePhoto}
       onCancel={() => setDeletePhotoConfirmOpen(false)}
     />
+    {showImagePopup && photoSignedUrl && (
+      <div className="image-popup-overlay" onClick={() => setShowImagePopup(false)}>
+        <div className="image-popup-content" onClick={(e) => e.stopPropagation()}>
+          <button className="image-popup-close" onClick={() => setShowImagePopup(false)}>×</button>
+          <img src={photoSignedUrl} alt="Profile" className="image-popup-image" />
+        </div>
+      </div>
+    )}
   </>
   );
 };
