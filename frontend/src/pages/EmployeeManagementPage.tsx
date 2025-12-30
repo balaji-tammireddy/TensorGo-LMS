@@ -778,7 +778,6 @@ const EmployeeManagementPage: React.FC = () => {
                           className="action-icon"
                           title="Add Leaves"
                           onClick={() => handleAddLeaves(employee.id, employee.name)}
-                          style={{ color: '#3c6ff2' }}
                         >
                           <FaCalendarPlus />
                         </span>

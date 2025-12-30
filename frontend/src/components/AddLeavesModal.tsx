@@ -96,7 +96,17 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   };
 
   const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    let value = e.target.value;
+    
+    // Only allow numbers and a single decimal point
+    // Remove any non-numeric characters except decimal point
+    value = value.replace(/[^0-9.]/g, '');
+    
+    // Ensure only one decimal point
+    const parts = value.split('.');
+    if (parts.length > 2) {
+      value = parts[0] + '.' + parts.slice(1).join('');
+    }
     
     // Prevent 3-digit numbers (100 and above)
     const countNum = parseFloat(value);
