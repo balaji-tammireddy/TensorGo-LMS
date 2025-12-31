@@ -1163,8 +1163,9 @@ const EmployeeManagementPage: React.FC = () => {
                               setNewEmployee({ ...newEmployee, dateOfBirth: date })
                             }
                             disabled={isViewMode}
-                            placeholder="Select date of birth"
+                            placeholder="DD-MM-YYYY"
                             max={new Date().toISOString().split('T')[0]}
+                            allowManualEntry={true}
                           />
                         </div>
                         <div className="employee-modal-field">
@@ -1441,7 +1442,8 @@ const EmployeeManagementPage: React.FC = () => {
                               })
                             }
                             disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
-                            placeholder="Select date of joining"
+                            placeholder="DD-MM-YYYY"
+                            allowManualEntry={true}
                           />
                         </div>
                         {isEditMode && (

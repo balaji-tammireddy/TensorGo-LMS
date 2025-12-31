@@ -1,4 +1,3 @@
-
 .rdp-calendar {
   padding: 8px 4px 4px 4px;
   background: white;
@@ -48,7 +47,7 @@
   text-align: center;
   position: absolute;
   left: 50%;
-  transform: translateX(-50%) translateY(-15px);
+  transform: translateX(-50%);
   pointer-events: none;
   z-index: 0;
 }
