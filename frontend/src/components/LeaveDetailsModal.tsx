@@ -13,6 +13,7 @@ import {
 import { Button } from './ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
+import { Holiday } from '../services/leaveService';
 import './LeaveDetailsModal.css';
 
 interface LeaveDay {
@@ -73,6 +74,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const [rejectReason, setRejectReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [showConvertConfirmDialog, setShowConvertConfirmDialog] = useState(false);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -83,11 +85,26 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setRejectReason('');
       setSelectedStatus('');
       setShowConvertConfirmDialog(false);
-    } else if (isOpen && leaveRequest && isEditMode) {
-      // Set initial status when opening in edit mode
-      setSelectedStatus(leaveRequest.currentStatus);
+    } else if (isOpen && leaveRequest) {
+      // Fetch holidays if not already fetched
+      if (holidays.length === 0) {
+        const fetchHolidays = async () => {
+          try {
+            const data = await leaveService.getHolidays();
+            setHolidays(data);
+          } catch (error) {
+            console.error('Failed to fetch holidays:', error);
+          }
+        };
+        fetchHolidays();
+      }
+
+      if (isEditMode) {
+        // Set initial status when opening in edit mode
+        setSelectedStatus(leaveRequest.currentStatus);
+      }
     }
-  }, [isOpen, leaveRequest, isEditMode]);
+  }, [isOpen, leaveRequest, isEditMode, holidays.length]);
 
   if (!isOpen || !leaveRequest) return null;
 
@@ -116,10 +133,10 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
 
     const from = parse(fromDate, 'yyyy-MM-dd', new Date());
     const to = parse(toDate, 'yyyy-MM-dd', new Date());
-    
+
     const selectedDates: number[] = [];
     const interval = eachDayOfInterval({ start: from, end: to });
-    
+
     interval.forEach(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
       const dayInfo = dateMap.get(dateStr);
@@ -134,14 +151,14 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const handleApproveClick = () => {
     if (isMultiDay && pendingDays.length > 0) {
       // For multi-day, approve selected range or all pending if no range selected
-      const daysToApprove = fromDate && toDate 
+      const daysToApprove = fromDate && toDate
         ? getSelectedDayIds()
         : pendingDays.map(day => day.id);
-      
+
       if (daysToApprove.length === 0) {
         return;
       }
-      
+
       onApprove(leaveRequest.id, daysToApprove);
       setFromDate('');
       setToDate('');
@@ -158,7 +175,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
 
   const confirmReject = () => {
     if (!rejectReason.trim()) return;
-    
+
     if (isEditMode && onUpdate) {
       // Edit mode - update status to rejected
       const allDayIds = allLeaveDates.map(day => day.id);
@@ -167,21 +184,21 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setRejectReason('');
     } else if (isMultiDay && pendingDays.length > 0) {
       // For multi-day, reject selected range or all pending if no range selected
-      const daysToReject = fromDate && toDate 
+      const daysToReject = fromDate && toDate
         ? getSelectedDayIds()
         : pendingDays.map(day => day.id);
-      
+
       if (daysToReject.length === 0) {
         return;
       }
-      
+
       onReject(leaveRequest.id, daysToReject, rejectReason.trim());
     } else {
       // Single day - use the day ID
       const dayId = pendingDays.length === 1 ? pendingDays[0].id : undefined;
       onReject(leaveRequest.id, dayId ? [dayId] : undefined, rejectReason.trim());
     }
-    
+
     setShowRejectDialog(false);
     setRejectReason('');
     setFromDate('');
@@ -193,9 +210,9 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     if (newFromDate && !availableDates.includes(newFromDate)) {
       return;
     }
-    
+
     setFromDate(newFromDate);
-    
+
     // If toDate is before new fromDate, clear it
     if (toDate && newFromDate && toDate < newFromDate) {
       setToDate('');
@@ -207,12 +224,12 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     if (newToDate && !availableDates.includes(newToDate)) {
       return;
     }
-    
+
     // Validate that toDate is after fromDate
     if (fromDate && newToDate && newToDate < fromDate) {
       return;
     }
-    
+
     setToDate(newToDate);
   };
 
@@ -278,6 +295,34 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     return leaveRequest.currentStatus;
   };
 
+  // Calculate projected casual days (excluding weekends and holidays)
+  const calculateProjectedCasualDays = () => {
+    if (!leaveRequest || !leaveRequest.leaveDays) return 0;
+
+    return leaveRequest.leaveDays.reduce((count, day) => {
+      // Normalize dates to YYYY-MM-DD for comparison
+      const dayDateObj = new Date(day.date);
+      const dayDateStr = format(dayDateObj, 'yyyy-MM-dd');
+      const dayOfWeek = dayDateObj.getDay(); // 0 = Sunday, 6 = Saturday
+
+      // Check if it's a weekend
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      // Check if it's a holiday - normalize holiday date string too
+      const isHoliday = holidays.some(h => {
+        const holidayDateStr = format(new Date(h.date), 'yyyy-MM-dd');
+        return holidayDateStr === dayDateStr;
+      });
+
+      if (!isWeekend && !isHoliday) {
+        return count + (day.type === 'half' ? 0.5 : 1);
+      }
+      return count;
+    }, 0);
+  };
+
+  const projectedCasualDays = calculateProjectedCasualDays();
+
   return (
     <>
       <div className="leave-details-modal-overlay" onClick={onClose}>
@@ -341,11 +386,11 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="leave-type-dropdown-trigger"
                         disabled={isLoading}
-                        style={{ 
+                        style={{
                           padding: '6px 8px',
                           fontSize: '12px',
                           fontFamily: 'Poppins, sans-serif',
@@ -358,8 +403,8 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                       >
                         <span>
                           {selectedStatus === 'approved' ? 'Approved' :
-                           selectedStatus === 'partially_approved' ? 'Partially Approved' :
-                           selectedStatus === 'rejected' ? 'Rejected' : selectedStatus}
+                            selectedStatus === 'partially_approved' ? 'Partially Approved' :
+                              selectedStatus === 'rejected' ? 'Rejected' : selectedStatus}
                         </span>
                         <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                       </Button>
@@ -444,7 +489,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                       className="prescription-view-button"
                       onClick={async () => {
                         let imageUrl: string;
-                        
+
                         // Check if it's an OVHcloud key or base64
                         if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('medical-certificates/')) {
                           // Request signed URL from backend
@@ -463,7 +508,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           // Fallback - try as base64
                           imageUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
                         }
-                        
+
                         const img = document.createElement('img');
                         img.src = imageUrl;
                         img.style.maxWidth = '90vw';
@@ -471,7 +516,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         img.style.objectFit = 'contain';
                         img.style.cursor = 'default';
                         img.onclick = (e) => e.stopPropagation();
-                        
+
                         const closeButton = document.createElement('button');
                         closeButton.innerHTML = '×';
                         closeButton.style.position = 'absolute';
@@ -497,18 +542,18 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         closeButton.onmouseleave = () => {
                           closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
                         };
-                        
+
                         const closeOverlay = () => {
                           if (document.body.contains(overlay)) {
                             document.body.removeChild(overlay);
                           }
                         };
-                        
+
                         closeButton.onclick = (e) => {
                           e.stopPropagation();
                           closeOverlay();
                         };
-                        
+
                         const overlay = document.createElement('div');
                         overlay.style.position = 'fixed';
                         overlay.style.top = '0';
@@ -522,7 +567,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         overlay.style.zIndex = '10000';
                         overlay.style.cursor = 'pointer';
                         overlay.onclick = closeOverlay;
-                        
+
                         overlay.appendChild(img);
                         overlay.appendChild(closeButton);
                         document.body.appendChild(overlay);
@@ -565,7 +610,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                     </div>
                     {fromDate && toDate && (
                       <div className="date-range-selection-info">
-                        Selected range: {formatDateSafe(fromDate)} to {formatDateSafe(toDate)} 
+                        Selected range: {formatDateSafe(fromDate)} to {formatDateSafe(toDate)}
                         ({getSelectedDayIds().length} day(s))
                       </div>
                     )}
@@ -644,33 +689,33 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
             >
               Close
             </button>
-            {leaveRequest.leaveType === 'lop' && 
-             (userRole === 'hr' || userRole === 'super_admin') && 
-             onConvertLopToCasual && (
-              <button
-                className="leave-details-modal-button leave-details-modal-button-convert"
-                onClick={() => setShowConvertConfirmDialog(true)}
-                disabled={isLoading || isConverting}
-                title="Convert LOP to Casual"
-              >
-                {isConverting ? (
-                  <>
-                    <span className="loading-spinner"></span>
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <FaExchangeAlt /> Convert to Casual
-                  </>
-                )}
-              </button>
-            )}
+            {leaveRequest.leaveType === 'lop' &&
+              (userRole === 'hr' || userRole === 'super_admin') &&
+              onConvertLopToCasual && (
+                <button
+                  className="leave-details-modal-button leave-details-modal-button-convert"
+                  onClick={() => setShowConvertConfirmDialog(true)}
+                  disabled={isLoading || isConverting}
+                  title="Convert LOP to Casual"
+                >
+                  {isConverting ? (
+                    <>
+                      <span className="loading-spinner"></span>
+                      Converting...
+                    </>
+                  ) : (
+                    <>
+                      <FaExchangeAlt /> Convert to Casual
+                    </>
+                  )}
+                </button>
+              )}
             {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
               <button
                 className="leave-details-modal-button leave-details-modal-button-approve"
                 onClick={() => {
                   if (!onUpdate) return;
-                  
+
                   // For partially approved, need date range
                   if (selectedStatus === 'partially_approved') {
                     if (!fromDate || !toDate) {
@@ -752,8 +797,8 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
           <div className="reject-reason-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="reject-reason-dialog-header">
               <h3>Reject Leave Request</h3>
-              <button 
-                className="reject-reason-dialog-close" 
+              <button
+                className="reject-reason-dialog-close"
                 onClick={() => {
                   setShowRejectDialog(false);
                   setRejectReason('');
@@ -805,13 +850,12 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
         </div>
       )}
 
-      {/* Convert LOP to Casual Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showConvertConfirmDialog}
         title="Convert LOP to Casual"
         message={
           leaveRequest
-            ? `Are you sure you want to convert this LOP leave request to Casual?\n\nThis will:\n• Refund ${leaveRequest.noOfDays} ${leaveRequest.noOfDays === 1 ? 'day' : 'days'} to LOP balance\n• Deduct ${leaveRequest.noOfDays} ${leaveRequest.noOfDays === 1 ? 'day' : 'days'} from Casual balance\n\n⚠️ This action cannot be undone.`
+            ? `Are you sure you want to convert this LOP leave request to Casual?\n\nThis will:\n• Refund ${leaveRequest.noOfDays} ${leaveRequest.noOfDays === 1 ? 'day' : 'days'} to LOP balance\n• Deduct ${projectedCasualDays} ${projectedCasualDays === 1 ? 'day' : 'days'} from Casual balance\n\n⚠️ This action cannot be undone.`
             : ''
         }
         confirmText="Convert"
