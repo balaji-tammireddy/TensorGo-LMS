@@ -795,45 +795,47 @@ const EmployeeManagementPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="actions-cell">
-                        <span
-                          className="action-icon"
-                          title="View"
-                          onClick={() => handleViewEmployee(employee.id)}
-                        >
-                          <FaEye />
-                        </span>
-                        {/* HR cannot edit super_admin users or their own details */}
-                        {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
+                        <div className="actions-wrapper">
                           <span
                             className="action-icon"
-                            title="Edit"
-                            onClick={() => handleEditEmployee(employee.id)}
+                            title="View"
+                            onClick={() => handleViewEmployee(employee.id)}
                           >
-                            <FaPencilAlt />
+                            <FaEye />
                           </span>
-                        )}
-                        {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
-                        {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
-                          (user?.role === 'super_admin' && employee.id !== user.id)) && (
+                          {/* HR cannot edit super_admin users or their own details */}
+                          {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
                             <span
                               className="action-icon"
-                              title="Add Leaves"
-                              onClick={() => handleAddLeaves(employee.id, employee.name)}
+                              title="Edit"
+                              onClick={() => handleEditEmployee(employee.id)}
                             >
-                              <FaCalendarPlus />
+                              <FaPencilAlt />
                             </span>
                           )}
-                        {/* Super Admin can delete employees but not themselves */}
-                        {user?.role === 'super_admin' && employee.id !== user.id && (
-                          <span
-                            className="action-icon"
-                            title="Delete"
-                            onClick={() => handleDelete(employee.id)}
-                            style={{ color: '#f44336' }}
-                          >
-                            <FaTrash />
-                          </span>
-                        )}
+                          {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
+                          {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
+                            (user?.role === 'super_admin' && employee.id !== user.id)) && (
+                              <span
+                                className="action-icon"
+                                title="Add Leaves"
+                                onClick={() => handleAddLeaves(employee.id, employee.name)}
+                              >
+                                <FaCalendarPlus />
+                              </span>
+                            )}
+                          {/* Super Admin can delete employees but not themselves */}
+                          {user?.role === 'super_admin' && employee.id !== user.id && (
+                            <span
+                              className="action-icon"
+                              title="Delete"
+                              onClick={() => handleDelete(employee.id)}
+                              style={{ color: '#f44336' }}
+                            >
+                              <FaTrash />
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

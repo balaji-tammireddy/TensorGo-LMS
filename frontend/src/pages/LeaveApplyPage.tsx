@@ -506,42 +506,52 @@ const LeaveApplyPage: React.FC = () => {
   // Memoize expensive computation
   const requestedDays = useMemo(() => {
     if (!formData.startDate || !formData.endDate) return 0;
+
+    // Safety check: ensure start is not after end
+    if (formData.startDate > formData.endDate && formData.leaveType !== 'permission') return 0;
+
     const start = new Date(`${formData.startDate}T00:00:00`);
     const end = new Date(`${formData.endDate}T00:00:00`);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-    const daysArr = eachDayOfInterval({ start, end });
-    let total = 0;
-    const startHalf = formData.startType !== 'full';
-    const endHalf = formData.endType !== 'full';
 
-    // Create a Set of holiday date strings for faster lookup relative to the holidays currently loaded/displayed
-    const holidaySet = new Set(holidays.map(h => h.date));
+    try {
+      const daysArr = eachDayOfInterval({ start, end });
+      let total = 0;
+      const startHalf = formData.startType !== 'full';
+      const endHalf = formData.endType !== 'full';
 
-    daysArr.forEach((d, idx) => {
-      const dateStr = format(d, 'yyyy-MM-dd');
-      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      const isHoliday = holidaySet.has(dateStr);
+      // Create a Set of holiday date strings for faster lookup relative to the holidays currently loaded/displayed
+      const holidaySet = new Set(holidays.map(h => h.date));
 
-      // If NOT LOP, skip weekends and holidays.
-      // If LOP, we count everything (weekends and holidays included).
-      const isLop = formData.leaveType?.toLowerCase() === 'lop';
-      if (!isLop) {
-        if (isWeekend || isHoliday) return;
-      }
+      daysArr.forEach((d, idx) => {
+        const dateStr = format(d, 'yyyy-MM-dd');
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const isHoliday = holidaySet.has(dateStr);
 
-      const isFirst = idx === 0;
-      const isLast = idx === daysArr.length - 1;
-      if (isFirst && isLast) {
-        total += startHalf || endHalf ? 0.5 : 1;
-      } else if (isFirst) {
-        total += startHalf ? 0.5 : 1;
-      } else if (isLast) {
-        total += endHalf ? 0.5 : 1;
-      } else {
-        total += 1;
-      }
-    });
-    return total;
+        // If NOT LOP, skip weekends and holidays.
+        // If LOP, we count everything (weekends and holidays included).
+        const isLop = formData.leaveType?.toLowerCase() === 'lop';
+        if (!isLop) {
+          if (isWeekend || isHoliday) return;
+        }
+
+        const isFirst = idx === 0;
+        const isLast = idx === daysArr.length - 1;
+        if (isFirst && isLast) {
+          total += startHalf || endHalf ? 0.5 : 1;
+        } else if (isFirst) {
+          total += startHalf ? 0.5 : 1;
+        } else if (isLast) {
+          total += endHalf ? 0.5 : 1;
+        } else {
+          total += 1;
+        }
+      });
+      return total;
+    } catch (e) {
+      console.error('Error calculating requested days:', e);
+      return 0;
+    }
   }, [formData.startDate, formData.endDate, formData.startType, formData.endType, formData.leaveType, holidays]);
 
   // Optimize date overlap check with memoization and early exits
@@ -570,64 +580,69 @@ const LeaveApplyPage: React.FC = () => {
 
     if (activeRequests.length === 0) return null;
 
-    const requestedDaysArray = eachDayOfInterval({ start, end });
-    const startHalf = formData.startType !== 'full';
-    const endHalf = formData.endType !== 'full';
+    try {
+      const requestedDaysArray = eachDayOfInterval({ start, end });
+      const startHalf = formData.startType !== 'full';
+      const endHalf = formData.endType !== 'full';
 
-    // Check each requested day against existing leave requests
-    for (const day of requestedDaysArray) {
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-      if (isWeekend) continue; // Skip weekends
+      // Check each requested day against existing leave requests
+      for (const day of requestedDaysArray) {
+        const dayStr = format(day, 'yyyy-MM-dd');
+        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+        if (isWeekend) continue; // Skip weekends
 
-      const isFirst = dayStr === formData.startDate;
-      const isLast = dayStr === formData.endDate;
-      const isHalfDay = (isFirst && startHalf) || (isLast && endHalf);
+        const isFirst = dayStr === formData.startDate;
+        const isLast = dayStr === formData.endDate;
+        const isHalfDay = (isFirst && startHalf) || (isLast && endHalf);
 
-      // Check against existing requests with optimized lookup
-      for (const request of activeRequests) {
-        // Quick date range check first (faster than day-by-day)
-        if (day < request.reqStart || day > request.reqEnd) {
-          continue;
-        }
+        // Check against existing requests with optimized lookup
+        for (const request of activeRequests) {
+          // Quick date range check first (faster than day-by-day)
+          if (day < request.reqStart || day > request.reqEnd) {
+            continue;
+          }
 
-        // Check leaveDays array if available (more accurate)
-        if (request.leaveDaysMap) {
-          const existingDay = request.leaveDaysMap.get(dayStr);
-          if (existingDay) {
-            // Check status - block if approved, pending, or partially_approved (not rejected)
-            if (existingDay.status === 'approved' || existingDay.status === 'pending' || existingDay.status === 'partially_approved') {
-              // If existing leave is full day, block any new leave (full or half)
-              if (existingDay.type === 'full') {
-                const statusText = existingDay.status === 'approved' ? 'approved' :
-                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
-              }
-              // If existing leave is half day
-              if (existingDay.type === 'half') {
-                // Block if new request is full day
-                if (!isHalfDay) {
+          // Check leaveDays array if available (more accurate)
+          if (request.leaveDaysMap) {
+            const existingDay = request.leaveDaysMap.get(dayStr);
+            if (existingDay) {
+              // Check status - block if approved, pending, or partially_approved (not rejected)
+              if (existingDay.status === 'approved' || existingDay.status === 'pending' || existingDay.status === 'partially_approved') {
+                // If existing leave is full day, block any new leave (full or half)
+                if (existingDay.type === 'full') {
                   const statusText = existingDay.status === 'approved' ? 'approved' :
                     existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                  return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
+                  return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
                 }
-                // If both are half days, block to prevent conflicts
-                const statusText = existingDay.status === 'approved' ? 'approved' :
-                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
+                // If existing leave is half day
+                if (existingDay.type === 'half') {
+                  // Block if new request is full day
+                  if (!isHalfDay) {
+                    const statusText = existingDay.status === 'approved' ? 'approved' :
+                      existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                    return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
+                  }
+                  // If both are half days, block to prevent conflicts
+                  const statusText = existingDay.status === 'approved' ? 'approved' :
+                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                  return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
+                }
               }
             }
-          }
-        } else {
-          // Fallback: check date range overlap (less precise but better than nothing)
-          // If the request has approved or pending status, block the entire date range
-          if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
-            const statusText = request.currentStatus === 'approved' ? 'approved' :
-              request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
-            return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
+          } else {
+            // Fallback: check date range overlap (less precise but better than nothing)
+            // If the request has approved or pending status, block the entire date range
+            if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
+              const statusText = request.currentStatus === 'approved' ? 'approved' :
+                request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
+              return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
+            }
           }
         }
       }
+    } catch (e) {
+      console.error('Error checking date overlap:', e);
+      return null;
     }
 
     return null;
@@ -1911,7 +1926,7 @@ const LeaveApplyPage: React.FC = () => {
         <div className="recent-requests-section">
           <h2>Recent Leave Requests</h2>
           <div
-            className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 5 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
+            className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 3 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
             style={{
               pointerEvents: (applyMutation.isLoading || deleteMutation.isLoading) ? 'none' : 'auto',
               opacity: (applyMutation.isLoading || deleteMutation.isLoading) ? 0.8 : 1
