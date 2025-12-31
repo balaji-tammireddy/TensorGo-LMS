@@ -114,6 +114,8 @@ const ProfilePage: React.FC = () => {
       retry: false,
       staleTime: 0,
       refetchInterval: 60000, // Polling every 1 minute
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
           window.location.href = '/login';
@@ -417,7 +419,8 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  // Initial loading state (only for first-time page load)
+  if (isLoading && !profile) {
     return (
       <AppLayout>
         <div className="profile-page">

@@ -32,7 +32,8 @@ const HolidayManagementPage: React.FC = () => {
             retry: false,
             staleTime: 0,
             refetchInterval: 30000, // Polling every 30 seconds
-            cacheTime: 0,
+            cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+            keepPreviousData: true, // Keep old data while fetching new
             refetchOnMount: true
         }
     );
@@ -208,70 +209,77 @@ const HolidayManagementPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {holidaysLoading ? (
-                        <div className="hm-loading-message">Loading holidays...</div>
-                    ) : holidays.length === 0 ? (
-                        <EmptyState
-                            title={`No Holidays for ${selectedYear}`}
-                            description="There are no holidays listed for the selected year."
-                        />
-                    ) : (
-                        <div className="hm-table-container">
-                            <table className="hm-table">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Holiday Name</th>
-                                        <th>Day</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {holidays.map((holiday: any) => {
-                                        const holidayDate = new Date(holiday.date + 'T00:00:00');
-                                        const dayName = holidayDate.toLocaleDateString('en-US', { weekday: 'long' });
-                                        const formattedDate = format(holidayDate, 'dd MMM yyyy');
+                    <div className={`hm-table-wrapper ${holidaysLoading && holidays.length > 0 ? 'fetching' : ''}`}>
+                        {holidaysLoading && holidays.length === 0 ? (
+                            <div className="hm-skeleton-container">
+                                {Array.from({ length: 5 }).map((_, idx) => (
+                                    <div key={idx} className="hm-skeleton-row"></div>
+                                ))}
+                            </div>
+                        ) : holidays.length === 0 ? (
+                            <EmptyState
+                                title={`No Holidays for ${selectedYear}`}
+                                description="There are no holidays listed for the selected year."
+                            />
+                        ) : (
+                            <div className="hm-table-container">
+                                <table className="hm-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Holiday Name</th>
+                                            <th>Day</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {holidays.map((holiday: any) => {
+                                            const holidayDate = new Date(holiday.date + 'T00:00:00');
+                                            const dayName = holidayDate.toLocaleDateString('en-US', { weekday: 'long' });
+                                            const formattedDate = format(holidayDate, 'dd MMM yyyy');
 
-                                        return (
-                                            <tr key={holiday.id || holiday.date}>
-                                                <td>{formattedDate}</td>
-                                                <td>{holiday.name}</td>
-                                                <td>{dayName}</td>
-                                                <td>
-                                                    <button
-                                                        className="hm-delete-icon-button"
-                                                        onClick={() => handleDelete(holiday.id, holiday.name)}
-                                                        disabled={deleteMutation.isLoading}
-                                                        title="Delete holiday"
-                                                    >
-                                                        <FaTrash />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                            return (
+                                                <tr key={holiday.id || holiday.date}>
+                                                    <td>{formattedDate}</td>
+                                                    <td>{holiday.name}</td>
+                                                    <td>{dayName}</td>
+                                                    <td>
+                                                        <button
+                                                            className="hm-delete-icon-button"
+                                                            onClick={() => handleDelete(holiday.id, holiday.name)}
+                                                            disabled={deleteMutation.isLoading}
+                                                            title="Delete holiday"
+                                                        >
+                                                            <FaTrash />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                    <ConfirmationDialog
+                        isOpen={deleteConfirmOpen}
+                        title="Delete Holiday"
+                        message={`Are you sure you want to delete "${selectedHoliday?.name}"? This action cannot be undone.`}
+                        confirmText="Delete"
+                        cancelText="Cancel"
+                        type="danger"
+                        isLoading={deleteMutation.isLoading}
+                        onConfirm={confirmDelete}
+                        onCancel={() => {
+                            setDeleteConfirmOpen(false);
+                            setSelectedHoliday(null);
+                        }}
+                    />
                 </div>
-                <ConfirmationDialog
-                    isOpen={deleteConfirmOpen}
-                    title="Delete Holiday"
-                    message={`Are you sure you want to delete "${selectedHoliday?.name}"? This action cannot be undone.`}
-                    confirmText="Delete"
-                    cancelText="Cancel"
-                    type="danger"
-                    isLoading={deleteMutation.isLoading}
-                    onConfirm={confirmDelete}
-                    onCancel={() => {
-                        setDeleteConfirmOpen(false);
-                        setSelectedHoliday(null);
-                    }}
-                />
             </div>
-        </AppLayout >
+        </AppLayout>
     );
 };
 
 export default HolidayManagementPage;
+
