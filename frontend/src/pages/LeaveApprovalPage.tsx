@@ -17,6 +17,7 @@ import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import { FaPencilAlt, FaEye } from 'react-icons/fa';
+import EmptyState from '../components/common/EmptyState';
 import './LeaveApprovalPage.css';
 
 const LeaveApprovalPage: React.FC = () => {
@@ -74,11 +75,11 @@ const LeaveApprovalPage: React.FC = () => {
         // Cancel outgoing refetches
         await queryClient.cancelQueries(['pendingLeaves']);
         await queryClient.cancelQueries(['approvedLeaves']);
-        
+
         // Snapshot for rollback
         const previousPending = queryClient.getQueryData(['pendingLeaves']);
         const previousApproved = queryClient.getQueryData(['approvedLeaves']);
-        
+
         // Optimistically remove from pending list
         queryClient.setQueryData(['pendingLeaves'], (old: any) => {
           if (!old?.requests) return old;
@@ -87,7 +88,7 @@ const LeaveApprovalPage: React.FC = () => {
             requests: old.requests.filter((r: any) => r.id !== id)
           };
         });
-        
+
         return { previousPending, previousApproved };
       },
       onSuccess: (response, variables) => {
@@ -133,11 +134,11 @@ const LeaveApprovalPage: React.FC = () => {
         // Cancel outgoing refetches
         await queryClient.cancelQueries(['pendingLeaves']);
         await queryClient.cancelQueries(['approvedLeaves']);
-        
+
         // Snapshot for rollback
         const previousPending = queryClient.getQueryData(['pendingLeaves']);
         const previousApproved = queryClient.getQueryData(['approvedLeaves']);
-        
+
         // Optimistically remove from pending list
         queryClient.setQueryData(['pendingLeaves'], (old: any) => {
           if (!old?.requests) return old;
@@ -146,7 +147,7 @@ const LeaveApprovalPage: React.FC = () => {
             requests: old.requests.filter((r: any) => r.id !== id)
           };
         });
-        
+
         return { previousPending, previousApproved };
       },
       onSuccess: () => {
@@ -204,18 +205,18 @@ const LeaveApprovalPage: React.FC = () => {
       onMutate: async (requestId) => {
         await queryClient.cancelQueries(['pendingLeaves']);
         const previousPending = queryClient.getQueryData(['pendingLeaves']);
-        
+
         // Optimistically update leave type in the list
         queryClient.setQueryData(['pendingLeaves'], (old: any) => {
           if (!old?.requests) return old;
           return {
             ...old,
-            requests: old.requests.map((r: any) => 
+            requests: old.requests.map((r: any) =>
               r.id === requestId ? { ...r, leaveType: 'casual' } : r
             )
           };
         });
-        
+
         return { previousPending };
       },
       onSuccess: (response, requestId) => {
@@ -226,8 +227,8 @@ const LeaveApprovalPage: React.FC = () => {
         showSuccess('Leave request converted from LOP to Casual successfully!');
         // Update selected request if modal is open
         if (selectedRequest && selectedRequest.id === requestId) {
-            setSelectedRequest({
-              ...selectedRequest,
+          setSelectedRequest({
+            ...selectedRequest,
             leaveType: 'casual'
           });
         }
@@ -351,11 +352,11 @@ const LeaveApprovalPage: React.FC = () => {
         // Cancel outgoing refetches
         await queryClient.cancelQueries(['pendingLeaves']);
         await queryClient.cancelQueries(['approvedLeaves']);
-        
+
         // Snapshot for rollback
         const previousPending = queryClient.getQueryData(['pendingLeaves']);
         const previousApproved = queryClient.getQueryData(['approvedLeaves']);
-        
+
         // Optimistically update based on status
         if (status === 'approved') {
           queryClient.setQueryData(['pendingLeaves'], (old: any) => {
@@ -374,7 +375,7 @@ const LeaveApprovalPage: React.FC = () => {
             };
           });
         }
-        
+
         return { previousPending, previousApproved };
       },
       onSuccess: () => {
@@ -486,10 +487,10 @@ const LeaveApprovalPage: React.FC = () => {
     const pendingDays = request.leaveDays?.filter((day: any) => (day.status || 'pending') === 'pending') || [];
     const approvedDays = request.leaveDays?.filter((day: any) => day.status === 'approved') || [];
     const rejectedDays = request.leaveDays?.filter((day: any) => day.status === 'rejected') || [];
-    
+
     // Determine display status - prioritize pending status if there are any pending days
     let displayStatus = request.currentStatus;
-    
+
     // If there are pending days, status should be 'pending' or 'partially_approved', never 'rejected' or 'approved'
     if (pendingDays.length > 0) {
       if (approvedDays.length > 0) {
@@ -526,13 +527,13 @@ const LeaveApprovalPage: React.FC = () => {
           <div className="skeleton-loader">
             {/* Page Title Skeleton */}
             <div className="skeleton-title"></div>
-            
+
             {/* Search and Filter Bar Skeleton */}
             <div className="skeleton-search-filter">
               <div className="skeleton-input" style={{ width: '300px', height: '40px' }}></div>
               <div className="skeleton-input" style={{ width: '150px', height: '40px' }}></div>
             </div>
-            
+
             {/* Table Section Skeleton */}
             <div className="skeleton-card">
               <div className="skeleton-header"></div>
@@ -553,8 +554,8 @@ const LeaveApprovalPage: React.FC = () => {
     const errorMessage = pendingError?.response?.status === 403 || approvedError?.response?.status === 403
       ? 'You do not have permission to view this page'
       : pendingError?.response?.status === 429 || approvedError?.response?.status === 429
-      ? 'Too many requests. Please try again later.'
-      : 'Error loading data. Please try again.';
+        ? 'Too many requests. Please try again later.'
+        : 'Error loading data. Please try again.';
 
     const handleRetry = () => {
       window.location.reload();
@@ -563,7 +564,7 @@ const LeaveApprovalPage: React.FC = () => {
     return (
       <AppLayout>
         <div className="leave-approval-page">
-          <ErrorDisplay 
+          <ErrorDisplay
             message={errorMessage}
             onRetry={handleRetry}
             showRetryButton={pendingError?.response?.status !== 403 && approvedError?.response?.status !== 403}
@@ -575,282 +576,288 @@ const LeaveApprovalPage: React.FC = () => {
 
   return (
     <>
-    <AppLayout>
-      <div className="leave-approval-page">
-        <h1 className="page-title">Pending Requests</h1>
+      <AppLayout>
+        <div className="leave-approval-page">
+          <h1 className="page-title">Pending Requests</h1>
 
-        <div className="search-filter-bar">
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search by Name or Emp ID..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-            />
-            {searchInput && (
-              <button type="button" className="search-clear" onClick={clearSearch} aria-label="Clear search">
-                ×
-              </button>
-            )}
-          </div>
-          <div className="filter-box">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="leave-type-dropdown-trigger"
-                  style={{ 
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontFamily: 'Poppins, sans-serif',
-                    border: '1px solid #dcdcdc',
-                    borderRadius: '2px',
-                    backgroundColor: '#ffffff',
-                    color: '#1f2a3d',
-                    height: 'auto'
-                  }}
-                >
-                  <span>{filter === '' ? 'All Types' : filter === 'casual' ? 'Casual' : filter === 'sick' ? 'Sick' : 'LOP'}</span>
-                  <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="leave-type-dropdown-content">
-                <DropdownMenuItem
-                  onClick={() => setFilter('')}
-                >
-                  All Types
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setFilter('casual')}
-                >
-                  Casual
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setFilter('sick')}
-                >
-                  Sick
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setFilter('lop')}
-                >
-                  LOP
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="pending-requests-section">
-          <div 
-            className={`requests-table-container ${groupedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
-            style={{ 
-              pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
-              opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
-            }}
-          >
-            <table className="requests-table">
-              <thead>
-                <tr>
-                  <th>S NO</th>
-                  <th>EMP ID</th>
-                  <th>EMP NAME</th>
-                  <th>APPLIED DATE</th>
-                  <th>LEAVE DATE</th>
-                  <th>LEAVE TYPE</th>
-                  <th>NO OF DAYS</th>
-                  <th>LEAVE REASON</th>
-                  <th>CURRENT STATUS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-            {groupedPendingRequests.length === 0 ? (
-              <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>
-                  No leaves applied
-                </td>
-              </tr>
-            ) : (
-              groupedPendingRequests.map((request: any, idx: number) => {
-                const isUpdating = updatingRequestIds.has(request.id);
-                const leaveDateRange = request.leaveDays && request.leaveDays.length > 0
-                  ? `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`
-                  : formatDateSafe(request.startDate);
-                return (
-                <tr 
-                  key={request.id}
-                  className={isUpdating ? 'updating-row' : ''}
-                >
-                  <td>{idx + 1}</td>
-                  <td>{request.empId}</td>
-                  <td>{request.empName}</td>
-                  <td>{formatDateSafe(request.appliedDate)}</td>
-                  <td>{leaveDateRange}</td>
-                  <td>{request.leaveType}</td>
-                  <td>{request.noOfDays}</td>
-                  <td>{request.leaveReason}</td>
-                  <td>
-                    {request.displayStatus === 'pending' ? (
-                      <span className="status-badge status-pending">Pending</span>
-                    ) : request.displayStatus === 'approved' ? (
-                      <span className="status-badge status-approved">Approved</span>
-                    ) : request.displayStatus === 'rejected' ? (
-                      <span className="status-badge status-rejected">Rejected</span>
-                    ) : request.displayStatus === 'partially_approved' ? (
-                      <span className="status-badge status-partial">Partially Approved</span>
-                    ) : (
-                      <span className="status-badge">{request.displayStatus}</span>
-                    )}
-                  </td>
-                  <td className="actions-cell">
-                    <button
-                      className={`edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
-                      onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleEditClick(request)}
-                      title={isUpdating ? 'Updating...' : 'View Details & Approve/Reject'}
-                      disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
-                    >
-                      {isUpdating ? (
-                        <span className="loading-spinner-small"></span>
-                      ) : (
-                        <FaPencilAlt />
-                      )}
-                    </button>
-                  </td>
-                </tr>
-                );
-              })
-            )}
-            </tbody>
-          </table>
-          </div>
-        </div>
-
-        <div className="approved-requests-section">
-          <h2>Recent Leave Requests</h2>
-          <div 
-            className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
-            style={{ 
-              pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
-              opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
-            }}
-          >
-            <table className="requests-table">
-              <thead>
-                <tr>
-                  <th>S NO</th>
-                  <th>EMP ID</th>
-                  <th>EMP NAME</th>
-                  <th>APPLIED DATE</th>
-                  <th>LEAVE DATE</th>
-                  <th>LEAVE TYPE</th>
-                  <th>NO OF DAYS</th>
-                  <th>LEAVE STATUS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-              {!approvedData?.requests || approvedData.requests.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '16px' }}>
-                    No leaves applied
-                  </td>
-                </tr>
-              ) : (
-                approvedData.requests
-                  .filter((request: any) => {
-                    // Filter out any requests that still have pending days
-                    // This is a safety check in case backend filtering isn't perfect
-                    const hasPendingDays = request.leaveDays?.some((day: any) => 
-                      (day.status || 'pending') === 'pending'
-                    );
-                    return !hasPendingDays && request.leaveStatus !== 'pending';
-                  })
-                  .map((request: any, idx: number) => {
-                  const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
-                  const canEdit = request.canEdit && (user?.role === 'hr' || user?.role === 'super_admin');
-                  return (
-                  <tr 
-                    key={request.id}
-                    className={isUpdating ? 'updating-row' : ''}
-                  >
-                    <td>{idx + 1}</td>
-                    <td>{request.empId}</td>
-                    <td>{request.empName}</td>
-                    <td>{formatDateSafe(request.appliedDate)}</td>
-                    <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
-                    <td>{request.leaveType}</td>
-                    <td>{request.noOfDays}</td>
-                    <td>
-                    {request.leaveStatus === 'pending' ? (
-                      <span className="status-badge status-pending">Pending</span>
-                    ) : request.leaveStatus === 'approved' ? (
-                        <span className="status-badge status-approved">Approved</span>
-                      ) : request.leaveStatus === 'rejected' ? (
-                        <span className="status-badge status-rejected">Rejected</span>
-                    ) : request.leaveStatus === 'partially_approved' ? (
-                      <span className="status-badge status-partial">Partially Approved</span>
-                      ) : (
-                        <span className="status-badge">{request.leaveStatus}</span>
-                      )}
-                    </td>
-                    <td className="actions-cell">
-                      {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
-                        <div className="action-icons-container">
-                          <span
-                            className={`action-icon ${isUpdating ? 'disabled' : ''}`}
-                            title="View Details"
-                            onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
-                          >
-                            <FaEye />
-                          </span>
-                          <span
-                            className={`action-icon ${isUpdating ? 'disabled' : ''}`}
-                            title={isUpdating ? 'Loading...' : 'Edit'}
-                            onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
-                            style={{ 
-                              cursor: isUpdating ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            {isUpdating && editingRequestId === request.id ? (
-                              <span className="loading-spinner-small"></span>
-                            ) : (
-                              <FaPencilAlt />
-                            )}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                  );
-                })
+          <div className="search-filter-bar">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search by Name or Emp ID..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+              />
+              {searchInput && (
+                <button type="button" className="search-clear" onClick={clearSearch} aria-label="Clear search">
+                  ×
+                </button>
               )}
-            </tbody>
-          </table>
+            </div>
+            <div className="filter-box">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="leave-type-dropdown-trigger"
+                    style={{
+                      padding: '6px 10px',
+                      fontSize: '12px',
+                      fontFamily: 'Poppins, sans-serif',
+                      border: '1px solid #dcdcdc',
+                      borderRadius: '2px',
+                      backgroundColor: '#ffffff',
+                      color: '#1f2a3d',
+                      height: 'auto'
+                    }}
+                  >
+                    <span>{filter === '' ? 'All Types' : filter === 'casual' ? 'Casual' : filter === 'sick' ? 'Sick' : 'LOP'}</span>
+                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="leave-type-dropdown-content">
+                  <DropdownMenuItem
+                    onClick={() => setFilter('')}
+                  >
+                    All Types
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFilter('casual')}
+                  >
+                    Casual
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFilter('sick')}
+                  >
+                    Sick
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setFilter('lop')}
+                  >
+                    LOP
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          <div className="pending-requests-section">
+            <div
+              className={`requests-table-container ${groupedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+              style={{
+                pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
+                opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
+              }}
+            >
+              <table className="requests-table">
+                <thead>
+                  <tr>
+                    <th>S NO</th>
+                    <th>EMP ID</th>
+                    <th>EMP NAME</th>
+                    <th>APPLIED DATE</th>
+                    <th>LEAVE DATE</th>
+                    <th>LEAVE TYPE</th>
+                    <th>NO OF DAYS</th>
+                    <th>LEAVE REASON</th>
+                    <th>CURRENT STATUS</th>
+                    <th>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedPendingRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} style={{ padding: 0 }}>
+                        <EmptyState
+                          title="No Pending Requests"
+                          description="There are no leave requests waiting for your approval."
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    groupedPendingRequests.map((request: any, idx: number) => {
+                      const isUpdating = updatingRequestIds.has(request.id);
+                      const leaveDateRange = request.leaveDays && request.leaveDays.length > 0
+                        ? `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`
+                        : formatDateSafe(request.startDate);
+                      return (
+                        <tr
+                          key={request.id}
+                          className={isUpdating ? 'updating-row' : ''}
+                        >
+                          <td>{idx + 1}</td>
+                          <td>{request.empId}</td>
+                          <td>{request.empName}</td>
+                          <td>{formatDateSafe(request.appliedDate)}</td>
+                          <td>{leaveDateRange}</td>
+                          <td>{request.leaveType}</td>
+                          <td>{request.noOfDays}</td>
+                          <td>{request.leaveReason}</td>
+                          <td>
+                            {request.displayStatus === 'pending' ? (
+                              <span className="status-badge status-pending">Pending</span>
+                            ) : request.displayStatus === 'approved' ? (
+                              <span className="status-badge status-approved">Approved</span>
+                            ) : request.displayStatus === 'rejected' ? (
+                              <span className="status-badge status-rejected">Rejected</span>
+                            ) : request.displayStatus === 'partially_approved' ? (
+                              <span className="status-badge status-partial">Partially Approved</span>
+                            ) : (
+                              <span className="status-badge">{request.displayStatus}</span>
+                            )}
+                          </td>
+                          <td className="actions-cell">
+                            <button
+                              className={`edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
+                              onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleEditClick(request)}
+                              title={isUpdating ? 'Updating...' : 'View Details & Approve/Reject'}
+                              disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
+                            >
+                              {isUpdating ? (
+                                <span className="loading-spinner-small"></span>
+                              ) : (
+                                <FaPencilAlt />
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="approved-requests-section">
+            <h2>Recent Leave Requests</h2>
+            <div
+              className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+              style={{
+                pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
+                opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
+              }}
+            >
+              <table className="requests-table">
+                <thead>
+                  <tr>
+                    <th>S NO</th>
+                    <th>EMP ID</th>
+                    <th>EMP NAME</th>
+                    <th>APPLIED DATE</th>
+                    <th>LEAVE DATE</th>
+                    <th>LEAVE TYPE</th>
+                    <th>NO OF DAYS</th>
+                    <th>LEAVE STATUS</th>
+                    <th>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!approvedData?.requests || approvedData.requests.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: 0 }}>
+                        <EmptyState
+                          title="No Recent Activity"
+                          description="No recently approved or rejected leave requests found."
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    approvedData.requests
+                      .filter((request: any) => {
+                        // Filter out any requests that still have pending days
+                        // This is a safety check in case backend filtering isn't perfect
+                        const hasPendingDays = request.leaveDays?.some((day: any) =>
+                          (day.status || 'pending') === 'pending'
+                        );
+                        return !hasPendingDays && request.leaveStatus !== 'pending';
+                      })
+                      .map((request: any, idx: number) => {
+                        const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
+                        const canEdit = request.canEdit && (user?.role === 'hr' || user?.role === 'super_admin');
+                        return (
+                          <tr
+                            key={request.id}
+                            className={isUpdating ? 'updating-row' : ''}
+                          >
+                            <td>{idx + 1}</td>
+                            <td>{request.empId}</td>
+                            <td>{request.empName}</td>
+                            <td>{formatDateSafe(request.appliedDate)}</td>
+                            <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
+                            <td>{request.leaveType}</td>
+                            <td>{request.noOfDays}</td>
+                            <td>
+                              {request.leaveStatus === 'pending' ? (
+                                <span className="status-badge status-pending">Pending</span>
+                              ) : request.leaveStatus === 'approved' ? (
+                                <span className="status-badge status-approved">Approved</span>
+                              ) : request.leaveStatus === 'rejected' ? (
+                                <span className="status-badge status-rejected">Rejected</span>
+                              ) : request.leaveStatus === 'partially_approved' ? (
+                                <span className="status-badge status-partial">Partially Approved</span>
+                              ) : (
+                                <span className="status-badge">{request.leaveStatus}</span>
+                              )}
+                            </td>
+                            <td className="actions-cell">
+                              {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
+                                <div className="action-icons-container">
+                                  <span
+                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                    title="View Details"
+                                    onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
+                                  >
+                                    <FaEye />
+                                  </span>
+                                  <span
+                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                    title={isUpdating ? 'Loading...' : 'Edit'}
+                                    onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
+                                    style={{
+                                      cursor: isUpdating ? 'not-allowed' : 'pointer'
+                                    }}
+                                  >
+                                    {isUpdating && editingRequestId === request.id ? (
+                                      <span className="loading-spinner-small"></span>
+                                    ) : (
+                                      <FaPencilAlt />
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
-    </AppLayout>
-    <LeaveDetailsModal
-      isOpen={isModalOpen}
-      leaveRequest={selectedRequest}
-      onClose={() => {
-        setIsModalOpen(false);
-        setSelectedRequest(null);
-        setIsEditMode(false);
-      }}
-      onApprove={handleModalApprove}
-      onReject={handleModalReject}
-      onUpdate={handleUpdateStatus}
-      onConvertLopToCasual={handleConvertLopToCasual}
-      isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading}
-      isConverting={convertLopToCasualMutation.isLoading}
-      isEditMode={isEditMode}
-      userRole={user?.role}
-    />
+      </AppLayout>
+      <LeaveDetailsModal
+        isOpen={isModalOpen}
+        leaveRequest={selectedRequest}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedRequest(null);
+          setIsEditMode(false);
+        }}
+        onApprove={handleModalApprove}
+        onReject={handleModalReject}
+        onUpdate={handleUpdateStatus}
+        onConvertLopToCasual={handleConvertLopToCasual}
+        isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading}
+        isConverting={convertLopToCasualMutation.isLoading}
+        isEditMode={isEditMode}
+        userRole={user?.role}
+      />
     </>
   );
 };

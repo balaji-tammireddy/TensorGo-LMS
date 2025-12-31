@@ -752,8 +752,11 @@ const EmployeeManagementPage: React.FC = () => {
             <tbody>
               {sortedEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="no-results-row">
-                    No results found
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <EmptyState
+                      title="No Employees Found"
+                      description="Try adjusting your search or filters to find what you're looking for."
+                    />
                   </td>
                 </tr>
               ) : (
@@ -1787,18 +1790,20 @@ const EmployeeManagementPage: React.FC = () => {
 
               <div className="employee-modal-footer">
                 {isViewMode ? (
-                  <button
-                    type="button"
-                    className="modal-save-button"
-                    onClick={() => {
-                      if (!showLeaveHistory) {
-                        refetchLeaveHistory();
-                      }
-                      setShowLeaveHistory(!showLeaveHistory);
-                    }}
-                  >
-                    {showLeaveHistory ? 'Back to Details' : 'Leave History'}
-                  </button>
+                  newEmployee.role !== 'super_admin' && (
+                    <button
+                      type="button"
+                      className="modal-save-button"
+                      onClick={() => {
+                        if (!showLeaveHistory) {
+                          refetchLeaveHistory();
+                        }
+                        setShowLeaveHistory(!showLeaveHistory);
+                      }}
+                    >
+                      {showLeaveHistory ? 'Back to Details' : 'Leave History'}
+                    </button>
+                  )
                 ) : (
                   <>
                     <button

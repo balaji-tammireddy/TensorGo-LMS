@@ -19,6 +19,7 @@ import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { FaPencilAlt, FaTrash, FaEye } from 'react-icons/fa';
+import EmptyState from '../components/common/EmptyState';
 import './LeaveApplyPage.css';
 
 const LeaveApplyPage: React.FC = () => {
@@ -49,9 +50,9 @@ const LeaveApplyPage: React.FC = () => {
   const minStartDate = formData.leaveType === 'casual'
     ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days for casual
     : formData.leaveType === 'sick'
-    ? format(addDays(new Date(), -3), 'yyyy-MM-dd') // allow past 3 days for sick leave
-    : todayStr; // LOP and permission can be applied for today
-  
+      ? format(addDays(new Date(), -3), 'yyyy-MM-dd') // allow past 3 days for sick leave
+      : todayStr; // LOP and permission can be applied for today
+
   // For sick leave: max date is tomorrow (only allow tomorrow for future dates)
   const maxStartDate = formData.leaveType === 'sick'
     ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // only allow tomorrow for future sick leave
@@ -106,20 +107,20 @@ const LeaveApplyPage: React.FC = () => {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
-    
+
     // If before office hours, return 10:00
     if (currentHour < 10) {
       return '10:00';
     }
-    
+
     // If after office hours for start time (18:00), return 10:00 (next day, but we'll handle this in validation)
     if (currentHour >= 18) {
       return '10:00';
     }
-    
+
     // Round to next 15-minute slot
     const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
-    
+
     if (roundedMinutes >= 60) {
       const nextHour = currentHour + 1;
       // If next hour is after office hours for start time, cap at 18:00
@@ -128,14 +129,14 @@ const LeaveApplyPage: React.FC = () => {
       }
       return `${String(nextHour).padStart(2, '0')}:00`;
     }
-    
+
     const result = `${String(currentHour).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
-    
+
     // Ensure result is within office hours for start time (max 18:00)
     if (result >= '18:00') {
       return '18:00';
     }
-    
+
     return result;
   };
 
@@ -151,10 +152,10 @@ const LeaveApplyPage: React.FC = () => {
   // Handle start time change from custom picker
   const handleStartTimeChange = (newStartTime: string) => {
     if (!newStartTime) return;
-    
+
     // Round to nearest 15-minute slot (should already be valid from select, but ensure)
     let roundedStartTime = roundTo15Minutes(newStartTime);
-    
+
     // Clamp to office hours (10:00-18:00 for start time)
     if (roundedStartTime < '10:00') {
       showWarning('Start time must be within office hours (10:00 AM - 6:00 PM). Setting to 10:00.');
@@ -163,21 +164,21 @@ const LeaveApplyPage: React.FC = () => {
       showWarning('Start time must be within office hours (10:00 AM - 6:00 PM). Setting to 18:00.');
       roundedStartTime = '18:00';
     }
-    
+
     // Validate start time is not in the past (if date is today)
     if (formData.startDate === todayStr) {
       const now = new Date();
       const [hours, minutes] = roundedStartTime.split(':').map(Number);
       const selectedTime = new Date();
       selectedTime.setHours(hours, minutes, 0, 0);
-      
+
       if (selectedTime < now) {
         const nextSlot = clampToOfficeHours(getNext15MinuteSlot(), true);
         showWarning('Start time cannot be in the past. Setting to next available 15-minute slot within office hours.');
         setFormData({
           ...formData,
-          timeForPermission: { 
-            start: nextSlot, 
+          timeForPermission: {
+            start: nextSlot,
             end: (() => {
               const [h, m] = nextSlot.split(':').map(Number);
               const st = new Date();
@@ -202,33 +203,33 @@ const LeaveApplyPage: React.FC = () => {
         return;
       }
     }
-    
+
     // Calculate end time (2 hours after start, rounded to 15 minutes)
     const [hours, minutes] = roundedStartTime.split(':').map(Number);
     const startTime = new Date();
     startTime.setHours(hours, minutes, 0, 0);
     const endTime = new Date(startTime);
     endTime.setHours(endTime.getHours() + 2);
-    
+
     // Round end time to 15-minute slot and clamp to office hours
     let endHour = endTime.getHours();
     let endMinute = endTime.getMinutes();
-    
+
     // Round to 15-minute slot
     endMinute = Math.round(endMinute / 15) * 15;
     if (endMinute >= 60) {
       endHour += 1;
       endMinute = 0;
     }
-    
+
     // Clamp to office hours (19:00 max)
     if (endHour >= 19) {
       endHour = 19;
       endMinute = 0;
     }
-    
+
     const calculatedEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
-    
+
     setFormData({
       ...formData,
       timeForPermission: { start: roundedStartTime, end: calculatedEndTime }
@@ -238,10 +239,10 @@ const LeaveApplyPage: React.FC = () => {
   // Handle end time change from custom picker
   const handleEndTimeChange = (newEndTime: string) => {
     if (!newEndTime || !formData.timeForPermission.start) return;
-    
+
     // Round to nearest 15-minute slot (should already be valid from select, but ensure)
     let roundedEndTime = roundTo15Minutes(newEndTime);
-    
+
     // Clamp to office hours (10:00-19:00)
     if (roundedEndTime < '10:00') {
       roundedEndTime = '10:00';
@@ -250,20 +251,20 @@ const LeaveApplyPage: React.FC = () => {
       roundedEndTime = '19:00';
       showWarning('End time must be within office hours (10:00 AM - 7:00 PM).');
     }
-    
+
     const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
     const [endHours, endMinutes] = roundedEndTime.split(':').map(Number);
     const startTime = new Date(`2000-01-01T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00`);
     let endTime = new Date(`2000-01-01T${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`);
-    
+
     // Handle case where end time is next day (after midnight)
     if (endTime < startTime) {
       endTime.setDate(endTime.getDate() + 1);
     }
-    
+
     const diffMs = endTime.getTime() - startTime.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    
+
     // Validate end time is after start time
     if (diffHours <= 0) {
       showWarning('End time must be after start time.');
@@ -289,7 +290,7 @@ const LeaveApplyPage: React.FC = () => {
       });
       return;
     }
-    
+
     // Validate duration doesn't exceed 2 hours
     if (diffHours > 2) {
       showWarning('Permission duration cannot exceed 2 hours. Maximum end time is 2 hours after start time.');
@@ -315,7 +316,7 @@ const LeaveApplyPage: React.FC = () => {
       });
       return;
     }
-    
+
     setFormData({
       ...formData,
       timeForPermission: { ...formData.timeForPermission, end: roundedEndTime }
@@ -390,11 +391,11 @@ const LeaveApplyPage: React.FC = () => {
   useEffect(() => {
     if (formData.leaveType === 'permission' && formData.startDate && !formData.timeForPermission.start) {
       const isToday = formData.startDate === todayStr;
-      
+
       // If it's today, use next 15-minute slot within office hours; otherwise use 10:00
       let defaultStartTime = isToday ? getNext15MinuteSlot() : '10:00';
       defaultStartTime = clampToOfficeHours(defaultStartTime);
-      
+
       // Calculate end time (2 hours after start time, rounded to 15 minutes, within office hours)
       const [startHours, startMinutes] = defaultStartTime.split(':').map(Number);
       const startTime = new Date();
@@ -403,22 +404,22 @@ const LeaveApplyPage: React.FC = () => {
       endTime.setHours(endTime.getHours() + 2);
       let endHour = endTime.getHours();
       let endMinute = endTime.getMinutes();
-      
+
       // Round to 15-minute slot
       endMinute = Math.round(endMinute / 15) * 15;
       if (endMinute >= 60) {
         endHour += 1;
         endMinute = 0;
       }
-      
+
       // Clamp to office hours (19:00 max)
       if (endHour >= 19) {
         endHour = 19;
         endMinute = 0;
       }
-      
+
       const defaultEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
-      
+
       setFormData(prev => ({
         ...prev,
         timeForPermission: { start: defaultStartTime, end: defaultEndTime }
@@ -432,13 +433,13 @@ const LeaveApplyPage: React.FC = () => {
       const [hours, minutes] = formData.timeForPermission.start.split(':').map(Number);
       const startTime = new Date();
       startTime.setHours(hours, minutes, 0, 0);
-      
+
       // Calculate end time (2 hours after start, rounded to 15 minutes)
       const endTime = new Date(startTime);
       endTime.setHours(endTime.getHours() + 2);
       let endHour = endTime.getHours();
       let endMinute = endTime.getMinutes();
-      
+
       // Round to 15-minute slot
       endMinute = Math.round(endMinute / 15) * 15;
       if (endMinute >= 60) {
@@ -449,9 +450,9 @@ const LeaveApplyPage: React.FC = () => {
         endHour = 23;
         endMinute = 45;
       }
-      
+
       const calculatedEndTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
-      
+
       // Auto-update end time to be 2 hours after start (unless user manually changed it)
       // We'll allow manual changes but validate max 2 hours
       setFormData(prev => {
@@ -465,12 +466,12 @@ const LeaveApplyPage: React.FC = () => {
           const diffHours = diffMs / (1000 * 60 * 60);
           return diffHours > 2;
         })();
-        
+
         return {
           ...prev,
-          timeForPermission: { 
-            ...prev.timeForPermission, 
-            end: shouldUpdate ? calculatedEndTime : prev.timeForPermission.end 
+          timeForPermission: {
+            ...prev.timeForPermission,
+            end: shouldUpdate ? calculatedEndTime : prev.timeForPermission.end
           }
         };
       });
@@ -480,7 +481,7 @@ const LeaveApplyPage: React.FC = () => {
   const { data: balances, isLoading: balancesLoading, error: balancesError } = useQuery(
     'leaveBalances',
     leaveService.getLeaveBalances,
-    { 
+    {
       retry: false,
       staleTime: 1 * 60 * 1000, // Cache for 1 minute
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
@@ -494,11 +495,11 @@ const LeaveApplyPage: React.FC = () => {
 
 
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-  
+
   const { data: holidaysData = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
     ['holidays', selectedYear],
     () => leaveService.getHolidays(selectedYear),
-    { 
+    {
       retry: false,
       staleTime: 0, // Always refetch when year changes
       cacheTime: 0, // Don't cache old year data
@@ -535,7 +536,7 @@ const LeaveApplyPage: React.FC = () => {
   const { data: myRequests, isLoading: requestsLoading, error: requestsError } = useQuery(
     'myLeaveRequests',
     () => leaveService.getMyLeaveRequests(1, 50), // Reduced from 100 to 50 for faster loading
-    { 
+    {
       retry: false,
       staleTime: 2 * 60 * 1000, // Cache for 2 minutes
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
@@ -566,7 +567,7 @@ const LeaveApplyPage: React.FC = () => {
         ...r,
         reqStart: new Date(`${r.startDate}T00:00:00`),
         reqEnd: new Date(`${r.endDate}T00:00:00`),
-        leaveDaysMap: r.leaveDays && Array.isArray(r.leaveDays) 
+        leaveDaysMap: r.leaveDays && Array.isArray(r.leaveDays)
           ? new Map(r.leaveDays.map((ld: any) => [ld.date, ld]))
           : null
       }));
@@ -602,21 +603,21 @@ const LeaveApplyPage: React.FC = () => {
             if (existingDay.status === 'approved' || existingDay.status === 'pending' || existingDay.status === 'partially_approved') {
               // If existing leave is full day, block any new leave (full or half)
               if (existingDay.type === 'full') {
-                const statusText = existingDay.status === 'approved' ? 'approved' : 
-                                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                const statusText = existingDay.status === 'approved' ? 'approved' :
+                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
                 return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
               }
               // If existing leave is half day
               if (existingDay.type === 'half') {
                 // Block if new request is full day
                 if (!isHalfDay) {
-                  const statusText = existingDay.status === 'approved' ? 'approved' : 
-                                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                  const statusText = existingDay.status === 'approved' ? 'approved' :
+                    existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
                   return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
                 }
                 // If both are half days, block to prevent conflicts
-                const statusText = existingDay.status === 'approved' ? 'approved' : 
-                                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
+                const statusText = existingDay.status === 'approved' ? 'approved' :
+                  existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
                 return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
               }
             }
@@ -625,8 +626,8 @@ const LeaveApplyPage: React.FC = () => {
           // Fallback: check date range overlap (less precise but better than nothing)
           // If the request has approved or pending status, block the entire date range
           if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
-            const statusText = request.currentStatus === 'approved' ? 'approved' : 
-                              request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
+            const statusText = request.currentStatus === 'approved' ? 'approved' :
+              request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
             return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
           }
         }
@@ -637,8 +638,8 @@ const LeaveApplyPage: React.FC = () => {
   }, [formData.startDate, formData.endDate, formData.startType, formData.endType, myRequests?.requests, editingId]);
 
   const applyMutation = useMutation(
-    (data: { id?: number; data: any }) => 
-      data.id 
+    (data: { id?: number; data: any }) =>
+      data.id
         ? leaveService.updateLeaveRequest(data.id, data.data)
         : leaveService.applyLeave(data.data),
     {
@@ -646,11 +647,11 @@ const LeaveApplyPage: React.FC = () => {
         // Cancel outgoing refetches
         await queryClient.cancelQueries('myLeaveRequests');
         await queryClient.cancelQueries('leaveBalances');
-        
+
         // Snapshot previous values for rollback
         const previousRequests = queryClient.getQueryData('myLeaveRequests');
         const previousBalances = queryClient.getQueryData('leaveBalances');
-        
+
         return { previousRequests, previousBalances };
       },
       onSuccess: (response, variables) => {
@@ -672,11 +673,11 @@ const LeaveApplyPage: React.FC = () => {
             return { ...old, requests };
           });
         }
-        
+
         // Invalidate queries in background (non-blocking) for fresh data
         queryClient.invalidateQueries('leaveBalances');
         queryClient.invalidateQueries('myLeaveRequests');
-        
+
         showSuccess(variables.id ? 'Leave updated successfully!' : 'Leave applied successfully!');
         setFormData({
           leaveType: 'casual',
@@ -699,10 +700,10 @@ const LeaveApplyPage: React.FC = () => {
         if (context?.previousBalances) {
           queryClient.setQueryData('leaveBalances', context.previousBalances);
         }
-        
+
         const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to apply leave';
         const errorDetails = error.response?.data?.error?.details;
-        
+
         if (errorDetails && Array.isArray(errorDetails)) {
           // Format field names to be user-friendly
           const formatFieldName = (path: string[]): string => {
@@ -710,7 +711,7 @@ const LeaveApplyPage: React.FC = () => {
             // Capitalize first letter and replace underscores with spaces
             return field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
           };
-          
+
           // Remove duplicates and format messages
           const uniqueMessages = new Map<string, string>();
           errorDetails.forEach((d: any) => {
@@ -722,7 +723,7 @@ const LeaveApplyPage: React.FC = () => {
               uniqueMessages.set(key, `${fieldName}: ${message}`);
             }
           });
-          
+
           const detailMessages = Array.from(uniqueMessages.values()).join('\n');
           showError(detailMessages || errorMessage);
         } else {
@@ -736,7 +737,7 @@ const LeaveApplyPage: React.FC = () => {
     onMutate: async (requestId) => {
       await queryClient.cancelQueries('myLeaveRequests');
       const previousRequests = queryClient.getQueryData('myLeaveRequests');
-      
+
       // Optimistically remove from list
       queryClient.setQueryData('myLeaveRequests', (old: any) => {
         if (!old?.requests) return old;
@@ -745,7 +746,7 @@ const LeaveApplyPage: React.FC = () => {
           requests: old.requests.filter((r: any) => r.id !== requestId)
         };
       });
-      
+
       return { previousRequests };
     },
     onSuccess: () => {
@@ -797,13 +798,13 @@ const LeaveApplyPage: React.FC = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const oneDayMs = 1000 * 60 * 60 * 24;
-      
+
       // Validate start date
       if (formData.startDate) {
         const startDate = new Date(formData.startDate + 'T12:00:00');
         startDate.setHours(0, 0, 0, 0);
         const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / oneDayMs);
-        
+
         if (daysDifference < -3) {
           showWarning('Cannot apply sick leave for start dates more than 3 days in the past.');
           return;
@@ -813,13 +814,13 @@ const LeaveApplyPage: React.FC = () => {
           return;
         }
       }
-      
+
       // Validate end date
       if (formData.endDate) {
         const endDate = new Date(formData.endDate + 'T12:00:00');
         endDate.setHours(0, 0, 0, 0);
         const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / oneDayMs);
-        
+
         if (endDaysDifference < -3) {
           showWarning('Cannot apply sick leave for end dates more than 3 days in the past.');
           return;
@@ -876,14 +877,14 @@ const LeaveApplyPage: React.FC = () => {
       endType: formData.leaveType === 'permission' ? 'full' : formData.endType,
       reason: formData.reason
     };
-    
+
     // For permission, timeForPermission is required
     if (formData.leaveType === 'permission') {
       if (!formData.timeForPermission.start || !formData.timeForPermission.end) {
         showWarning('Please provide start and end timings for permission');
         return;
       }
-      
+
       // Validate that permission time is not in the past if start date is today
       const isToday = formData.startDate === todayStr;
       if (isToday) {
@@ -891,32 +892,32 @@ const LeaveApplyPage: React.FC = () => {
         const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
         const permissionStartTime = new Date();
         permissionStartTime.setHours(startHours, startMinutes, 0, 0);
-        
+
         if (permissionStartTime < now) {
           showWarning('Cannot apply permission for past times. Please select a future time.');
           return;
         }
       }
-      
+
       // Validate permission duration (max 2 hours)
       const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);
       const [endHours, endMinutes] = formData.timeForPermission.end.split(':').map(Number);
       const startTime = new Date(`2000-01-01T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00`);
       const endTime = new Date(`2000-01-01T${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`);
-      
+
       // Handle case where end time is next day (after midnight)
       if (endTime < startTime) {
         endTime.setDate(endTime.getDate() + 1);
       }
-      
+
       const diffMs = endTime.getTime() - startTime.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      
+
       if (diffHours > 2) {
         showWarning('Permission duration cannot exceed 2 hours');
         return;
       }
-      
+
       if (diffHours <= 0) {
         showWarning('End time must be after start time');
         return;
@@ -939,7 +940,7 @@ const LeaveApplyPage: React.FC = () => {
         submitData.doctorNote = existingDoctorNote;
       }
     }
-    
+
     if (editingId) {
       applyMutation.mutate({ id: editingId, data: submitData });
     } else {
@@ -952,7 +953,7 @@ const LeaveApplyPage: React.FC = () => {
     if (applyMutation.isLoading || deleteMutation.isLoading) {
       return;
     }
-    
+
     try {
       setEditingRequestId(requestId);
       const request = await leaveService.getLeaveRequest(requestId);
@@ -1039,7 +1040,7 @@ const LeaveApplyPage: React.FC = () => {
           <div className="skeleton-loader">
             {/* Page Title Skeleton */}
             <div className="skeleton-title"></div>
-            
+
             {/* Top Sections Row Skeleton */}
             <div className="top-sections-row">
               {/* Leave Balances Skeleton */}
@@ -1062,7 +1063,7 @@ const LeaveApplyPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Rules Skeleton */}
               <div className="skeleton-card">
                 <div className="skeleton-header"></div>
@@ -1072,7 +1073,7 @@ const LeaveApplyPage: React.FC = () => {
                   <div className="skeleton-table-row"></div>
                 </div>
               </div>
-              
+
               {/* Holidays Skeleton */}
               <div className="skeleton-card">
                 <div className="skeleton-header"></div>
@@ -1084,7 +1085,7 @@ const LeaveApplyPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Form Section Skeleton */}
             <div className="skeleton-card skeleton-form">
               <div className="skeleton-header"></div>
@@ -1102,7 +1103,7 @@ const LeaveApplyPage: React.FC = () => {
                 <div className="skeleton-button"></div>
               </div>
             </div>
-            
+
             {/* Requests Section Skeleton */}
             <div className="skeleton-card">
               <div className="skeleton-header"></div>
@@ -1134,7 +1135,7 @@ const LeaveApplyPage: React.FC = () => {
     return (
       <AppLayout>
         <div className="leave-apply-page">
-          <ErrorDisplay 
+          <ErrorDisplay
             message={errorMessage}
             onRetry={handleRetry}
             showRetryButton={true}
@@ -1260,11 +1261,11 @@ const LeaveApplyPage: React.FC = () => {
                 <label>Leave Type</label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="leave-type-dropdown-trigger"
-                      style={{ 
-                        width: '100%', 
+                      style={{
+                        width: '100%',
                         justifyContent: 'space-between',
                         padding: '6px 8px',
                         fontSize: '12px',
@@ -1308,8 +1309,8 @@ const LeaveApplyPage: React.FC = () => {
                     <DropdownMenuItem
                       onClick={() => {
                         const newLeaveType = 'permission';
-                        setFormData({ 
-                          ...formData, 
+                        setFormData({
+                          ...formData,
                           leaveType: newLeaveType,
                           startType: 'full',
                           endDate: formData.startDate || '',
@@ -1353,11 +1354,11 @@ const LeaveApplyPage: React.FC = () => {
                   <label>Start Type</label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="leave-type-dropdown-trigger"
-                        style={{ 
-                          width: '100%', 
+                        style={{
+                          width: '100%',
                           justifyContent: 'space-between',
                           padding: '6px 8px',
                           fontSize: '12px',
@@ -1422,16 +1423,16 @@ const LeaveApplyPage: React.FC = () => {
                     <label>End Type</label>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="leave-type-dropdown-trigger"
                           disabled={
                             !!formData.startDate &&
                             !!formData.endDate &&
                             formData.startDate === formData.endDate
                           }
-                          style={{ 
-                            width: '100%', 
+                          style={{
+                            width: '100%',
                             justifyContent: 'space-between',
                             padding: '6px 8px',
                             fontSize: '12px',
@@ -1469,7 +1470,7 @@ const LeaveApplyPage: React.FC = () => {
                     </DropdownMenu>
                   </div>
                 </>
-            )}
+              )}
               {formData.leaveType === 'sick' && (
                 <div className="form-group doctor-note-group">
                   <label>Doctor Prescription</label>
@@ -1505,10 +1506,10 @@ const LeaveApplyPage: React.FC = () => {
                       <div className="custom-time-picker">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="time-dropdown-trigger"
-                              style={{ 
+                              style={{
                                 minWidth: '80px',
                                 justifyContent: 'space-between',
                                 padding: '10px 8px',
@@ -1549,10 +1550,10 @@ const LeaveApplyPage: React.FC = () => {
                         <span className="time-separator">:</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="time-dropdown-trigger"
-                              style={{ 
+                              style={{
                                 minWidth: '80px',
                                 justifyContent: 'space-between',
                                 padding: '10px 8px',
@@ -1631,10 +1632,10 @@ const LeaveApplyPage: React.FC = () => {
                       <div className="custom-time-picker">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="time-dropdown-trigger"
-                              style={{ 
+                              style={{
                                 minWidth: '80px',
                                 justifyContent: 'space-between',
                                 padding: '10px 8px',
@@ -1675,10 +1676,10 @@ const LeaveApplyPage: React.FC = () => {
                         <span className="time-separator">:</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="time-dropdown-trigger"
-                              style={{ 
+                              style={{
                                 minWidth: '80px',
                                 justifyContent: 'space-between',
                                 padding: '10px 8px',
@@ -1773,8 +1774,8 @@ const LeaveApplyPage: React.FC = () => {
                 />
               </div>
               <div className="form-actions">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="submit-button"
                   disabled={applyMutation.isLoading}
                 >
@@ -1787,9 +1788,9 @@ const LeaveApplyPage: React.FC = () => {
                     'Submit'
                   )}
                 </button>
-                <button 
-                  type="button" 
-                  onClick={handleClear} 
+                <button
+                  type="button"
+                  onClick={handleClear}
                   className="clear-button"
                   disabled={applyMutation.isLoading}
                 >
@@ -1803,9 +1804,9 @@ const LeaveApplyPage: React.FC = () => {
         {/* Recent Leave Requests Section */}
         <div className="recent-requests-section">
           <h2>Recent Leave Requests</h2>
-          <div 
+          <div
             className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 5 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
-            style={{ 
+            style={{
               pointerEvents: (applyMutation.isLoading || deleteMutation.isLoading) ? 'none' : 'auto',
               opacity: (applyMutation.isLoading || deleteMutation.isLoading) ? 0.8 : 1
             }}
@@ -1826,117 +1827,122 @@ const LeaveApplyPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-              {!myRequests?.requests || myRequests.requests.length === 0 ? (
-                <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>No leaves applied</td>
-                </tr>
-              ) : (
-                [...(myRequests.requests || [])]
-                  .sort((a: any, b: any) => {
-                    // Sort by start date in ascending order (earliest/upcoming dates first)
-                    const dateA = new Date(a.startDate + 'T12:00:00').getTime();
-                    const dateB = new Date(b.startDate + 'T12:00:00').getTime();
-                    return dateA - dateB; // Ascending order (earliest dates first)
-                  })
-                  .map((request: any, idx: number) => {
-                    const isUpdating = (applyMutation.isLoading && editingId === request.id) || 
-                                      (deleteMutation.isLoading && deleteRequestId === request.id) ||
-                                      editingRequestId === request.id;
-                    return (
-                  <tr 
-                    key={request.id}
-                    className={isUpdating ? 'updating-row' : ''}
-                  >
-                    <td>{idx + 1}</td>
-                    <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                    <td>
-                      <div className="reason-cell">
-                        {request.leaveReason}
-                      </div>
-                    </td>
-                    <td>
-                      {format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}
-                      {request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
-                    </td>
-                    <td>
-                      {format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}
-                      {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
-                    </td>
-                    <td>{request.noOfDays}</td>
-                    <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType}</td>
-                    <td>
-                      {(() => {
-                        const approvedDates = (request.leaveDays || [])
-                          .filter((d: any) => d.status === 'approved')
-                          .map((d: any) => new Date(d.date + 'T12:00:00'))
-                          .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-
-                        if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
-                          return '-';
-                        }
-                        if (!approvedDates.length) return '-';
-                        if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
-                        return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
-                      })()}
-                    </td>
-                    <td>
-                    {request.currentStatus === 'pending' ? (
-                      <span className="status-badge status-applied">Applied</span>
-                    ) : request.currentStatus === 'approved' ? (
-                        <span className="status-badge status-approved">Approved</span>
-                      ) : request.currentStatus === 'rejected' ? (
-                        <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
-                          Rejected
-                        </span>
-                    ) : request.currentStatus === 'partially_approved' ? (
-                      <span className="status-badge status-partial">Partially Approved</span>
-                      ) : (
-                        <span className="status-badge">{request.currentStatus}</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="action-icons-container">
-                        <span 
-                          className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
-                          title="View Details" 
-                          onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
-                        >
-                          <FaEye />
-                        </span>
-                        {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
-                          <>
-                            <span 
-                              className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
-                              title={isUpdating ? 'Updating...' : 'Edit'} 
-                              onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
-                            >
-                              {isUpdating && editingId === request.id ? (
-                                <span className="loading-spinner-small"></span>
-                              ) : (
-                                <FaPencilAlt />
-                              )}
-                            </span>
-                            <span 
-                              className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`} 
-                              title={isUpdating ? 'Updating...' : 'Delete'} 
-                              onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
-                            >
-                              {isUpdating && deleteRequestId === request.id ? (
-                                <span className="loading-spinner-small"></span>
-                              ) : (
-                                <FaTrash />
-                              )}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                {!myRequests?.requests || myRequests.requests.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} style={{ padding: 0 }}>
+                      <EmptyState
+                        title="No Leave History"
+                        description="You haven't applied for any leaves yet."
+                      />
                     </td>
                   </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  [...(myRequests.requests || [])]
+                    .sort((a: any, b: any) => {
+                      // Sort by start date in ascending order (earliest/upcoming dates first)
+                      const dateA = new Date(a.startDate + 'T12:00:00').getTime();
+                      const dateB = new Date(b.startDate + 'T12:00:00').getTime();
+                      return dateA - dateB; // Ascending order (earliest dates first)
+                    })
+                    .map((request: any, idx: number) => {
+                      const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
+                        (deleteMutation.isLoading && deleteRequestId === request.id) ||
+                        editingRequestId === request.id;
+                      return (
+                        <tr
+                          key={request.id}
+                          className={isUpdating ? 'updating-row' : ''}
+                        >
+                          <td>{idx + 1}</td>
+                          <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                          <td>
+                            <div className="reason-cell">
+                              {request.leaveReason}
+                            </div>
+                          </td>
+                          <td>
+                            {format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                            {request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
+                          </td>
+                          <td>
+                            {format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                            {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
+                          </td>
+                          <td>{request.noOfDays}</td>
+                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType}</td>
+                          <td>
+                            {(() => {
+                              const approvedDates = (request.leaveDays || [])
+                                .filter((d: any) => d.status === 'approved')
+                                .map((d: any) => new Date(d.date + 'T12:00:00'))
+                                .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+                              if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
+                                return '-';
+                              }
+                              if (!approvedDates.length) return '-';
+                              if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
+                              return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
+                            })()}
+                          </td>
+                          <td>
+                            {request.currentStatus === 'pending' ? (
+                              <span className="status-badge status-applied">Applied</span>
+                            ) : request.currentStatus === 'approved' ? (
+                              <span className="status-badge status-approved">Approved</span>
+                            ) : request.currentStatus === 'rejected' ? (
+                              <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
+                                Rejected
+                              </span>
+                            ) : request.currentStatus === 'partially_approved' ? (
+                              <span className="status-badge status-partial">Partially Approved</span>
+                            ) : (
+                              <span className="status-badge">{request.currentStatus}</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="action-icons-container">
+                              <span
+                                className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                title="View Details"
+                                onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
+                              >
+                                <FaEye />
+                              </span>
+                              {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
+                                <>
+                                  <span
+                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                    title={isUpdating ? 'Updating...' : 'Edit'}
+                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
+                                  >
+                                    {isUpdating && editingId === request.id ? (
+                                      <span className="loading-spinner-small"></span>
+                                    ) : (
+                                      <FaPencilAlt />
+                                    )}
+                                  </span>
+                                  <span
+                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                    title={isUpdating ? 'Updating...' : 'Delete'}
+                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
+                                  >
+                                    {isUpdating && deleteRequestId === request.id ? (
+                                      <span className="loading-spinner-small"></span>
+                                    ) : (
+                                      <FaTrash />
+                                    )}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
