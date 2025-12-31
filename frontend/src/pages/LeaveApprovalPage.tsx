@@ -38,6 +38,10 @@ const LeaveApprovalPage: React.FC = () => {
     () => leaveService.getPendingLeaveRequests(1, 10, search || undefined, filter || undefined),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 15000, // Polling every 15 seconds
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
           // Redirect to login if unauthorized
@@ -52,6 +56,10 @@ const LeaveApprovalPage: React.FC = () => {
     () => leaveService.getApprovedLeaves(1, 10),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 15000, // Polling every 15 seconds
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
           window.location.href = '/login';
@@ -91,7 +99,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending, previousApproved };
       },
-      onSuccess: (response, variables) => {
+      onSuccess: (_response, _variables) => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
@@ -219,7 +227,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending };
       },
-      onSuccess: (response, requestId) => {
+      onSuccess: (_response, requestId) => {
         // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
@@ -520,7 +528,8 @@ const LeaveApprovalPage: React.FC = () => {
     };
   }).filter((request: any) => request.pendingDaysCount > 0); // Only show requests with pending days
 
-  if (pendingLoading || approvedLoading) {
+  // Initial loading state (only for first-time page load)
+  if ((pendingLoading && !pendingData) || (approvedLoading && !approvedData)) {
     return (
       <AppLayout>
         <div className="leave-approval-page">
@@ -647,10 +656,10 @@ const LeaveApprovalPage: React.FC = () => {
 
           <div className="pending-requests-section">
             <div
-              className={`requests-table-container ${groupedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+              className={`requests-table-container ${groupedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || pendingLoading ? 'updating' : ''}`}
               style={{
-                pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
-                opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
+                pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading || pendingLoading) ? 'none' : 'auto',
+                opacity: (approveMutation.isLoading || rejectMutation.isLoading || pendingLoading) ? 0.8 : 1
               }}
             >
               <table className="requests-table">
@@ -669,7 +678,17 @@ const LeaveApprovalPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {groupedPendingRequests.length === 0 ? (
+                  {pendingLoading && !pendingData ? (
+                    <tr>
+                      <td colSpan={10}>
+                        <div className="skeleton-table">
+                          <div className="skeleton-table-row"></div>
+                          <div className="skeleton-table-row"></div>
+                          <div className="skeleton-table-row"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : groupedPendingRequests.length === 0 ? (
                     <tr>
                       <td colSpan={10} style={{ padding: 0 }}>
                         <EmptyState
@@ -736,10 +755,10 @@ const LeaveApprovalPage: React.FC = () => {
           <div className="approved-requests-section">
             <h2>Recent Leave Requests</h2>
             <div
-              className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading ? 'updating' : ''}`}
+              className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || approvedLoading ? 'updating' : ''}`}
               style={{
-                pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading) ? 'none' : 'auto',
-                opacity: (approveMutation.isLoading || rejectMutation.isLoading) ? 0.8 : 1
+                pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading || approvedLoading) ? 'none' : 'auto',
+                opacity: (approveMutation.isLoading || rejectMutation.isLoading || approvedLoading) ? 0.8 : 1
               }}
             >
               <table className="requests-table">
@@ -752,14 +771,22 @@ const LeaveApprovalPage: React.FC = () => {
                     <th>LEAVE DATE</th>
                     <th>LEAVE TYPE</th>
                     <th>NO OF DAYS</th>
-                    <th>LEAVE STATUS</th>
-                    <th>ACTIONS</th>
+                    <th>STATUS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {!approvedData?.requests || approvedData.requests.length === 0 ? (
+                  {approvedLoading && !approvedData ? (
                     <tr>
-                      <td colSpan={9} style={{ padding: 0 }}>
+                      <td colSpan={8}>
+                        <div className="skeleton-table">
+                          <div className="skeleton-table-row"></div>
+                          <div className="skeleton-table-row"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : !approvedData?.requests || approvedData.requests.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: 0 }}>
                         <EmptyState
                           title="No Recent Activity"
                           description="No recently approved or rejected leave requests found."

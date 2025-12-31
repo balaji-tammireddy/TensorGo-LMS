@@ -333,3 +333,34 @@
         justify-content: space-between;
     }
 }
+
+/* Local loading styles for holiday management */
+.hm-table-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.hm-table-wrapper.fetching {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.hm-skeleton-row {
+    height: 48.5px;
+    /* height of a table row */
+    background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: hm-skeleton-loading 1.5s infinite;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+@keyframes hm-skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}

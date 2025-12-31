@@ -166,6 +166,9 @@ const EmployeeManagementPage: React.FC = () => {
     () => getReportingManagers(undefined, newEmployee.role, editingEmployeeId || undefined),
     {
       retry: false,
+      staleTime: 0,
+      cacheTime: 5 * 60 * 1000,
+      keepPreviousData: true,
       enabled: isModalOpen && !!newEmployee.role
     }
   );
@@ -175,6 +178,10 @@ const EmployeeManagementPage: React.FC = () => {
     () => leaveService.getEmployeeLeaveRequests(editingEmployeeId!, 1, 100),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 30000, // Polling every 30 seconds
+      cacheTime: 5 * 60 * 1000,
+      keepPreviousData: true,
       enabled: showLeaveHistory && !!editingEmployeeId && (user?.role === 'hr' || user?.role === 'super_admin')
     }
   );
@@ -191,6 +198,8 @@ const EmployeeManagementPage: React.FC = () => {
       ),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 30000, // Polling every 30 seconds
       keepPreviousData: true,
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
@@ -736,94 +745,102 @@ const EmployeeManagementPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="employees-section">
-          <table className="employees-table">
-            <thead>
-              <tr>
-                <th>SNo</th>
-                <th>Emp ID</th>
-                <th>Emp Name</th>
-                <th>Position</th>
-                <th>Joining Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedEmployees.length === 0 ? (
+        <div className={`employees-section employees-table-wrapper ${employeesLoading && sortedEmployees.length > 0 ? 'fetching' : ''}`}>
+          {employeesLoading && sortedEmployees.length === 0 ? (
+            <div className="skeleton-table">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div key={idx} className="skeleton-table-row"></div>
+              ))}
+            </div>
+          ) : (
+            <table className="employees-table">
+              <thead>
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
-                    <EmptyState
-                      title="No Employees Found"
-                      description="Try adjusting your search or filters to find what you're looking for."
-                    />
-                  </td>
+                  <th>SNo</th>
+                  <th>Emp ID</th>
+                  <th>Emp Name</th>
+                  <th>Position</th>
+                  <th>Joining Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                sortedEmployees.map((employee, idx) => (
-                  <tr key={employee.id}>
-                    <td>{idx + 1}</td>
-                    <td>{employee.empId}</td>
-                    <td>{employee.name}</td>
-                    <td>{employee.position}</td>
-                    <td>{format(new Date(employee.joiningDate), 'dd/MM/yyyy')}</td>
-                    <td>
-                      <span
-                        className="status-badge"
-                        style={{
-                          backgroundColor: getStatusColor(employee.status),
-                          color: '#ffffff'
-                        }}
-                      >
-                        {employee.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="actions-cell">
-                      <span
-                        className="action-icon"
-                        title="View"
-                        onClick={() => handleViewEmployee(employee.id)}
-                      >
-                        <FaEye />
-                      </span>
-                      {/* HR cannot edit super_admin users or their own details */}
-                      {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
-                        <span
-                          className="action-icon"
-                          title="Edit"
-                          onClick={() => handleEditEmployee(employee.id)}
-                        >
-                          <FaPencilAlt />
-                        </span>
-                      )}
-                      {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
-                      {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
-                        (user?.role === 'super_admin' && employee.id !== user.id)) && (
-                          <span
-                            className="action-icon"
-                            title="Add Leaves"
-                            onClick={() => handleAddLeaves(employee.id, employee.name)}
-                          >
-                            <FaCalendarPlus />
-                          </span>
-                        )}
-                      {/* Super Admin can delete employees but not themselves */}
-                      {user?.role === 'super_admin' && employee.id !== user.id && (
-                        <span
-                          className="action-icon"
-                          title="Delete"
-                          onClick={() => handleDelete(employee.id)}
-                          style={{ color: '#f44336' }}
-                        >
-                          <FaTrash />
-                        </span>
-                      )}
+              </thead>
+              <tbody>
+                {sortedEmployees.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 0 }}>
+                      <EmptyState
+                        title="No Employees Found"
+                        description="Try adjusting your search or filters to find what you're looking for."
+                      />
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  sortedEmployees.map((employee, idx) => (
+                    <tr key={employee.id}>
+                      <td>{idx + 1}</td>
+                      <td>{employee.empId}</td>
+                      <td>{employee.name}</td>
+                      <td>{employee.position}</td>
+                      <td>{format(new Date(employee.joiningDate), 'dd/MM/yyyy')}</td>
+                      <td>
+                        <span
+                          className="status-badge"
+                          style={{
+                            backgroundColor: getStatusColor(employee.status),
+                            color: '#ffffff'
+                          }}
+                        >
+                          {employee.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="actions-cell">
+                        <span
+                          className="action-icon"
+                          title="View"
+                          onClick={() => handleViewEmployee(employee.id)}
+                        >
+                          <FaEye />
+                        </span>
+                        {/* HR cannot edit super_admin users or their own details */}
+                        {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
+                          <span
+                            className="action-icon"
+                            title="Edit"
+                            onClick={() => handleEditEmployee(employee.id)}
+                          >
+                            <FaPencilAlt />
+                          </span>
+                        )}
+                        {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
+                        {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
+                          (user?.role === 'super_admin' && employee.id !== user.id)) && (
+                            <span
+                              className="action-icon"
+                              title="Add Leaves"
+                              onClick={() => handleAddLeaves(employee.id, employee.name)}
+                            >
+                              <FaCalendarPlus />
+                            </span>
+                          )}
+                        {/* Super Admin can delete employees but not themselves */}
+                        {user?.role === 'super_admin' && employee.id !== user.id && (
+                          <span
+                            className="action-icon"
+                            title="Delete"
+                            onClick={() => handleDelete(employee.id)}
+                            style={{ color: '#f44336' }}
+                          >
+                            <FaTrash />
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {isModalOpen && (

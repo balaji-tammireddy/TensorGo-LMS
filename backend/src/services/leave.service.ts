@@ -224,13 +224,17 @@ export const applyLeave = async (
     endDate.setHours(0, 0, 0, 0);
 
     // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
-    const startDayOfWeek = startDate.getDay();
-    const endDayOfWeek = endDate.getDay();
-    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
-    }
-    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+    // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
+    // EXCEPTION: LOP leaves can start/end on weekends
+    if (leaveData.leaveType !== 'lop') {
+      const startDayOfWeek = startDate.getDay();
+      const endDayOfWeek = endDate.getDay();
+      if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+        throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+      }
+      if (endDayOfWeek === 0 || endDayOfWeek === 6) {
+        throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+      }
     }
 
     // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
@@ -315,13 +319,16 @@ export const applyLeave = async (
     const holidayStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const holidayEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-    if (holidayDates.has(holidayStartDateStr)) {
-      const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
-      throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
-    }
-    if (holidayDates.has(holidayEndDateStr)) {
-      const holidayName = holidayNames.get(holidayEndDateStr) || 'Holiday';
-      throw new Error(`Cannot select ${holidayName} (${holidayEndDateStr}) as end date. Please select a working day.`);
+    // EXCEPTION: LOP leaves can start/end on holidays
+    if (leaveData.leaveType !== 'lop') {
+      if (holidayDates.has(holidayStartDateStr)) {
+        const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
+        throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
+      }
+      if (holidayDates.has(holidayEndDateStr)) {
+        const holidayName = holidayNames.get(holidayEndDateStr) || 'Holiday';
+        throw new Error(`Cannot select ${holidayName} (${holidayEndDateStr}) as end date. Please select a working day.`);
+      }
     }
 
     // Validation: For sick leave, end date has same restrictions as start date
@@ -367,7 +374,8 @@ export const applyLeave = async (
         startDate,
         endDate,
         normalizedStartType as 'full' | 'half',
-        normalizedEndType as 'full' | 'half'
+        normalizedEndType as 'full' | 'half',
+        leaveData.leaveType
       );
 
       for (const requestedDay of requestedLeaveDays) {
@@ -422,7 +430,8 @@ export const applyLeave = async (
       startDate,
       endDate,
       normalizedStartType as 'full' | 'half',
-      normalizedEndType as 'full' | 'half'
+      normalizedEndType as 'full' | 'half',
+      leaveData.leaveType
     );
 
     // Require timings for permission
@@ -1356,11 +1365,22 @@ export const convertLeaveRequestLopToCasual = async (
   }
 
   const employeeId = leave.employee_id;
+  /* REMOVED: Old hardcoded noOfDays logic
   const noOfDays = parseFloat(leave.no_of_days) || 0;
+  if (noOfDays <= 0) { throw new Error('Invalid number of days in leave request'); }
+  */
 
-  if (noOfDays <= 0) {
-    throw new Error('Invalid number of days in leave request');
-  }
+  // Recalculate days based on 'casual' rules (excludes weekends/holidays)
+  // This handles the edge case where LOP included weekends/holidays but Casual should not.
+  const { days: newNoOfDays, leaveDays: newLeaveDaysList } = await calculateLeaveDays(
+    new Date(leave.start_date),
+    new Date(leave.end_date),
+    leave.start_type,
+    leave.end_type,
+    'casual'
+  );
+
+  const originalLopDays = parseFloat(leave.no_of_days) || 0;
 
   // Get current balances
   const balanceResult = await pool.query(
@@ -1383,16 +1403,16 @@ export const convertLeaveRequestLopToCasual = async (
   }
 
   // Check if casual balance is sufficient after conversion
-  // When converting: refund LOP (add back), deduct Casual (subtract)
-  let newLopBalance = currentLop + noOfDays; // Refund LOP
-  const newCasualBalance = currentCasual - noOfDays; // Deduct Casual
+  // Refund ORIGINAL LOP days, Deduct NEW calculated casual days
+  let newLopBalance = currentLop + originalLopDays; // Refund what was originally taken
+  const newCasualBalance = currentCasual - newNoOfDays; // Deduct what is valid for casual
 
   // Check if casual balance would go negative
   if (newCasualBalance < 0) {
-    throw new Error(`Insufficient casual balance. Current: ${currentCasual}, Required: ${noOfDays}`);
+    throw new Error(`Insufficient casual balance. Available: ${currentCasual}, Required: ${newNoOfDays}`);
   }
 
-  // Check if casual balance would exceed 99 days (shouldn't happen since we're deducting, but check anyway)
+  // Check if casual balance would exceed 99 days
   if (newCasualBalance > 99) {
     throw new Error(`Cannot convert. Casual balance would exceed 99 days. Current: ${currentCasual}, After conversion: ${newCasualBalance}`);
   }
@@ -1400,7 +1420,7 @@ export const convertLeaveRequestLopToCasual = async (
   // Ensure LOP balance never exceeds 10
   if (newLopBalance > 10) {
     logger.warn(
-      `LOP balance would exceed 10 after conversion. Current: ${currentLop}, Refunding: ${noOfDays}, Would be: ${newLopBalance}. Capping at 10.`
+      `LOP balance would exceed 10 after conversion. Current: ${currentLop}, Refunding: ${originalLopDays}, Would be: ${newLopBalance}. Capping at 10.`
     );
     newLopBalance = 10;
   }
@@ -1410,22 +1430,32 @@ export const convertLeaveRequestLopToCasual = async (
   try {
     await client.query('BEGIN');
 
-    // Update leave_type from LOP to Casual
+    // Update leave_type AND no_of_days (since casual excludes weekends)
     await client.query(
       `UPDATE leave_requests 
        SET leave_type = 'casual',
+           no_of_days = $1,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [requestId]
+       WHERE id = $2`,
+      [newNoOfDays, requestId]
     );
 
-    // Update leave_days to reflect new leave type
-    await client.query(
-      `UPDATE leave_days 
-       SET leave_type = 'casual'
-       WHERE leave_request_id = $1`,
-      [requestId]
-    );
+    // Delete OLD leave days (which may include weekends/holidays)
+    await client.query('DELETE FROM leave_days WHERE leave_request_id = $1', [requestId]);
+
+    // Insert NEW leave days (only valid casual days)
+    for (const day of newLeaveDaysList) {
+      const leaveDayDate = new Date(day.date);
+      const ldYear = leaveDayDate.getFullYear();
+      const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
+      const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
+      const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
+
+      await client.query(
+        'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)',
+        [requestId, leaveDayDateStr, day.type, 'casual', employeeId]
+      );
+    }
 
     // Adjust balances:
     // Refund LOP (add back the days that were deducted when leave was applied)
@@ -1444,7 +1474,8 @@ export const convertLeaveRequestLopToCasual = async (
 
     logger.info(
       `Leave request ${requestId} converted from LOP to Casual by ${userRole} (user ${userId}). ` +
-      `Employee: ${leave.employee_name}, Days: ${noOfDays}. ` +
+      `Employee: ${leave.employee_name}. ` +
+      `Days: ${originalLopDays} (LOP) -> ${newNoOfDays} (Casual). ` +
       `Balances: LOP ${currentLop} → ${newLopBalance} (refunded), Casual ${currentCasual} → ${newCasualBalance} (deducted)`
     );
 
@@ -1460,7 +1491,7 @@ export const convertLeaveRequestLopToCasual = async (
       startType: leave.start_type || 'full',
       endDate: leave.end_date,
       endType: leave.end_type || 'full',
-      noOfDays: noOfDays,
+      noOfDays: newNoOfDays,
       reason: leave.reason || '',
       converterName: leave.converter_name || 'Converter',
       converterRole: userRole,

@@ -324,33 +324,7 @@ const LeaveApplyPage: React.FC = () => {
     });
   };
 
-  // Memoize expensive computation
-  const requestedDays = useMemo(() => {
-    if (!formData.startDate || !formData.endDate) return 0;
-    const start = new Date(`${formData.startDate}T00:00:00`);
-    const end = new Date(`${formData.endDate}T00:00:00`);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-    const daysArr = eachDayOfInterval({ start, end });
-    let total = 0;
-    const startHalf = formData.startType !== 'full';
-    const endHalf = formData.endType !== 'full';
-    daysArr.forEach((d, idx) => {
-      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      if (isWeekend) return;
-      const isFirst = idx === 0;
-      const isLast = idx === daysArr.length - 1;
-      if (isFirst && isLast) {
-        total += startHalf || endHalf ? 0.5 : 1;
-      } else if (isFirst) {
-        total += startHalf ? 0.5 : 1;
-      } else if (isLast) {
-        total += endHalf ? 0.5 : 1;
-      } else {
-        total += 1;
-      }
-    });
-    return total;
-  }, [formData.startDate, formData.endDate, formData.startType, formData.endType]);
+
 
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -484,7 +458,8 @@ const LeaveApplyPage: React.FC = () => {
     leaveService.getLeaveBalances,
     {
       retry: false,
-      staleTime: 1 * 60 * 1000, // Cache for 1 minute
+      staleTime: 0,
+      refetchInterval: 30000, // Polling every 30 seconds
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -503,7 +478,9 @@ const LeaveApplyPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0, // Always refetch when year changes
-      cacheTime: 0, // Don't cache old year data
+      refetchInterval: 60000, // Polling every minute
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      keepPreviousData: true, // Keep old year's data while fetching new year
       refetchOnMount: true, // Always refetch when component mounts
       refetchOnWindowFocus: false // Don't refetch on window focus
     }
@@ -539,7 +516,8 @@ const LeaveApplyPage: React.FC = () => {
     () => leaveService.getMyLeaveRequests(1, 50), // Reduced from 100 to 50 for faster loading
     {
       retry: false,
-      staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+      staleTime: 0,
+      refetchInterval: 15000, // Polling every 15 seconds
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -548,6 +526,48 @@ const LeaveApplyPage: React.FC = () => {
       }
     }
   );
+
+
+  // Memoize expensive computation
+  const requestedDays = useMemo(() => {
+    if (!formData.startDate || !formData.endDate) return 0;
+    const start = new Date(`${formData.startDate}T00:00:00`);
+    const end = new Date(`${formData.endDate}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+    const daysArr = eachDayOfInterval({ start, end });
+    let total = 0;
+    const startHalf = formData.startType !== 'full';
+    const endHalf = formData.endType !== 'full';
+
+    // Create a Set of holiday date strings for faster lookup relative to the holidays currently loaded/displayed
+    const holidaySet = new Set(holidays.map(h => h.date));
+
+    daysArr.forEach((d, idx) => {
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      const isHoliday = holidaySet.has(dateStr);
+
+      // If NOT LOP, skip weekends and holidays.
+      // If LOP, we count everything (weekends and holidays included).
+      const isLop = formData.leaveType?.toLowerCase() === 'lop';
+      if (!isLop) {
+        if (isWeekend || isHoliday) return;
+      }
+
+      const isFirst = idx === 0;
+      const isLast = idx === daysArr.length - 1;
+      if (isFirst && isLast) {
+        total += startHalf || endHalf ? 0.5 : 1;
+      } else if (isFirst) {
+        total += startHalf ? 0.5 : 1;
+      } else if (isLast) {
+        total += endHalf ? 0.5 : 1;
+      } else {
+        total += 1;
+      }
+    });
+    return total;
+  }, [formData.startDate, formData.endDate, formData.startType, formData.endType, formData.leaveType, holidays]);
 
   // Optimize date overlap check with memoization and early exits
   const checkDateOverlap = useCallback((): string | null => {
@@ -1033,7 +1053,10 @@ const LeaveApplyPage: React.FC = () => {
     setEditingId(null);
   };
 
-  if (balancesLoading || holidaysLoading || rulesLoading || requestsLoading) {
+  // Initial loading state (only for first-time page load)
+  // We use !holidaysData.length instead of (holidaysLoading && holidaysData.length === 0) 
+  // because keepPreviousData: true preserves the length during year change.
+  if (balancesLoading || (holidaysLoading && !holidaysData.length) || rulesLoading || requestsLoading) {
     return (
       <AppLayout>
         <div className="leave-apply-page">
@@ -1212,33 +1235,43 @@ const LeaveApplyPage: React.FC = () => {
               </div>
             </div>
             <div className="holidays-table-container">
-              <table className="holidays-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Holiday name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holidays.length === 0 ? (
-                    <tr>
-                      <td colSpan={2} style={{ padding: 0 }}>
-                        <EmptyState
-                          title={`No Holidays for ${selectedYear}`}
-                          description="There are no holidays listed for the selected year."
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    holidays.map((holiday, idx) => (
-                      <tr key={idx}>
-                        <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
-                        <td>{holiday.name}</td>
+              {holidaysLoading && holidaysData.length === 0 ? (
+                <div className="holiday-local-skeleton">
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                </div>
+              ) : holidays.length === 0 ? (
+                <EmptyState
+                  title={`No Holidays for ${selectedYear}`}
+                  description="There are no holidays listed for the selected year."
+                />
+              ) : (
+                <div className={`holidays-table-wrapper ${holidaysLoading ? 'fetching' : ''}`}>
+                  <table className="holidays-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Holiday name</th>
                       </tr>
-                    ))
+                    </thead>
+                    <tbody>
+                      {holidays.map((holiday, idx) => (
+                        <tr key={idx}>
+                          <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
+                          <td>{holiday.name}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {holidaysLoading && (
+                    <div className="holiday-mini-spinner">
+                      <div className="spinner"></div>
+                    </div>
                   )}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1319,11 +1352,24 @@ const LeaveApplyPage: React.FC = () => {
                 <DatePicker
                   value={formData.startDate}
                   onChange={(newStartDate) => {
-                    // Block weekends (Saturday and Sunday)
-                    if (isWeekend(newStartDate)) {
-                      showWarning('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+                    // Check for weekends
+                    const isLop = formData.leaveType?.toLowerCase() === 'lop';
+                    const blockedWeekend = !isLop && isWeekend(newStartDate);
+
+                    // Check for holidays
+                    const holiday = holidays.find(h => h.date === newStartDate);
+                    const blockedHoliday = !isLop && !!holiday;
+
+                    if (blockedWeekend) {
+                      showWarning('Cannot select Saturday or Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.');
                       return;
                     }
+
+                    if (blockedHoliday && holiday) {
+                      showWarning(`Cannot select ${holiday.name} (${holiday.date}). If this is for LOP, please select "LOP" as the Leave Type first.`);
+                      return;
+                    }
+
                     // For permission, update end date to match start date
                     if (formData.leaveType === 'permission') {
                       setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
@@ -1336,7 +1382,13 @@ const LeaveApplyPage: React.FC = () => {
                   placeholder="Select start date"
                   disabledDates={(date) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
-                    return isWeekend(dateStr);
+                    const isLop = formData.leaveType?.toLowerCase() === 'lop';
+
+                    // If LOP, allow everything. If not, block weekends and holidays
+                    if (isLop) return false;
+
+                    const isHoliday = holidays.some(h => h.date === dateStr);
+                    return isWeekend(dateStr) || isHoliday;
                   }}
                 />
               </div>
@@ -1394,11 +1446,24 @@ const LeaveApplyPage: React.FC = () => {
                     <DatePicker
                       value={formData.endDate}
                       onChange={(newEndDate) => {
-                        // Block weekends (Saturday and Sunday)
-                        if (isWeekend(newEndDate)) {
-                          showWarning('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+                        // Check for weekends
+                        const isLop = formData.leaveType?.toLowerCase() === 'lop';
+                        const blockedWeekend = !isLop && isWeekend(newEndDate);
+
+                        // Check for holidays
+                        const holiday = holidays.find(h => h.date === newEndDate);
+                        const blockedHoliday = !isLop && !!holiday;
+
+                        if (blockedWeekend) {
+                          showWarning('Cannot select Saturday or Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.');
                           return;
                         }
+
+                        if (blockedHoliday && holiday) {
+                          showWarning(`Cannot select ${holiday.name} (${holiday.date}). If this is for LOP, please select "LOP" as the Leave Type first.`);
+                          return;
+                        }
+
                         setFormData({ ...formData, endDate: newEndDate });
                       }}
                       min={formData.startDate || minStartDate}
@@ -1406,7 +1471,13 @@ const LeaveApplyPage: React.FC = () => {
                       placeholder="Select end date"
                       disabledDates={(date) => {
                         const dateStr = format(date, 'yyyy-MM-dd');
-                        return isWeekend(dateStr);
+                        const isLop = formData.leaveType?.toLowerCase() === 'lop';
+
+                        // If LOP, allow everything. If not, block weekends and holidays
+                        if (isLop) return false;
+
+                        const isHoliday = holidays.some(h => h.date === dateStr);
+                        return isWeekend(dateStr) || isHoliday;
                       }}
                     />
                   </div>
