@@ -25,7 +25,7 @@ import './LeaveApplyPage.css';
 const LeaveApplyPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { showSuccess, showError, showWarning, showInfo } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -88,19 +88,6 @@ const LeaveApplyPage: React.FC = () => {
       return `${String(hours + 1).padStart(2, '0')}:00`;
     }
     return `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
-  };
-
-  // Validate and force 15-minute intervals (00, 15, 30, 45 only)
-  const validate15MinuteInterval = (timeStr: string): string => {
-    if (!timeStr) return timeStr;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    // Only allow 00, 15, 30, 45
-    const validMinutes = [0, 15, 30, 45];
-    if (!validMinutes.includes(minutes)) {
-      // Round to nearest valid minute
-      return roundTo15Minutes(timeStr);
-    }
-    return timeStr;
   };
 
   // Round current time to next 15-minute slot within office hours (10:00-19:00)
@@ -325,18 +312,6 @@ const LeaveApplyPage: React.FC = () => {
   };
 
 
-
-  const readFileAsBase64 = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result?.toString() || '';
-        const base64 = result.includes('base64,') ? result.split('base64,')[1] : result;
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
 
   // Clear doctor note when not needed
   useEffect(() => {
@@ -673,27 +648,96 @@ const LeaveApplyPage: React.FC = () => {
         const previousRequests = queryClient.getQueryData('myLeaveRequests');
         const previousBalances = queryClient.getQueryData('leaveBalances');
 
+        // Optimistically update 'leaveBalances'
+        if (!variables.id && variables.data.leaveType !== 'permission' && previousBalances) {
+          queryClient.setQueryData('leaveBalances', (old: any) => {
+            if (!old) return old;
+            // Map leaveType to balance key
+            const balanceKey = variables.data.leaveType === 'casual' ? 'casual' :
+              variables.data.leaveType === 'sick' ? 'sick' : 'lop';
+
+            return {
+              ...old,
+              [balanceKey]: (parseFloat(old[balanceKey] as string) || 0) - requestedDays
+            };
+          });
+        }
+
+        // Optimistically update 'myLeaveRequests' list
+        queryClient.setQueryData('myLeaveRequests', (old: any) => {
+          if (!old) return { requests: [], pagination: { total: 0, page: 1, limit: 10 } };
+          const requests = [...(old.requests || [])];
+
+          if (variables.id) {
+            // Optimistic Edit
+            const index = requests.findIndex((r: any) => r.id === variables.id);
+            if (index !== -1) {
+              requests[index] = {
+                ...requests[index],
+                ...variables.data,
+                leaveReason: variables.data.reason,
+                currentStatus: 'pending'
+              };
+            }
+          } else {
+            // Optimistic Create
+            const newRequest = {
+              id: 'optimistic-' + Date.now(),
+              appliedDate: new Date().toISOString().split('T')[0],
+              leaveReason: variables.data.reason,
+              startDate: variables.data.startDate,
+              startType: variables.data.startType,
+              endDate: variables.data.endDate,
+              endType: variables.data.endType,
+              noOfDays: requestedDays,
+              leaveType: variables.data.leaveType,
+              currentStatus: 'pending',
+              canEdit: true,
+              canDelete: true,
+              leaveDays: [],
+              isOptimistic: true
+            };
+            requests.unshift(newRequest);
+          }
+
+          return {
+            ...old,
+            requests,
+            pagination: variables.id ? old.pagination : {
+              ...old.pagination,
+              total: (old.pagination?.total || 0) + 1
+            }
+          };
+        });
+
         return { previousRequests, previousBalances };
       },
       onSuccess: (response, variables) => {
-        // Optimistically add/update request in the list immediately
-        if (response?.request) {
-          queryClient.setQueryData('myLeaveRequests', (old: any) => {
-            if (!old?.requests) return old;
-            const requests = [...old.requests];
-            if (variables.id) {
-              // Update existing
-              const index = requests.findIndex((r: any) => r.id === variables.id);
-              if (index !== -1) {
-                requests[index] = { ...requests[index], ...response.request };
-              }
-            } else {
-              // Add new at the beginning
-              requests.unshift(response.request);
+        // Replace optimistic record with real one or update existing
+        queryClient.setQueryData('myLeaveRequests', (old: any) => {
+          if (!old?.requests) return old;
+          let requests = [...old.requests];
+
+          if (variables.id) {
+            // Update the record we edited
+            const index = requests.findIndex((r: any) => r.id === variables.id);
+            if (index !== -1) {
+              // Merge server response if available, otherwise use original but with real ID if it changed (unlikely for edit)
+              requests[index] = response?.request ? { ...requests[index], ...response.request } : requests[index];
             }
-            return { ...old, requests };
-          });
-        }
+          } else {
+            // Replace the optimistic record with the real one
+            // First find the optimistic one (usually at index 0)
+            const optIndex = requests.findIndex((r: any) => r.isOptimistic);
+            if (optIndex !== -1 && response?.request) {
+              requests[optIndex] = response.request;
+            } else if (response?.request) {
+              // Fallback: just add the real one and filter out any remaining optimistic ones
+              requests = [response.request, ...requests.filter((r: any) => !r.isOptimistic)];
+            }
+          }
+          return { ...old, requests };
+        });
 
         // Invalidate queries in background (non-blocking) for fresh data
         queryClient.invalidateQueries('leaveBalances');
@@ -713,7 +757,7 @@ const LeaveApplyPage: React.FC = () => {
         setEditingId(null);
         setEditingRequestId(null);
       },
-      onError: (error: any, variables, context) => {
+      onError: (error: any, _, context) => {
         // Rollback on error
         if (context?.previousRequests) {
           queryClient.setQueryData('myLeaveRequests', context.previousRequests);
@@ -790,7 +834,7 @@ const LeaveApplyPage: React.FC = () => {
       setDeleteConfirmOpen(false);
       setDeleteRequestId(null);
     },
-    onError: (error: any, requestId, context) => {
+    onError: (error: any, _, context) => {
       // Rollback on error
       if (context?.previousRequests) {
         queryClient.setQueryData('myLeaveRequests', context.previousRequests);

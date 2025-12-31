@@ -723,13 +723,26 @@ export const getMyLeaveRequests = async (
       return `${year}-${month}-${day}`;
     };
 
+    const requestIds = result.rows.map(r => r.id);
+    const allLeaveDaysMap = new Map<number, any[]>();
+
+    if (requestIds.length > 0) {
+      const allDaysResult = await pool.query(
+        'SELECT leave_request_id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = ANY($1) ORDER BY leave_date',
+        [requestIds]
+      );
+
+      allDaysResult.rows.forEach(day => {
+        if (!allLeaveDaysMap.has(day.leave_request_id)) {
+          allLeaveDaysMap.set(day.leave_request_id, []);
+        }
+        allLeaveDaysMap.get(day.leave_request_id)?.push(day);
+      });
+    }
+
     const requests = [];
     for (const row of result.rows) {
-      const daysResult = await pool.query(
-        'SELECT leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-        [row.id]
-      );
-      const days = daysResult.rows || [];
+      const days = allLeaveDaysMap.get(row.id) || [];
       const totalDays = days.length || parseFloat(row.no_of_days) || 0;
       const approvedDays = days.reduce((acc, d) => acc + (d.day_status === 'approved' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
       const rejectedDays = days.reduce((acc, d) => acc + (d.day_status === 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
@@ -1785,64 +1798,77 @@ export const getPendingLeaveRequests = async (
       return true;
     });
 
-  // Get day-wise breakdown for each request
-  const requestsWithDays = await Promise.all(
-    filteredRows.map(async (row) => {
-      try {
-        const daysResult = await pool.query(
-          'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-          [row.id]
-        );
+  // Batch fetch leave days for all request IDs to avoid N+1 query problem
+  const requestIds = filteredRows.map(r => r.id);
+  const daysMap = new Map<number, any[]>();
 
-        // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
-        const rejectionReason = (row.current_status === 'rejected')
-          ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
-          : null;
+  if (requestIds.length > 0) {
+    const daysResult = await pool.query(
+      'SELECT id, leave_request_id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = ANY($1) ORDER BY leave_date',
+      [requestIds]
+    );
 
-        // Get approver name from last_updated_by fields
-        let approverName: string | null = row.approver_name || null;
-        let approverRole: string | null = null;
-
-        // Map role from database to display format
-        if (row.last_updated_by_role === 'super_admin') {
-          approverRole = 'Super Admin';
-        } else if (row.last_updated_by_role === 'hr') {
-          approverRole = 'HR';
-        } else if (row.last_updated_by_role === 'manager') {
-          approverRole = 'Manager';
-        }
-
-        return {
-          id: row.id,
-          empId: row.emp_id,
-          empName: row.emp_name,
-          appliedDate: formatDate(row.applied_date),
-          leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
-          leaveType: row.leave_type,
-          noOfDays: parseFloat(row.no_of_days),
-          leaveReason: row.leave_reason,
-          currentStatus: row.current_status,
-          startDate: formatDate(row.start_date),
-          endDate: formatDate(row.end_date),
-          startType: row.start_type,
-          endType: row.end_type,
-          doctorNote: row.doctor_note || null,
-          rejectionReason,
-          approverName,
-          approverRole,
-          leaveDays: daysResult.rows.map(d => ({
-            id: d.id,
-            date: formatDate(d.leave_date),
-            type: d.day_type,
-            status: d.day_status || 'pending'
-          }))
-        };
-      } catch (e) {
-        console.error('Pending leave days fetch failed', { leaveRequestId: row.id, error: e });
-        throw e;
+    daysResult.rows.forEach(day => {
+      if (!daysMap.has(day.leave_request_id)) {
+        daysMap.set(day.leave_request_id, []);
       }
-    })
-  );
+      daysMap.get(day.leave_request_id)?.push(day);
+    });
+  }
+
+  // Get day-wise breakdown for each request
+  const requestsWithDays = filteredRows.map((row) => {
+    try {
+      const days = daysMap.get(row.id) || [];
+
+      // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+      const rejectionReason = (row.current_status === 'rejected')
+        ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+        : null;
+
+      // Get approver name from last_updated_by fields
+      let approverName: string | null = row.approver_name || null;
+      let approverRole: string | null = null;
+
+      // Map role from database to display format
+      if (row.last_updated_by_role === 'super_admin') {
+        approverRole = 'Super Admin';
+      } else if (row.last_updated_by_role === 'hr') {
+        approverRole = 'HR';
+      } else if (row.last_updated_by_role === 'manager') {
+        approverRole = 'Manager';
+      }
+
+      return {
+        id: row.id,
+        empId: row.emp_id,
+        empName: row.emp_name,
+        appliedDate: formatDate(row.applied_date),
+        leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
+        leaveType: row.leave_type,
+        noOfDays: parseFloat(row.no_of_days),
+        leaveReason: row.leave_reason,
+        currentStatus: row.current_status,
+        startDate: formatDate(row.start_date),
+        endDate: formatDate(row.end_date),
+        startType: row.start_type,
+        endType: row.end_type,
+        doctorNote: row.doctor_note || null,
+        rejectionReason,
+        approverName,
+        approverRole,
+        leaveDays: days.map(d => ({
+          id: d.id,
+          date: formatDate(d.leave_date),
+          type: d.day_type,
+          status: d.day_status || 'pending'
+        }))
+      };
+    } catch (e) {
+      console.error('Pending leave days fetch failed', { leaveRequestId: row.id, error: e });
+      throw e;
+    }
+  });
 
   // Count total
   let countQuery = `
@@ -3515,113 +3541,126 @@ export const getApprovedLeaves = async (
         )`
   );
 
+  // Batch fetch leave days for all request IDs to avoid N+1 query problem
+  const requestIds = result.rows.map(r => r.id);
+  const daysMap = new Map<number, any[]>();
+
+  if (requestIds.length > 0) {
+    const allDaysResult = await pool.query(
+      'SELECT id, leave_request_id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = ANY($1) ORDER BY leave_date',
+      [requestIds]
+    );
+
+    allDaysResult.rows.forEach(day => {
+      if (!daysMap.has(day.leave_request_id)) {
+        daysMap.set(day.leave_request_id, []);
+      }
+      daysMap.get(day.leave_request_id)?.push(day);
+    });
+  }
+
   // Get leave days for each request
-  const requestsWithDays = await Promise.all(
-    result.rows.map(async (row) => {
-      const daysResult = await pool.query(
-        'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-        [row.id]
-      );
+  const requestsWithDays = result.rows.map((row) => {
+    const days = daysMap.get(row.id) || [];
 
-      const approvedDates = Array.isArray(row.approved_dates) ? row.approved_dates.filter((d: any) => d) : [];
-      const rejectedDates = Array.isArray(row.rejected_dates) ? row.rejected_dates.filter((d: any) => d) : [];
-      const approvedDays = parseFloat(row.approved_days) || 0;
-      const rejectedDays = parseFloat(row.rejected_days) || 0;
-      const pendingDays = parseFloat(row.pending_days) || 0;
+    const approvedDates = Array.isArray(row.approved_dates) ? row.approved_dates.filter((d: any) => d) : [];
+    const rejectedDates = Array.isArray(row.rejected_dates) ? row.rejected_dates.filter((d: any) => d) : [];
+    const approvedDays = parseFloat(row.approved_days) || 0;
+    const rejectedDays = parseFloat(row.rejected_days) || 0;
+    const pendingDays = parseFloat(row.pending_days) || 0;
 
-      let displayStatus = row.leave_status;
-      // Since we're filtering out requests with pending days, we should never have pendingDays > 0 here
-      // But we'll still calculate it correctly
-      if (pendingDays > 0) {
-        // This shouldn't happen due to the WHERE clause, but handle it just in case
-        displayStatus = 'pending';
-      } else if (approvedDays > 0 && rejectedDays > 0) {
-        displayStatus = 'partially_approved';
-      } else if (approvedDays > 0 && rejectedDays === 0) {
-        displayStatus = 'approved';
-      } else if (rejectedDays > 0 && approvedDays === 0) {
-        displayStatus = 'rejected';
-      } else {
-        // Fallback to the database status
-        displayStatus = row.leave_status;
-      }
+    let displayStatus = row.leave_status;
+    // Since we're filtering out requests with pending days, we should never have pendingDays > 0 here
+    // But we'll still calculate it correctly
+    if (pendingDays > 0) {
+      // This shouldn't happen due to the WHERE clause, but handle it just in case
+      displayStatus = 'pending';
+    } else if (approvedDays > 0 && rejectedDays > 0) {
+      displayStatus = 'partially_approved';
+    } else if (approvedDays > 0 && rejectedDays === 0) {
+      displayStatus = 'approved';
+    } else if (rejectedDays > 0 && approvedDays === 0) {
+      displayStatus = 'rejected';
+    } else {
+      // Fallback to the database status
+      displayStatus = row.leave_status;
+    }
 
-      // Format leave date - show approved dates if available, otherwise show rejected dates, otherwise show full range
-      let leaveDate: string;
-      if (approvedDates.length > 0) {
-        const formatted = approvedDates.map((d: Date) => formatDate(d));
-        const first = formatted[0];
-        const last = formatted[formatted.length - 1];
-        leaveDate = formatted.length === 1 ? first : `${first} to ${last}`;
-      } else if (rejectedDates.length > 0 && approvedDays === 0) {
-        // If all rejected, show rejected date range
-        const formatted = rejectedDates.map((d: Date) => formatDate(d));
-        const first = formatted[0];
-        const last = formatted[formatted.length - 1];
-        leaveDate = formatted.length === 1 ? first : `${first} to ${last}`;
-      } else {
-        leaveDate = `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`;
-      }
+    // Format leave date - show approved dates if available, otherwise show rejected dates, otherwise show full range
+    let leaveDate: string;
+    if (approvedDates.length > 0) {
+      const formatted = approvedDates.map((d: Date) => formatDate(d));
+      const first = formatted[0];
+      const last = formatted[formatted.length - 1];
+      leaveDate = formatted.length === 1 ? first : `${first} to ${last}`;
+    } else if (rejectedDates.length > 0 && approvedDays === 0) {
+      // If all rejected, show rejected date range
+      const formatted = rejectedDates.map((d: Date) => formatDate(d));
+      const first = formatted[0];
+      const last = formatted[formatted.length - 1];
+      leaveDate = formatted.length === 1 ? first : `${first} to ${last}`;
+    } else {
+      leaveDate = `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`;
+    }
 
-      // Calculate total days based on status
-      let noOfDays: number;
-      if (displayStatus === 'approved' || displayStatus === 'partially_approved') {
-        noOfDays = approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days);
-      } else if (displayStatus === 'rejected') {
-        noOfDays = rejectedDays > 0 ? rejectedDays : parseFloat(row.no_of_days);
-      } else {
-        noOfDays = parseFloat(row.no_of_days);
-      }
+    // Calculate total days based on status
+    let noOfDays: number;
+    if (displayStatus === 'approved' || displayStatus === 'partially_approved') {
+      noOfDays = approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days);
+    } else if (displayStatus === 'rejected') {
+      noOfDays = rejectedDays > 0 ? rejectedDays : parseFloat(row.no_of_days);
+    } else {
+      noOfDays = parseFloat(row.no_of_days);
+    }
 
-      // Manager can only view, HR and Super Admin can view and edit
-      // No one can delete approved/rejected leaves
-      const canEdit = userRole === 'hr' || userRole === 'super_admin';
-      const canDelete = false; // Approved/rejected leaves cannot be deleted
+    // Manager can only view, HR and Super Admin can view and edit
+    // No one can delete approved/rejected leaves
+    const canEdit = userRole === 'hr' || userRole === 'super_admin';
+    const canDelete = false; // Approved/rejected leaves cannot be deleted
 
-      // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
-      const rejectionReason = (displayStatus === 'rejected')
-        ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
-        : null;
+    // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+    const rejectionReason = (displayStatus === 'rejected')
+      ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+      : null;
 
-      // Get approver name from last_updated_by fields
-      let approverName: string | null = row.approver_name || null;
-      let approverRole: string | null = null;
+    // Get approver name from last_updated_by fields
+    let approverName: string | null = row.approver_name || null;
+    let approverRole: string | null = null;
 
-      // Map role from database to display format
-      if (row.last_updated_by_role === 'super_admin') {
-        approverRole = 'Super Admin';
-      } else if (row.last_updated_by_role === 'hr') {
-        approverRole = 'HR';
-      } else if (row.last_updated_by_role === 'manager') {
-        approverRole = 'Manager';
-      }
+    // Map role from database to display format
+    if (row.last_updated_by_role === 'super_admin') {
+      approverRole = 'Super Admin';
+    } else if (row.last_updated_by_role === 'hr') {
+      approverRole = 'HR';
+    } else if (row.last_updated_by_role === 'manager') {
+      approverRole = 'Manager';
+    }
 
-      return {
-        id: row.id,
-        empId: row.emp_id,
-        empName: row.emp_name,
-        appliedDate: formatDate(row.applied_date),
-        leaveDate,
-        startDate: formatDate(row.start_date),
-        endDate: formatDate(row.end_date),
-        leaveType: row.leave_type,
-        noOfDays,
-        leaveStatus: displayStatus,
-        rejectionReason,
-        approverName,
-        approverRole,
-        lastUpdatedByRole: row.last_updated_by_role || null,
-        canEdit,
-        canDelete,
-        leaveDays: daysResult.rows.map(d => ({
-          id: d.id,
-          date: formatDate(d.leave_date),
-          type: d.day_type,
-          status: d.day_status || 'pending'
-        }))
-      };
-    })
-  );
+    return {
+      id: row.id,
+      empId: row.emp_id,
+      empName: row.emp_name,
+      appliedDate: formatDate(row.applied_date),
+      leaveDate,
+      startDate: formatDate(row.start_date),
+      endDate: formatDate(row.end_date),
+      leaveType: row.leave_type,
+      noOfDays,
+      leaveStatus: displayStatus,
+      rejectionReason,
+      approverName,
+      approverRole,
+      lastUpdatedByRole: row.last_updated_by_role || null,
+      canEdit,
+      canDelete,
+      leaveDays: days.map(d => ({
+        id: d.id,
+        date: formatDate(d.leave_date),
+        type: d.day_type,
+        status: d.day_status || 'pending'
+      }))
+    };
+  });
 
   return {
     requests: requestsWithDays,
