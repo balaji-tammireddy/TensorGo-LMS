@@ -495,11 +495,7 @@ const LeaveApplyPage: React.FC = () => {
   );
 
 
-<<<<<<< HEAD
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-=======
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
->>>>>>> 99f46a81d9c94c6a11f89e8ec9b9a9209f3002ce
 
   const { data: holidaysData = [], isLoading: holidaysLoading, error: holidaysError } = useQuery(
     ['holidays', selectedYear],
@@ -1821,16 +1817,12 @@ const LeaveApplyPage: React.FC = () => {
               <tbody>
                 {!myRequests?.requests || myRequests.requests.length === 0 ? (
                   <tr>
-<<<<<<< HEAD
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '16px' }}>No leaves applied</td>
-=======
                     <td colSpan={10} style={{ padding: 0 }}>
                       <EmptyState
                         title="No Leave History"
                         description="You haven't applied for any leaves yet."
                       />
                     </td>
->>>>>>> 99f46a81d9c94c6a11f89e8ec9b9a9209f3002ce
                   </tr>
                 ) : (
                   [...(myRequests.requests || [])]
