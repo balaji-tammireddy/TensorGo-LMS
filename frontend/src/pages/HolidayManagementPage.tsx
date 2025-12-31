@@ -141,7 +141,7 @@ const HolidayManagementPage: React.FC = () => {
                                 <DatePicker
                                     value={formData.holidayDate}
                                     onChange={handleDateChange}
-                                    placeholder="dd-mm-yyyy"
+                                    placeholder="Select date"
                                     min={new Date().toISOString().split('T')[0]}
                                     disabledDates={(date) => {
                                         // Check if date is in existing holidays

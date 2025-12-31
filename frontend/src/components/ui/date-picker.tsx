@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { format, parse, isValid } from 'date-fns';
 import { Calendar } from './calendar';
@@ -15,6 +15,7 @@ interface DatePickerProps {
   placeholder?: string;
   disabledDates?: (date: Date) => boolean;
   allowManualEntry?: boolean;
+  isEmployeeVariant?: boolean; // Toggle specific behavior for Add Employee
 }
 
 export const DatePicker: React.FC<DatePickerProps> = ({
@@ -24,14 +25,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   max,
   disabled = false,
   className,
-<<<<<<< HEAD
-  placeholder = 'DD-MM-YYYY',
+  placeholder,
   disabledDates,
-  allowManualEntry = false
-=======
-  placeholder = 'dd-mm-yyyy',
-  disabledDates
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
+  allowManualEntry = false,
+  isEmployeeVariant = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -39,62 +36,54 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     value ? new Date(value + 'T00:00:00') : undefined
   );
 
-<<<<<<< HEAD
-  const [inputValue, setInputValue] = useState(
-    value ? format(new Date(value + 'T00:00:00'), 'dd-MM-yyyy') : ''
-  );
-
-=======
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [popoverCoords, setPopoverCoords] = useState({ top: 0, left: 0, width: 0 });
   const [position, setPosition] = useState<'bottom' | 'top'>('bottom');
 
-  useEffect(() => {
-    if (value) {
-      const date = new Date(value + 'T00:00:00');
-      setSelectedDate(date);
-<<<<<<< HEAD
-      setInputValue(format(date, 'dd-MM-yyyy'));
-=======
-      setInputValue(format(date, 'dd - MM - yyyy'));
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
-    } else {
-      setSelectedDate(undefined);
-      setInputValue('');
-    }
-  }, [value]);
+  const effectivePlaceholder = placeholder || (isEmployeeVariant ? 'dd - mm - yyyy' : 'Select date');
 
-  const updatePopoverPosition = () => {
+  const updatePopoverPosition = useCallback(() => {
     if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const scrollY = window.scrollY;
-    const scrollX = window.scrollX;
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
 
-    const popoverHeight = 310; // Approximate max height of calendar + padding
+    const popoverHeight = 240; // Lower threshold to prefer showing below
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
 
     let newPosition: 'top' | 'bottom' = 'bottom';
-    let top = 0;
+    let topValue = 0;
 
+    // Only show above if there is significantly more space above AND very little space below
     if (spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
       newPosition = 'top';
-      top = rect.top + scrollY - popoverHeight - 8;
+      topValue = rect.top + scrollY - 264; // Approximate height when compact
     } else {
       newPosition = 'bottom';
-      top = rect.bottom + scrollY + 8;
+      topValue = rect.bottom + scrollY + 4;
     }
 
     setPosition(newPosition);
     setPopoverCoords({
-      top,
+      top: topValue,
       left: rect.left + scrollX,
       width: rect.width
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    if (value) {
+      const date = new Date(value + 'T00:00:00');
+      setSelectedDate(date);
+      setInputValue(format(date, isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd'));
+    } else {
+      setSelectedDate(undefined);
+      setInputValue('');
+    }
+  }, [value, isEmployeeVariant]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -108,148 +97,20 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
     if (isOpen) {
       updatePopoverPosition();
+      const timeoutId = setTimeout(updatePopoverPosition, 50);
+
       document.addEventListener('mousedown', handleClickOutside);
       window.addEventListener('scroll', updatePopoverPosition, true);
       window.addEventListener('resize', updatePopoverPosition);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('scroll', updatePopoverPosition, true);
-      window.removeEventListener('resize', updatePopoverPosition);
-    };
-  }, [isOpen]);
-
-<<<<<<< HEAD
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      const updatePosition = () => {
-        if (!containerRef.current) return;
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const popoverHeight = 300;
-
-        let scrollableContainer: HTMLElement | null = containerRef.current;
-        while (scrollableContainer) {
-          const style = window.getComputedStyle(scrollableContainer);
-          if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
-            style.overflow === 'auto' || style.overflow === 'scroll') {
-            break;
-          }
-          scrollableContainer = scrollableContainer.parentElement;
-        }
-
-        const containerBounds = scrollableContainer
-          ? scrollableContainer.getBoundingClientRect()
-          : { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth };
-
-        const spaceBelow = containerBounds.bottom - containerRect.bottom - 8;
-        const spaceAbove = containerRect.top - containerBounds.top - 8;
-
-        if (spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
-          setPosition('top');
-        } else {
-          setPosition('bottom');
-        }
-      };
-
-      updatePosition();
-      const timeoutId = setTimeout(updatePosition, 10);
-
-      const scrollableContainer = containerRef.current.closest('[style*="overflow"], .employee-modal-body, .leave-details-modal-body');
-      const scrollTarget = scrollableContainer || window;
-
-      scrollTarget.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
 
       return () => {
         clearTimeout(timeoutId);
-        scrollTarget.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
+        document.removeEventListener('mousedown', handleClickOutside);
+        window.removeEventListener('scroll', updatePopoverPosition, true);
+        window.removeEventListener('resize', updatePopoverPosition);
       };
     }
-  }, [isOpen]);
-=======
-  const handleSelect = (date: Date | undefined) => {
-    if (date) {
-      const dateStrYMD = format(date, 'yyyy-MM-dd');
-      const dateStrDMY = format(date, 'dd - MM - yyyy');
-      setSelectedDate(date);
-      setInputValue(dateStrDMY);
-      onChange(dateStrYMD);
-      setIsOpen(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
-
-    // Auto-masking: Add " - " (space-hyphen-space) as the user types
-    const isDeleting = (e.nativeEvent as any).inputType === 'deleteContentBackward';
-    if (!isDeleting) {
-      // Remove everything except digits
-      const digits = val.replace(/\D/g, '');
-      if (digits.length > 0) {
-        if (digits.length <= 2) {
-          val = digits;
-        } else if (digits.length <= 4) {
-          val = `${digits.slice(0, 2)} - ${digits.slice(2)}`;
-        } else {
-          val = `${digits.slice(0, 2)} - ${digits.slice(2, 4)} - ${digits.slice(4, 8)}`;
-        }
-      }
-    }
-
-    setInputValue(val);
-
-    // Attempt to parse various formats (ignoring spaces)
-    const cleanVal = val.replace(/\s/g, '');
-    let parsedDate: Date | undefined;
-
-    // Check for DD-MM-YYYY
-    if (/^\d{2}-\d{2}-\d{4}$/.test(cleanVal)) {
-      const d = parse(cleanVal, 'dd-MM-yyyy', new Date());
-      if (isValid(d)) parsedDate = d;
-    }
-    // Check for DDMMYYYY
-    else if (/^\d{8}$/.test(cleanVal)) {
-      const d = parse(cleanVal, 'ddMMyyyy', new Date());
-      if (isValid(d)) parsedDate = d;
-    }
-
-    if (parsedDate) {
-      if (!isDateDisabled(parsedDate)) {
-        const dateStr = format(parsedDate, 'yyyy-MM-dd');
-        setSelectedDate(parsedDate);
-        onChange(dateStr);
-      }
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      // Force an update on Enter if valid
-      const cleanVal = inputValue.replace(/\s/g, '');
-      let finalDate: Date | undefined;
-
-      if (/^\d{2}-\d{2}-\d{4}$/.test(cleanVal)) {
-        finalDate = parse(cleanVal, 'dd-MM-yyyy', new Date());
-      } else if (/^\d{8}$/.test(cleanVal)) {
-        finalDate = parse(cleanVal, 'ddMMyyyy', new Date());
-      }
-
-      if (finalDate && isValid(finalDate) && !isDateDisabled(finalDate)) {
-        const dateStr = format(finalDate, 'yyyy-MM-dd');
-        setSelectedDate(finalDate);
-        setInputValue(format(finalDate, 'dd - MM - yyyy'));
-        onChange(dateStr);
-        setIsOpen(false);
-      } else if (selectedDate) {
-        // Just close if we already have a valid selection
-        setIsOpen(false);
-      }
-    }
-  };
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
+  }, [isOpen, updatePopoverPosition]);
 
   const minDate = min ? new Date(min + 'T00:00:00') : undefined;
   const maxDate = max ? new Date(max + 'T00:00:00') : undefined;
@@ -261,78 +122,99 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     return false;
   };
 
-<<<<<<< HEAD
-  const parseAndValidateDate = (val: string) => {
-    const dateRegex = /^(\d{2})-(\d{2})-(\d{4})$/;
-    const match = val.match(dateRegex);
-
-    if (match) {
-      const day = parseInt(match[1], 10);
-      const month = parseInt(match[2], 10) - 1;
-      const year = parseInt(match[3], 10);
-      const date = new Date(year, month, day);
-
-      if (!isNaN(date.getTime()) &&
-        date.getDate() === day &&
-        date.getMonth() === month &&
-        date.getFullYear() === year &&
-        !isDateDisabled(date)) {
-        return date;
-      }
+  const handleSelect = (date: Date | undefined) => {
+    if (date) {
+      const dateStrYMD = format(date, 'yyyy-MM-dd');
+      const dateStrDisplay = format(date, isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd');
+      setSelectedDate(date);
+      setInputValue(dateStrDisplay);
+      onChange(dateStrYMD);
+      setIsOpen(false);
     }
-    return null;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!allowManualEntry) return;
 
-    let val = e.target.value.replace(/[^0-9]/g, '');
+    let val = e.target.value;
 
-    // Auto-format: Add hyphens
-    if (val.length > 2) {
-      val = val.slice(0, 2) + '-' + val.slice(2);
-    }
-    if (val.length > 5) {
-      val = val.slice(0, 5) + '-' + val.slice(5, 9);
+    if (isEmployeeVariant) {
+      const isDeleting = (e.nativeEvent as any).inputType === 'deleteContentBackward';
+      if (!isDeleting) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length > 0) {
+          if (digits.length <= 2) {
+            val = digits;
+          } else if (digits.length <= 4) {
+            val = `${digits.slice(0, 2)} - ${digits.slice(2)}`;
+          } else {
+            val = `${digits.slice(0, 2)} - ${digits.slice(2, 4)} - ${digits.slice(4, 8)}`;
+          }
+        }
+      }
     }
 
     setInputValue(val);
 
-    const validDate = parseAndValidateDate(val);
-    if (validDate) {
-      setSelectedDate(validDate);
-      onChange(format(validDate, 'yyyy-MM-dd'));
+    let parsedDate: Date | undefined;
+    if (isEmployeeVariant) {
+      const cleanVal = val.replace(/\s/g, '');
+      if (/^\d{2}-\d{2}-\d{4}$/.test(cleanVal)) {
+        const d = parse(cleanVal, 'dd-MM-yyyy', new Date());
+        if (isValid(d)) parsedDate = d;
+      } else if (/^\d{8}$/.test(cleanVal)) {
+        const d = parse(cleanVal, 'ddMMyyyy', new Date());
+        if (isValid(d)) parsedDate = d;
+      }
+    } else {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        const d = new Date(val + 'T00:00:00');
+        if (isValid(d)) parsedDate = d;
+      }
+    }
+
+    if (parsedDate && !isDateDisabled(parsedDate)) {
+      setSelectedDate(parsedDate);
+      onChange(format(parsedDate, 'yyyy-MM-dd'));
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const validDate = parseAndValidateDate(inputValue);
-      if (validDate) {
-        setSelectedDate(validDate);
-        setInputValue(format(validDate, 'dd-MM-yyyy'));
-        onChange(format(validDate, 'yyyy-MM-dd'));
+      if (isEmployeeVariant) {
+        const cleanVal = inputValue.replace(/\s/g, '');
+        let finalDate: Date | undefined;
+        if (/^\d{2}-\d{2}-\d{4}$/.test(cleanVal)) {
+          finalDate = parse(cleanVal, 'dd-MM-yyyy', new Date());
+        } else if (/^\d{8}$/.test(cleanVal)) {
+          finalDate = parse(cleanVal, 'ddMMyyyy', new Date());
+        }
+        if (finalDate && isValid(finalDate) && !isDateDisabled(finalDate)) {
+          const dateStr = format(finalDate, 'yyyy-MM-dd');
+          setSelectedDate(finalDate);
+          setInputValue(format(finalDate, 'dd - MM - yyyy'));
+          onChange(dateStr);
+          setIsOpen(false);
+        }
+      } else if (selectedDate) {
         setIsOpen(false);
       }
-    }
-  };
-
-  const handleSelect = (date: Date | undefined) => {
-    if (date) {
-      setSelectedDate(date);
-      setInputValue(format(date, 'dd-MM-yyyy'));
-      onChange(format(date, 'yyyy-MM-dd'));
+    } else if (e.key === 'Escape') {
       setIsOpen(false);
     }
   };
 
-=======
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
   const getDefaultMonth = () => {
     if (selectedDate) return selectedDate;
     if (minDate) return minDate;
     if (maxDate && new Date() > maxDate) return maxDate;
     return new Date();
+  };
+
+  const toggleOpen = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
+    }
   };
 
   return (
@@ -343,47 +225,34 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           disabled && 'date-picker-input-disabled',
           isOpen && 'date-picker-input-open'
         )}
-<<<<<<< HEAD
-        onClick={() => !disabled && !isOpen && setIsOpen(true)}
-      >
-        <input
-          type="text"
-          readOnly={!allowManualEntry}
-          value={inputValue}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-=======
+        onClick={toggleOpen}
+        style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
       >
         <input
           type="text"
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onClick={() => !disabled && setIsOpen(true)}
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           disabled={disabled}
+          readOnly={!allowManualEntry}
           className="date-picker-input-field"
+          style={{ pointerEvents: allowManualEntry ? 'auto' : 'none' }}
         />
-        <div
-          className="date-picker-icon-container"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
-        >
-          <CalendarIcon />
-        </div>
+        {isEmployeeVariant && (
+          <div className="date-picker-icon-container">
+            <CalendarIcon />
+          </div>
+        )}
       </div>
-<<<<<<< HEAD
-      {isOpen && !disabled && (
-=======
       {isOpen && !disabled && createPortal(
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
         <div
           ref={popoverRef}
           className={cn('date-picker-popover-portal', position === 'top' && 'date-picker-popover-top')}
           style={{
-            top: popoverCoords.top,
-            left: popoverCoords.left,
-            width: popoverCoords.width,
+            top: `${popoverCoords.top}px`,
+            left: `${popoverCoords.left}px`,
+            width: `${popoverCoords.width}px`,
             position: 'absolute',
             zIndex: 9999
           }}
@@ -402,8 +271,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     </div>
   );
 };
-<<<<<<< HEAD
-=======
 
 const CalendarIcon = () => (
   <svg
@@ -423,5 +290,3 @@ const CalendarIcon = () => (
     <line x1="3" y1="10" x2="21" y2="10" />
   </svg>
 );
-
->>>>>>> 86ee2ab305ed9bd9fe8048f4c4c21479573c12e0
