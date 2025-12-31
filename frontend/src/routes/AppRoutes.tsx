@@ -11,6 +11,7 @@ const EmployeeManagementPage = lazy(() => import('../pages/EmployeeManagementPag
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const ChangePasswordPage = lazy(() => import('../pages/ChangePasswordPage'));
 const HolidayManagementPage = lazy(() => import('../pages/HolidayManagementPage'));
+const ViewPoliciesPage = lazy(() => import('../pages/ViewPoliciesPage'));
 
 const AppRoutes: React.FC = () => {
 
@@ -78,6 +79,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['hr', 'super_admin']}>
               <HolidayManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/view-policies"
+          element={
+            <ProtectedRoute>
+              <ViewPoliciesPage />
             </ProtectedRoute>
           }
         />

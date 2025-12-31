@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -44,6 +44,9 @@ const Sidebar: React.FC = memo(() => {
     if (['hr', 'super_admin'].includes(user.role)) {
       routes.push({ path: '/holiday-management', icon: <FaCalendarAlt />, label: 'Holiday Management' });
     }
+
+    // View Policies - Available to all
+    routes.push({ path: '/view-policies', icon: <FaBook />, label: 'View Policies' });
 
     // Profile is always available
     routes.push({ path: '/profile', icon: <FaUser />, label: 'Profile' });

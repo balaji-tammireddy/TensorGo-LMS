@@ -1,7 +1,8 @@
 import cron from 'node-cron';
 import { pool } from '../database/db';
 import { logger } from './logger';
-import { sendPendingLeaveReminderEmail, sendBirthdayWishEmail } from './emailTemplates';
+import { sendPendingLeaveReminderEmail, sendBirthdayWishEmail, sendHolidayListReminderEmail } from './emailTemplates';
+import { isLastWorkingDayOfMonth } from './leaveCredit';
 
 /**
  * Send daily pending leave reminders to managers and HR
@@ -191,6 +192,65 @@ const sendBirthdayWishes = async () => {
 };
 
 /**
+ * Send reminder to HR to add next year's holidays
+ * Runs daily in November to check for last working day
+ * Trigger: Last working day of November
+ */
+const checkAndSendHolidayListReminder = async () => {
+  try {
+    const today = new Date();
+    const month = today.getMonth(); // 0-11. November is 10.
+
+    // Only run in November
+    if (month !== 10) return;
+
+    // Check if today is last working day of month
+    if (!isLastWorkingDayOfMonth()) return;
+
+    logger.info('📅 Last working day of November detected. Sending Holiday List Reminder...');
+
+    // 1. Get all HRs
+    const hrResult = await pool.query(
+      `SELECT email, first_name || ' ' || COALESCE(last_name, '') as name 
+       FROM users WHERE role = 'hr' AND status = 'active'`
+    );
+
+    if (hrResult.rows.length === 0) {
+      logger.warn('⚠️ No active HRs found to send holiday list reminder.');
+      return;
+    }
+
+    // 2. Get all Super Admins for CC
+    const adminResult = await pool.query(
+      `SELECT email FROM users WHERE role = 'super_admin' AND status = 'active'`
+    );
+
+    // Filter out admins who might also be HR to avoid duplicate/confusion (optional, but safe)
+    // Actually, CCing them is fine even if they are HR? Usually separate users.
+    const adminEmails = adminResult.rows.map(r => r.email);
+    const nextYear = today.getFullYear() + 1;
+
+    logger.info(`📧 Sending holiday reminder to ${hrResult.rows.length} HRs (CC: ${adminEmails.length} Admins) for Year ${nextYear}`);
+
+    // 3. Send email to each HR
+    for (const hr of hrResult.rows) {
+      try {
+        await sendHolidayListReminderEmail(
+          hr.email,
+          { recipientName: hr.name, nextYear },
+          adminEmails.length > 0 ? adminEmails : undefined
+        );
+        logger.info(`✅ Holiday list reminder sent to HR: ${hr.email}`);
+      } catch (err) {
+        logger.error(`❌ Failed to send holiday reminder to HR ${hr.email}:`, err);
+      }
+    }
+  } catch (error) {
+    logger.error('❌ Error in holiday list reminder job:', error);
+  }
+};
+
+/**
  * Cleanup old holidays
  * Keeps holidays from (Current Year - 1) onwards
  * Runs annually on Dec 31st
@@ -233,6 +293,14 @@ export const initializeCronJobs = () => {
     timezone: 'Asia/Kolkata' // Adjust timezone as needed
   });
   logger.info('✅ Cron job scheduled: Daily birthday wishes (9:00 AM)');
+
+  // Holiday List Reminder - Checks daily from Nov 23-30 to find the last working day
+  // Note: We scan the date range including weekends, but the code logic explicitly checks for 
+  // "Last Working Day" (Mon-Fri) and ignores Sat/Sun automatically.
+  cron.schedule('0 9 23-30 11 *', checkAndSendHolidayListReminder, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Holiday List Reminder (Checks Nov 23-30 at 9:00 AM)');
 
   // Holiday cleanup once a year on Dec 31st at 00:00
   cron.schedule('0 0 31 12 *', cleanupOldHolidays, {

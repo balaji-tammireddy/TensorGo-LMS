@@ -179,7 +179,7 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -247,7 +247,7 @@ Leave Details:
 Please review and take appropriate action on the leave application.
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -269,7 +269,7 @@ export const sendLeaveApplicationEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Leave Application - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
   const emailHtml = generateLeaveApplicationEmailHtml(data);
   const emailText = generateLeaveApplicationEmailText(data);
@@ -317,7 +317,7 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
   const statusColor = data.status === 'approved' ? '#10b981' : data.status === 'partially_approved' ? '#f59e0b' : '#ef4444';
   const statusBgColor = data.status === 'approved' ? '#d1fae5' : data.status === 'partially_approved' ? '#fef3c7' : '#fee2e2';
   const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
-  
+
   // Determine message based on recipient role
   let mainMessage = '';
   if (data.recipientRole === 'employee') {
@@ -432,7 +432,7 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -468,7 +468,7 @@ const generateLeaveStatusEmailText = (data: LeaveStatusEmailData): string => {
   const endTypeDisplay = formatDayType(data.endType);
   const statusDisplay = data.status === 'approved' ? 'Approved' : data.status === 'partially_approved' ? 'Partially Approved' : 'Rejected';
   const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
-  
+
   // Determine message based on recipient role
   let mainMessage = '';
   if (data.recipientRole === 'employee') {
@@ -504,7 +504,7 @@ Reason: ${data.reason}
 ${data.status === 'approved' || data.status === 'partially_approved' ? 'Approved' : 'Rejected'} by: ${data.approverName} (${approverRoleDisplay})
 
 Best regards,
-TensorGo-LMS Team
+TensorGo
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -526,13 +526,13 @@ export const sendLeaveStatusEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const statusDisplay = data.status === 'approved' ? 'Approved' : data.status === 'partially_approved' ? 'Partially Approved' : 'Rejected';
   const approverRoleDisplay = data.approverRole === 'manager' ? 'Manager' : data.approverRole === 'hr' ? 'HR' : 'Super Admin';
-  
+
   // Subject line based on status
   const emailSubject = `Leave Request Status - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
-  
+
   const emailHtml = generateLeaveStatusEmailHtml(data);
   const emailText = generateLeaveStatusEmailText(data);
 
@@ -631,7 +631,7 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -674,7 +674,7 @@ Login URL: ${data.loginUrl}
 Important: Please change your password after your first login for security purposes.
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -689,7 +689,7 @@ export const sendNewEmployeeCredentialsEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Welcome to TensorGo LMS - Your Login Credentials [Ref: ${uniqueId}]`;
   const emailHtml = generateNewEmployeeCredentialsEmailHtml(data);
   const emailText = generateNewEmployeeCredentialsEmailText(data);
@@ -813,7 +813,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -859,7 +859,7 @@ Allocation Details:
 ${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -874,7 +874,7 @@ export const sendLeaveAllocationEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Leave Allocation - ${data.leaveType} Leave Added [Ref: ${uniqueId}]`;
   const emailHtml = generateLeaveAllocationEmailHtml(data);
   const emailText = generateLeaveAllocationEmailText(data);
@@ -983,7 +983,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Security Team</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -1025,7 +1025,7 @@ ${data.ipAddress ? `- IP Address: ${data.ipAddress}\n` : ''}
 ⚠️ Important: If you did not make this change, please contact your administrator immediately and change your password again.
 
 Best regards,
-TensorGo-LMS Security Team
+TensorGo
 
 ---
 This is an automated security email from TensorGo Leave Management System.
@@ -1040,7 +1040,7 @@ export const sendPasswordChangeSecurityEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Security Alert: Password Changed [Ref: ${uniqueId}]`;
   const emailHtml = generatePasswordChangeSecurityEmailHtml(data);
   const emailText = generatePasswordChangeSecurityEmailText(data);
@@ -1147,7 +1147,7 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -1192,7 +1192,7 @@ ${index + 1}. ${leave.employeeName} (${leave.employeeEmpId})
 Please review and take appropriate action on these leave requests at your earliest convenience.
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated daily reminder from TensorGo Leave Management System.
@@ -1207,7 +1207,7 @@ export const sendPendingLeaveReminderEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Reminder: ${data.pendingLeaves.length} Pending Leave ${data.pendingLeaves.length === 1 ? 'Request' : 'Requests'} Awaiting Approval [Ref: ${uniqueId}]`;
   const emailHtml = generatePendingLeaveReminderEmailHtml(data);
   const emailText = generatePendingLeaveReminderEmailText(data);
@@ -1338,7 +1338,7 @@ export const sendBirthdayWishEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Happy Birthday ${data.employeeName}! [Ref: ${uniqueId}]`;
   const emailHtml = generateBirthdayWishEmailHtml(data);
   const emailText = generateBirthdayWishEmailText(data);
@@ -1453,7 +1453,7 @@ const generateLeaveCarryForwardEmailHtml = (data: LeaveCarryForwardEmailData): s
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -1505,7 +1505,7 @@ Carry Forward Details:
   * LOP: ${data.newYearBalances.lop} ${data.newYearBalances.lop === 1 ? 'day' : 'days'}
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -1520,7 +1520,7 @@ export const sendLeaveCarryForwardEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Leave Carry Forward - ${data.previousYear} to ${data.newYear} [Ref: ${uniqueId}]`;
   const emailHtml = generateLeaveCarryForwardEmailHtml(data);
   const emailText = generateLeaveCarryForwardEmailText(data);
@@ -1545,10 +1545,10 @@ export const sendUrgentLeaveApplicationEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   // Use professional urgent subject line
   const emailSubject = `URGENT: Leave Application - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
-  
+
   // Generate HTML with professional corporate styling
   const leaveTypeDisplay = formatLeaveType(data.leaveType);
   const startDateDisplay = formatDateForDisplay(data.startDate);
@@ -1686,7 +1686,7 @@ export const sendUrgentLeaveApplicationEmail = async (
               
               <p style="margin: 24px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -1734,7 +1734,7 @@ ACTION REQUIRED: This urgent leave application requires your prompt review and d
 Thank you for your attention to this matter.
 
 Best regards,
-TensorGo Leave Management System
+TensorGo
 
 ---
 This is an automated notification from TensorGo Leave Management System.
@@ -1828,7 +1828,7 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -1869,7 +1869,7 @@ Employee Information:
 - Employee ID: ${data.employeeEmpId}
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated email from TensorGo Leave Management System.
@@ -1888,7 +1888,7 @@ export const sendEmployeeDetailsUpdateEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Employee Details Updated - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
   const emailHtml = generateEmployeeDetailsUpdateEmailHtml(data);
   const emailText = generateEmployeeDetailsUpdateEmailText(data);
@@ -2050,7 +2050,7 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
                 Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo Leave Management System</strong>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
               </p>
             </td>
           </tr>
@@ -2107,7 +2107,7 @@ Balance Changes:
 - Casual Balance: ${data.previousCasualBalance} → ${data.newCasualBalance} (Deducted ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})
 
 Best regards,
-TensorGo-LMS
+TensorGo
 
 ---
 This is an automated sdhsgf email from TensorGo Leave Management System.
@@ -2129,7 +2129,7 @@ export const sendLopToCasualConversionEmail = async (
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
-  
+
   const emailSubject = `Leave Type Converted - ${data.employeeName} (${data.employeeEmpId}) [Ref: ${uniqueId}]`;
   const emailHtml = generateLopToCasualConversionEmailHtml(data);
   const emailText = generateLopToCasualConversionEmailText(data);
@@ -2140,5 +2140,79 @@ export const sendLopToCasualConversionEmail = async (
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
+  });
+};
+
+// ============================================================================
+// HOLIDAY LIST REMINDER EMAIL
+// ============================================================================
+
+export interface HolidayListReminderEmailData {
+  recipientName: string;
+  nextYear: number;
+}
+
+const generateHolidayListReminderEmailHtml = (data: HolidayListReminderEmailData): string => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Action Required: Add Holiday List</title>
+</head>
+<body style="font-family: 'Poppins', sans-serif; background-color: #f5f7fa; padding: 20px; margin: 0;">
+  <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">Upcoming Year Holidays</h1>
+    </div>
+    <div style="padding: 40px;">
+      <p style="color: #333; font-size: 16px;">Dear ${data.recipientName},</p>
+      <p style="color: #555; line-height: 1.6;">This is an automated reminder to update the holiday list for the upcoming year <strong>${data.nextYear}</strong>.</p>
+      <p style="color: #555; line-height: 1.6;">Please ensure the holiday calendar is updated before the start of the new year to avoid any disruptions in leave planning.</p>
+      <br>
+      <p style="color: #333;">Best regards,<br><strong>TensorGo</strong></p>
+    </div>
+    <div style="background: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #999;">
+       Reference ID: ${uniqueId}
+    </div>
+  </div>
+</body>
+</html>
+  `;
+};
+
+const generateHolidayListReminderEmailText = (data: HolidayListReminderEmailData): string => {
+  return `
+Action Required: Add Holiday List for ${data.nextYear}
+
+Dear ${data.recipientName},
+
+This is an automated reminder to update the holiday list for the upcoming year ${data.nextYear}.
+Please ensure the holiday calendar is updated before the start of the new year.
+
+Best regards,
+TensorGo
+  `;
+};
+
+export const sendHolidayListReminderEmail = async (
+  recipientEmail: string,
+  data: HolidayListReminderEmailData,
+  cc?: string | string[]
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  return await sendEmail({
+    to: recipientEmail,
+    cc,
+    subject: `Action Required: Add Holiday List for ${data.nextYear} [Ref: ${uniqueId}]`,
+    html: generateHolidayListReminderEmailHtml(data),
+    text: generateHolidayListReminderEmailText(data),
   });
 };
