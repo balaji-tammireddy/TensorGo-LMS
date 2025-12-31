@@ -169,7 +169,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   );
 
-  const { data: leaveHistoryData, isLoading: leaveHistoryLoading } = useQuery(
+  const { data: leaveHistoryData, isLoading: leaveHistoryLoading, refetch: refetchLeaveHistory } = useQuery(
     ['employee-leave-requests', editingEmployeeId],
     () => leaveService.getEmployeeLeaveRequests(editingEmployeeId!, 1, 100),
     {
@@ -1789,6 +1789,9 @@ const EmployeeManagementPage: React.FC = () => {
                     type="button"
                     className="modal-save-button"
                     onClick={() => {
+                      if (!showLeaveHistory) {
+                        refetchLeaveHistory();
+                      }
                       setShowLeaveHistory(!showLeaveHistory);
                     }}
                   >
