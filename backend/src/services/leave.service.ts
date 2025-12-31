@@ -224,13 +224,17 @@ export const applyLeave = async (
     endDate.setHours(0, 0, 0, 0);
 
     // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
-    const startDayOfWeek = startDate.getDay();
-    const endDayOfWeek = endDate.getDay();
-    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
-    }
-    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+    // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
+    // EXCEPTION: LOP leaves can start/end on weekends
+    if (leaveData.leaveType !== 'lop') {
+      const startDayOfWeek = startDate.getDay();
+      const endDayOfWeek = endDate.getDay();
+      if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+        throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+      }
+      if (endDayOfWeek === 0 || endDayOfWeek === 6) {
+        throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+      }
     }
 
     // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
@@ -315,13 +319,16 @@ export const applyLeave = async (
     const holidayStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const holidayEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-    if (holidayDates.has(holidayStartDateStr)) {
-      const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
-      throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
-    }
-    if (holidayDates.has(holidayEndDateStr)) {
-      const holidayName = holidayNames.get(holidayEndDateStr) || 'Holiday';
-      throw new Error(`Cannot select ${holidayName} (${holidayEndDateStr}) as end date. Please select a working day.`);
+    // EXCEPTION: LOP leaves can start/end on holidays
+    if (leaveData.leaveType !== 'lop') {
+      if (holidayDates.has(holidayStartDateStr)) {
+        const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
+        throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
+      }
+      if (holidayDates.has(holidayEndDateStr)) {
+        const holidayName = holidayNames.get(holidayEndDateStr) || 'Holiday';
+        throw new Error(`Cannot select ${holidayName} (${holidayEndDateStr}) as end date. Please select a working day.`);
+      }
     }
 
     // Validation: For sick leave, end date has same restrictions as start date
@@ -367,7 +374,8 @@ export const applyLeave = async (
         startDate,
         endDate,
         normalizedStartType as 'full' | 'half',
-        normalizedEndType as 'full' | 'half'
+        normalizedEndType as 'full' | 'half',
+        leaveData.leaveType
       );
 
       for (const requestedDay of requestedLeaveDays) {
@@ -422,7 +430,8 @@ export const applyLeave = async (
       startDate,
       endDate,
       normalizedStartType as 'full' | 'half',
-      normalizedEndType as 'full' | 'half'
+      normalizedEndType as 'full' | 'half',
+      leaveData.leaveType
     );
 
     // Require timings for permission

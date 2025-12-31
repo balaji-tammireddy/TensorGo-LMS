@@ -14,24 +14,25 @@ export async function calculateLeaveDays(
   startDate: Date,
   endDate: Date,
   startType: 'full' | 'half',
-  endType: 'full' | 'half'
+  endType: 'full' | 'half',
+  leaveType: string = 'casual'
 ): Promise<{ days: number; leaveDays: LeaveDay[] }> {
   try {
     const leaveDays: LeaveDay[] = [];
     let days = 0;
-    
+
     const currentDate = new Date(startDate);
     const end = new Date(endDate);
-    
+
     // Get the years that the leave period spans (could be same year or across two years)
     const startYear = startDate.getFullYear();
     const endYear = endDate.getFullYear();
-    
+
     // Fetch holidays for all years that the leave spans
     // If leave spans Dec 22, 2025 to Jan 5, 2026, we need holidays for both 2025 and 2026
     let holidaysQuery: string;
     let holidaysParams: number[];
-    
+
     if (startYear === endYear) {
       // Leave is within the same year
       holidaysQuery = `SELECT holiday_date FROM holidays 
@@ -47,9 +48,9 @@ export async function calculateLeaveDays(
                        ORDER BY holiday_date`;
       holidaysParams = [startYear, endYear];
     }
-    
+
     const holidaysResult = await pool.query(holidaysQuery, holidaysParams);
-    
+
     // Create a Set of holiday dates for quick lookup (format: YYYY-MM-DD)
     const holidayDates = new Set<string>();
     holidaysResult.rows.forEach((row: any) => {
@@ -57,31 +58,31 @@ export async function calculateLeaveDays(
       const holidayDateStr = `${holidayDate.getFullYear()}-${String(holidayDate.getMonth() + 1).padStart(2, '0')}-${String(holidayDate.getDate()).padStart(2, '0')}`;
       holidayDates.add(holidayDateStr);
     });
-    
+
     // Format dates for database query and comparison (reuse same variables)
     const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
     const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-    
+
     while (currentDate <= end) {
       const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
-      
-      // Skip weekends (Saturday and Sunday)
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
+
+      // Skip weekends (Saturday and Sunday) - UNLESS it's LOP
+      if (leaveType !== 'lop' && (dayOfWeek === 0 || dayOfWeek === 6)) {
         currentDate.setDate(currentDate.getDate() + 1);
         continue;
       }
-      
+
       const year = currentDate.getFullYear();
       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
       const day = String(currentDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
-      // Skip holidays (check both current year and next year)
-      if (holidayDates.has(dateStr)) {
+
+      // Skip holidays (check both current year and next year) - UNLESS it's LOP
+      if (leaveType !== 'lop' && holidayDates.has(dateStr)) {
         currentDate.setDate(currentDate.getDate() + 1);
         continue;
       }
-      
+
       // Compare using date strings to avoid time component issues
       if (dateStr === startDateStr && dateStr === endDateStr) {
         // Same day - start and end are the same
@@ -115,10 +116,10 @@ export async function calculateLeaveDays(
         leaveDays.push({ date: new Date(currentDate), type: 'full' });
         days += 1;
       }
-      
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return { days, leaveDays };
   } catch (error: any) {
     console.error('Error in calculateLeaveDays:', error);
