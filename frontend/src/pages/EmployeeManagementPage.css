@@ -394,7 +394,7 @@
   font-size: 14px;
   line-height: 1.5;
   min-height: 42px;
-  resize: vertical;
+  resize: none;
   background: transparent;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;

@@ -210,7 +210,7 @@
   font-size: 14px;
   line-height: 1.5;
   min-height: 42px;
-  resize: vertical;
+  resize: none;
   background: transparent;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
@@ -389,13 +389,11 @@
   width: 150px;
   height: 150px;
   border-radius: 50%;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -404,6 +402,7 @@
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
@@ -413,7 +412,7 @@
   background: white;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
 
@@ -421,13 +420,11 @@
   height: 32px;
   width: 200px;
   border-radius: 8px;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -437,13 +434,11 @@
   width: 180px;
   border-radius: 4px;
   margin-bottom: 15px;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -457,13 +452,11 @@
 .skeleton-input {
   height: 44px;
   border-radius: 4px;
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 0%,
-    #f8f8f8 20%,
-    #f0f0f0 40%,
-    #f0f0f0 100%
-  );
+  background: linear-gradient(90deg,
+      #f0f0f0 0%,
+      #f8f8f8 20%,
+      #f0f0f0 40%,
+      #f0f0f0 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -472,13 +465,11 @@
   height: 40px;
   width: 120px;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -507,6 +498,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -527,6 +519,7 @@
     transform: scale(0.9);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
@@ -587,6 +580,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -607,6 +601,7 @@
     transform: scale(0.9);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
