@@ -62,17 +62,23 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const countNum = parseFloat(count);
-    
+
     if (isNaN(countNum) || countNum <= 0) {
       setValidationError('Please enter a valid number greater than 0');
       return;
     }
 
+    // Check if it's an integer or .5
+    if (countNum % 1 !== 0 && countNum % 1 !== 0.5) {
+      setValidationError('Only whole numbers or .5 increments are allowed');
+      return;
+    }
+
     // Get current balance for the selected leave type
-    const currentBalance = balances 
+    const currentBalance = balances
       ? (leaveType === 'casual' ? balances.casual : leaveType === 'sick' ? balances.sick : balances.lop)
       : 0;
-    
+
     const newTotal = currentBalance + countNum;
 
     // Check if count is 3 digits or more (100+)
@@ -97,47 +103,45 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 
   const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    
-    // Only allow numbers and a single decimal point
-    // Remove any non-numeric characters except decimal point
+
+    // Allow digits and at most one decimal point
     value = value.replace(/[^0-9.]/g, '');
-    
-    // Ensure only one decimal point
     const parts = value.split('.');
     if (parts.length > 2) {
       value = parts[0] + '.' + parts.slice(1).join('');
     }
-    
-    // Prevent 3-digit numbers (100 and above)
+
+    // If there is a decimal part, it must eventually be '5'
+    if (parts.length === 2 && parts[1].length > 1) {
+      value = parts[0] + '.' + parts[1].slice(0, 1);
+    }
+
     const countNum = parseFloat(value);
+
+    // Prevent 3-digit numbers (100 and above)
     if (!isNaN(countNum) && countNum >= 100) {
       setValidationError('Cannot enter 3-digit numbers.');
       return;
     }
-    
+
     setCount(value);
     setValidationError(''); // Clear error when user types
 
     if (!isNaN(countNum) && countNum > 0 && balances) {
       const currentBalance = leaveType === 'casual' ? balances.casual : leaveType === 'sick' ? balances.sick : balances.lop;
       const newTotal = currentBalance + countNum;
-      
+
       if (newTotal > 99) {
         setValidationError(`Total would exceed 99 (current: ${currentBalance} + ${countNum} = ${newTotal})`);
       }
     }
   };
 
-  const handleLeaveTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setLeaveType(e.target.value as 'casual' | 'sick' | 'lop');
+  const handleLeaveTypeChange = (value: 'casual' | 'sick' | 'lop') => {
+    setLeaveType(value);
     setCount('');
     setValidationError('');
   };
-
-  const currentBalance = balances 
-    ? (leaveType === 'casual' ? balances.casual : leaveType === 'sick' ? balances.sick : balances.lop)
-    : 0;
-  const maxAllowed = 99 - currentBalance;
 
   const handleClose = () => {
     setLeaveType('casual');
@@ -159,95 +163,99 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           {balancesLoading ? (
             <div style={{ textAlign: 'center', padding: '20px' }}>Loading balances...</div>
           ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="leave-type-dropdown-trigger"
-                  disabled={isLoading || balancesLoading}
-                    style={{ 
-                      width: '100%', 
-                      justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      fontSize: '12px',
-                      fontFamily: 'Poppins, sans-serif',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      backgroundColor: 'transparent',
-                      color: '#1f2a3d',
-                      height: 'auto'
-                    }}
-                  >
-                    <span>
-                      {leaveType === 'casual' ? `Casual (Current: ${balances?.casual || 0})` :
-                       leaveType === 'sick' ? `Sick (Current: ${balances?.sick || 0})` :
-                       `LOP (Current: ${balances?.lop || 0})`}
-                    </span>
-                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="leave-type-dropdown-content">
-                  <DropdownMenuItem
-                    onClick={() => handleLeaveTypeChange({ target: { value: 'casual' } } as any)}
-                  >
-                    Casual (Current: {balances?.casual || 0})
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => handleLeaveTypeChange({ target: { value: 'sick' } } as any)}
-                  >
-                    Sick (Current: {balances?.sick || 0})
-                  </DropdownMenuItem>
-                  {user?.role === 'super_admin' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => handleLeaveTypeChange({ target: { value: 'lop' } } as any)}
-                      >
-                        LOP (Current: {balances?.lop || 0})
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="form-group">
-              <label htmlFor="count">Count <span className="required">*</span></label>
-              <input
-                id="count"
-                type="number"
-                min="0.5"
-                  max={Math.min(99, maxAllowed > 0 ? maxAllowed : 0.5)}
-                step="0.5"
-                value={count}
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="leave-type-dropdown-trigger"
+                      disabled={isLoading || balancesLoading}
+                      style={{
+                        width: '100%',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        fontSize: '12px',
+                        fontFamily: 'Poppins, sans-serif',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        backgroundColor: 'transparent',
+                        color: '#1f2a3d',
+                        height: 'auto'
+                      }}
+                    >
+                      <span>
+                        {leaveType === 'casual' ? `Casual (Current: ${balances?.casual || 0})` :
+                          leaveType === 'sick' ? `Sick (Current: ${balances?.sick || 0})` :
+                            `LOP (Current: ${balances?.lop || 0})`}
+                      </span>
+                      <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="leave-type-dropdown-content">
+                    <DropdownMenuItem
+                      onClick={() => handleLeaveTypeChange('casual')}
+                    >
+                      Casual (Current: {balances?.casual || 0})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => handleLeaveTypeChange('sick')}
+                    >
+                      Sick (Current: {balances?.sick || 0})
+                    </DropdownMenuItem>
+                    {user?.role === 'super_admin' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('lop')}
+                        >
+                          LOP (Current: {balances?.lop || 0})
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="form-group">
+                <label htmlFor="count">Count <span className="required">*</span></label>
+                <input
+                  id="count"
+                  type="text"
+                  inputMode="decimal"
+                  value={count}
                   onChange={handleCountChange}
+                  onKeyDown={(e) => {
+                    // Allow digits, decimal point, backspace, delete, tab, and arrow keys
+                    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', '.'];
+                    if (!/[0-9]/.test(e.key) && !allowedKeys.includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
                   disabled={isLoading || balancesLoading}
-                placeholder="Enter leave count"
-                required
-              />
-              <small className="help-text">Enter number of leaves (0.5 for half day, 1 for full day, etc.)</small>
+                  required
+                />
+                <small className="help-text">Enter number of leaves (e.g. 0.5, 1, 2, etc.)</small>
                 {validationError && (
                   <div style={{ color: '#f44336', fontSize: '12px', marginTop: '5px' }}>
                     {validationError}
                   </div>
                 )}
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="cancel-button" onClick={handleClose} disabled={isLoading}>
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                className="submit-button" 
-                disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !!validationError}
-              >
-                {isLoading ? 'Adding...' : 'Add Leaves'}
-              </button>
-            </div>
-          </form>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="cancel-button" onClick={handleClose} disabled={isLoading}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="submit-button"
+                  disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !!validationError}
+                >
+                  {isLoading ? 'Adding...' : 'Add Leaves'}
+                </button>
+              </div>
+            </form>
           )}
         </div>
       </div>

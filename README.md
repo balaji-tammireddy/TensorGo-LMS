@@ -28,16 +28,16 @@ A comprehensive, production-ready HR Leave Management System (LMS) designed to s
 #### 📝 Leave Application
 - **Multiple Leave Types**: Support for **Casual**, **Sick**, **LOP** (Loss of Pay), and **Permission**.
 - **Permission Leave**: 
-  - Special logic for short absences.
-  - Restricted to max **2 hours**.
-  - Must be within office hours.
-- **Validation**:
-  - **Sick Leave**: Can be applied for past 3 days (retrospective) or future dates (limited to next day).
-  - **Casual Leave**: Must be applied at least 3 days in advance (blocks immediate future dates).
-  - **Overlap Detection**: Real-time checking against existing approved/pending leaves to prevent conflicts.
-  - **Weekend Handling**: Automatic calculation of leave days excluding weekends.
-  - **Half-Day Support**: Flexible "First Half" or "Second Half" selection.
-- **Documentation**: File upload support for medical certificates (required for Sick leaves).
+  - Special logic for short absences (max **2 hours**).
+  - Restricted to office hours (10 AM - 7 PM).
+- **Validation & Business Logic**:
+  - **LOP (Loss of Pay)**: Inclusive logic—Saturdays, Sundays, and Holidays are **counted** as leave days if they fall within the LOP period.
+  - **Casual/Sick Leave**: Exclusive logic—Weekends and Holidays are automatically **excluded** from the duration.
+  - **Sick Leave**: Retrospective application (past 3 days) supported; future dates restricted to next day.
+  - **Casual Leave**: Requires 3 days advance notice.
+  - **Overlap Detection**: Real-time checking across all request statuses (Approved, Pending, Partially Approved).
+- **Documentation**: S3-backed file upload for medical certificates (Sick leave).
+- **LOP to Casual Conversion**: HR/Admins can instantly convert an LOP request to Casual leave with automatic balance reconciliation and duration recalculation.
 
 #### ✅ Approval Workflow
 - **Dashboard**: Centralized "Pending Requests" view for Managers/HR.
@@ -53,6 +53,19 @@ A comprehensive, production-ready HR Leave Management System (LMS) designed to s
 - **Status Tracking**: Clear visual indicators for Pending, Approved, Rejected, and Partially Approved states.
 - **Balance Tracking**: Automated deduction and tracking of available leave balances.
 - **Holiday Calendar**: Integrated holiday list view customized by year.
+
+### 🚀 Performance & UX Optimization
+
+#### ⚡ Backend Performance
+- **N+1 Query Resolution**: Refactored major API endpoints (`getMyLeaveRequests`, `getPendingLeaveRequests`, `getApprovedLeaves`) to fetch data in efficient batches. This eliminates database bottlenecks and ensures smooth table loading even with thousands of records.
+- **Gzip Content Compression**: All API responses are compressed using Gzip, reducing payload sizes by up to 80% and improving load times on slower networks.
+- **Efficient Caching**: Implemented intelligent cache headers for static assets (profile photos, medical certificates) and optimized `React Query` cache times for frequently accessed data.
+
+#### 🎨 Snappy User Experience
+- **True Optimistic Updates**: Leave applications and balance changes are reflected in the UI **instantly**. The system predicts the result and updates the cache before the server even responds, creating a zero-latency feel.
+- **Intelligent Data Prefetching**: Profile data, leave balances, and holidays are proactively loaded in the background as soon as a user logs in, making the first click on any module feel instantaneous.
+- **Localized Loading States**: Replaced jarring full-page loaders with refined, localized skeleton states and background "fetching" indicators. This ensures the UI remains stable and interactive during data refreshes.
+- **Memoized Logic**: Complex data processing and filtering (e.g., in the Leave Approval dashboard) are wrapped in `useMemo` to prevent UI jank during high-frequency interactions.
 
 ### � Email Services & Automation
 - **Email Notifications**: 
