@@ -1,59 +1,89 @@
-# HR Leave Management System
+# TensorGo LMS - HR Leave Management System
 
-A production-ready HR Leave Management Web Application built with React, Express.js, and PostgreSQL.
+A comprehensive, production-ready HR Leave Management System (LMS) designed to streamline employee leave tracking, approvals, and personnel management. Built with a modern tech stack ensuring performance, scalability, and a premium user experience.
 
-## Features
+## 🚀 Features
 
-- Role-based access control (Employee, Manager, HR, Super Admin)
-- Leave application and approval workflow
-- Employee management (HR only)
-- Profile management
-- Multi-day leave day-wise breakdown
-- Approval hierarchy enforcement
-- Real-time notifications
+### 👤 Role-Based Access Control
+- **Super Admin**: Full system control, including admin management.
+- **HR**: Employee lifecycle management, leave oversight, and reporting.
+- **Manager**: Team oversight and leave approval workflows.
+- **Employee**: Self-service portal for leave applications and profile management.
 
-## Tech Stack
+### 📅 Leave Management
+- **Smart Application**: Intuitive interface for applying for leaves (Casual, Sick, LOP, etc.).
+- **Day-wise Breakdown**: Support for multi-day leaves with half-day options.
+- **Approval Workflow**: Hierarchical approval process enforcing manager review.
+- **Leave History**: Real-time tracking of past and current leave requests with status updates.
+- **Balance Tracking**: Automated tracking of available leave balances.
+
+### 👥 Employee Management (HR/Admin)
+- **Centralized Directory**: Searchable list of all employees with advanced filtering (Active/Inactive, Search by Name/ID).
+- **CRUD Operations**: Add, view, edit, and delete employee records.
+- **Onboarding**: Comprehensive form for personal, professional, and educational details.
+- **Direct Leave Assignment**: HR/Admins can grant leaves directly to employees.
+- **Live Updates**: "Leave History" view automatically fetches the latest data without page reloads.
+
+### 🔐 Security & Profile
+- **Secure Authentication**: JWT-based login system.
+- **Profile Management**: Employees can view and manage their personal details.
+- **Password Management**: Secure password change functionality.
+
+## 🛠️ Tech Stack
 
 ### Frontend
-- React 18+ with TypeScript
-- React Router v6
-- React Query for server state
-- React Hook Form + Zod for validation
-- Axios for API calls
-- Poppins font (SemiBold for headings)
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite
+- **State Management**: React Query (TanStack Query) for efficient server state management
+- **Routing**: React Router v6
+- **Styling**: Vanilla CSS with modern aesthetics, `clsx`, `tailwind-merge`
+- **UI Components**: Radix UI primitives, React Icons, Lucide React
+- **Forms**: React Hook Form + Zod validation
+- **Date Handling**: `date-fns`, `react-day-picker`
 
 ### Backend
-- Express.js with TypeScript
-- PostgreSQL 14+
-- JWT authentication
-- Zod validation
-- Winston logging
+- **Runtime**: Node.js with Express
+- **Language**: TypeScript
+- **Database**: PostgreSQL 14+
+- **ORM/Querying**: Raw SQL / `pg` (with structured service layer)
+- **Validation**: Zod
+- **Authentication**: JSON Web Tokens (JWT)
+- **Logging**: Winston
 
-## Project Structure
+## 📂 Project Structure
 
 ```
-TG-LMS/
+TensorGo-LMS/
 ├── backend/          # Express.js API server
-├── frontend/         # React SPA
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── database/    # Migrations & Seeds
+│   │   ├── routes/
+│   │   ├── services/
+│   │   └── ...
+├── frontend/         # React + Vite SPA
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/    # API integrations
+│   │   └── ...
 └── README.md
 ```
 
-## Getting Started
+## 🏁 Getting Started
 
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL 14+
-- npm or yarn
 
-### Database Setup
-
-1. Create a PostgreSQL database:
+### 1. Database Setup
+Create a PostgreSQL database named `hr_lms`.
 ```sql
 CREATE DATABASE hr_lms;
 ```
 
-2. Update `backend/.env` with your database credentials:
-```
+Update `backend/.env` with your credentials:
+```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=hr_lms
@@ -62,37 +92,31 @@ DB_PASSWORD=your_password
 JWT_SECRET=your-super-secret-jwt-key
 ```
 
-### Backend Setup
+### 2. Backend Setup
 ```bash
 cd backend
 npm install
 npm run migrate    # Creates database schema
-npm run seed       # Creates sample users (optional)
-npm run dev        # Starts development server on port 5000
+npm run seed       # Populates default users
+npm run dev        # Starts server on port 5000
 ```
 
-### Frontend Setup
+### 3. Frontend Setup
 ```bash
 cd frontend
 npm install
-npm run dev        # Starts development server on port 3000
+npm run dev        # Starts client on port 5173 (or 3000)
 ```
 
-### Default Login Credentials (from seed)
+## 🔑 Default Login Credentials
+*(From default seed data)*
 
-- **Super Admin**: admin@tensorgo.com / admin123
-- **HR**: hr@tensorgo.com / hr1234
-- **Manager**: balaji@tensorgo.com / manager123
-- **Employee**: jaiwanth@tensorgo.com / emp123
+| Role | Email | Password |
+|------|-------|----------|
+| **Super Admin** | admin@tensorgo.com | admin123 |
+| **HR** | hr@tensorgo.com | hr1234 |
+| **Manager** | balaji@tensorgo.com | manager123 |
+| **Employee** | jaiwanth@tensorgo.com | emp123 |
 
-## Default Roles
-
-- **Employee**: Can apply leave, view own profile
-- **Manager**: Can approve direct reports' leaves
-- **HR**: Can manage employees, approve manager leaves
-- **Super Admin**: Full access to all features
-
-## License
-
-Proprietary
-
+## 📄 License
+Proprietary software developed for TensorGo.
