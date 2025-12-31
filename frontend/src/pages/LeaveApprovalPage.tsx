@@ -38,6 +38,8 @@ const LeaveApprovalPage: React.FC = () => {
     () => leaveService.getPendingLeaveRequests(1, 10, search || undefined, filter || undefined),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 15000, // Polling every 15 seconds
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
           // Redirect to login if unauthorized
@@ -52,6 +54,8 @@ const LeaveApprovalPage: React.FC = () => {
     () => leaveService.getApprovedLeaves(1, 10),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 15000, // Polling every 15 seconds
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
           window.location.href = '/login';
@@ -91,7 +95,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending, previousApproved };
       },
-      onSuccess: (response, variables) => {
+      onSuccess: (_response, _variables) => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
@@ -219,7 +223,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending };
       },
-      onSuccess: (response, requestId) => {
+      onSuccess: (_response, requestId) => {
         // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);

@@ -166,6 +166,7 @@ const EmployeeManagementPage: React.FC = () => {
     () => getReportingManagers(undefined, newEmployee.role, editingEmployeeId || undefined),
     {
       retry: false,
+      staleTime: 0,
       enabled: isModalOpen && !!newEmployee.role
     }
   );
@@ -175,6 +176,8 @@ const EmployeeManagementPage: React.FC = () => {
     () => leaveService.getEmployeeLeaveRequests(editingEmployeeId!, 1, 100),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 30000, // Polling every 30 seconds
       enabled: showLeaveHistory && !!editingEmployeeId && (user?.role === 'hr' || user?.role === 'super_admin')
     }
   );
@@ -191,6 +194,8 @@ const EmployeeManagementPage: React.FC = () => {
       ),
     {
       retry: false,
+      staleTime: 0,
+      refetchInterval: 30000, // Polling every 30 seconds
       keepPreviousData: true,
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {

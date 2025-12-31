@@ -458,7 +458,8 @@ const LeaveApplyPage: React.FC = () => {
     leaveService.getLeaveBalances,
     {
       retry: false,
-      staleTime: 1 * 60 * 1000, // Cache for 1 minute
+      staleTime: 0,
+      refetchInterval: 30000, // Polling every 30 seconds
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -477,7 +478,9 @@ const LeaveApplyPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0, // Always refetch when year changes
-      cacheTime: 0, // Don't cache old year data
+      refetchInterval: 60000, // Polling every minute
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      keepPreviousData: true, // Keep old year's data while fetching new year
       refetchOnMount: true, // Always refetch when component mounts
       refetchOnWindowFocus: false // Don't refetch on window focus
     }
@@ -513,7 +516,8 @@ const LeaveApplyPage: React.FC = () => {
     () => leaveService.getMyLeaveRequests(1, 50), // Reduced from 100 to 50 for faster loading
     {
       retry: false,
-      staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+      staleTime: 0,
+      refetchInterval: 15000, // Polling every 15 seconds
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -1049,7 +1053,10 @@ const LeaveApplyPage: React.FC = () => {
     setEditingId(null);
   };
 
-  if (balancesLoading || holidaysLoading || rulesLoading || requestsLoading) {
+  // Initial loading state (only for first-time page load)
+  // We use !holidaysData.length instead of (holidaysLoading && holidaysData.length === 0) 
+  // because keepPreviousData: true preserves the length during year change.
+  if (balancesLoading || (holidaysLoading && !holidaysData.length) || rulesLoading || requestsLoading) {
     return (
       <AppLayout>
         <div className="leave-apply-page">
@@ -1228,28 +1235,42 @@ const LeaveApplyPage: React.FC = () => {
               </div>
             </div>
             <div className="holidays-table-container">
-              {holidays.length === 0 ? (
+              {holidaysLoading && holidaysData.length === 0 ? (
+                <div className="holiday-local-skeleton">
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                  <div className="skeleton-table-row"></div>
+                </div>
+              ) : holidays.length === 0 ? (
                 <EmptyState
                   title={`No Holidays for ${selectedYear}`}
                   description="There are no holidays listed for the selected year."
                 />
               ) : (
-                <table className="holidays-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Holiday name</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {holidays.map((holiday, idx) => (
-                      <tr key={idx}>
-                        <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
-                        <td>{holiday.name}</td>
+                <div className={`holidays-table-wrapper ${holidaysLoading ? 'fetching' : ''}`}>
+                  <table className="holidays-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Holiday name</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {holidays.map((holiday, idx) => (
+                        <tr key={idx}>
+                          <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
+                          <td>{holiday.name}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {holidaysLoading && (
+                    <div className="holiday-mini-spinner">
+                      <div className="spinner"></div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
