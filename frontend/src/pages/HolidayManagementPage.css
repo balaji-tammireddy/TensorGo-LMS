@@ -34,16 +34,29 @@
 }
 
 .hm-form-row {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
+    display: flex;
     gap: 15px;
-    align-items: end;
+    align-items: flex-end;
+    flex-wrap: wrap;
 }
 
 .hm-form-group {
     display: flex;
     flex-direction: column;
     gap: 5px;
+    /* Default behavior handled by specific classes below */
+}
+
+.hm-form-group-date {
+    flex: 0.5;
+    /* Reduce date input size */
+    min-width: 150px;
+}
+
+.hm-form-group-name {
+    flex: 2;
+    /* Increase name input size */
+    min-width: 250px;
 }
 
 .hm-form-group label {
@@ -59,6 +72,7 @@
     font-size: 14px;
     font-family: 'Poppins', sans-serif;
     background: #f8f9fc;
+    width: 100%;
 }
 
 .hm-form-group input:focus {
@@ -70,7 +84,8 @@
 .hm-form-actions {
     display: flex;
     gap: 10px;
-    margin-top: 5px;
+    margin-top: 0;
+    margin-bottom: 2px;
 }
 
 .hm-submit-button {
@@ -84,7 +99,8 @@
     font-family: 'Poppins', sans-serif;
     font-size: 12px;
     white-space: nowrap;
-    min-width: 110px;
+    min-width: 140px;
+    padding: 0 20px;
     height: 42px;
     line-height: 1.2;
     display: inline-flex;
@@ -118,7 +134,8 @@
     font-family: 'Poppins', sans-serif;
     font-size: 12px;
     white-space: nowrap;
-    min-width: 110px;
+    min-width: 140px;
+    padding: 0 20px;
     height: 42px;
     line-height: 1.2;
     display: inline-flex;
@@ -296,7 +313,13 @@
 /* Responsive Design */
 @media (max-width: 768px) {
     .hm-form-row {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .hm-form-group {
+        width: 100% !important;
+        /* Override inline style on mobile */
     }
 
     .hm-header {

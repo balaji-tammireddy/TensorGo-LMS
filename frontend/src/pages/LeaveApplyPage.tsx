@@ -1222,8 +1222,11 @@ const LeaveApplyPage: React.FC = () => {
                 <tbody>
                   {holidays.length === 0 ? (
                     <tr>
-                      <td colSpan={2} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                        No holidays found for {selectedYear}
+                      <td colSpan={2} style={{ padding: 0 }}>
+                        <EmptyState
+                          title={`No Holidays for ${selectedYear}`}
+                          description="There are no holidays listed for the selected year."
+                        />
                       </td>
                     </tr>
                   ) : (

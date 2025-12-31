@@ -6,6 +6,8 @@ import { DatePicker } from '../components/ui/date-picker';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import { FaTrash } from 'react-icons/fa';
+import EmptyState from '../components/common/EmptyState';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import './HolidayManagementPage.css';
 
 const HolidayManagementPage: React.FC = () => {
@@ -16,6 +18,8 @@ const HolidayManagementPage: React.FC = () => {
         holidayDate: '',
         holidayName: ''
     });
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [selectedHoliday, setSelectedHoliday] = useState<{ id: number; name: string } | null>(null);
 
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -76,10 +80,13 @@ const HolidayManagementPage: React.FC = () => {
                 showSuccess('Holiday deleted successfully!');
                 queryClient.invalidateQueries(['holidays', selectedYear]);
                 queryClient.invalidateQueries('holidays');
+                setDeleteConfirmOpen(false);
+                setSelectedHoliday(null);
             },
             onError: (error: any) => {
                 const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to delete holiday';
                 showError(errorMessage);
+                setDeleteConfirmOpen(false);
             }
         }
     );
@@ -103,8 +110,13 @@ const HolidayManagementPage: React.FC = () => {
     };
 
     const handleDelete = (holidayId: number, holidayName: string) => {
-        if (window.confirm(`Are you sure you want to delete "${holidayName}"?`)) {
-            deleteMutation.mutate(holidayId);
+        setSelectedHoliday({ id: holidayId, name: holidayName });
+        setDeleteConfirmOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (selectedHoliday) {
+            deleteMutation.mutate(selectedHoliday.id);
         }
     };
 
@@ -122,15 +134,23 @@ const HolidayManagementPage: React.FC = () => {
                     <h2>Add New Holiday</h2>
                     <form onSubmit={handleSubmit} className="hm-form">
                         <div className="hm-form-row">
-                            <div className="hm-form-group">
+                            <div className="hm-form-group hm-form-group-date">
                                 <label>Holiday Date *</label>
                                 <DatePicker
                                     value={formData.holidayDate}
                                     onChange={handleDateChange}
                                     placeholder="Select date"
+                                    min={new Date().toISOString().split('T')[0]}
+                                    disabledDates={(date) => {
+                                        // Check if date is in existing holidays
+                                        return holidaysData.some((holiday: any) => {
+                                            const holidayDate = new Date(holiday.date);
+                                            return holidayDate.toDateString() === date.toDateString();
+                                        });
+                                    }}
                                 />
                             </div>
-                            <div className="hm-form-group">
+                            <div className="hm-form-group hm-form-group-name">
                                 <label>Holiday Name *</label>
                                 <input
                                     type="text"
@@ -140,23 +160,23 @@ const HolidayManagementPage: React.FC = () => {
                                     maxLength={100}
                                 />
                             </div>
-                        </div>
-                        <div className="hm-form-actions">
-                            <button
-                                type="submit"
-                                className="hm-submit-button"
-                                disabled={createMutation.isLoading}
-                            >
-                                {createMutation.isLoading ? 'Adding...' : 'Add Holiday'}
-                            </button>
-                            <button
-                                type="button"
-                                className="hm-reset-button"
-                                onClick={handleReset}
-                                disabled={createMutation.isLoading}
-                            >
-                                Reset
-                            </button>
+                            <div className="hm-form-actions">
+                                <button
+                                    type="submit"
+                                    className="hm-submit-button"
+                                    disabled={createMutation.isLoading}
+                                >
+                                    {createMutation.isLoading ? 'Adding...' : 'Add Holiday'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="hm-reset-button"
+                                    onClick={handleReset}
+                                    disabled={createMutation.isLoading}
+                                >
+                                    Reset
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -190,9 +210,10 @@ const HolidayManagementPage: React.FC = () => {
                     {holidaysLoading ? (
                         <div className="hm-loading-message">Loading holidays...</div>
                     ) : holidays.length === 0 ? (
-                        <div className="hm-no-holidays-message">
-                            No holidays found for {selectedYear}
-                        </div>
+                        <EmptyState
+                            title={`No Holidays for ${selectedYear}`}
+                            description="There are no holidays listed for the selected year."
+                        />
                     ) : (
                         <div className="hm-table-container">
                             <table className="hm-table">
@@ -233,8 +254,22 @@ const HolidayManagementPage: React.FC = () => {
                         </div>
                     )}
                 </div>
+                <ConfirmationDialog
+                    isOpen={deleteConfirmOpen}
+                    title="Delete Holiday"
+                    message={`Are you sure you want to delete "${selectedHoliday?.name}"? This action cannot be undone.`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    type="danger"
+                    isLoading={deleteMutation.isLoading}
+                    onConfirm={confirmDelete}
+                    onCancel={() => {
+                        setDeleteConfirmOpen(false);
+                        setSelectedHoliday(null);
+                    }}
+                />
             </div>
-        </AppLayout>
+        </AppLayout >
     );
 };
 
