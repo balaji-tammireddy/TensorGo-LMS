@@ -1212,33 +1212,29 @@ const LeaveApplyPage: React.FC = () => {
               </div>
             </div>
             <div className="holidays-table-container">
-              <table className="holidays-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Holiday name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holidays.length === 0 ? (
+              {holidays.length === 0 ? (
+                <EmptyState
+                  title={`No Holidays for ${selectedYear}`}
+                  description="There are no holidays listed for the selected year."
+                />
+              ) : (
+                <table className="holidays-table">
+                  <thead>
                     <tr>
-                      <td colSpan={2} style={{ padding: 0 }}>
-                        <EmptyState
-                          title={`No Holidays for ${selectedYear}`}
-                          description="There are no holidays listed for the selected year."
-                        />
-                      </td>
+                      <th>Date</th>
+                      <th>Holiday name</th>
                     </tr>
-                  ) : (
-                    holidays.map((holiday, idx) => (
+                  </thead>
+                  <tbody>
+                    {holidays.map((holiday, idx) => (
                       <tr key={idx}>
                         <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
                         <td>{holiday.name}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
