@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -23,8 +24,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Security middleware
+// Global Middleware
 app.use(helmet());
+app.use(compression()); // Enable Gzip compression
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -45,7 +47,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files for uploaded assets (e.g. profile photos)
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads', express.static(uploadDir, {
+  maxAge: '1d', // Cache static assets for 1 day
+  immutable: true
+}));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -114,12 +119,12 @@ const scheduleLeaveCreditCheck = () => {
     eightPM.setMinutes(0);
     eightPM.setSeconds(0);
     eightPM.setMilliseconds(0);
-    
+
     // If 8 PM has already passed today, schedule for tomorrow 8 PM
     if (now >= eightPM) {
       eightPM.setDate(eightPM.getDate() + 1);
     }
-    
+
     const msUntil8PM = eightPM.getTime() - now.getTime();
     logger.info(`Next leave credit check scheduled for ${eightPM.toISOString()} (in ${Math.round(msUntil8PM / 1000 / 60)} minutes)`);
     return msUntil8PM;
@@ -128,33 +133,33 @@ const scheduleLeaveCreditCheck = () => {
   // Schedule first check at 8 PM
   const scheduleNextCheck = () => {
     const msUntil8PM = getMillisecondsUntil8PM();
-    
+
     setTimeout(() => {
       // Verify it's actually 8 PM before processing
       const now = new Date();
       const currentHour = now.getHours();
-      
+
       if (currentHour === 20) {
         // It's 8 PM, check if today is the last working day
         logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
-      checkAndCreditMonthlyLeaves().catch(err => {
-        logger.error('Daily leave credit check failed:', err);
-      });
+        checkAndCreditMonthlyLeaves().catch(err => {
+          logger.error('Daily leave credit check failed:', err);
+        });
       } else {
         logger.warn(`Scheduled check triggered at hour ${currentHour} (not 8 PM). Skipping leave credit.`);
       }
-      
+
       // Then check every 24 hours (once per day at 8 PM)
       setInterval(() => {
         const checkTime = new Date();
         const checkHour = checkTime.getHours();
-        
+
         if (checkHour === 20) {
           // It's 8 PM, check if today is the last working day
           logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
-        checkAndCreditMonthlyLeaves().catch(err => {
-          logger.error('Daily leave credit check failed:', err);
-        });
+          checkAndCreditMonthlyLeaves().catch(err => {
+            logger.error('Daily leave credit check failed:', err);
+          });
         } else {
           logger.warn(`Scheduled check triggered at hour ${checkHour} (not 8 PM). Skipping leave credit.`);
         }

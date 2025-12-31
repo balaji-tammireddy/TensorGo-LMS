@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
@@ -107,7 +107,7 @@ const LeaveApprovalPage: React.FC = () => {
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
-      onError: (error: any, variables, context) => {
+      onError: (error: any, _, context) => {
         // Rollback on error
         if (context?.previousPending) {
           queryClient.setQueryData(['pendingLeaves'], context.previousPending);
@@ -166,7 +166,7 @@ const LeaveApprovalPage: React.FC = () => {
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
-      onError: (error: any, variables, context) => {
+      onError: (error: any, _, context) => {
         // Rollback on error
         if (context?.previousPending) {
           queryClient.setQueryData(['pendingLeaves'], context.previousPending);
@@ -188,7 +188,7 @@ const LeaveApprovalPage: React.FC = () => {
 
   const handleEditClick = (request: any) => {
     // Find the original request from pendingRequests (not expanded)
-    const originalRequest = pendingRequests.find((r: any) => r.id === request.id);
+    const originalRequest = (pendingData?.requests || []).find((r: any) => r.id === request.id);
     if (originalRequest) {
       setSelectedRequest(originalRequest);
       setIsModalOpen(true);
@@ -395,7 +395,7 @@ const LeaveApprovalPage: React.FC = () => {
         setSelectedRequest(null);
         setIsEditMode(false);
       },
-      onError: (error: any, variables, context) => {
+      onError: (error: any, _, context) => {
         // Rollback on error
         if (context?.previousPending) {
           queryClient.setQueryData(['pendingLeaves'], context.previousPending);
@@ -488,45 +488,46 @@ const LeaveApprovalPage: React.FC = () => {
     }
   };
 
-  const pendingRequests = pendingData?.requests || [];
-
   // Group requests by ID and show one row per request (not expanded by days)
-  const groupedPendingRequests = pendingRequests.map((request: any) => {
-    const pendingDays = request.leaveDays?.filter((day: any) => (day.status || 'pending') === 'pending') || [];
-    const approvedDays = request.leaveDays?.filter((day: any) => day.status === 'approved') || [];
-    const rejectedDays = request.leaveDays?.filter((day: any) => day.status === 'rejected') || [];
+  const groupedPendingRequests = useMemo(() => {
+    const pendingRequests = pendingData?.requests || [];
+    return pendingRequests.map((request: any) => {
+      const pendingDays = request.leaveDays?.filter((day: any) => (day.status || 'pending') === 'pending') || [];
+      const approvedDays = request.leaveDays?.filter((day: any) => day.status === 'approved') || [];
+      const rejectedDays = request.leaveDays?.filter((day: any) => day.status === 'rejected') || [];
 
-    // Determine display status - prioritize pending status if there are any pending days
-    let displayStatus = request.currentStatus;
+      // Determine display status - prioritize pending status if there are any pending days
+      let displayStatus = request.currentStatus;
 
-    // If there are pending days, status should be 'pending' or 'partially_approved', never 'rejected' or 'approved'
-    if (pendingDays.length > 0) {
-      if (approvedDays.length > 0) {
-        displayStatus = 'partially_approved';
+      // If there are pending days, status should be 'pending' or 'partially_approved', never 'rejected' or 'approved'
+      if (pendingDays.length > 0) {
+        if (approvedDays.length > 0) {
+          displayStatus = 'partially_approved';
+        } else {
+          displayStatus = 'pending';
+        }
       } else {
-        displayStatus = 'pending';
+        // No pending days - determine final status
+        if (approvedDays.length > 0 && rejectedDays.length === 0) {
+          displayStatus = 'approved';
+        } else if (rejectedDays.length > 0 && approvedDays.length === 0) {
+          displayStatus = 'rejected';
+        } else if (approvedDays.length > 0 && rejectedDays.length > 0) {
+          displayStatus = 'partially_approved';
+        } else {
+          displayStatus = 'pending';
+        }
       }
-    } else {
-      // No pending days - determine final status
-      if (approvedDays.length > 0 && rejectedDays.length === 0) {
-        displayStatus = 'approved';
-      } else if (rejectedDays.length > 0 && approvedDays.length === 0) {
-        displayStatus = 'rejected';
-      } else if (approvedDays.length > 0 && rejectedDays.length > 0) {
-        displayStatus = 'partially_approved';
-      } else {
-        displayStatus = 'pending';
-      }
-    }
 
-    return {
-      ...request,
-      displayStatus,
-      pendingDaysCount: pendingDays.length,
-      approvedDaysCount: approvedDays.length,
-      rejectedDaysCount: rejectedDays.length
-    };
-  }).filter((request: any) => request.pendingDaysCount > 0); // Only show requests with pending days
+      return {
+        ...request,
+        displayStatus,
+        pendingDaysCount: pendingDays.length,
+        approvedDaysCount: approvedDays.length,
+        rejectedDaysCount: rejectedDays.length
+      };
+    }).filter((request: any) => request.pendingDaysCount > 0); // Only show requests with pending days
+  }, [pendingData]);
 
   // Initial loading state (only for first-time page load)
   if ((pendingLoading && !pendingData) || (approvedLoading && !approvedData)) {
@@ -805,7 +806,6 @@ const LeaveApprovalPage: React.FC = () => {
                       })
                       .map((request: any, idx: number) => {
                         const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
-                        const canEdit = request.canEdit && (user?.role === 'hr' || user?.role === 'super_admin');
                         return (
                           <tr
                             key={request.id}
