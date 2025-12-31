@@ -62,5 +62,9 @@ router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admi
 router.post('/:id/update-status', authorizeRole('hr', 'super_admin'), leaveController.updateLeaveStatus);
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 
+// Holiday management routes (HR and Super Admin only)
+router.post('/holidays', authorizeRole('hr', 'super_admin'), leaveController.createHoliday);
+router.delete('/holidays/:id', authorizeRole('hr', 'super_admin'), leaveController.deleteHoliday);
+
 export default router;
 

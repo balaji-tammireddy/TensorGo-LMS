@@ -26,7 +26,7 @@ export interface LeaveBalance {
 export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> => {
   logger.info(`[LEAVE] [GET LEAVE BALANCES] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET LEAVE BALANCES] User ID: ${userId}`);
-  
+
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [userId]
@@ -56,44 +56,100 @@ export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> =>
 export const getHolidays = async (year?: number) => {
   logger.info(`[LEAVE] [GET HOLIDAYS] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET HOLIDAYS] Year: ${year || 'all'}`);
-  
+
   try {
-  let query = 'SELECT holiday_date, holiday_name FROM holidays WHERE is_active = true';
-  const params: any[] = [];
-  
+    let query = 'SELECT id, holiday_date, holiday_name FROM holidays WHERE is_active = true';
+    const params: any[] = [];
+
     // Always include current year and next year
-  if (year !== undefined && year !== null && !isNaN(year)) {
-    const yearNum = parseInt(String(year), 10);
+    if (year !== undefined && year !== null && !isNaN(year)) {
+      const yearNum = parseInt(String(year), 10);
       const nextYear = yearNum + 1;
       query += ' AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)';
       params.push(yearNum, nextYear);
       logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for year: ${yearNum} and next year: ${nextYear}`);
-  } else {
+    } else {
       // If no year provided, get current year and next year
       const currentYear = new Date().getFullYear();
       const nextYear = currentYear + 1;
       query += ' AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)';
       params.push(currentYear, nextYear);
       logger.info(`[LEAVE] [GET HOLIDAYS] Fetching holidays for current year: ${currentYear} and next year: ${nextYear}`);
-  }
-  
-  query += ' ORDER BY holiday_date';
-  
-  const result = await pool.query(query, params);
-  
-  // Log for debugging
-    const years = year !== undefined && year !== null && !isNaN(year) 
-      ? `${year} and ${year + 1}` 
+    }
+
+    query += ' ORDER BY holiday_date';
+
+    const result = await pool.query(query, params);
+
+    // Log for debugging
+    const years = year !== undefined && year !== null && !isNaN(year)
+      ? `${year} and ${year + 1}`
       : `${new Date().getFullYear()} and ${new Date().getFullYear() + 1}`;
     logger.info(`[LEAVE] [GET HOLIDAYS] Fetched ${result.rows.length} holidays for years: ${years}`);
-  
-  return result.rows.map(row => ({
-    date: formatDate(row.holiday_date),
-    name: row.holiday_name
-  }));
+
+    return result.rows.map(row => ({
+      id: row.id,
+      date: formatDate(row.holiday_date),
+      name: row.holiday_name
+    }));
   } catch (error: any) {
     logger.error(`[LEAVE] [GET HOLIDAYS] Error fetching holidays:`, error);
     throw new Error(`Failed to fetch holidays: ${error.message || error.toString()}`);
+  }
+};
+
+export const createHoliday = async (holidayDate: string, holidayName: string) => {
+  logger.info(`[LEAVE] [CREATE HOLIDAY] ========== FUNCTION CALLED ==========`);
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO holidays (holiday_date, holiday_name, is_active)
+       VALUES ($1, $2, true)
+       RETURNING id, holiday_date, holiday_name, is_active, created_at`,
+      [holidayDate, holidayName.trim()]
+    );
+
+    logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${result.rows[0].id}`);
+
+    return {
+      id: result.rows[0].id,
+      date: formatDate(result.rows[0].holiday_date),
+      name: result.rows[0].holiday_name,
+      isActive: result.rows[0].is_active,
+      createdAt: result.rows[0].created_at
+    };
+  } catch (error: any) {
+    logger.error(`[LEAVE] [CREATE HOLIDAY] Error creating holiday:`, error);
+    if (error.code === '23505') { // duplicate key
+      throw new Error('A holiday already exists for this date');
+    }
+    throw new Error(`Failed to create holiday: ${error.message}`);
+  }
+};
+
+export const deleteHoliday = async (holidayId: number) => {
+  logger.info(`[LEAVE] [DELETE HOLIDAY] ========== FUNCTION CALLED ==========`);
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM holidays WHERE id = $1 RETURNING id, holiday_date, holiday_name',
+      [holidayId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Holiday not found');
+    }
+
+    logger.info(`[LEAVE] [DELETE HOLIDAY] Holiday deleted successfully - ID: ${holidayId}`);
+
+    return {
+      id: result.rows[0].id,
+      date: formatDate(result.rows[0].holiday_date),
+      name: result.rows[0].holiday_name
+    };
+  } catch (error: any) {
+    logger.error(`[LEAVE] [DELETE HOLIDAY] Error deleting holiday:`, error);
+    throw error;
   }
 };
 
@@ -107,20 +163,20 @@ export const getHolidays = async (year?: number) => {
  */
 export const getLeaveRules = async () => {
   logger.info(`[LEAVE] [GET LEAVE RULES] ========== FUNCTION CALLED ==========`);
-  
+
   try {
     logger.info(`[LEAVE] [GET LEAVE RULES] Fetching active leave rules`);
-  const result = await pool.query(
-    'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
-  );
+    const result = await pool.query(
+      'SELECT leave_required_min, leave_required_max, prior_information_days FROM leave_rules WHERE is_active = true ORDER BY leave_required_min'
+    );
     logger.info(`[LEAVE] [GET LEAVE RULES] Found ${result.rows.length} active leave rules`);
-    
-  return result.rows.map(row => ({
-    leaveRequired: row.leave_required_max 
-      ? `${row.leave_required_min} to ${row.leave_required_max} days`
-      : `More Than ${row.leave_required_min} days`,
-    priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
-  }));
+
+    return result.rows.map(row => ({
+      leaveRequired: row.leave_required_max
+        ? `${row.leave_required_min} to ${row.leave_required_max} days`
+        : `More Than ${row.leave_required_min} days`,
+      priorInformation: `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : row.prior_information_days === 30 ? 'Month' : 'days'}`
+    }));
   } catch (error: any) {
     logger.error(`[LEAVE] [GET LEAVE RULES] Error fetching leave rules:`, error);
     throw new Error(`Failed to fetch leave rules: ${error.message || error.toString()}`);
@@ -142,7 +198,7 @@ export const applyLeave = async (
 ) => {
   logger.info(`[LEAVE] [APPLY LEAVE] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [APPLY LEAVE] User ID: ${userId}, Leave Type: ${leaveData.leaveType}, Start Date: ${leaveData.startDate}, End Date: ${leaveData.endDate}`);
-  
+
   try {
     // Parse dates in local timezone to avoid timezone shift issues
     // Create date objects from YYYY-MM-DD strings by parsing in local timezone
@@ -150,18 +206,18 @@ export const applyLeave = async (
       logger.warn(`[LEAVE] [APPLY LEAVE] Missing start date or end date`);
       throw new Error('Start date and end date are required');
     }
-    
+
     const [startYear, startMonth, startDay] = leaveData.startDate.split('-').map(Number);
     const [endYear, endMonth, endDay] = leaveData.endDate.split('-').map(Number);
-    
-    if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) || 
-        isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
+
+    if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) ||
+      isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
       throw new Error('Invalid date format');
     }
-    
+
     const startDate = new Date(startYear, startMonth - 1, startDay);
     const endDate = new Date(endYear, endMonth - 1, endDay);
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     startDate.setHours(0, 0, 0, 0);
@@ -182,7 +238,7 @@ export const applyLeave = async (
     if (leaveData.leaveType === 'sick') {
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
-      
+
       // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
       // For future dates: ONLY allow tomorrow (daysDifference === 1)
       if (daysDifference < -3) {
@@ -213,10 +269,10 @@ export const applyLeave = async (
     // LOP can be applied at any date except past dates (no advance notice required)
     // Sick leave validation is already handled above
     if (leaveData.leaveType === 'casual') {
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
       if (daysUntilStart < 3) {
-      throw new Error('Casual leaves must be applied at least 3 days in advance.');
+        throw new Error('Casual leaves must be applied at least 3 days in advance.');
       }
     }
 
@@ -230,7 +286,7 @@ export const applyLeave = async (
     const holidayEndYear = endDate.getFullYear();
     let holidaysQuery: string;
     let holidaysParams: number[];
-    
+
     if (holidayStartYear === holidayEndYear) {
       holidaysQuery = `SELECT holiday_date, holiday_name FROM holidays 
                        WHERE is_active = true 
@@ -244,21 +300,21 @@ export const applyLeave = async (
                        ORDER BY holiday_date`;
       holidaysParams = [holidayStartYear, holidayEndYear];
     }
-    
+
     const holidaysResult = await pool.query(holidaysQuery, holidaysParams);
     const holidayDates = new Set<string>();
     const holidayNames = new Map<string, string>();
-    
+
     holidaysResult.rows.forEach((row: any) => {
       const holidayDate = new Date(row.holiday_date);
       const holidayDateStr = `${holidayDate.getFullYear()}-${String(holidayDate.getMonth() + 1).padStart(2, '0')}-${String(holidayDate.getDate()).padStart(2, '0')}`;
       holidayDates.add(holidayDateStr);
       holidayNames.set(holidayDateStr, row.holiday_name);
     });
-    
+
     const holidayStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const holidayEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-    
+
     if (holidayDates.has(holidayStartDateStr)) {
       const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
       throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
@@ -273,7 +329,7 @@ export const applyLeave = async (
     if (leaveData.leaveType === 'sick') {
       const msPerDay = 1000 * 60 * 60 * 24;
       const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / msPerDay);
-      
+
       // Allow past 3 days: today - 3, today - 2, today - 1, today (endDaysDifference: -3, -2, -1, 0)
       // For future dates: ONLY allow tomorrow (endDaysDifference === 1)
       if (endDaysDifference < -3) {
@@ -288,7 +344,7 @@ export const applyLeave = async (
     // Use DATE comparison to ensure accurate matching
     const checkStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const checkEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-    
+
     const existingLeavesCheck = await pool.query(
       `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
        FROM leave_days ld
@@ -306,7 +362,7 @@ export const applyLeave = async (
       // Check each requested day against existing leaves
       const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
       const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
-      
+
       const { leaveDays: requestedLeaveDays } = await calculateLeaveDays(
         startDate,
         endDate,
@@ -316,7 +372,7 @@ export const applyLeave = async (
 
       for (const requestedDay of requestedLeaveDays) {
         const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
-        
+
         // Find existing leave by comparing date strings (handle both Date objects and strings)
         const existingLeave = existingLeavesCheck.rows.find((row: any) => {
           let existingDateStr: string;
@@ -331,17 +387,17 @@ export const applyLeave = async (
           }
           return existingDateStr === requestedDateStr;
         });
-        
+
         if (existingLeave) {
           const existingType = existingLeave.day_type;
           const existingStatus = existingLeave.day_status || 'pending';
           const statusText = existingStatus === 'approved' ? 'approved' : existingStatus === 'partially_approved' ? 'partially approved' : 'pending';
-          
+
           // If existing leave is full day, block any new leave
           if (existingType === 'full') {
             throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - full day). Cannot apply leave on this date.`);
           }
-          
+
           // If existing leave is half day
           if (existingType === 'half') {
             // Block if new request is full day
@@ -361,7 +417,7 @@ export const applyLeave = async (
     // Normalize first_half/second_half to half for calculation
     const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
     const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
-    
+
     const { days, leaveDays } = await calculateLeaveDays(
       startDate,
       endDate,
@@ -370,8 +426,8 @@ export const applyLeave = async (
     );
 
     // Require timings for permission
-    if (leaveData.leaveType === 'permission' && 
-        (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
+    if (leaveData.leaveType === 'permission' &&
+      (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
       throw new Error('Start and end timings are required for permission requests');
     }
 
@@ -384,7 +440,7 @@ export const applyLeave = async (
         if (!isNaN(startHours) && !isNaN(startMinutes)) {
           const permissionStartTime = new Date();
           permissionStartTime.setHours(startHours, startMinutes, 0, 0);
-          
+
           if (permissionStartTime < now) {
             throw new Error('Cannot apply permission for past times. Please select a future time.');
           }
@@ -436,7 +492,7 @@ export const applyLeave = async (
       WHERE u.id = $1`,
       [userId]
     );
-    
+
     const employeeRole = userResult.rows[0]?.employee_role;
     reportingManagerId = userResult.rows[0]?.reporting_manager_id;
     employeeName = userResult.rows[0]?.employee_name || 'Employee';
@@ -452,7 +508,7 @@ export const applyLeave = async (
     // Use transaction for all database operations to ensure atomicity
     const client = await pool.connect();
     let leaveRequestId: number;
-    
+
     try {
       await client.query('BEGIN');
 
@@ -488,7 +544,7 @@ export const applyLeave = async (
         const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
         const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
         const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
-        
+
         await client.query(
           `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id)
            VALUES ($1, $2, $3, $4, $5)`,
@@ -502,8 +558,8 @@ export const applyLeave = async (
           leaveData.leaveType === 'casual'
             ? 'casual_balance'
             : leaveData.leaveType === 'sick'
-            ? 'sick_balance'
-            : 'lop_balance';
+              ? 'sick_balance'
+              : 'lop_balance';
 
         await client.query(
           `UPDATE leave_balances 
@@ -567,25 +623,25 @@ export const applyLeave = async (
     if (managerEmail && reportingManagerId) {
       // Fire and forget - don't await
       (async () => {
-      try {
-        // Build CC list: Manager's Reporting Manager/HR (if exists and different from manager)
-        const ccEmails: string[] = [];
-        if (hrEmail && hrId && managerEmail !== hrEmail) {
-          ccEmails.push(hrEmail);
-        }
+        try {
+          // Build CC list: Manager's Reporting Manager/HR (if exists and different from manager)
+          const ccEmails: string[] = [];
+          if (hrEmail && hrId && managerEmail !== hrEmail) {
+            ccEmails.push(hrEmail);
+          }
 
-        const emailSent = isUrgent
-          ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined)
-          : await sendLeaveApplicationEmail(managerEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
-        if (emailSent) {
+          const emailSent = isUrgent
+            ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined)
+            : await sendLeaveApplicationEmail(managerEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+          if (emailSent) {
             logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to reporting manager (${managerRole || 'Manager'}): ${managerEmail}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
-        } else {
-          logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+          } else {
+            logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+          }
+        } catch (emailError: any) {
+          // Don't fail the leave application if email fails
+          logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
         }
-      } catch (emailError: any) {
-        // Don't fail the leave application if email fails
-        logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
-      }
       })().catch(err => logger.error(`[LEAVE] [APPLY LEAVE] Unhandled error in async email send:`, err));
     }
 
@@ -614,10 +670,10 @@ export const getMyLeaveRequests = async (
 ) => {
   logger.info(`[LEAVE] [GET MY LEAVE REQUESTS] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET MY LEAVE REQUESTS] User ID: ${userId}, Page: ${page}, Limit: ${limit}, Status: ${status || 'all'}, Role: ${userRole || 'none'}`);
-  
+
   try {
-  const offset = (page - 1) * limit;
-  let query = `
+    const offset = (page - 1) * limit;
+    let query = `
     SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
            lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
@@ -627,116 +683,116 @@ export const getMyLeaveRequests = async (
     LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
     WHERE lr.employee_id = $1
   `;
-  const params: any[] = [userId];
-  
-  if (status) {
-    query += ' AND current_status = $2';
-    params.push(status);
-    query += ' ORDER BY applied_date DESC LIMIT $3 OFFSET $4';
-    params.push(limit, offset);
-  } else {
-    query += ' ORDER BY applied_date DESC LIMIT $2 OFFSET $3';
-    params.push(limit, offset);
-  }
+    const params: any[] = [userId];
 
-  const result = await pool.query(query, params);
-  const countResult = await pool.query(
-    'SELECT COUNT(*) FROM leave_requests WHERE employee_id = $1' + (status ? ' AND current_status = $2' : ''),
-    status ? [userId, status] : [userId]
-  );
-
-  // Helper function to format date without timezone conversion
-  const formatDate = (date: Date | string): string => {
-    if (typeof date === 'string') {
-      return date;
+    if (status) {
+      query += ' AND current_status = $2';
+      params.push(status);
+      query += ' ORDER BY applied_date DESC LIMIT $3 OFFSET $4';
+      params.push(limit, offset);
+    } else {
+      query += ' ORDER BY applied_date DESC LIMIT $2 OFFSET $3';
+      params.push(limit, offset);
     }
-    const d = new Date(date);
-    // Use local timezone to avoid day shift
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
-  const requests = [];
-  for (const row of result.rows) {
-    const daysResult = await pool.query(
-      'SELECT leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-      [row.id]
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM leave_requests WHERE employee_id = $1' + (status ? ' AND current_status = $2' : ''),
+      status ? [userId, status] : [userId]
     );
-    const days = daysResult.rows || [];
-    const totalDays = days.length || parseFloat(row.no_of_days) || 0;
-    const approvedDays = days.reduce((acc, d) => acc + (d.day_status === 'approved' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
-    const rejectedDays = days.reduce((acc, d) => acc + (d.day_status === 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
-    const pendingDays = days.reduce((acc, d) => acc + (d.day_status !== 'approved' && d.day_status !== 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
 
-    let displayStatus = row.current_status;
-    if (approvedDays > 0 && (rejectedDays > 0 || pendingDays > 0)) {
-      displayStatus = 'partially_approved';
-    } else if (approvedDays > 0 && rejectedDays === 0 && pendingDays === 0) {
-      displayStatus = 'approved';
-    } else if (rejectedDays > 0 && approvedDays === 0 && pendingDays === 0) {
-      displayStatus = 'rejected';
-    } else if (pendingDays > 0 && approvedDays === 0 && rejectedDays === 0) {
-      displayStatus = 'pending';
+    // Helper function to format date without timezone conversion
+    const formatDate = (date: Date | string): string => {
+      if (typeof date === 'string') {
+        return date;
+      }
+      const d = new Date(date);
+      // Use local timezone to avoid day shift
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const requests = [];
+    for (const row of result.rows) {
+      const daysResult = await pool.query(
+        'SELECT leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
+        [row.id]
+      );
+      const days = daysResult.rows || [];
+      const totalDays = days.length || parseFloat(row.no_of_days) || 0;
+      const approvedDays = days.reduce((acc, d) => acc + (d.day_status === 'approved' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
+      const rejectedDays = days.reduce((acc, d) => acc + (d.day_status === 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
+      const pendingDays = days.reduce((acc, d) => acc + (d.day_status !== 'approved' && d.day_status !== 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
+
+      let displayStatus = row.current_status;
+      if (approvedDays > 0 && (rejectedDays > 0 || pendingDays > 0)) {
+        displayStatus = 'partially_approved';
+      } else if (approvedDays > 0 && rejectedDays === 0 && pendingDays === 0) {
+        displayStatus = 'approved';
+      } else if (rejectedDays > 0 && approvedDays === 0 && pendingDays === 0) {
+        displayStatus = 'rejected';
+      } else if (pendingDays > 0 && approvedDays === 0 && rejectedDays === 0) {
+        displayStatus = 'pending';
+      }
+
+      // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+      const rejectionReason = (displayStatus === 'rejected')
+        ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+        : null;
+
+      // Get approver name from last_updated_by fields
+      let approverName: string | null = row.approver_name || null;
+      let approverRole: string | null = null;
+
+      // Map role from database to display format
+      if (row.last_updated_by_role === 'super_admin') {
+        approverRole = 'Super Admin';
+      } else if (row.last_updated_by_role === 'hr') {
+        approverRole = 'HR';
+      } else if (row.last_updated_by_role === 'manager') {
+        approverRole = 'Manager';
+      }
+
+      requests.push({
+        id: row.id,
+        appliedDate: formatDate(row.applied_date),
+        leaveReason: row.leave_reason,
+        startDate: formatDate(row.start_date),
+        startType: row.start_type || 'full',
+        endDate: formatDate(row.end_date),
+        endType: row.end_type || 'full',
+        noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
+        leaveType: row.leave_type,
+        currentStatus: displayStatus,
+        rejectionReason,
+        approverName,
+        approverRole,
+        doctorNote: row.doctor_note || null,
+        // HR and Super Admin can edit/delete any leave, regular users can only edit/delete pending leaves
+        canEdit: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
+        canDelete: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
+        leaveDays: days.map(d => ({
+          date: formatDate(d.leave_date),
+          type: d.day_type,
+          status: d.day_status || 'pending'
+        })),
+        approvedDays,
+        rejectedDays,
+        pendingDays,
+        totalDays
+      });
     }
 
-    // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
-    const rejectionReason = (displayStatus === 'rejected') 
-      ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
-      : null;
-    
-    // Get approver name from last_updated_by fields
-    let approverName: string | null = row.approver_name || null;
-    let approverRole: string | null = null;
-    
-    // Map role from database to display format
-    if (row.last_updated_by_role === 'super_admin') {
-      approverRole = 'Super Admin';
-    } else if (row.last_updated_by_role === 'hr') {
-      approverRole = 'HR';
-    } else if (row.last_updated_by_role === 'manager') {
-      approverRole = 'Manager';
-    }
-
-    requests.push({
-      id: row.id,
-      appliedDate: formatDate(row.applied_date),
-      leaveReason: row.leave_reason,
-      startDate: formatDate(row.start_date),
-      startType: row.start_type || 'full',
-      endDate: formatDate(row.end_date),
-      endType: row.end_type || 'full',
-      noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
-      leaveType: row.leave_type,
-      currentStatus: displayStatus,
-      rejectionReason,
-      approverName,
-      approverRole,
-      doctorNote: row.doctor_note || null,
-      // HR and Super Admin can edit/delete any leave, regular users can only edit/delete pending leaves
-      canEdit: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
-      canDelete: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
-      leaveDays: days.map(d => ({
-        date: formatDate(d.leave_date),
-        type: d.day_type,
-        status: d.day_status || 'pending'
-      })),
-      approvedDays,
-      rejectedDays,
-      pendingDays,
-      totalDays
-    });
-  }
-
-  return {
-    requests,
-    pagination: {
-      page,
-      limit,
-      total: parseInt(countResult.rows[0].count)
-    }
-  };
+    return {
+      requests,
+      pagination: {
+        page,
+        limit,
+        total: parseInt(countResult.rows[0].count)
+      }
+    };
   } catch (error: any) {
     logger.error(`[LEAVE] [GET MY LEAVE REQUESTS] Error fetching my leave requests:`, error);
     throw new Error(`Failed to fetch leave requests: ${error.message || error.toString()}`);
@@ -746,7 +802,7 @@ export const getMyLeaveRequests = async (
 export const getLeaveRequestById = async (requestId: number, userId: number, userRole?: string) => {
   logger.info(`[LEAVE] [GET LEAVE REQUEST BY ID] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET LEAVE REQUEST BY ID] Request ID: ${requestId}, User ID: ${userId}, User Role: ${userRole || 'none'}`);
-  
+
   if (isNaN(requestId) || requestId <= 0) {
     logger.warn(`[LEAVE] [GET LEAVE REQUEST BY ID] Invalid leave request ID: ${requestId}`);
     throw new Error('Invalid leave request ID');
@@ -756,10 +812,10 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   // Managers can view leaves of their direct reports
   // Others can only view their own
   const canViewAny = userRole === 'super_admin' || userRole === 'hr';
-  
+
   let query: string;
   let params: any[];
-  
+
   if (canViewAny) {
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
                 lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
@@ -797,7 +853,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
      WHERE lr.id = $1 AND lr.employee_id = $2`;
     params = [requestId, userId];
   }
-  
+
   const result = await pool.query(query, params);
 
   if (result.rows.length === 0) {
@@ -807,7 +863,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   }
 
   const row = result.rows[0];
-  
+
   // Note: We allow viewing all requests regardless of status
   // The edit/delete restrictions are handled in the update/delete functions
 
@@ -825,14 +881,14 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   };
 
   // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
-  const rejectionReason = (row.current_status === 'rejected') 
+  const rejectionReason = (row.current_status === 'rejected')
     ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
     : null;
-  
+
   // Get approver name from last_updated_by fields
   let approverName: string | null = row.approver_name || null;
   let approverRole: string | null = null;
-  
+
   // Map role from database to display format
   if (row.last_updated_by_role === 'super_admin') {
     approverRole = 'Super Admin';
@@ -889,7 +945,7 @@ export const updateLeaveRequest = async (
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
-  
+
   // HR and Super Admin can edit any leave (approved, rejected, etc.)
   // Regular users can only edit pending leaves
   const canEdit = currentStatus === 'pending' || userRole === 'hr' || userRole === 'super_admin';
@@ -897,7 +953,7 @@ export const updateLeaveRequest = async (
   if (!canEdit) {
     throw new Error('Only pending leave requests can be edited');
   }
-  
+
   // Authorization: Super Admin and HR can edit any leave, others can only edit their own
   if (userRole !== 'super_admin' && userRole !== 'hr' && !belongsToUser) {
     throw new Error('You do not have permission to edit this leave request');
@@ -908,63 +964,63 @@ export const updateLeaveRequest = async (
   if (!leaveData.startDate || !leaveData.endDate) {
     throw new Error('Start date and end date are required');
   }
-  
+
   const [startYear, startMonth, startDay] = leaveData.startDate.split('-').map(Number);
   const [endYear, endMonth, endDay] = leaveData.endDate.split('-').map(Number);
-  
-  if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) || 
-      isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
+
+  if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) ||
+    isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
     throw new Error('Invalid date format');
   }
-  
-    const startDate = new Date(startYear, startMonth - 1, startDay);
-    const endDate = new Date(endYear, endMonth - 1, endDay);
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(0, 0, 0, 0);
 
-    // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
-    const startDayOfWeek = startDate.getDay();
-    const endDayOfWeek = endDate.getDay();
-    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
-    }
-    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
-    }
+  const startDate = new Date(startYear, startMonth - 1, startDay);
+  const endDate = new Date(endYear, endMonth - 1, endDay);
 
-    // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
-    // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
-    if (leaveData.leaveType === 'sick') {
-      const msPerDay = 1000 * 60 * 60 * 24;
-      const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
-      
-      // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
-      // For future dates: ONLY allow tomorrow (daysDifference === 1)
-      if (daysDifference < -3) {
-        throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
-      }
-      if (daysDifference > 1) {
-        throw new Error('For future dates, sick leave can only be applied for tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
-      }
-      if (daysDifference === 0 && startDate > today) {
-        // This shouldn't happen, but just in case
-        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or tomorrow only.');
-      }
-      // daysDifference === 1 is allowed (tomorrow only)
-      // daysDifference between -3 and 0 is allowed (past 3 days + today)
-    } else if (leaveData.leaveType === 'lop') {
-      // LOP: today is allowed, but not past dates
-      if (startDate < today) {
-        throw new Error('Cannot apply for past dates.');
-      }
-    } else {
-      if (startDate <= today) {
-        throw new Error('Cannot apply for past dates or today.');
-      }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+
+  // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
+  const startDayOfWeek = startDate.getDay();
+  const endDayOfWeek = endDate.getDay();
+  if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+    throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+  }
+  if (endDayOfWeek === 0 || endDayOfWeek === 6) {
+    throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+  }
+
+  // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
+  // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
+  if (leaveData.leaveType === 'sick') {
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
+
+    // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
+    // For future dates: ONLY allow tomorrow (daysDifference === 1)
+    if (daysDifference < -3) {
+      throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
     }
+    if (daysDifference > 1) {
+      throw new Error('For future dates, sick leave can only be applied for tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
+    }
+    if (daysDifference === 0 && startDate > today) {
+      // This shouldn't happen, but just in case
+      throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or tomorrow only.');
+    }
+    // daysDifference === 1 is allowed (tomorrow only)
+    // daysDifference between -3 and 0 is allowed (past 3 days + today)
+  } else if (leaveData.leaveType === 'lop') {
+    // LOP: today is allowed, but not past dates
+    if (startDate < today) {
+      throw new Error('Cannot apply for past dates.');
+    }
+  } else {
+    if (startDate <= today) {
+      throw new Error('Cannot apply for past dates or today.');
+    }
+  }
 
   // Validation: casual needs at least 3 days notice (block today + next two days)
   // LOP can be applied at any date except past dates (no advance notice required)
@@ -984,7 +1040,7 @@ export const updateLeaveRequest = async (
   const holidayEndYear = endDate.getFullYear();
   let holidaysQuery: string;
   let holidaysParams: number[];
-  
+
   if (holidayStartYear === holidayEndYear) {
     holidaysQuery = `SELECT holiday_date, holiday_name FROM holidays 
                      WHERE is_active = true 
@@ -998,21 +1054,21 @@ export const updateLeaveRequest = async (
                      ORDER BY holiday_date`;
     holidaysParams = [holidayStartYear, holidayEndYear];
   }
-  
+
   const holidaysResult = await pool.query(holidaysQuery, holidaysParams);
   const holidayDates = new Set<string>();
   const holidayNames = new Map<string, string>();
-  
+
   holidaysResult.rows.forEach((row: any) => {
     const holidayDate = new Date(row.holiday_date);
     const holidayDateStr = `${holidayDate.getFullYear()}-${String(holidayDate.getMonth() + 1).padStart(2, '0')}-${String(holidayDate.getDate()).padStart(2, '0')}`;
     holidayDates.add(holidayDateStr);
     holidayNames.set(holidayDateStr, row.holiday_name);
   });
-  
+
   const holidayStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
   const holidayEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-  
+
   if (holidayDates.has(holidayStartDateStr)) {
     const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
     throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
@@ -1027,7 +1083,7 @@ export const updateLeaveRequest = async (
   if (leaveData.leaveType === 'sick') {
     const msPerDay = 1000 * 60 * 60 * 24;
     const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / msPerDay);
-    
+
     // Allow past 3 days: today - 3, today - 2, today - 1, today (endDaysDifference: -3, -2, -1, 0)
     // For future dates: ONLY allow tomorrow (endDaysDifference === 1)
     if (endDaysDifference < -3) {
@@ -1042,7 +1098,7 @@ export const updateLeaveRequest = async (
   // Use DATE comparison to ensure accurate matching
   const checkStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
   const checkEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-  
+
   const existingLeavesCheck = await pool.query(
     `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
      FROM leave_days ld
@@ -1061,7 +1117,7 @@ export const updateLeaveRequest = async (
     // Check each requested day against existing leaves
     const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
     const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
-    
+
     const { leaveDays: requestedLeaveDays } = await calculateLeaveDays(
       startDate,
       endDate,
@@ -1071,7 +1127,7 @@ export const updateLeaveRequest = async (
 
     for (const requestedDay of requestedLeaveDays) {
       const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
-      
+
       // Find existing leave by comparing date strings (handle both Date objects and strings)
       const existingLeave = existingLeavesCheck.rows.find((row: any) => {
         let existingDateStr: string;
@@ -1086,17 +1142,17 @@ export const updateLeaveRequest = async (
         }
         return existingDateStr === requestedDateStr;
       });
-      
+
       if (existingLeave) {
         const existingType = existingLeave.day_type;
         const existingStatus = existingLeave.day_status || 'pending';
         const statusText = existingStatus === 'approved' ? 'approved' : existingStatus === 'partially_approved' ? 'partially approved' : 'pending';
-        
+
         // If existing leave is full day, block any new leave
         if (existingType === 'full') {
           throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - full day). Cannot apply leave on this date.`);
         }
-        
+
         // If existing leave is half day
         if (existingType === 'half') {
           // Block if new request is full day
@@ -1115,7 +1171,7 @@ export const updateLeaveRequest = async (
   // Normalize first_half/second_half to half for calculation
   const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
   const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
-  
+
   // Calculate leave days
   const { days, leaveDays } = await calculateLeaveDays(
     startDate,
@@ -1125,8 +1181,8 @@ export const updateLeaveRequest = async (
   );
 
   // Require timings for permission
-  if (leaveData.leaveType === 'permission' && 
-      (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
+  if (leaveData.leaveType === 'permission' &&
+    (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
     throw new Error('Start and end timings are required for permission requests');
   }
 
@@ -1141,7 +1197,7 @@ export const updateLeaveRequest = async (
       if (!isNaN(startHours) && !isNaN(startMinutes)) {
         const permissionStartTime = new Date();
         permissionStartTime.setHours(startHours, startMinutes, 0, 0);
-        
+
         if (permissionStartTime < now) {
           throw new Error('Cannot apply permission for past times. Please select a future time.');
         }
@@ -1150,18 +1206,18 @@ export const updateLeaveRequest = async (
   }
 
   // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
-    if (leaveData.leaveType !== 'permission') {
-      const balance = await getLeaveBalances(userId);
-      const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
-      const currentBalance = balance[balanceKey];
-      
-      if (currentBalance <= 0) {
-        throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
-      }
-      if (currentBalance < days) {
-        throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
-      }
+  if (leaveData.leaveType !== 'permission') {
+    const balance = await getLeaveBalances(userId);
+    const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
+    const currentBalance = balance[balanceKey];
+
+    if (currentBalance <= 0) {
+      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
     }
+    if (currentBalance < days) {
+      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+    }
+  }
 
   // Start transaction
   const client = await pool.connect();
@@ -1205,7 +1261,7 @@ export const updateLeaveRequest = async (
       const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
       const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
       const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
-      
+
       await client.query(
         'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)',
         [requestId, leaveDayDateStr, day.type, leaveData.leaveType, userId]
@@ -1245,7 +1301,7 @@ export const convertLeaveRequestLopToCasual = async (
 ) => {
   logger.info(`[LEAVE] [CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [CONVERT LOP TO CASUAL] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}`);
-  
+
   // Only HR and Super Admin can convert leave types
   if (userRole !== 'hr' && userRole !== 'super_admin') {
     logger.warn(`[LEAVE] [CONVERT LOP TO CASUAL] Unauthorized attempt - User ID: ${userId}, Role: ${userRole}`);
@@ -1395,7 +1451,7 @@ export const convertLeaveRequestLopToCasual = async (
     // ========== SEND EMAIL NOTIFICATIONS ==========
     logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LOP TO CASUAL CONVERSION ==========`);
     logger.info(`[EMAIL] Request ID: ${requestId}, Converter ID: ${userId}, Converter Role: ${userRole}`);
-    
+
     const emailData = {
       employeeName: leave.employee_name || 'Employee',
       employeeEmpId: leave.employee_emp_id || '',
@@ -1416,12 +1472,12 @@ export const convertLeaveRequestLopToCasual = async (
 
     // Send email notifications based on converter role - ONE EMAIL with TO/CC
     logger.info(`[EMAIL] Converter role: ${userRole}, Employee email: ${leave.employee_email || 'NO EMAIL'}, HR email: ${leave.hr_email || 'NO EMAIL'}`);
-    
+
     if (leave.employee_email) {
       try {
         // Build CC list based on converter role
         const ccEmails: string[] = [];
-        
+
         if (userRole === 'super_admin') {
           // Super Admin converts → Employee (TO), HR (CC)
           if (leave.hr_email && leave.hr_email !== leave.employee_email) {
@@ -1438,7 +1494,7 @@ export const convertLeaveRequestLopToCasual = async (
           recipientName: leave.employee_name || 'Employee',
           recipientRole: 'employee' as const
         }, ccEmails.length > 0 ? ccEmails : undefined);
-        
+
         logger.info(`[EMAIL] ✅ Conversion email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}, Result: ${emailResult}`);
       } catch (err: any) {
         logger.error(`[EMAIL] ❌ Error sending conversion email:`, err);
@@ -1469,7 +1525,7 @@ export const convertLeaveRequestLopToCasual = async (
 export const deleteLeaveRequest = async (requestId: number, userId: number, userRole?: string) => {
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole || 'none'}`);
-  
+
   // Verify the request
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Verifying leave request exists`);
   const checkResult = await pool.query(
@@ -1485,7 +1541,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
-  
+
   // Authorization: Super Admin and HR can delete any leave, others can only delete their own
   if (userRole !== 'super_admin' && userRole !== 'hr' && !belongsToUser) {
     throw new Error('You do not have permission to delete this leave request');
@@ -1516,22 +1572,22 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
          WHERE leave_request_id = $1`,
         [requestId]
       );
-      
+
       let daysToRefund = parseFloat(daysToRefundResult.rows[0]?.days_to_refund || '0');
-      
+
       // If no leave_days exist (edge case) or query returned 0, use the original no_of_days
       // This handles cases where leave_days might not have been created yet
       if (daysToRefund === 0) {
         daysToRefund = parseFloat(no_of_days || '0');
       }
-      
+
       if (daysToRefund > 0) {
         const balanceColumn =
           leave_type === 'casual'
             ? 'casual_balance'
             : leave_type === 'sick'
-            ? 'sick_balance'
-            : 'lop_balance';
+              ? 'sick_balance'
+              : 'lop_balance';
 
         // For LOP, check if refund would exceed 10 and cap it
         if (leave_type === 'lop') {
@@ -1541,7 +1597,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
           );
           const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
           const newLopBalance = currentLop + daysToRefund;
-          
+
           if (newLopBalance > 10) {
             const cappedRefund = 10 - currentLop;
             if (cappedRefund > 0) {
@@ -1564,14 +1620,14 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
             );
           }
         } else {
-        await client.query(
-          `UPDATE leave_balances 
+          await client.query(
+            `UPDATE leave_balances 
            SET ${balanceColumn} = ${balanceColumn} + $1
            WHERE employee_id = $2`,
-          [daysToRefund, userId]
-        );
+            [daysToRefund, userId]
+          );
+        }
       }
-    }
     }
 
 
@@ -1622,9 +1678,9 @@ export const getPendingLeaveRequests = async (
 ) => {
   logger.info(`[LEAVE] [GET PENDING LEAVE REQUESTS] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET PENDING LEAVE REQUESTS] Approver ID: ${approverId}, Role: ${approverRole}, Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, Filter: ${filter || 'none'}`);
-  
+
   const offset = (page - 1) * limit;
-  
+
   // Build query based on role
   let query = `
     SELECT DISTINCT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
@@ -1688,68 +1744,68 @@ export const getPendingLeaveRequests = async (
   // Also filter out approver's own requests to prevent self-approval
   // This ensures data integrity even if query construction has issues
   // Use Number() to handle type coercion (PostgreSQL may return strings)
-  const filteredRows = approverRole === 'manager' 
+  const filteredRows = approverRole === 'manager'
     ? result.rows.filter(row => Number(row.reporting_manager_id) === Number(approverId))
     : result.rows.filter(row => {
-        // For HR and Super Admin, exclude their own requests (no self-approval)
-        if (approverRole === 'hr' || approverRole === 'super_admin') {
-          return Number(row.employee_id) !== Number(approverId);
-        }
-        return true;
-      });
+      // For HR and Super Admin, exclude their own requests (no self-approval)
+      if (approverRole === 'hr' || approverRole === 'super_admin') {
+        return Number(row.employee_id) !== Number(approverId);
+      }
+      return true;
+    });
 
   // Get day-wise breakdown for each request
   const requestsWithDays = await Promise.all(
     filteredRows.map(async (row) => {
       try {
-      const daysResult = await pool.query(
+        const daysResult = await pool.query(
           'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-        [row.id]
-      );
+          [row.id]
+        );
 
-      // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
-      const rejectionReason = (row.current_status === 'rejected') 
-        ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
-        : null;
-      
-      // Get approver name from last_updated_by fields
-      let approverName: string | null = row.approver_name || null;
-      let approverRole: string | null = null;
-      
-      // Map role from database to display format
-      if (row.last_updated_by_role === 'super_admin') {
-        approverRole = 'Super Admin';
-      } else if (row.last_updated_by_role === 'hr') {
-        approverRole = 'HR';
-      } else if (row.last_updated_by_role === 'manager') {
-        approverRole = 'Manager';
-      }
+        // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
+        const rejectionReason = (row.current_status === 'rejected')
+          ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
+          : null;
 
-      return {
-        id: row.id,
-        empId: row.emp_id,
-        empName: row.emp_name,
+        // Get approver name from last_updated_by fields
+        let approverName: string | null = row.approver_name || null;
+        let approverRole: string | null = null;
+
+        // Map role from database to display format
+        if (row.last_updated_by_role === 'super_admin') {
+          approverRole = 'Super Admin';
+        } else if (row.last_updated_by_role === 'hr') {
+          approverRole = 'HR';
+        } else if (row.last_updated_by_role === 'manager') {
+          approverRole = 'Manager';
+        }
+
+        return {
+          id: row.id,
+          empId: row.emp_id,
+          empName: row.emp_name,
           appliedDate: formatDate(row.applied_date),
           leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
-        leaveType: row.leave_type,
-        noOfDays: parseFloat(row.no_of_days),
-        leaveReason: row.leave_reason,
-        currentStatus: row.current_status,
-        startDate: formatDate(row.start_date),
-        endDate: formatDate(row.end_date),
-        startType: row.start_type,
-        endType: row.end_type,
-        doctorNote: row.doctor_note || null,
-        rejectionReason,
-        approverName,
-        approverRole,
-        leaveDays: daysResult.rows.map(d => ({
+          leaveType: row.leave_type,
+          noOfDays: parseFloat(row.no_of_days),
+          leaveReason: row.leave_reason,
+          currentStatus: row.current_status,
+          startDate: formatDate(row.start_date),
+          endDate: formatDate(row.end_date),
+          startType: row.start_type,
+          endType: row.end_type,
+          doctorNote: row.doctor_note || null,
+          rejectionReason,
+          approverName,
+          approverRole,
+          leaveDays: daysResult.rows.map(d => ({
             id: d.id,
             date: formatDate(d.leave_date),
             type: d.day_type,
             status: d.day_status || 'pending'
-        }))
-      };
+          }))
+        };
       } catch (e) {
         console.error('Pending leave days fetch failed', { leaveRequestId: row.id, error: e });
         throw e;
@@ -1814,7 +1870,7 @@ export const approveLeave = async (
 ) => {
   logger.info(`[APPROVE LEAVE] ========== FUNCTION CALLED ==========`);
   logger.info(`[APPROVE LEAVE] Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Role: ${approverRole}`);
-  
+
   // Get leave request details with employee, approver, manager, and HR information
   const leaveResult = await pool.query(
     `SELECT 
@@ -1853,7 +1909,7 @@ export const approveLeave = async (
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
-  
+
   if (approverRole === 'manager') {
     // Managers can approve only their direct reports
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
@@ -1895,7 +1951,7 @@ export const approveLeave = async (
          )`,
       [comment || null, approverId, leaveRequestId]
     );
-    
+
     if (updateResult.rowCount === 0) {
       throw new Error('Not authorized to approve this leave');
     }
@@ -1979,13 +2035,13 @@ export const approveLeave = async (
   // ========== SEND EMAIL NOTIFICATIONS ==========
   logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LEAVE APPROVAL ==========`);
   logger.info(`[EMAIL] Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Approver Role: ${approverRole}`);
-  
+
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
   if (leave.employee_email) {
     try {
       // Build CC list based on approver role
       const ccEmails: string[] = [];
-      
+
       if (approverRole === 'hr') {
         // HR approves → Employee (TO), Manager (CC)
         if (leave.manager_email && leave.manager_email !== leave.employee_email) {
@@ -2023,7 +2079,7 @@ export const approveLeave = async (
         comment: comment || null,
         status: 'approved' as const
       }, ccEmails.length > 0 ? ccEmails : undefined);
-      
+
       logger.info(`[EMAIL] ✅ Approval email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
     } catch (err: any) {
       logger.error(`[EMAIL] ❌ Error sending approval email:`, err);
@@ -2043,7 +2099,7 @@ export const rejectLeave = async (
 ) => {
   logger.info(`[REJECT LEAVE] ========== FUNCTION CALLED ==========`);
   logger.info(`[REJECT LEAVE] Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Role: ${approverRole}`);
-  
+
   // Similar authorization check as approve - get employee, approver, manager, and HR information
   const leaveResult = await pool.query(
     `SELECT 
@@ -2096,7 +2152,7 @@ export const rejectLeave = async (
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
-  
+
   if (approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to reject this leave');
@@ -2140,7 +2196,7 @@ export const rejectLeave = async (
          )`,
       [comment, approverId, leaveRequestId]
     );
-    
+
     if (updateResult.rowCount === 0) {
       throw new Error('Not authorized to reject this leave');
     }
@@ -2176,9 +2232,9 @@ export const rejectLeave = async (
       leave.leave_type === 'casual'
         ? 'casual_balance'
         : leave.leave_type === 'sick'
-        ? 'sick_balance'
-        : 'lop_balance';
-    
+          ? 'sick_balance'
+          : 'lop_balance';
+
     // For LOP, check if refund would exceed 10 and cap it
     if (leave.leave_type === 'lop') {
       const currentBalanceResult = await pool.query(
@@ -2187,7 +2243,7 @@ export const rejectLeave = async (
       );
       const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
       const newLopBalance = currentLop + refundDays;
-      
+
       if (newLopBalance > 10) {
         const cappedRefund = 10 - currentLop;
         if (cappedRefund > 0) {
@@ -2211,10 +2267,10 @@ export const rejectLeave = async (
         logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
       }
     } else {
-    await pool.query(
-      `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-      [refundDays, leave.employee_id]
-    );
+      await pool.query(
+        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+        [refundDays, leave.employee_id]
+      );
       logger.info(`[REJECT LEAVE] Refunded ${refundDays} days to employee ${leave.employee_id}`);
     }
   }
@@ -2241,13 +2297,13 @@ export const rejectLeave = async (
   // ========== SEND EMAIL NOTIFICATIONS ==========
   logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LEAVE REJECTION ==========`);
   logger.info(`[EMAIL] Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Approver Role: ${approverRole}`);
-  
+
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
   if (leave.employee_email) {
     try {
       // Build CC list based on approver role
       const ccEmails: string[] = [];
-      
+
       if (approverRole === 'hr') {
         // HR rejects → Employee (TO), Manager (CC)
         if (leave.manager_email && leave.manager_email !== leave.employee_email) {
@@ -2285,7 +2341,7 @@ export const rejectLeave = async (
         comment: comment || null,
         status: 'rejected' as const
       }, ccEmails.length > 0 ? ccEmails : undefined);
-      
+
       logger.info(`[EMAIL] ✅ Rejection email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
     } catch (err: any) {
       logger.error(`[EMAIL] ❌ Error sending rejection email:`, err);
@@ -2356,7 +2412,7 @@ export const approveLeaveDay = async (
 ) => {
   logger.info(`[APPROVE LEAVE DAY] ========== FUNCTION CALLED ==========`);
   logger.info(`[APPROVE LEAVE DAY] Request ID: ${leaveRequestId}, Day ID: ${dayId}, Approver ID: ${approverId}, Role: ${approverRole}`);
-  
+
   // Get leave request details with employee, approver, manager, and HR information
   const leaveResult = await pool.query(
     `SELECT 
@@ -2395,7 +2451,7 @@ export const approveLeaveDay = async (
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
-  
+
   if (approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
@@ -2455,7 +2511,7 @@ export const approveLeaveDay = async (
          )`,
       [comment || null, approverId, leaveRequestId]
     );
-    
+
     if (updateResult.rowCount === 0) {
       throw new Error('Not authorized to approve this leave');
     }
@@ -2489,7 +2545,7 @@ export const approveLeaveDay = async (
 
   // Recalculate status only (no balance changes)
   try {
-  await recalcLeaveRequestStatus(leaveRequestId);
+    await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[APPROVE LEAVE DAY] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
     logger.error(`[APPROVE LEAVE DAY] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
@@ -2507,13 +2563,13 @@ export const approveLeaveDay = async (
   // ========== SEND EMAIL NOTIFICATIONS ==========
   logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LEAVE DAY APPROVAL ==========`);
   logger.info(`[EMAIL] Request ID: ${leaveRequestId}, Day ID: ${dayId}, Approver ID: ${approverId}, Approver Role: ${approverRole}`);
-  
+
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
   if (leave.employee_email) {
     try {
       // Build CC list based on approver role
       const ccEmails: string[] = [];
-      
+
       if (approverRole === 'hr') {
         // HR approves → Employee (TO), Manager (CC)
         if (leave.manager_email && leave.manager_email !== leave.employee_email) {
@@ -2551,7 +2607,7 @@ export const approveLeaveDay = async (
         comment: comment || null,
         status: 'approved' as const
       }, ccEmails.length > 0 ? ccEmails : undefined);
-      
+
       logger.info(`[EMAIL] ✅ Day approval email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
     } catch (err: any) {
       logger.error(`[EMAIL] ❌ Error sending day approval email:`, err);
@@ -2574,7 +2630,7 @@ export const approveLeaveDays = async (
 ) => {
   logger.info(`[APPROVE LEAVE DAYS] ========== FUNCTION CALLED ==========`);
   logger.info(`[APPROVE LEAVE DAYS] Request ID: ${leaveRequestId}, Day IDs: ${dayIds.join(', ')}, Approver ID: ${approverId}, Role: ${approverRole}`);
-  
+
   if (!dayIds || dayIds.length === 0) {
     throw new Error('No days specified for approval');
   }
@@ -2617,7 +2673,7 @@ export const approveLeaveDays = async (
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
-  
+
   if (approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
@@ -2697,7 +2753,7 @@ export const approveLeaveDays = async (
          )`,
       [comment || null, approverId, leaveRequestId]
     );
-    
+
     if (updateResult.rowCount === 0) {
       throw new Error('Not authorized to approve this leave');
     }
@@ -2731,7 +2787,7 @@ export const approveLeaveDays = async (
 
   // Recalculate status
   try {
-  await recalcLeaveRequestStatus(leaveRequestId);
+    await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[APPROVE LEAVE DAYS] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
     logger.error(`[APPROVE LEAVE DAYS] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
@@ -2744,9 +2800,9 @@ export const approveLeaveDays = async (
     [leaveRequestId]
   );
   const actualStatus = statusResult.rows[0]?.current_status || 'pending';
-  const emailStatus: 'approved' | 'partially_approved' | 'rejected' = 
-    actualStatus === 'partially_approved' ? 'partially_approved' : 
-    actualStatus === 'approved' ? 'approved' : 'rejected';
+  const emailStatus: 'approved' | 'partially_approved' | 'rejected' =
+    actualStatus === 'partially_approved' ? 'partially_approved' :
+      actualStatus === 'approved' ? 'approved' : 'rejected';
 
   logger.info(`[APPROVE LEAVE DAYS] Actual status after recalculation: ${actualStatus}, Email status: ${emailStatus}`);
 
@@ -2761,13 +2817,13 @@ export const approveLeaveDays = async (
   // ========== SEND EMAIL NOTIFICATIONS ==========
   logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LEAVE DAYS APPROVAL ==========`);
   logger.info(`[EMAIL] Request ID: ${leaveRequestId}, Day IDs: ${dayIds.join(', ')}, Approver ID: ${approverId}, Approver Role: ${approverRole}`);
-  
+
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
   if (leave.employee_email) {
     try {
       // Build CC list based on approver role
       const ccEmails: string[] = [];
-      
+
       if (approverRole === 'hr') {
         // HR approves → Employee (TO), Manager (CC)
         if (leave.manager_email && leave.manager_email !== leave.employee_email) {
@@ -2805,7 +2861,7 @@ export const approveLeaveDays = async (
         comment: comment || null,
         status: emailStatus
       }, ccEmails.length > 0 ? ccEmails : undefined);
-      
+
       logger.info(`[EMAIL] ✅ Days approval email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
     } catch (err: any) {
       logger.error(`[EMAIL] ❌ Error sending days approval email:`, err);
@@ -2814,9 +2870,9 @@ export const approveLeaveDays = async (
 
   logger.info(`[EMAIL] ========== EMAIL NOTIFICATION COMPLETED FOR LEAVE DAYS APPROVAL ==========`);
   logger.info(`[APPROVE LEAVE DAYS] ========== FUNCTION COMPLETING ==========`);
-  
-  return { 
-    message: `Approved ${daysToApprove.length} day(s), rejected ${daysToReject.length} day(s)` 
+
+  return {
+    message: `Approved ${daysToApprove.length} day(s), rejected ${daysToReject.length} day(s)`
   };
 };
 
@@ -2829,7 +2885,7 @@ export const rejectLeaveDay = async (
 ) => {
   logger.info(`[REJECT LEAVE DAY] ========== FUNCTION CALLED ==========`);
   logger.info(`[REJECT LEAVE DAY] Request ID: ${leaveRequestId}, Day ID: ${dayId}, Approver ID: ${approverId}, Role: ${approverRole}`);
-  
+
   // Get leave request details with employee, approver, manager, and HR information
   const leaveResult = await pool.query(
     `SELECT 
@@ -2864,7 +2920,7 @@ export const rejectLeaveDay = async (
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
-  
+
   if (approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to reject this leave');
@@ -2911,9 +2967,9 @@ export const rejectLeaveDay = async (
         leave.leave_type === 'casual'
           ? 'casual_balance'
           : leave.leave_type === 'sick'
-          ? 'sick_balance'
-          : 'lop_balance';
-      
+            ? 'sick_balance'
+            : 'lop_balance';
+
       // For LOP, check if refund would exceed 10 and cap it
       if (leave.leave_type === 'lop') {
         const currentBalanceResult = await pool.query(
@@ -2922,7 +2978,7 @@ export const rejectLeaveDay = async (
         );
         const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
         const newLopBalance = currentLop + refund;
-        
+
         if (newLopBalance > 10) {
           const cappedRefund = 10 - currentLop;
           if (cappedRefund > 0) {
@@ -2945,10 +3001,10 @@ export const rejectLeaveDay = async (
           );
         }
       } else {
-      await pool.query(
-        `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-        [refund, leave.employee_id]
-      );
+        await pool.query(
+          `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+          [refund, leave.employee_id]
+        );
       }
     }
   }
@@ -2971,7 +3027,7 @@ export const rejectLeaveDay = async (
          )`,
       [comment || null, approverId, leaveRequestId]
     );
-    
+
     if (updateResult.rowCount === 0) {
       throw new Error('Not authorized to reject this leave');
     }
@@ -3009,7 +3065,7 @@ export const rejectLeaveDay = async (
 
   // Recalculate status
   try {
-  await recalcLeaveRequestStatus(leaveRequestId);
+    await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[REJECT LEAVE DAY] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
     logger.error(`[REJECT LEAVE DAY] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
@@ -3027,13 +3083,13 @@ export const rejectLeaveDay = async (
   // ========== SEND EMAIL NOTIFICATIONS ==========
   logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LEAVE DAY REJECTION ==========`);
   logger.info(`[EMAIL] Request ID: ${leaveRequestId}, Day ID: ${dayId}, Approver ID: ${approverId}, Approver Role: ${approverRole}`);
-  
+
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
   if (leave.employee_email) {
     try {
       // Build CC list based on approver role
       const ccEmails: string[] = [];
-      
+
       if (approverRole === 'hr') {
         // HR rejects → Employee (TO), Manager (CC)
         if (leave.manager_email && leave.manager_email !== leave.employee_email) {
@@ -3071,7 +3127,7 @@ export const rejectLeaveDay = async (
         comment: comment || null,
         status: 'rejected' as const
       }, ccEmails.length > 0 ? ccEmails : undefined);
-      
+
       logger.info(`[EMAIL] ✅ Day rejection email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
     } catch (err: any) {
       logger.error(`[EMAIL] ❌ Error sending day rejection email:`, err);
@@ -3096,7 +3152,7 @@ export const updateLeaveStatus = async (
 ) => {
   logger.info(`[LEAVE] [UPDATE LEAVE STATUS] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Request ID: ${leaveRequestId}, Approver ID: ${approverId}, Role: ${approverRole}, New Status: ${newStatus}, Selected Day IDs: ${selectedDayIds?.join(', ') || 'none'}`);
-  
+
   // Only HR and Super Admin can use this function
   if (approverRole !== 'hr' && approverRole !== 'super_admin') {
     logger.warn(`[LEAVE] [UPDATE LEAVE STATUS] Unauthorized attempt - Approver ID: ${approverId}, Role: ${approverRole}`);
@@ -3149,7 +3205,7 @@ export const updateLeaveStatus = async (
       `UPDATE leave_days SET day_status = 'approved' WHERE leave_request_id = $1`,
       [leaveRequestId]
     );
-    
+
     // Update leave request status and reason
     // Clear rejection comments when changing to approved
     // Update the appropriate approval field based on role
@@ -3285,7 +3341,7 @@ export const updateLeaveStatus = async (
   if (newStatus === 'approved' || newStatus === 'partially_approved' || newStatus === 'rejected') {
     try {
       logger.info(`[EMAIL DEBUG] Starting email notification for updateLeaveStatus. Request ID: ${leaveRequestId}, Status: ${newStatus}, Approver Role: ${approverRole}`);
-      
+
       // Get employee, manager, and HR information for emails
       const emailResult = await pool.query(
         `SELECT 
@@ -3314,7 +3370,7 @@ export const updateLeaveStatus = async (
         if (emailLeave.employee_email) {
           // Build CC list based on approver role
           const ccEmails: string[] = [];
-          
+
           if (approverRole === 'hr') {
             // HR updates → Employee (TO), Manager (CC)
             if (emailLeave.manager_email && emailLeave.manager_email !== emailLeave.employee_email) {
@@ -3349,7 +3405,7 @@ export const updateLeaveStatus = async (
             comment: newStatus === 'rejected' ? (rejectReason || null) : null,
             status: newStatus as 'approved' | 'partially_approved' | 'rejected'
           };
-          
+
           const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);
           if (emailSent) {
             logger.info(`✅ Leave ${newStatus} email sent to employee: ${emailLeave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
@@ -3373,9 +3429,9 @@ export const getApprovedLeaves = async (
 ) => {
   logger.info(`[LEAVE] [GET APPROVED LEAVES] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET APPROVED LEAVES] Page: ${page}, Limit: ${limit}, User Role: ${userRole || 'none'}`);
-  
+
   const offset = (page - 1) * limit;
-  
+
   const result = await pool.query(
     `SELECT
         lr.id,
@@ -3492,14 +3548,14 @@ export const getApprovedLeaves = async (
       const canDelete = false; // Approved/rejected leaves cannot be deleted
 
       // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
-      const rejectionReason = (displayStatus === 'rejected') 
+      const rejectionReason = (displayStatus === 'rejected')
         ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
         : null;
-      
+
       // Get approver name from last_updated_by fields
       let approverName: string | null = row.approver_name || null;
       let approverRole: string | null = null;
-      
+
       // Map role from database to display format
       if (row.last_updated_by_role === 'super_admin') {
         approverRole = 'Super Admin';

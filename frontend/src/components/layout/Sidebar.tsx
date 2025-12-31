@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -22,27 +22,32 @@ const Sidebar: React.FC = memo(() => {
 
   const availableRoutes = useMemo(() => {
     if (!user) return [];
-    
+
     const routes: Array<{ path: string; icon: React.ReactNode; label: string }> = [];
-    
+
     // Leave Apply available to everyone except super_admin
     if (user.role !== 'super_admin') {
-    routes.push({ path: '/leave-apply', icon: <FaFileAlt />, label: 'Leave Apply' });
+      routes.push({ path: '/leave-apply', icon: <FaFileAlt />, label: 'Leave Apply' });
     }
-    
+
     // Manager, HR, Super Admin can access Leave Approval
     if (['manager', 'hr', 'super_admin'].includes(user.role)) {
       routes.push({ path: '/leave-approval', icon: <FaCheckCircle />, label: 'Leave Approval' });
     }
-    
+
     // HR and Super Admin can access Employee Management
     if (['hr', 'super_admin'].includes(user.role)) {
       routes.push({ path: '/employee-management', icon: <FaUsers />, label: 'Employee Management' });
     }
-    
+
+    // HR and Super Admin can access Holiday Management
+    if (['hr', 'super_admin'].includes(user.role)) {
+      routes.push({ path: '/holiday-management', icon: <FaCalendarAlt />, label: 'Holiday Management' });
+    }
+
     // Profile is always available
     routes.push({ path: '/profile', icon: <FaUser />, label: 'Profile' });
-    
+
     return routes;
   }, [user]);
 
@@ -71,7 +76,7 @@ const Sidebar: React.FC = memo(() => {
           </div>
         ))}
       </div>
-      
+
       <div className="sidebar-user">
         {user && (
           <div className="user-toggle" onClick={() => setShowUserMenu((prev) => !prev)}>
@@ -84,7 +89,7 @@ const Sidebar: React.FC = memo(() => {
             <button className="logout-button" onClick={handleLogout}>
               <FaSignOutAlt /> Logout
             </button>
-        </div>
+          </div>
         )}
       </div>
     </div>

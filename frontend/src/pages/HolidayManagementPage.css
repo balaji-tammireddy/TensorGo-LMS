@@ -1,0 +1,312 @@
+.holiday-management-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.hm-page-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+/* Holiday Form Section */
+.hm-form-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 25px;
+}
+
+.hm-form-section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.hm-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.hm-form-row {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 15px;
+    align-items: end;
+}
+
+.hm-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.hm-form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+}
+
+.hm-form-group input {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: 'Poppins', sans-serif;
+    background: #f8f9fc;
+}
+
+.hm-form-group input:focus {
+    outline: none;
+    border-color: #4299e1;
+    background: white;
+}
+
+.hm-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.hm-submit-button {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
+    color: white;
+    border: 1px solid #2951c8;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    white-space: nowrap;
+    min-width: 110px;
+    height: 42px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
+    transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    box-sizing: border-box;
+}
+
+.hm-submit-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
+}
+
+.hm-submit-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.hm-reset-button {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
+    color: #3a4a6b;
+    border: 1px solid #c3ccdd;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    white-space: nowrap;
+    min-width: 110px;
+    height: 42px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 14px rgba(63, 81, 181, 0.12);
+    transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    box-sizing: border-box;
+}
+
+.hm-reset-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(63, 81, 181, 0.16);
+}
+
+.hm-reset-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Holidays List Section */
+.hm-list-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.hm-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.hm-year-selector {
+    display: flex;
+    gap: 8px;
+}
+
+.hm-year-button {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    color: #666;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+.hm-year-button:hover:not(:disabled) {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    opacity: 0.85;
+    color: #333;
+}
+
+.hm-year-button.active {
+    background-color: #3c6ff2;
+    color: #ffffff;
+    border-color: #3c6ff2;
+    opacity: 1;
+    box-shadow: 0 2px 4px rgba(60, 111, 242, 0.2);
+}
+
+.hm-year-button.active:hover {
+    background-color: #2951c8;
+    border-color: #2951c8;
+    opacity: 1;
+}
+
+.hm-loading-message,
+.hm-no-holidays-message {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    font-size: 14px;
+}
+
+.hm-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.hm-table-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.hm-table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.hm-table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.hm-table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.hm-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.hm-table th,
+.hm-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-size: 13px;
+}
+
+.hm-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.hm-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.hm-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.hm-table th:last-child,
+.hm-table td:last-child {
+    text-align: center;
+    width: 100px;
+}
+
+.hm-delete-icon-button {
+    background: transparent;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hm-delete-icon-button:hover:not(:disabled) {
+    background-color: #ffe5e8;
+    color: #c82333;
+}
+
+.hm-delete-icon-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .hm-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .hm-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .hm-year-selector {
+        width: 100%;
+        justify-content: space-between;
+    }
+}

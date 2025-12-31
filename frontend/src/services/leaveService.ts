@@ -82,7 +82,7 @@ export const getLeaveRules = async (): Promise<LeaveRule[]> => {
 
 export const applyLeave = async (data: ApplyLeaveData) => {
   const formData = new FormData();
-  
+
   // Add all fields except doctorNote
   formData.append('leaveType', data.leaveType);
   formData.append('startDate', data.startDate);
@@ -90,12 +90,12 @@ export const applyLeave = async (data: ApplyLeaveData) => {
   formData.append('endDate', data.endDate);
   formData.append('endType', data.endType);
   formData.append('reason', data.reason);
-  
+
   if (data.timeForPermission) {
     if (data.timeForPermission.start) formData.append('timeForPermission[start]', data.timeForPermission.start);
     if (data.timeForPermission.end) formData.append('timeForPermission[end]', data.timeForPermission.end);
   }
-  
+
   // Handle doctorNote - if it's a File, append it; if it's a string (existing key/base64), append as is
   if (data.doctorNote) {
     if (data.doctorNote instanceof File) {
@@ -105,7 +105,7 @@ export const applyLeave = async (data: ApplyLeaveData) => {
       formData.append('doctorNote', data.doctorNote);
     }
   }
-  
+
   const response = await api.post('/leave/apply', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -175,7 +175,7 @@ export const getLeaveRequest = async (requestId: number) => {
 export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData) => {
   // Check if we have a new file to upload
   const hasNewFile = data.doctorNote instanceof File;
-  
+
   // If no new file, use JSON for faster transmission
   if (!hasNewFile) {
     const jsonData: any = {
@@ -186,20 +186,20 @@ export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData
       endType: data.endType,
       reason: data.reason
     };
-    
+
     if (data.timeForPermission) {
       jsonData.timeForPermission = data.timeForPermission;
     }
-    
+
     // If doctorNote is a string (existing key), include it
     if (data.doctorNote && typeof data.doctorNote === 'string') {
       jsonData.doctorNote = data.doctorNote;
     }
-    
+
     const response = await api.put(`/leave/request/${requestId}`, jsonData);
     return response.data;
   }
-  
+
   // If we have a new file, use FormData
   const formData = new FormData();
   formData.append('leaveType', data.leaveType);
@@ -208,16 +208,16 @@ export const updateLeaveRequest = async (requestId: number, data: ApplyLeaveData
   formData.append('endDate', data.endDate);
   formData.append('endType', data.endType);
   formData.append('reason', data.reason);
-  
+
   if (data.timeForPermission) {
     if (data.timeForPermission.start) formData.append('timeForPermission[start]', data.timeForPermission.start);
     if (data.timeForPermission.end) formData.append('timeForPermission[end]', data.timeForPermission.end);
   }
-  
-    if (data.doctorNote instanceof File) {
-      formData.append('doctorNote', data.doctorNote);
+
+  if (data.doctorNote instanceof File) {
+    formData.append('doctorNote', data.doctorNote);
   }
-  
+
   const response = await api.put(`/leave/request/${requestId}`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -258,6 +258,24 @@ export const updateLeaveStatus = async (
  */
 export const convertLeaveRequestLopToCasual = async (requestId: number) => {
   const response = await api.post(`/leave/request/${requestId}/convert-lop-to-casual`);
+  return response.data;
+};
+
+/**
+ * Create a new holiday
+ * Only HR and Super Admin can create holidays
+ */
+export const createHoliday = async (holidayDate: string, holidayName: string) => {
+  const response = await api.post('/leave/holidays', { holidayDate, holidayName });
+  return response.data;
+};
+
+/**
+ * Delete a holiday
+ * Only HR and Super Admin can delete holidays
+ */
+export const deleteHoliday = async (holidayId: number) => {
+  const response = await api.delete(`/leave/holidays/${holidayId}`);
   return response.data;
 };
 

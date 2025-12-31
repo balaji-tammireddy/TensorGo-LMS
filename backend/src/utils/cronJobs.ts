@@ -191,6 +191,34 @@ const sendBirthdayWishes = async () => {
 };
 
 /**
+ * Cleanup old holidays
+ * Keeps holidays from (Current Year - 1) onwards
+ * Runs annually on Dec 31st
+ */
+const cleanupOldHolidays = async () => {
+  try {
+    logger.info('🧹 Starting old holidays cleanup job...');
+
+    const currentYear = new Date().getFullYear();
+    const cutoffYear = currentYear - 1;
+
+    // Delete holidays older than (currentYear - 1)
+    const result = await pool.query(
+      'DELETE FROM holidays WHERE EXTRACT(YEAR FROM holiday_date) < $1',
+      [cutoffYear]
+    );
+
+    if (result.rowCount && result.rowCount > 0) {
+      logger.info(`✅ Deleted ${result.rowCount} old holidays (older than ${cutoffYear})`);
+    } else {
+      logger.info('✅ No old holidays found to delete');
+    }
+  } catch (error: any) {
+    logger.error('❌ Error in old holidays cleanup job:', error);
+  }
+};
+
+/**
  * Initialize and start all cron jobs
  */
 export const initializeCronJobs = () => {
@@ -205,6 +233,15 @@ export const initializeCronJobs = () => {
     timezone: 'Asia/Kolkata' // Adjust timezone as needed
   });
   logger.info('✅ Cron job scheduled: Daily birthday wishes (9:00 AM)');
+
+  // Holiday cleanup once a year on Dec 31st at 00:00
+  cron.schedule('0 0 31 12 *', cleanupOldHolidays, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Holiday cleanup (Annually Dec 31st 00:00)');
+
+  // Run on startup to ensure clean state
+  cleanupOldHolidays();
 
   // Run immediately on startup for testing (optional - remove in production)
   // sendDailyPendingLeaveReminders();
