@@ -25,37 +25,37 @@ const ViewPoliciesPage: React.FC = () => {
             id: 'asset',
             title: 'Asset Management Policy',
             icon: <FaLaptop />,
-            link: 'https://drive.google.com/file/d/17VV62wq3nDbEjIsSUxjv2mvY1_r0J1my/view?usp=sharing'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/asset-management-policy.pdf'
         },
         {
             id: 'communication',
             title: 'Communication Policy',
             icon: <FaComments />,
-            link: 'https://drive.google.com/file/d/12gEiPPZaMYDuviGUbCn5Z6YhMxh9DhF3/view?usp=sharing'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/communication-policy.pdf'
         },
         {
             id: 'dress-code',
             title: 'Dress Code Policy',
             icon: <FaUserTie />,
-            link: 'https://drive.google.com/file/d/14iH2dyTRW5uHzEpkQEhlP17i0XIlNsH7/view?usp=sharing'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/dress-code-policy.pdf'
         },
         {
             id: 'leave',
             title: 'Leave Policy',
             icon: <FaCalendarAlt />,
-            link: 'https://drive.google.com/file/d/1c8swrM5oyDk_uj8dDqv7pRkNMAY4-pbD/view?usp=sharing'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/leave-policy.pdf'
         },
         {
             id: 'quality',
             title: 'Quality Management Policy',
             icon: <FaCheckCircle />,
-            link: 'https://drive.google.com/file/d/149A0PlIW6mzSKj4G4dcTWbaxN7A7mfmh/view?usp=sharing'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/quality-management-policy.pdf'
         },
         {
             id: 'wfo',
             title: 'WFO Policy',
             icon: <FaBuilding />,
-            link: 'https://drive.google.com/file/d/1hn9wzeSyyD74TI4EXw9pQt3MaoFA6GNe/view?usp=sharing'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/wfo-policy.pdf'
         }
     ];
 
