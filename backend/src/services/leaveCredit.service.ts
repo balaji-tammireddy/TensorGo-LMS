@@ -75,8 +75,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
           const bonus3Val = parseFloat(casualPolicy.anniversary_3_year_bonus) || 0;
           const bonus5Val = parseFloat(casualPolicy.anniversary_5_year_bonus) || 0;
 
-          // quarterly: Mar(3), Jun(6), Sep(9), Dec(12)
-          const isQuarterEnd = [3, 6, 9, 12].includes(currentMonth);
+          const isBonus3Month = [4, 8, 12].includes(currentMonth);
           // half-yearly: Jun(6), Dec(12)
           const isHalfYearEnd = [6, 12].includes(currentMonth);
 
@@ -87,10 +86,10 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
               logger.info(`[LEAVE_CREDIT] [BONUS] Adding 5-year half-yearly bonus (+${bonus5Val}) for ${employee.emp_id}`);
             }
           } else if (years >= 3) {
-            // Only 3-year bonus applies (four times a year)
-            if (isQuarterEnd) {
+            // Only 3-year bonus applies (three times a year)
+            if (isBonus3Month) {
               casualCredit += bonus3Val;
-              logger.info(`[LEAVE_CREDIT] [BONUS] Adding 3-year quarterly bonus (+${bonus3Val}) for ${employee.emp_id}`);
+              logger.info(`[LEAVE_CREDIT] [BONUS] Adding 3-year bonus (+${bonus3Val}) for ${employee.emp_id}`);
             }
           }
         }
@@ -340,7 +339,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
             logger.info(`[LEAVE_CREDIT] [YEAR-END BONUS] Adding 5-year half-yearly bonus (+${bonus5Val}) for ${employee.emp_id}`);
           } else if (years >= 3) {
             casualCredit += bonus3Val;
-            logger.info(`[LEAVE_CREDIT] [YEAR-END BONUS] Adding 3-year quarterly bonus (+${bonus3Val}) for ${employee.emp_id}`);
+            logger.info(`[LEAVE_CREDIT] [YEAR-END BONUS] Adding 3-year bonus (+${bonus3Val}) for ${employee.emp_id}`);
           }
         }
 

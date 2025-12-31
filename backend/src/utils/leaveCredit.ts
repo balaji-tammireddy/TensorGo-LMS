@@ -213,7 +213,7 @@ export function calculateAllLeaveCredits(joinDate: string | Date, checkDate: Dat
           yearsAtMonthEnd--;
         }
 
-        const isQuarterEnd = [3, 6, 9, 12].includes(month);
+        const isBonus3Month = [4, 8, 12].includes(month);
         const isHalfYearEnd = [6, 12].includes(month);
 
         // We need the bonus values from policy, but this utility (calculateAllLeaveCredits) 
@@ -227,7 +227,7 @@ export function calculateAllLeaveCredits(joinDate: string | Date, checkDate: Dat
             yearCasual += bonus5;
           }
         } else if (yearsAtMonthEnd >= 3) {
-          if (isQuarterEnd) {
+          if (isBonus3Month) {
             yearCasual += bonus3;
           }
         }

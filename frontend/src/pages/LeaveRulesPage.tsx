@@ -202,7 +202,7 @@ const LeaveRulesPage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="lr-input-group">
-                                        <label>3-Year Anniversary Bonus (Quaterly Accrual value)</label>
+                                        <label>3-Year Anniversary Bonus (April, August, December Accrual)</label>
                                         <input
                                             type="number"
                                             disabled={true}
@@ -293,7 +293,7 @@ const LeaveRulesPage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="lr-input-group">
-                                        <label>3-Year Anniversary Bonus (Quaterly Accrual value)</label>
+                                        <label>3-Year Anniversary Bonus (April, August, December Accrual)</label>
                                         <input
                                             type="number"
                                             step="0.5"
