@@ -546,7 +546,6 @@ const ProfilePage: React.FC = () => {
                 <img
                   src={photoSignedUrl}
                   alt="Profile"
-                  style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
                   onLoad={() => {
                     console.log('✅ Profile image loaded successfully. URL:', photoSignedUrl);
                   }}
@@ -1124,7 +1123,7 @@ const ProfilePage: React.FC = () => {
                       documents: { ...formData.documents, panNumber: sanitized }
                     });
                   }}
-                  onBlur={(e) => {
+                  onBlur={() => {
                     const panError = validatePan(formData.documents?.panNumber || '');
                     if (panError && formData.documents?.panNumber) {
                       showWarning(panError);
