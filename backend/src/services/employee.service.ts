@@ -11,7 +11,7 @@ export const getEmployees = async (
 ) => {
   logger.info(`[EMPLOYEE] [GET EMPLOYEES] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}`);
-  
+
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
@@ -74,7 +74,7 @@ export const getEmployees = async (
   }
 
   const countResult = await pool.query(countQuery, countParams);
-  
+
   logger.info(`[EMPLOYEE] [GET EMPLOYEES] Found ${result.rows.length} employees, Total: ${countResult.rows[0].count}`);
 
   return {
@@ -86,8 +86,8 @@ export const getEmployees = async (
       joiningDate: row.joining_date.toISOString().split('T')[0],
       status: row.status,
       role: row.role,
-      profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/') 
-        ? row.profile_photo_key 
+      profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/')
+        ? row.profile_photo_key
         : null
     })),
     pagination: {
@@ -100,7 +100,7 @@ export const getEmployees = async (
 
 export const getNextEmployeeId = async (): Promise<string> => {
   logger.info(`[EMPLOYEE] [GET NEXT EMPLOYEE ID] ========== FUNCTION CALLED ==========`);
-  
+
   // Get all employee IDs that are numeric and find the maximum
   logger.info(`[EMPLOYEE] [GET NEXT EMPLOYEE ID] Querying database for maximum numeric employee ID`);
   const result = await pool.query(
@@ -117,7 +117,7 @@ export const getNextEmployeeId = async (): Promise<string> => {
 
   const maxId = parseInt(result.rows[0].emp_id, 10);
   const nextId = maxId + 1;
-  
+
   // Format as 3-digit string (001, 002, etc.)
   return String(nextId).padStart(3, '0');
 };
@@ -156,21 +156,21 @@ export const getEmployeeById = async (employeeId: number) => {
 export const createEmployee = async (employeeData: any) => {
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}`);
-  
+
   // Employee ID must be provided by HR/Super Admin
   if (!employeeData.empId || !employeeData.empId.trim()) {
     logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID is required`);
     throw new Error('Employee ID is required');
   }
-  
+
   const empId = employeeData.empId.trim().toUpperCase();
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Normalized Employee ID: ${empId}`);
-  
+
   // Validate employee ID length (max 6 characters)
   if (empId.length > 6) {
     throw new Error('Employee ID must be maximum 6 characters');
   }
-  
+
   // Validate employee ID format (alphanumeric only)
   if (!/^[A-Z0-9]+$/.test(empId)) {
     throw new Error('Employee ID must contain only letters and numbers');
@@ -199,6 +199,12 @@ export const createEmployee = async (employeeData: any) => {
     }
   }
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID and email are unique`);
+
+  // Validate organization email domain
+  const email = (employeeData.email || '').toLowerCase();
+  if (!email.endsWith('@tensorgo.com') && !email.endsWith('@tensorgo.co.in')) {
+    throw new Error('Only organization mail should be used');
+  }
 
   // Validate date of birth - employee must be at least 18 years old
   if (employeeData.dateOfBirth) {
@@ -291,12 +297,12 @@ export const createEmployee = async (employeeData: any) => {
   // - Year-end adjustments (applied at end of each calendar year: casual capped at 8, sick reset to 0)
   const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
   const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
-  
+
   // Initialize leave balance with calculated credits
   // Ensure casual balance doesn't exceed 99 limit
   const casualBalance = Math.min(allCredits.casual, 99);
   const sickBalance = Math.min(allCredits.sick, 99);
-  
+
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
   await pool.query(
     'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
@@ -317,7 +323,7 @@ export const createEmployee = async (employeeData: any) => {
             throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
           }
         }
-        
+
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -346,7 +352,7 @@ export const createEmployee = async (employeeData: any) => {
     const { sendNewEmployeeCredentialsEmail } = await import('../utils/emailTemplates');
     const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const temporaryPassword = employeeData.password || 'tensorgo@2023';
-    
+
     await sendNewEmployeeCredentialsEmail(employeeData.email, {
       employeeName: `${employeeData.firstName} ${employeeData.middleName || ''} ${employeeData.lastName || ''}`.trim(),
       employeeEmpId: empId,
@@ -368,7 +374,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${employeeId}, Requester Role: ${requesterRole || 'none'}, Requester ID: ${requesterId || 'none'}`);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Fields to update: ${Object.keys(employeeData).join(', ')}`);
-  
+
   // Check if employee exists and get their role
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
   const employeeCheck = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
@@ -379,14 +385,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee found - Role: ${employeeCheck.rows[0].role}`);
 
   const employeeRole = employeeCheck.rows[0].role;
-  
+
   // Check what fields are being updated
-  const fieldsBeingUpdated = Object.keys(employeeData).map(key => 
+  const fieldsBeingUpdated = Object.keys(employeeData).map(key =>
     key.replace(/([A-Z])/g, '_$1').toLowerCase()
   );
   const isOnlyRoleUpdate = fieldsBeingUpdated.length === 1 && fieldsBeingUpdated[0] === 'role';
   const isRoleBeingUpdated = fieldsBeingUpdated.includes('role');
-  
+
   // Super admin should not have a reporting manager
   // If role is being changed to super_admin, clear reporting manager
   // If role is already super_admin, prevent setting reporting manager
@@ -430,6 +436,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       });
     } else {
       throw new Error('HR cannot edit their own details');
+    }
+  }
+
+  // Validate organization email domain if email is being updated
+  if (employeeData.email) {
+    const email = employeeData.email.toLowerCase();
+    if (!email.endsWith('@tensorgo.com') && !email.endsWith('@tensorgo.co.in')) {
+      throw new Error('Only organization mail should be used');
     }
   }
 
@@ -526,18 +540,18 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   if (employeeData.dateOfJoining && requesterRole === 'super_admin') {
     const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
-    
+
     // Update leave balances with recalculated credits
     // Ensure casual balance doesn't exceed 99 limit
     const casualBalance = Math.min(allCredits.casual, 99);
     const sickBalance = Math.min(allCredits.sick, 99);
-    
+
     // Check if leave balance record exists
     const balanceCheck = await pool.query(
       'SELECT employee_id FROM leave_balances WHERE employee_id = $1',
       [employeeId]
     );
-    
+
     if (balanceCheck.rows.length > 0) {
       // Update existing balance
       await pool.query(
@@ -572,7 +586,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
             throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
           }
         }
-        
+
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -603,7 +617,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
          FROM users WHERE id = $1`,
         [employeeId]
       );
-      
+
       if (employeeResult.rows.length > 0 && employeeResult.rows[0].email) {
         const { sendEmployeeDetailsUpdateEmail } = await import('../utils/emailTemplates');
         await sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
@@ -625,7 +639,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 export const deleteEmployee = async (employeeId: number) => {
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${employeeId}`);
-  
+
   // Check if employee exists
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Checking if employee exists`);
   const result = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
@@ -636,7 +650,7 @@ export const deleteEmployee = async (employeeId: number) => {
 
   const employee = result.rows[0];
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee found - Role: ${employee.role}`);
-  
+
   // Prevent deletion of super_admin users
   if (employee.role === 'super_admin') {
     logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Attempt to delete super admin user - Employee ID: ${employeeId}`);
@@ -695,7 +709,7 @@ export const addLeavesToEmployee = async (
 ) => {
   logger.info(`[EMPLOYEE] [ADD LEAVES] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [ADD LEAVES] Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}, Updated By: ${updatedBy}`);
-  
+
   // Validate leave type
   if (!['casual', 'sick', 'lop'].includes(leaveType)) {
     logger.warn(`[EMPLOYEE] [ADD LEAVES] Invalid leave type: ${leaveType}`);
@@ -731,10 +745,10 @@ export const addLeavesToEmployee = async (
       if (count > 99) {
         throw new Error(`Cannot add ${count} leaves. Maximum limit is 99 leaves per employee.`);
       }
-      
+
       const initialBalances: any = { casual_balance: 0, sick_balance: 0, lop_balance: 0 };
       initialBalances[balanceColumn] = count;
-      
+
       await client.query(
         `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
          VALUES ($1, $2, $3, $4, $5)`,
@@ -750,17 +764,17 @@ export const addLeavesToEmployee = async (
       // Get current balance for the leave type
       const currentBalance = parseFloat(balanceCheck.rows[0][balanceColumn] || '0');
       const newTotal = currentBalance + count;
-      
+
       // For LOP, check if it would exceed 10 (strict limit)
       if (balanceColumn === 'lop_balance' && newTotal > 10) {
         throw new Error(`Cannot add ${count} LOP leaves. Current LOP balance: ${currentBalance}, Maximum limit: 10. Total would be: ${newTotal}`);
       }
-      
+
       // Check if total would exceed maximum limit (99 for casual/sick)
       if (balanceColumn !== 'lop_balance' && newTotal > 99) {
         throw new Error(`Cannot add ${count} leaves. Current balance: ${currentBalance}, Maximum limit: 99. Total would be: ${newTotal}`);
       }
-      
+
       // Update existing balance
       await client.query(
         `UPDATE leave_balances 
@@ -788,7 +802,7 @@ export const addLeavesToEmployee = async (
 
       if (employeeResult.rows.length > 0) {
         const employee = employeeResult.rows[0];
-        const previousBalance = balanceCheck.rows.length > 0 
+        const previousBalance = balanceCheck.rows.length > 0
           ? parseFloat(balanceCheck.rows[0][balanceColumn] || '0')
           : 0;
         const newBalance = previousBalance + count;
@@ -822,7 +836,7 @@ export const addLeavesToEmployee = async (
 export const getEmployeeLeaveBalances = async (employeeId: number) => {
   logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] Employee ID: ${employeeId}`);
-  
+
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [employeeId]
@@ -859,7 +873,7 @@ export const convertLopToCasual = async (
 ) => {
   logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Employee ID: ${employeeId}, Count: ${count}, Updated By: ${updatedBy}`);
-  
+
   // Validate count
   if (count <= 0) {
     logger.warn(`[EMPLOYEE] [CONVERT LOP TO CASUAL] Invalid count: ${count}`);
@@ -968,7 +982,7 @@ export const convertLopToCasual = async (
       logger.error(`❌ Error sending conversion email:`, emailError);
     }
 
-    return { 
+    return {
       message: `${count} LOP leave(s) converted to casual leave(s) successfully`,
       previousLop: currentLop,
       newLop: newLop,

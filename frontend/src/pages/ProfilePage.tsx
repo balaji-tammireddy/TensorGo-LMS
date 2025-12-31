@@ -769,7 +769,7 @@ const ProfilePage: React.FC = () => {
                     personalInfo: { ...formData.personalInfo, dateOfBirth: date }
                   })}
                   disabled={!isEditMode}
-                  placeholder="Select date of birth"
+                  placeholder="dd-mm-yyyy"
                 />
               </div>
               <div className="form-group">
@@ -1079,7 +1079,7 @@ const ProfilePage: React.FC = () => {
                     employmentInfo: { ...formData.employmentInfo, dateOfJoining: date }
                   })}
                   disabled
-                  placeholder="Select date of joining"
+                  placeholder="dd-mm-yyyy"
                 />
               </div>
             </div>
