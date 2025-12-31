@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { useToast } from '../contexts/ToastContext';
@@ -32,9 +32,7 @@ const sanitizePhone = (value: string) => {
   return value.replace(/[^0-9]/g, '').slice(0, 10);
 };
 
-const sanitizeEmpId = (value: string) => {
-  return value.replace(/[^0-9]/g, '');
-};
+
 
 const sanitizeAadhaar = (value: string) => {
   return value.replace(/[^0-9]/g, '').slice(0, 12);
@@ -233,7 +231,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   }, [showLeaveHistory, isModalOpen]);
 
-  const hasActiveFilters = Boolean(searchInput || statusFilter);
+
 
   const sortedEmployees = React.useMemo(() => {
     if (!employeesData?.employees) return [];
@@ -351,7 +349,15 @@ const EmployeeManagementPage: React.FC = () => {
       showWarning('Employee ID must be maximum 6 characters');
       return;
     }
-    if (isEmpty(newEmployee.email)) missingFields.push('Official Email');
+    if (isEmpty(newEmployee.email)) {
+      missingFields.push('Official Email');
+    } else {
+      const email = newEmployee.email.toLowerCase();
+      if (!email.endsWith('@tensorgo.com') && !email.endsWith('@tensorgo.co.in')) {
+        showWarning('Only organization mail should be used');
+        return;
+      }
+    }
     if (isEmpty(newEmployee.contactNumber)) missingFields.push('Contact Number');
     if (isEmpty(newEmployee.altContact)) missingFields.push('Alt Contact');
     if (isEmpty(newEmployee.dateOfBirth)) missingFields.push('Date of Birth');
@@ -593,11 +599,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   };
 
-  const handleResetFilters = () => {
-    setSearchInput('');
-    setAppliedSearch(undefined);
-    setStatusFilter('');
-  };
+
 
   const getStatusColor = (status: string) => {
     return status === 'active' ? '#4caf50' : '#f44336';
@@ -1090,7 +1092,6 @@ const EmployeeManagementPage: React.FC = () => {
                             onChange={(e) => {
                               const input = e.target;
                               const cursorPosition = input.selectionStart || 0;
-                              const oldValue = newEmployee.contactNumber || '';
                               const inputValue = e.target.value;
                               const newValue = sanitizePhone(inputValue);
 
@@ -1133,7 +1134,6 @@ const EmployeeManagementPage: React.FC = () => {
                             onChange={(e) => {
                               const input = e.target;
                               const cursorPosition = input.selectionStart || 0;
-                              const oldValue = newEmployee.altContact || '';
                               const newValue = sanitizePhone(e.target.value);
 
                               setNewEmployee({
@@ -1163,7 +1163,7 @@ const EmployeeManagementPage: React.FC = () => {
                               setNewEmployee({ ...newEmployee, dateOfBirth: date })
                             }
                             disabled={isViewMode}
-                            placeholder="Select date of birth"
+                            placeholder="dd-mm-yyyy"
                             max={new Date().toISOString().split('T')[0]}
                           />
                         </div>
@@ -1441,7 +1441,7 @@ const EmployeeManagementPage: React.FC = () => {
                               })
                             }
                             disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
-                            placeholder="Select date of joining"
+                            placeholder="dd-mm-yyyy"
                           />
                         </div>
                         {isEditMode && (
@@ -1530,7 +1530,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 panNumber: sanitized
                               });
                             }}
-                            onBlur={(e) => {
+                            onBlur={() => {
                               const panError = validatePan(newEmployee.panNumber);
                               if (panError && newEmployee.panNumber) {
                                 showWarning(panError);

@@ -1438,7 +1438,7 @@ const LeaveApplyPage: React.FC = () => {
                   }}
                   min={minStartDate}
                   max={maxStartDate}
-                  placeholder="Select start date"
+                  placeholder="dd-mm-yyyy"
                   disabledDates={(date) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
                     const isLop = formData.leaveType?.toLowerCase() === 'lop';
@@ -1527,7 +1527,7 @@ const LeaveApplyPage: React.FC = () => {
                       }}
                       min={formData.startDate || minStartDate}
                       max={maxStartDate}
-                      placeholder="Select end date"
+                      placeholder="dd-mm-yyyy"
                       disabledDates={(date) => {
                         const dateStr = format(date, 'yyyy-MM-dd');
                         const isLop = formData.leaveType?.toLowerCase() === 'lop';

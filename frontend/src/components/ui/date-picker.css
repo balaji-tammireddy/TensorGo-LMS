@@ -63,7 +63,8 @@
   cursor: not-allowed;
 }
 
-.date-picker-popover {
+.date-picker-popover,
+.date-picker-popover-portal {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
@@ -74,15 +75,33 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   padding: 6px 4px;
   width: 100%;
-  min-width: 0;
-  max-width: 100%;
+  min-width: 250px;
+  max-width: 320px;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.date-picker-popover-portal {
+  z-index: 9999;
 }
 
 .date-picker-popover-top {
   top: auto;
   bottom: calc(100% + 8px);
+}
+
+.date-picker-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  color: #3c6ff2;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.date-picker-icon-container:hover {
+  color: #2951c8;
 }
 
 .date-picker-calendar {
