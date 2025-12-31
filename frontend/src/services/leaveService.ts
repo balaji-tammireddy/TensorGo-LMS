@@ -121,6 +121,13 @@ export const getMyLeaveRequests = async (page: number = 1, limit: number = 10, s
   return response.data;
 };
 
+export const getEmployeeLeaveRequests = async (employeeId: number, page: number = 1, limit: number = 10, status?: string) => {
+  const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
+  if (status) params.append('status', status);
+  const response = await api.get(`/leave/employee/${employeeId}/requests?${params}`);
+  return response.data;
+};
+
 export const getPendingLeaveRequests = async (page: number = 1, limit: number = 10, search?: string, filter?: string) => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   if (search) params.append('search', search);

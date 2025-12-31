@@ -18,6 +18,7 @@ router.get('/rules', leaveController.getRules);
 // Note: applyLeave uses multer for file uploads, so validation is handled in the controller after FormData parsing
 router.post('/apply', leaveController.applyLeave);
 router.get('/my-requests', leaveController.getMyRequests);
+router.get('/employee/:employeeId/requests', authorizeRole('hr', 'super_admin'), leaveController.getEmployeeLeaveRequests);
 router.get('/request/:id', leaveController.getLeaveRequest);
 // Note: updateLeaveRequest uses multer for file uploads, so validation is handled in the controller after FormData parsing
 router.put('/request/:id', leaveController.updateLeaveRequest);

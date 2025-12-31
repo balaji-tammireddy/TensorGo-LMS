@@ -537,6 +537,51 @@ export const updateLeaveStatus = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getEmployeeLeaveRequests = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] Employee ID: ${req.params.employeeId}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Page: ${req.query.page || 1}, Limit: ${req.query.limit || 10}, Status: ${req.query.status || 'all'}`);
+  
+  try {
+    // Only HR and Super Admin can view leave requests for any employee
+    if (req.user!.role !== 'hr' && req.user!.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] Unauthorized access attempt by user ${req.user!.id} with role ${req.user!.role}`);
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only HR and Super Admin can view employee leave requests'
+        }
+      });
+    }
+
+    const employeeId = parseInt(req.params.employeeId);
+    if (isNaN(employeeId)) {
+      logger.warn(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] Invalid employee ID: ${req.params.employeeId}`);
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_EMPLOYEE_ID',
+          message: 'Invalid employee ID'
+        }
+      });
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const status = req.query.status as string | undefined;
+    
+    const result = await leaveService.getMyLeaveRequests(employeeId, page, limit, status, req.user!.role);
+    logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] Retrieved ${result.requests.length} leave requests for employee ${employeeId}, Total: ${result.pagination.total}`);
+    res.json(result);
+  } catch (error: any) {
+    logger.error(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] Error:`, error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
 export const getLeaveRequest = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [LEAVE] [GET LEAVE REQUEST] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [LEAVE] [GET LEAVE REQUEST] Request ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);

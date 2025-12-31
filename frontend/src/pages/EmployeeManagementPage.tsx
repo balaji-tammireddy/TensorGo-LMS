@@ -17,6 +17,7 @@ import { Button } from '../components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
+import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
@@ -157,6 +158,7 @@ const EmployeeManagementPage: React.FC = () => {
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<number | null>(null);
   const [addLeavesModalOpen, setAddLeavesModalOpen] = useState(false);
   const [selectedEmployeeForLeaves, setSelectedEmployeeForLeaves] = useState<{ id: number; name: string } | null>(null);
+  const [showLeaveHistory, setShowLeaveHistory] = useState(false);
 
   const { data: managersData } = useQuery(
     ['reporting-managers', newEmployee.role, editingEmployeeId],
@@ -164,6 +166,15 @@ const EmployeeManagementPage: React.FC = () => {
     {
       retry: false,
       enabled: isModalOpen && !!newEmployee.role
+    }
+  );
+
+  const { data: leaveHistoryData, isLoading: leaveHistoryLoading } = useQuery(
+    ['employee-leave-requests', editingEmployeeId],
+    () => leaveService.getEmployeeLeaveRequests(editingEmployeeId!, 1, 100),
+    {
+      retry: false,
+      enabled: showLeaveHistory && !!editingEmployeeId && (user?.role === 'hr' || user?.role === 'super_admin')
     }
   );
 
@@ -201,6 +212,16 @@ const EmployeeManagementPage: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Scroll modal body to top when showing leave history
+  useEffect(() => {
+    if (showLeaveHistory && isModalOpen) {
+      const modalBody = document.querySelector('.employee-modal-body');
+      if (modalBody) {
+        modalBody.scrollTop = 0;
+      }
+    }
+  }, [showLeaveHistory, isModalOpen]);
 
   const hasActiveFilters = Boolean(searchInput || statusFilter);
 
@@ -814,6 +835,7 @@ const EmployeeManagementPage: React.FC = () => {
                     setIsEditMode(false);
                     setIsViewMode(false);
                     setEditingEmployeeId(null);
+                    setShowLeaveHistory(false);
                   }}
                 >
                   ✕
@@ -826,6 +848,66 @@ const EmployeeManagementPage: React.FC = () => {
                     Loading details...
                   </div>
                 )}
+                {showLeaveHistory ? (
+                  <div className="employee-modal-section" style={{ marginTop: 0, marginBottom: 0 }}>
+                    <h3 style={{ marginTop: 0 }}>Leave History</h3>
+                    {leaveHistoryLoading ? (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                        Loading leave history...
+                      </div>
+                    ) : leaveHistoryData?.requests && leaveHistoryData.requests.length > 0 ? (
+                      <div style={{ marginTop: '8px', width: '100%', overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '100%' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid #e5e5e5', backgroundColor: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Applied Date</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Leave Type</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Start Date</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>End Date</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Days</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {leaveHistoryData.requests.map((request: any) => {
+                              const getStatusClass = (status: string) => {
+                                if (status === 'approved') return 'status-approved';
+                                if (status === 'rejected') return 'status-rejected';
+                                if (status === 'partially_approved') return 'status-partial';
+                                return 'status-pending';
+                              };
+                              const getStatusLabel = (status: string) => {
+                                if (status === 'approved') return 'Approved';
+                                if (status === 'rejected') return 'Rejected';
+                                if (status === 'partially_approved') return 'Partially Approved';
+                                return 'Pending';
+                              };
+                              return (
+                                <tr key={request.id} style={{ borderBottom: '1px solid #e5e5e5' }}>
+                                  <td style={{ padding: '8px' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', textTransform: 'capitalize' }}>{request.leaveType}</td>
+                                  <td style={{ padding: '8px' }}>{format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px' }}>{format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px' }}>{request.noOfDays}</td>
+                                  <td style={{ padding: '8px' }}>
+                                    <span className={`status-badge ${getStatusClass(request.currentStatus)}`}>
+                                      {getStatusLabel(request.currentStatus)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                        No leave requests found for this employee.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
                 <div className="employee-modal-section">
                   <h3>Personal Information</h3>
                   <div className="employee-modal-grid">
@@ -1697,36 +1779,36 @@ const EmployeeManagementPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+                  </>
+                )}
               </div>
 
               <div className="employee-modal-footer">
                 {isViewMode ? (
                   <button
                     type="button"
-                    className="modal-cancel-button"
+                    className="modal-save-button"
                     onClick={() => {
-                      setIsModalOpen(false);
-                      setIsEditMode(false);
-                      setIsViewMode(false);
-                      setEditingEmployeeId(null);
+                      setShowLeaveHistory(!showLeaveHistory);
                     }}
                   >
-                    Close
+                    {showLeaveHistory ? 'Back to Details' : 'Leave History'}
                   </button>
                 ) : (
                   <>
                     <button
                       type="button"
                       className="modal-cancel-button"
-                      onClick={() => {
-                        setIsModalOpen(false);
-                        setIsEditMode(false);
-                        setIsViewMode(false);
-                        setEditingEmployeeId(null);
-                      }}
-                    >
-                      Cancel
-                    </button>
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setIsEditMode(false);
+                      setIsViewMode(false);
+                      setEditingEmployeeId(null);
+                      setShowLeaveHistory(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
                     <button
                       type="button"
                       className="modal-save-button"

@@ -197,12 +197,45 @@
 
 .status-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-weight: 600;
-  text-transform: capitalize;
+  padding: 6px 14px;
+  border-radius: 20px;
   font-size: 12px;
-  border: 1px solid transparent;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-pending,
+.status-applied {
+  background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
+  color: #fff;
+  border: 1px solid #ffb300;
+}
+
+.status-approved {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+  border: 1px solid #45a049;
+}
+
+.status-rejected {
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  color: white;
+  border: 1px solid #c62828;
+}
+
+.status-partial,
+.status-partially-approved {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  color: white;
+  border: 1px solid #f57c00;
 }
 
 .actions-cell {
@@ -244,6 +277,7 @@
 
 .employee-modal {
   width: 960px;
+  height: 90vh;
   max-height: 90vh;
   background: #ffffff;
   border-radius: 4px;
@@ -258,6 +292,7 @@
   justify-content: space-between;
   padding: 12px 20px;
   border-bottom: 1px solid #e5e5e5;
+  flex-shrink: 0;
 }
 
 .employee-modal-header h2 {
@@ -278,6 +313,8 @@
 .employee-modal-body {
   padding: 14px 20px 4px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .employee-modal-section {
@@ -441,6 +478,7 @@
   gap: 8px;
   padding: 10px 20px 12px;
   border-top: 1px solid #e5e5e5;
+  flex-shrink: 0;
 }
 
 .modal-cancel-button {
