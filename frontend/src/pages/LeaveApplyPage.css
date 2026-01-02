@@ -20,7 +20,7 @@
 .holidays-section {
   background: white;
   padding: 15px;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
@@ -292,7 +292,7 @@
 .apply-form-section {
   background: white;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 30px;
 }
@@ -453,7 +453,7 @@
   width: 100%;
   padding: 10px 12px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid #ddd;
   height: 44px;
   line-height: 1.2;
@@ -464,7 +464,7 @@
   flex: 1;
   padding: 10px 12px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 4px;
   height: 44px;
   line-height: 1.2;
 }
@@ -483,7 +483,7 @@
   min-width: 80px;
   padding: 10px 8px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid #ddd;
   height: 44px;
   background-color: white;
@@ -544,7 +544,7 @@
   background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
   color: #3a4a6b;
   border: 1px solid #c3ccdd;
-  border-radius: 6px;
+  border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -610,7 +610,7 @@
   background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: white;
   border: 1px solid #2951c8;
-  border-radius: 6px;
+  border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -646,7 +646,7 @@
   background: linear-gradient(135deg, #e0e5f2 0%, #cfd7ea 100%);
   color: #3a4a6b;
   border: 1px solid #c3ccdd;
-  border-radius: 6px;
+  border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -678,7 +678,7 @@
 .recent-requests-section {
   background: white;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -1036,7 +1036,7 @@
 .skeleton-card {
   background: white;
   padding: 15px;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;

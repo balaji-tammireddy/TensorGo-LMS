@@ -779,20 +779,8 @@ const ProfilePage: React.FC = () => {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="leave-type-dropdown-trigger"
+                      className="profile-field-trigger"
                       disabled={!isEditMode}
-                      style={{
-                        width: '100%',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        fontFamily: 'Poppins, sans-serif',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        backgroundColor: 'transparent',
-                        color: '#1f2a3d',
-                        height: 'auto'
-                      }}
                     >
                       <span>{formData.personalInfo?.gender || ''}</span>
                       <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
@@ -837,20 +825,8 @@ const ProfilePage: React.FC = () => {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="leave-type-dropdown-trigger"
+                      className="profile-field-trigger"
                       disabled={!isEditMode}
-                      style={{
-                        width: '100%',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        fontFamily: 'Poppins, sans-serif',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        backgroundColor: 'transparent',
-                        color: '#1f2a3d',
-                        height: 'auto'
-                      }}
                     >
                       <span>{formData.personalInfo?.bloodGroup || ''}</span>
                       <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
@@ -882,20 +858,8 @@ const ProfilePage: React.FC = () => {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="leave-type-dropdown-trigger"
+                      className="profile-field-trigger"
                       disabled={!isEditMode}
-                      style={{
-                        width: '100%',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        fontFamily: 'Poppins, sans-serif',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        backgroundColor: 'transparent',
-                        color: '#1f2a3d',
-                        height: 'auto'
-                      }}
                     >
                       <span>{formData.personalInfo?.maritalStatus || ''}</span>
                       <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
