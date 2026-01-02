@@ -1242,7 +1242,11 @@ const LeaveApplyPage: React.FC = () => {
   return (
     <AppLayout>
       <div className="leave-apply-page">
-        <h1 className="page-title">Welcome, {user?.name}</h1>
+        <h1 className="page-title">
+          Welcome, {user?.name ? user.name.split(' ').map((part, i, arr) =>
+            (i === arr.length - 1 && arr.length > 1) ? part.charAt(0).toUpperCase() + part.slice(1) : part
+          ).join(' ') : ''}
+        </h1>
 
         {/* Top Row: Three Equal Sections */}
         <div className="top-sections-row">
@@ -1900,7 +1904,6 @@ const LeaveApplyPage: React.FC = () => {
                       reason: sanitizeLettersOnly(e.target.value)
                     })
                   }
-                  placeholder="Type reason..."
                   required
                   maxLength={100}
                 />
