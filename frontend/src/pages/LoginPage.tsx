@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { forgotPassword, verifyOTP, resetPassword } from '../services/authService';
-import { FaEye, FaEyeSlash, FaTimes, FaBriefcase } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaTimes } from 'react-icons/fa';
 import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
@@ -186,123 +186,105 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="login-page">
-      <div className="login-wrapper">
-        {/* Left Section - Image/Visual */}
-        <div className="login-image-section">
-          <div className="login-image-content">
-            <img
-              src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/portrait-professional-elegant-businessman.jpg"
-              alt="Professional Businessman"
-              className="login-side-image"
-              loading="eager"
-              onError={(e) => {
-                // Fallback to local image if OVHcloud URL fails
-                const target = e.target as HTMLImageElement;
-                target.src = '/uploads/portrait-professional-elegant-businessman.jpg';
+      <div className="ambient-blob blob-1"></div>
+      <div className="ambient-blob blob-2"></div>
+      <div className="login-container">
+        {isInactive ? (
+          <>
+            <div className="login-header">
+              <div className="login-logo">
+                <img src="/uploads/TensorGo logo black bg.png" alt="TensorGo logo" />
+              </div>
+              <h1>HR Management System</h1>
+            </div>
+            <div className="error-message" style={{ marginTop: 16 }}>
+              You are no longer active employee of this organisation.
+            </div>
+            <button
+              type="button"
+              className="login-button inactive-login-button"
+              onClick={() => {
+                setIsInactive(false);
+                setPassword('');
               }}
-            />
-          </div>
-        </div>
-
-        {/* Right Section - Login Form */}
-        <div className="login-form-section">
-          <div className="login-container">
-            {isInactive ? (
-              <>
-                <div className="login-header">
-                  <div className="login-logo">
-                    <FaBriefcase />
-                  </div>
-                  <h1>HR Management System</h1>
-                </div>
-                <div className="error-message" style={{ marginTop: 16 }}>
-                  You are no longer active employee of this organisation.
-                </div>
-                <button
-                  type="button"
-                  className="login-button inactive-login-button"
-                  onClick={() => {
-                    setIsInactive(false);
-                    setPassword('');
-                  }}
-                >
-                  Sign In as Different User
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="login-header">
-                  <div className="login-logo">
-                    <FaBriefcase />
-                  </div>
-                  <h1>HR Management System</h1>
-                </div>
-                <form onSubmit={handleSubmit} className="login-form">
-                  <div className="form-group">
-                    <label>Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      placeholder="Enter your email"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Password</label>
-                    <div className="password-field">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        placeholder="Enter your password"
-                      />
-                      <button
-                        type="button"
-                        className="toggle-password"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
-                    </div>
-                  </div>
-                  <button type="submit" disabled={loading} className="login-button">
-                    {loading ? 'Logging in...' : 'Sign In'}
-                  </button>
-                </form>
-                <div className="forgot-password-link">
+            >
+              Sign In as Different User
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="login-header">
+              <div className="login-logo">
+                <img src="/uploads/TensorGo logo black bg.png" alt="TensorGo logo" />
+              </div>
+              <h1>HR Management System</h1>
+            </div>
+            <form onSubmit={handleSubmit} className="login-form">
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="Enter your email"
+                />
+              </div>
+              <div className="form-group">
+                <label>Password</label>
+                <div className="password-field">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="Enter your password"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="forgot-password-button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    Forgot Password?
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        </div>
+              </div>
+              <button type="submit" disabled={loading} className="login-button">
+                {loading ? 'Logging in...' : 'Sign In'}
+              </button>
+            </form>
+            <div className="forgot-password-link">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="forgot-password-button"
+              >
+                Forgot Password?
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Forgot Password Modal */}
-      {showForgotPassword && (
-        <div className="forgot-password-overlay">
-          <div className="forgot-password-modal">
-            <div className="forgot-password-header">
-              <h2>Reset Password</h2>
-              <button
-                type="button"
-                className="close-button"
-                onClick={handleCloseForgotPassword}
-                aria-label="Close"
-              >
-                <FaTimes />
-              </button>
-            </div>
+      {
+        showForgotPassword && (
+          <div className="forgot-password-overlay">
+            <div className="forgot-password-modal">
+              <div className="forgot-password-header">
+                <h2>Reset Password</h2>
+                <button
+                  type="button"
+                  className="close-button"
+                  onClick={handleCloseForgotPassword}
+                  aria-label="Close"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
+<<<<<<< HEAD
             <div className="forgot-password-content">
               {forgotPasswordStep === 'email' && (
                 <>
@@ -383,67 +365,148 @@ const LoginPage: React.FC = () => {
                   <div className="form-group">
                     <label>New Password</label>
                     <div className="password-field">
+=======
+              <div className="forgot-password-content">
+                {forgotPasswordStep === 'email' && (
+                  <>
+                    <p className="forgot-password-description">
+                      Enter your registered email address. We'll send you an OTP to reset your password.
+                    </p>
+                    <div className="form-group">
+                      <label>Email</label>
+>>>>>>> 81e0c8989d2778612377b836ae143eabb51a91a4
                       <input
-                        type={showNewPassword ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Enter new password"
+                        type="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                        placeholder="Enter your email"
                         disabled={forgotPasswordLoading}
                       />
-                      <button
-                        type="button"
-                        className="toggle-password"
-                        onClick={() => setShowNewPassword((prev) => !prev)}
-                        aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showNewPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
                     </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Confirm Password</label>
-                    <div className="password-field">
-                      <input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                        disabled={forgotPasswordLoading}
-                      />
-                      <button
-                        type="button"
-                        className="toggle-password"
-                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="forgot-password-actions">
                     <button
                       type="button"
-                      onClick={handleCloseForgotPassword}
-                      className="forgot-password-back-button"
+                      onClick={handleForgotPassword}
                       disabled={forgotPasswordLoading}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetPassword}
-                      disabled={forgotPasswordLoading || !newPassword || newPassword !== confirmPassword}
                       className="forgot-password-submit-button"
                     >
-                      {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                      {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
                     </button>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+
+                {forgotPasswordStep === 'otp' && (
+                  <>
+                    <p className="forgot-password-description">
+                      Enter the 6-digit OTP sent to <strong>{forgotPasswordEmail}</strong>
+                    </p>
+                    <div className="form-group">
+                      <label>OTP</label>
+                      <input
+                        type="text"
+                        value={otp}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setOtp(value);
+                        }}
+                        maxLength={6}
+                        disabled={forgotPasswordLoading}
+                        style={{ textAlign: 'center', letterSpacing: '8px', fontFamily: 'monospace', fontSize: '20px' }}
+                      />
+                    </div>
+                    <div className="forgot-password-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotPasswordStep('email');
+                          setOtp('');
+                        }}
+                        className="forgot-password-back-button"
+                        disabled={forgotPasswordLoading}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleVerifyOTP}
+                        disabled={forgotPasswordLoading || otp.length !== 6}
+                        className="forgot-password-submit-button"
+                      >
+                        {forgotPasswordLoading ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {forgotPasswordStep === 'password' && (
+                  <>
+                    <p className="forgot-password-description">
+                      Enter your new password
+                    </p>
+                    <div className="form-group">
+                      <label>New Password</label>
+                      <div className="password-field">
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          disabled={forgotPasswordLoading}
+                        />
+                        <button
+                          type="button"
+                          className="toggle-password"
+                          onClick={() => setShowNewPassword((prev) => !prev)}
+                          aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showNewPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Confirm Password</label>
+                      <div className="password-field">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                          disabled={forgotPasswordLoading}
+                        />
+                        <button
+                          type="button"
+                          className="toggle-password"
+                          onClick={() => setShowConfirmPassword((prev) => !prev)}
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="forgot-password-actions">
+                      <button
+                        type="button"
+                        onClick={handleCloseForgotPassword}
+                        className="forgot-password-back-button"
+                        disabled={forgotPasswordLoading}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetPassword}
+                        disabled={forgotPasswordLoading || !newPassword || newPassword !== confirmPassword}
+                        className="forgot-password-submit-button"
+                      >
+                        {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </div>
   );
 };
