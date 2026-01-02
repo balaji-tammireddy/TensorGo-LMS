@@ -796,7 +796,7 @@ const EmployeeManagementPage: React.FC = () => {
                           {employee.status === 'active' ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="actions-cell">
+                      <td>
                         <div className="actions-wrapper">
                           <span
                             className="action-icon"

@@ -730,19 +730,21 @@ const LeaveApprovalPage: React.FC = () => {
                               <span className="status-badge">{request.displayStatus}</span>
                             )}
                           </td>
-                          <td className="actions-cell">
-                            <button
-                              className={`edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
-                              onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleEditClick(request)}
-                              title={isUpdating ? 'Updating...' : 'View Details & Approve/Reject'}
-                              disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
-                            >
-                              {isUpdating ? (
-                                <span className="loading-spinner-small"></span>
-                              ) : (
-                                <FaPencilAlt />
-                              )}
-                            </button>
+                          <td>
+                            <div className="actions-cell">
+                              <button
+                                className={`edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
+                                onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleEditClick(request)}
+                                title={isUpdating ? 'Updating...' : 'View Details & Approve/Reject'}
+                                disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
+                              >
+                                {isUpdating ? (
+                                  <span className="loading-spinner-small"></span>
+                                ) : (
+                                  <FaPencilAlt />
+                                )}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -831,32 +833,34 @@ const LeaveApprovalPage: React.FC = () => {
                                 <span className="status-badge">{request.leaveStatus}</span>
                               )}
                             </td>
-                            <td className="actions-cell">
-                              {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
-                                <div className="action-icons-container">
-                                  <span
-                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
-                                    title="View Details"
-                                    onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
-                                  >
-                                    <FaEye />
-                                  </span>
-                                  <span
-                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
-                                    title={isUpdating ? 'Loading...' : 'Edit'}
-                                    onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
-                                    style={{
-                                      cursor: isUpdating ? 'not-allowed' : 'pointer'
-                                    }}
-                                  >
-                                    {isUpdating && editingRequestId === request.id ? (
-                                      <span className="loading-spinner-small"></span>
-                                    ) : (
-                                      <FaPencilAlt />
-                                    )}
-                                  </span>
-                                </div>
-                              )}
+                            <td>
+                              <div className="actions-cell">
+                                {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
+                                  <div className="action-icons-container">
+                                    <span
+                                      className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                      title="View Details"
+                                      onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
+                                    >
+                                      <FaEye />
+                                    </span>
+                                    <span
+                                      className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                      title={isUpdating ? 'Loading...' : 'Edit'}
+                                      onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
+                                      style={{
+                                        cursor: isUpdating ? 'not-allowed' : 'pointer'
+                                      }}
+                                    >
+                                      {isUpdating && editingRequestId === request.id ? (
+                                        <span className="loading-spinner-small"></span>
+                                      ) : (
+                                        <FaPencilAlt />
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

@@ -67,7 +67,7 @@
   background: white;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 30px;
 }
 
@@ -92,7 +92,8 @@
 }
 
 .requests-table-container.scrollable {
-  max-height: calc(60px * 3 + 48px); /* 3 rows * 60px row height + header height */
+  max-height: calc(60px * 3 + 48px);
+  /* 3 rows * 60px row height + header height */
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -144,24 +145,27 @@
   text-align: center;
 }
 
-.actions-cell {
+.leave-approval-page .actions-cell {
   display: flex;
   gap: 10px;
   justify-content: center;
 }
 
 .status-applied {
-  background-color: #ffc107; /* Yellow */
+  background-color: #ffc107;
+  /* Yellow */
   color: #fff;
 }
 
 .status-pending {
-  background-color: #ffc107; /* Yellow */
+  background-color: #ffc107;
+  /* Yellow */
   color: #fff;
 }
 
 .status-partial {
-  background-color: #ff9800; /* Orange */
+  background-color: #ff9800;
+  /* Orange */
   color: #fff;
 }
 
@@ -219,6 +223,7 @@
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -235,8 +240,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .pending-requests-section,
@@ -256,13 +266,11 @@
   width: 250px;
   border-radius: 8px;
   margin-bottom: 20px;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -271,7 +279,7 @@
   background: white;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
 
@@ -280,26 +288,22 @@
   width: 200px;
   border-radius: 4px;
   margin-bottom: 15px;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
 
 .skeleton-input {
   border-radius: 4px;
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 0%,
-    #f8f8f8 20%,
-    #f0f0f0 40%,
-    #f0f0f0 100%
-  );
+  background: linear-gradient(90deg,
+      #f0f0f0 0%,
+      #f8f8f8 20%,
+      #f0f0f0 40%,
+      #f0f0f0 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -314,13 +318,11 @@
   height: 16px;
   width: 100%;
   border-radius: 4px;
-  background: linear-gradient(
-    90deg,
-    #e0e5f2 0%,
-    #f0f4fa 20%,
-    #e0e5f2 40%,
-    #e0e5f2 100%
-  );
+  background: linear-gradient(90deg,
+      #e0e5f2 0%,
+      #f0f4fa 20%,
+      #e0e5f2 40%,
+      #e0e5f2 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -328,13 +330,11 @@
 .skeleton-table-row {
   height: 12px;
   border-radius: 4px;
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 0%,
-    #f8f8f8 20%,
-    #f0f0f0 40%,
-    #f0f0f0 100%
-  );
+  background: linear-gradient(90deg,
+      #f0f0f0 0%,
+      #f8f8f8 20%,
+      #f0f0f0 40%,
+      #f0f0f0 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -343,8 +343,8 @@
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
 }
-
