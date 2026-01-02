@@ -1164,7 +1164,7 @@ const EmployeeManagementPage: React.FC = () => {
                               setNewEmployee({ ...newEmployee, dateOfBirth: date })
                             }
                             disabled={isViewMode}
-                            placeholder="dd - mm - yyyy"
+                            placeholder="DD-MM-YYYY"
                             max={new Date().toISOString().split('T')[0]}
                             allowManualEntry={true}
                             isEmployeeVariant={true}
@@ -1444,7 +1444,7 @@ const EmployeeManagementPage: React.FC = () => {
                               })
                             }
                             disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
-                            placeholder="dd - mm - yyyy"
+                            placeholder="DD-MM-YYYY"
                             allowManualEntry={true}
                             isEmployeeVariant={true}
                           />

@@ -593,8 +593,8 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           min={minDate}
                           max={maxDate}
                           disabled={isLoading}
-                          placeholder="dd-mm-yyyy"
-                        />
+                          placeholder="DD-MM-YYYY"
+                          />
                       </div>
                       <div className="date-range-input-group">
                         <label>To Date</label>
@@ -604,7 +604,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           min={fromDate || minDate}
                           max={maxDate}
                           disabled={isLoading || !fromDate}
-                          placeholder="dd-mm-yyyy"
+                          placeholder="DD-MM-YYYY"
                         />
                       </div>
                     </div>
@@ -650,7 +650,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                             }
                           }}
                           disabled={isLoading}
-                          placeholder="dd-mm-yyyy"
+                          placeholder="DD-MM-YYYY"
                         />
                       </div>
                       <div className="date-range-input-group">
@@ -666,7 +666,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                             setToDate(newToDate);
                           }}
                           disabled={isLoading || !fromDate}
-                          placeholder="dd-mm-yyyy"
+                          placeholder="DD-MM-YYYY"
                         />
                       </div>
                     </div>

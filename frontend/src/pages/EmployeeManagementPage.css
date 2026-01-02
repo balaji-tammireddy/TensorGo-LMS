@@ -403,15 +403,9 @@
   box-sizing: border-box;
 }
 
-.employee-modal-field .date-picker-input {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-}
-
 .employee-modal-field .date-picker-input-field {
   padding: 10px 12px;
+  padding-right: 35px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: transparent;
@@ -422,6 +416,29 @@
   color: #1f2a3d;
   width: 100%;
   box-sizing: border-box;
+}
+
+.employee-modal-field .date-picker-input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.employee-modal-field .date-picker-icon-container {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #3c6ff2;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  z-index: 1;
 }
 
 .same-address-checkbox {
