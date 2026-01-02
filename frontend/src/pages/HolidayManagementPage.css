@@ -60,7 +60,8 @@
     color: #333;
 }
 
-.hm-form-group input {
+.hm-form-group input,
+.hm-form-group .date-picker-input-field {
     padding: 10px 12px;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -68,12 +69,49 @@
     font-family: 'Poppins', sans-serif;
     background: #f8f9fc;
     width: 100%;
+    height: 42px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
 }
 
-.hm-form-group input:focus {
+.hm-form-group .date-picker-input-field {
+    padding-right: 35px; /* Space for the calendar icon */
+}
+
+.hm-form-group input:focus,
+.hm-form-group .date-picker-input-field:focus {
     outline: none;
-    border-color: #4299e1;
+    border-color: #3c6ff2;
     background: white;
+    box-shadow: 0 0 0 3px rgba(60, 111, 242, 0.1);
+}
+
+.hm-form-group .date-picker-input {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    height: auto;
+    display: flex;
+    align-items: center;
+    position: relative;
+    width: 100%;
+}
+
+.hm-form-group .date-picker-icon-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    color: #3c6ff2;
+    cursor: pointer;
+    transition: color 0.2s;
+    height: 100%;
+    position: absolute;
+    right: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .hm-form-actions {
