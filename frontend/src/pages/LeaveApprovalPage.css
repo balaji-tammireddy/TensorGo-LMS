@@ -3,12 +3,7 @@
   margin: 0 auto;
 }
 
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 20px;
-  color: #333;
-}
+
 
 .search-filter-bar {
   display: flex;

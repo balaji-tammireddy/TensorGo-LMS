@@ -14,13 +14,7 @@
   overflow: hidden;
 }
 
-/* Match the page title styling from the profile module */
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: #333;
-}
+
 
 .search-filter-bar {
   display: flex;

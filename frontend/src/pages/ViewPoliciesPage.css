@@ -19,26 +19,6 @@
     }
 }
 
-.vp-title {
-    font-size: 28px;
-    font-weight: 700;
-    color: #1f2937;
-    margin-bottom: 30px;
-    position: relative;
-    padding-left: 15px;
-}
-
-.vp-title::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 6px;
-    height: 30px;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    border-radius: 4px;
-}
 
 /* Glassmorphism Grid */
 .vp-grid {

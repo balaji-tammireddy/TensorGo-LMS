@@ -70,7 +70,7 @@ const ViewPoliciesPage: React.FC = () => {
     return (
         <AppLayout>
             <div className="vp-container">
-                <h1 className="vp-title">Company Policies</h1>
+                <h1 className="page-title">Company Policies</h1>
 
                 <div className="vp-grid">
                     {policies.map((policy) => (

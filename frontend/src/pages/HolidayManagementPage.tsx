@@ -129,7 +129,7 @@ const HolidayManagementPage: React.FC = () => {
     return (
         <AppLayout>
             <div className="holiday-management-page">
-                <h1 className="hm-page-title">Holiday Management</h1>
+                <h1 className="page-title">Holiday Management</h1>
 
                 {/* Add Holiday Form */}
                 <div className="hm-form-section">
