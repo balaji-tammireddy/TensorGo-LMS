@@ -266,166 +266,165 @@ const LoginPage: React.FC = () => {
           </>
         )}
       </div>
-    </div>
 
-  {/* Forgot Password Modal */ }
-  {
-    showForgotPassword && (
-      <div className="forgot-password-overlay">
-        <div className="forgot-password-modal">
-          <div className="forgot-password-header">
-            <h2>Reset Password</h2>
-            <button
-              type="button"
-              className="close-button"
-              onClick={handleCloseForgotPassword}
-              aria-label="Close"
-            >
-              <FaTimes />
-            </button>
-          </div>
-
-          <div className="forgot-password-content">
-            {forgotPasswordStep === 'email' && (
-              <>
-                <p className="forgot-password-description">
-                  Enter your registered email address. We'll send you an OTP to reset your password.
-                </p>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={forgotPasswordEmail}
-                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    disabled={forgotPasswordLoading}
-                  />
-                </div>
+      {/* Forgot Password Modal */}
+      {
+        showForgotPassword && (
+          <div className="forgot-password-overlay">
+            <div className="forgot-password-modal">
+              <div className="forgot-password-header">
+                <h2>Reset Password</h2>
                 <button
                   type="button"
-                  onClick={handleForgotPassword}
-                  disabled={forgotPasswordLoading}
-                  className="forgot-password-submit-button"
+                  className="close-button"
+                  onClick={handleCloseForgotPassword}
+                  aria-label="Close"
                 >
-                  {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
+                  <FaTimes />
                 </button>
-              </>
-            )}
+              </div>
 
-            {forgotPasswordStep === 'otp' && (
-              <>
-                <p className="forgot-password-description">
-                  Enter the 6-digit OTP sent to <strong>{forgotPasswordEmail}</strong>
-                </p>
-                <div className="form-group">
-                  <label>OTP</label>
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                      setOtp(value);
-                    }}
-                    maxLength={6}
-                    disabled={forgotPasswordLoading}
-                    style={{ textAlign: 'center', letterSpacing: '8px', fontFamily: 'monospace', fontSize: '20px' }}
-                  />
-                </div>
-                <div className="forgot-password-actions">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForgotPasswordStep('email');
-                      setOtp('');
-                    }}
-                    className="forgot-password-back-button"
-                    disabled={forgotPasswordLoading}
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleVerifyOTP}
-                    disabled={forgotPasswordLoading || otp.length !== 6}
-                    className="forgot-password-submit-button"
-                  >
-                    {forgotPasswordLoading ? 'Verifying...' : 'Verify OTP'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {forgotPasswordStep === 'password' && (
-              <>
-                <p className="forgot-password-description">
-                  Enter your new password
-                </p>
-                <div className="form-group">
-                  <label>New Password</label>
-                  <div className="password-field">
-                    <input
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      disabled={forgotPasswordLoading}
-                    />
+              <div className="forgot-password-content">
+                {forgotPasswordStep === 'email' && (
+                  <>
+                    <p className="forgot-password-description">
+                      Enter your registered email address. We'll send you an OTP to reset your password.
+                    </p>
+                    <div className="form-group">
+                      <label>Email</label>
+                      <input
+                        type="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        disabled={forgotPasswordLoading}
+                      />
+                    </div>
                     <button
                       type="button"
-                      className="toggle-password"
-                      onClick={() => setShowNewPassword((prev) => !prev)}
-                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showNewPassword ? <FaEyeSlash /> : <FaEye />}
-                    </button>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Confirm Password</label>
-                  <div className="password-field">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
+                      onClick={handleForgotPassword}
                       disabled={forgotPasswordLoading}
-                    />
-                    <button
-                      type="button"
-                      className="toggle-password"
-                      onClick={() => setShowConfirmPassword((prev) => !prev)}
-                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      className="forgot-password-submit-button"
                     >
-                      {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                      {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
                     </button>
-                  </div>
-                </div>
-                <div className="forgot-password-actions">
-                  <button
-                    type="button"
-                    onClick={handleCloseForgotPassword}
-                    className="forgot-password-back-button"
-                    disabled={forgotPasswordLoading}
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetPassword}
-                    disabled={forgotPasswordLoading || !newPassword || newPassword !== confirmPassword}
-                    className="forgot-password-submit-button"
-                  >
-                    {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
-                  </button>
-                </div>
-              </>
-            )}
+                  </>
+                )}
+
+                {forgotPasswordStep === 'otp' && (
+                  <>
+                    <p className="forgot-password-description">
+                      Enter the 6-digit OTP sent to <strong>{forgotPasswordEmail}</strong>
+                    </p>
+                    <div className="form-group">
+                      <label>OTP</label>
+                      <input
+                        type="text"
+                        value={otp}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setOtp(value);
+                        }}
+                        maxLength={6}
+                        disabled={forgotPasswordLoading}
+                        style={{ textAlign: 'center', letterSpacing: '8px', fontFamily: 'monospace', fontSize: '20px' }}
+                      />
+                    </div>
+                    <div className="forgot-password-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotPasswordStep('email');
+                          setOtp('');
+                        }}
+                        className="forgot-password-back-button"
+                        disabled={forgotPasswordLoading}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleVerifyOTP}
+                        disabled={forgotPasswordLoading || otp.length !== 6}
+                        className="forgot-password-submit-button"
+                      >
+                        {forgotPasswordLoading ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {forgotPasswordStep === 'password' && (
+                  <>
+                    <p className="forgot-password-description">
+                      Enter your new password
+                    </p>
+                    <div className="form-group">
+                      <label>New Password</label>
+                      <div className="password-field">
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          disabled={forgotPasswordLoading}
+                        />
+                        <button
+                          type="button"
+                          className="toggle-password"
+                          onClick={() => setShowNewPassword((prev) => !prev)}
+                          aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showNewPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Confirm Password</label>
+                      <div className="password-field">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                          disabled={forgotPasswordLoading}
+                        />
+                        <button
+                          type="button"
+                          className="toggle-password"
+                          onClick={() => setShowConfirmPassword((prev) => !prev)}
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="forgot-password-actions">
+                      <button
+                        type="button"
+                        onClick={handleCloseForgotPassword}
+                        className="forgot-password-back-button"
+                        disabled={forgotPasswordLoading}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetPassword}
+                        disabled={forgotPasswordLoading || !newPassword || newPassword !== confirmPassword}
+                        className="forgot-password-submit-button"
+                      >
+                        {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    )
-  }
-    </div >
+        )
+      }
+    </div>
   );
 };
 
