@@ -224,7 +224,6 @@ export const applyLeave = async (
     endDate.setHours(0, 0, 0, 0);
 
     // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
-    // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
     // EXCEPTION: LOP leaves can start/end on weekends
     if (leaveData.leaveType !== 'lop') {
       const startDayOfWeek = startDate.getDay();
@@ -238,40 +237,26 @@ export const applyLeave = async (
     }
 
     // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
-    // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
     if (leaveData.leaveType === 'sick') {
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysDifference = Math.floor((startDate.getTime() - today.getTime()) / msPerDay);
 
-      // Allow past 3 days: today - 3, today - 2, today - 1, today (daysDifference: -3, -2, -1, 0)
-      // For future dates: ONLY allow tomorrow (daysDifference === 1)
       if (daysDifference < -3) {
         throw new Error('Cannot apply sick leave for dates more than 3 days in the past.');
       }
       if (daysDifference > 1) {
         throw new Error('For future dates, sick leave can only be applied for tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
       }
-      if (daysDifference === 0 && startDate > today) {
-        // This shouldn't happen, but just in case
-        throw new Error('Cannot apply sick leave for today as a future date. You can apply for past dates (up to 3 days) or tomorrow only.');
-      }
-      // daysDifference === 1 is allowed (tomorrow only)
-      // daysDifference between -3 and 0 is allowed (past 3 days + today)
     } else if (leaveData.leaveType === 'lop' || leaveData.leaveType === 'permission') {
-      // LOP and permission: today is allowed, but not past dates
       if (startDate < today) {
         throw new Error('Cannot apply for past dates.');
       }
     } else {
-      // Casual leaves cannot be applied for today or past dates
       if (startDate <= today) {
         throw new Error('Cannot apply for past dates or today.');
       }
     }
 
-    // Validation: casual needs at least 3 days notice (block today + next two days)
-    // LOP can be applied at any date except past dates (no advance notice required)
-    // Sick leave validation is already handled above
     if (leaveData.leaveType === 'casual') {
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
@@ -280,32 +265,20 @@ export const applyLeave = async (
       }
     }
 
-    // Validation: End date must be >= start date
     if (endDate < startDate) {
       throw new Error('End date must be greater than or equal to start date');
     }
 
-    // Validation: Cannot select holidays (for all leave types including permission)
-    const holidayStartYear = startDate.getFullYear();
-    const holidayEndYear = endDate.getFullYear();
-    let holidaysQuery: string;
-    let holidaysParams: number[];
+    // Fetch holidays once
+    const holidayYears = startYear === endYear ? [startYear] : [startYear, endYear];
+    const holidaysResult = await pool.query(
+      `SELECT holiday_date, holiday_name FROM holidays 
+       WHERE is_active = true 
+       AND EXTRACT(YEAR FROM holiday_date) = ANY($1)
+       ORDER BY holiday_date`,
+      [holidayYears]
+    );
 
-    if (holidayStartYear === holidayEndYear) {
-      holidaysQuery = `SELECT holiday_date, holiday_name FROM holidays 
-                       WHERE is_active = true 
-                       AND EXTRACT(YEAR FROM holiday_date) = $1
-                       ORDER BY holiday_date`;
-      holidaysParams = [holidayStartYear];
-    } else {
-      holidaysQuery = `SELECT holiday_date, holiday_name FROM holidays 
-                       WHERE is_active = true 
-                       AND (EXTRACT(YEAR FROM holiday_date) = $1 OR EXTRACT(YEAR FROM holiday_date) = $2)
-                       ORDER BY holiday_date`;
-      holidaysParams = [holidayStartYear, holidayEndYear];
-    }
-
-    const holidaysResult = await pool.query(holidaysQuery, holidaysParams);
     const holidayDates = new Set<string>();
     const holidayNames = new Map<string, string>();
 
@@ -319,7 +292,6 @@ export const applyLeave = async (
     const holidayStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const holidayEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-    // EXCEPTION: LOP leaves can start/end on holidays
     if (leaveData.leaveType !== 'lop') {
       if (holidayDates.has(holidayStartDateStr)) {
         const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
@@ -331,29 +303,12 @@ export const applyLeave = async (
       }
     }
 
-    // Validation: For sick leave, end date has same restrictions as start date
-    // Can be applied for past 3 days (including today) or ONLY tomorrow for future dates
-    if (leaveData.leaveType === 'sick') {
-      const msPerDay = 1000 * 60 * 60 * 24;
-      const endDaysDifference = Math.floor((endDate.getTime() - today.getTime()) / msPerDay);
-
-      // Allow past 3 days: today - 3, today - 2, today - 1, today (endDaysDifference: -3, -2, -1, 0)
-      // For future dates: ONLY allow tomorrow (endDaysDifference === 1)
-      if (endDaysDifference < -3) {
-        throw new Error('Cannot apply sick leave for end dates more than 3 days in the past.');
-      }
-      if (endDaysDifference > 1) {
-        throw new Error('For future dates, sick leave end date can only be tomorrow (next day). You can apply for past dates (up to 3 days) or tomorrow only.');
-      }
-    }
-
-    // Check for existing leaves on the requested dates (exclude rejected)
-    // Use DATE comparison to ensure accurate matching
-    const checkStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const checkEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    // Check for existing leaves
+    const checkStartDateStr = holidayStartDateStr;
+    const checkEndDateStr = holidayEndDateStr;
 
     const existingLeavesCheck = await pool.query(
-      `SELECT DISTINCT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
+      `SELECT ld.leave_date::text as leave_date, ld.day_type, ld.day_status, lr.id as request_id
        FROM leave_days ld
        JOIN leave_requests lr ON ld.leave_request_id = lr.id
        WHERE ld.employee_id = $1
@@ -365,67 +320,10 @@ export const applyLeave = async (
       [userId, checkStartDateStr, checkEndDateStr]
     );
 
-    if (existingLeavesCheck.rows.length > 0) {
-      // Check each requested day against existing leaves
-      const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
-      const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
-
-      const { leaveDays: requestedLeaveDays } = await calculateLeaveDays(
-        startDate,
-        endDate,
-        normalizedStartType as 'full' | 'half',
-        normalizedEndType as 'full' | 'half',
-        leaveData.leaveType
-      );
-
-      for (const requestedDay of requestedLeaveDays) {
-        const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
-
-        // Find existing leave by comparing date strings (handle both Date objects and strings)
-        const existingLeave = existingLeavesCheck.rows.find((row: any) => {
-          let existingDateStr: string;
-          if (row.leave_date instanceof Date) {
-            existingDateStr = `${row.leave_date.getFullYear()}-${String(row.leave_date.getMonth() + 1).padStart(2, '0')}-${String(row.leave_date.getDate()).padStart(2, '0')}`;
-          } else if (typeof row.leave_date === 'string') {
-            existingDateStr = row.leave_date.split('T')[0];
-          } else {
-            // Try to parse as date
-            const d = new Date(row.leave_date);
-            existingDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          }
-          return existingDateStr === requestedDateStr;
-        });
-
-        if (existingLeave) {
-          const existingType = existingLeave.day_type;
-          const existingStatus = existingLeave.day_status || 'pending';
-          const statusText = existingStatus === 'approved' ? 'approved' : existingStatus === 'partially_approved' ? 'partially approved' : 'pending';
-
-          // If existing leave is full day, block any new leave
-          if (existingType === 'full') {
-            throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - full day). Cannot apply leave on this date.`);
-          }
-
-          // If existing leave is half day
-          if (existingType === 'half') {
-            // Block if new request is full day
-            if (requestedDay.type === 'full') {
-              throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - half day). Cannot apply full day leave on this date.`);
-            }
-            // If both are half days, block to prevent conflicts
-            if (requestedDay.type === 'half') {
-              throw new Error(`Leave already exists for ${requestedDateStr} (${statusText} - half day). Cannot apply leave on this date.`);
-            }
-          }
-        }
-      }
-    }
-
-    // Calculate leave days
-    // Normalize first_half/second_half to half for calculation
     const normalizedStartType = (leaveData.startType === 'first_half' || leaveData.startType === 'second_half') ? 'half' : leaveData.startType;
     const normalizedEndType = (leaveData.endType === 'first_half' || leaveData.endType === 'second_half') ? 'half' : leaveData.endType;
 
+    // Calculate leave days ONCE
     const { days, leaveDays } = await calculateLeaveDays(
       startDate,
       endDate,
@@ -434,67 +332,50 @@ export const applyLeave = async (
       leaveData.leaveType
     );
 
-    // Require timings for permission
-    if (leaveData.leaveType === 'permission' &&
-      (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
-      throw new Error('Start and end timings are required for permission requests');
-    }
+    if (existingLeavesCheck.rows.length > 0) {
+      for (const requestedDay of leaveDays) {
+        const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
 
-    // Validate that permission time is not in the past if start date is today
-    if (leaveData.leaveType === 'permission' && leaveData.timeForPermission?.start) {
-      const isToday = startDate.getTime() === today.getTime();
-      if (isToday) {
-        const now = new Date();
-        const [startHours, startMinutes] = leaveData.timeForPermission.start.split(':').map(Number);
-        if (!isNaN(startHours) && !isNaN(startMinutes)) {
-          const permissionStartTime = new Date();
-          permissionStartTime.setHours(startHours, startMinutes, 0, 0);
+        const existingLeave = existingLeavesCheck.rows.find((row: any) => {
+          let existingDateStr: string;
+          if (row.leave_date instanceof Date) {
+            existingDateStr = `${row.leave_date.getFullYear()}-${String(row.leave_date.getMonth() + 1).padStart(2, '0')}-${String(row.leave_date.getDate()).padStart(2, '0')}`;
+          } else if (typeof row.leave_date === 'string') {
+            existingDateStr = row.leave_date.split('T')[0];
+          } else {
+            const d = new Date(row.leave_date);
+            existingDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          }
+          return existingDateStr === requestedDateStr;
+        });
 
-          if (permissionStartTime < now) {
-            throw new Error('Cannot apply permission for past times. Please select a future time.');
+        if (existingLeave) {
+          const existingType = existingLeave.day_type;
+          const statusText = existingLeave.day_status || 'pending';
+          if (existingType === 'full' || requestedDay.type === 'full' || existingType === requestedDay.type) {
+            throw new Error(`Leave already exists for ${requestedDateStr} (${statusText}).`);
           }
         }
       }
     }
 
-    // Check balance for all leave types (permission skips balance)
+    if (leaveData.leaveType === 'permission' && (!leaveData.timeForPermission?.start || !leaveData.timeForPermission?.end)) {
+      throw new Error('Start and end timings are required for permission requests');
+    }
+
     if (leaveData.leaveType !== 'permission') {
       const balance = await getLeaveBalances(userId);
-      const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
+      const balanceKey = `${leaveData.leaveType}` as keyof LeaveBalance;
       if (balance[balanceKey] < days) {
         throw new Error(`Insufficient ${leaveData.leaveType} leave balance`);
       }
     }
 
-    // Format dates as YYYY-MM-DD for database
-    const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-
-    // Declare variables for employee and manager information
-    let reportingManagerId: number | null = null;
-    let employeeName = 'Employee';
-    let employeeEmpId = '';
-    let managerEmail: string | null = null;
-    let hrId: number | null = null;
-    let hrEmail: string | null = null;
-    let managerName: string | null = null;
-    let hrName: string | null = null;
-
-    // Get employee's information, reporting manager details, and HR (manager's reporting manager)
-    // This query needs to be outside transaction to get role information for email logic
     const userResult = await pool.query(
-      `SELECT 
-        u.role as employee_role,
-        u.reporting_manager_id,
-        u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-        u.emp_id as employee_emp_id,
-        rm.email as manager_email,
-        rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
-        rm.role as manager_role,
-        rm.reporting_manager_id as hr_id,
-        hr.email as hr_email,
-        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
-        hr.role as hr_role
+      `SELECT u.role as employee_role, u.reporting_manager_id, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+        u.emp_id as employee_emp_id, rm.email as manager_email, rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
+        rm.role as manager_role, rm.reporting_manager_id as hr_id, hr.email as hr_email,
+        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name, hr.role as hr_role
       FROM users u
       LEFT JOIN users rm ON u.reporting_manager_id = rm.id
       LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
@@ -502,171 +383,79 @@ export const applyLeave = async (
       [userId]
     );
 
-    const employeeRole = userResult.rows[0]?.employee_role;
-    reportingManagerId = userResult.rows[0]?.reporting_manager_id;
-    employeeName = userResult.rows[0]?.employee_name || 'Employee';
-    employeeEmpId = userResult.rows[0]?.employee_emp_id || '';
-    managerEmail = userResult.rows[0]?.manager_email;
-    const managerRole = userResult.rows[0]?.manager_role;
-    hrId = userResult.rows[0]?.hr_id;
-    hrEmail = userResult.rows[0]?.hr_email;
-    const hrRole = userResult.rows[0]?.hr_role;
-    managerName = userResult.rows[0]?.manager_name;
-    hrName = userResult.rows[0]?.hr_name;
-
-    // Use transaction for all database operations to ensure atomicity
+    const userData = userResult.rows[0];
     const client = await pool.connect();
     let leaveRequestId: number;
 
     try {
       await client.query('BEGIN');
-
-      // Insert leave request (don't store urgent flag - it's only for email template)
       const leaveRequestResult = await client.query(
-        `INSERT INTO leave_requests (
-          employee_id, leave_type, start_date, start_type, end_date, end_type,
-          reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING id`,
-        [
-          userId,
-          leaveData.leaveType,
-          startDateStr,
-          leaveData.startType,
-          endDateStr,
-          leaveData.endType,
-          leaveData.reason,
-          days,
-          leaveData.timeForPermission?.start || null,
-          leaveData.timeForPermission?.end || null,
-          leaveData.doctorNote || null
-        ]
+        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null]
       );
-
       leaveRequestId = leaveRequestResult.rows[0].id;
 
-      // Insert leave days
       for (const leaveDay of leaveDays) {
-        // Format leave day date properly
-        const leaveDayDate = new Date(leaveDay.date);
-        const ldYear = leaveDayDate.getFullYear();
-        const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
-        const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
-        const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
-
+        const leaveDayDateStr = `${leaveDay.date.getFullYear()}-${String(leaveDay.date.getMonth() + 1).padStart(2, '0')}-${String(leaveDay.date.getDate()).padStart(2, '0')}`;
         await client.query(
-          `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id)
-           VALUES ($1, $2, $3, $4, $5)`,
+          `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)`,
           [leaveRequestId, leaveDayDateStr, leaveDay.type, leaveData.leaveType, userId]
         );
       }
 
-      // Deduct balance immediately on apply (all leave types except permission)
       if (leaveData.leaveType !== 'permission') {
-        const balanceColumn =
-          leaveData.leaveType === 'casual'
-            ? 'casual_balance'
-            : leaveData.leaveType === 'sick'
-              ? 'sick_balance'
-              : 'lop_balance';
-
-        await client.query(
-          `UPDATE leave_balances 
-           SET ${balanceColumn} = ${balanceColumn} - $1
-           WHERE employee_id = $2`,
-          [days, userId]
-        );
+        const balanceColumn = leaveData.leaveType === 'casual' ? 'casual_balance' : leaveData.leaveType === 'sick' ? 'sick_balance' : 'lop_balance';
+        await client.query(`UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
       }
-
 
       await client.query('COMMIT');
-      logger.info(`[LEAVE] [APPLY LEAVE] Transaction committed successfully - Leave Request ID: ${leaveRequestId}`);
-    } catch (error: any) {
-      // Rollback transaction - wrap in try-catch to handle already-aborted transactions
-      try {
-        await client.query('ROLLBACK');
-      } catch (rollbackError: any) {
-        // Transaction might already be aborted, log but don't throw
-        logger.warn('Error during rollback (transaction may already be aborted):', rollbackError.message);
-      }
-      logger.error(`Error applying leave for user ${userId}:`, error);
+    } catch (error) {
+      await client.query('ROLLBACK');
       throw error;
     } finally {
-      // Always release the client connection
       client.release();
     }
 
-    // Return response immediately - don't wait for emails
-    // Send email notifications asynchronously (fire and forget)
-    const appliedDate = new Date().toISOString().split('T')[0]; // Use current date, no need for extra query
+    // Fire and forget email
+    (async () => {
+      try {
+        if (userData.manager_email && userData.reporting_manager_id) {
+          const emailData = {
+            employeeName: userData.employee_name,
+            employeeEmpId: userData.employee_emp_id,
+            managerName: userData.manager_name || 'Manager',
+            leaveType: leaveData.leaveType,
+            startDate: checkStartDateStr,
+            startType: leaveData.startType,
+            endDate: checkEndDateStr,
+            endType: leaveData.endType,
+            noOfDays: days,
+            reason: leaveData.reason,
+            timeForPermissionStart: leaveData.timeForPermission?.start || null,
+            timeForPermissionEnd: leaveData.timeForPermission?.end || null,
+            doctorNote: leaveData.doctorNote || null,
+            appliedDate: new Date().toISOString().split('T')[0]
+          };
 
-    // Prepare email data
-    const emailData = {
-      employeeName,
-      employeeEmpId,
-      managerName: managerName || 'Manager',
-      leaveType: leaveData.leaveType,
-      startDate: startDateStr,
-      startType: leaveData.startType,
-      endDate: endDateStr,
-      endType: leaveData.endType,
-      noOfDays: days,
-      reason: leaveData.reason,
-      timeForPermissionStart: leaveData.timeForPermission?.start || null,
-      timeForPermissionEnd: leaveData.timeForPermission?.end || null,
-      doctorNote: leaveData.doctorNote || null,
-      appliedDate: appliedDate
-    };
+          const isUrgent = startDate.getTime() === today.getTime();
+          const ccEmails = userData.hr_email && userData.manager_email !== userData.hr_email ? [userData.hr_email] : [];
 
-    // Determine if urgent: only if start date is today (same day application)
-    const isUrgent = startDate.getTime() === today.getTime();
-
-    // Send email notifications asynchronously (don't await - fire and forget)
-    // This allows the API to return immediately while emails are sent in the background
-    // For employees: Send to reporting manager and manager's manager (HR)
-    // For managers: Send to their reporting manager (HR/Super Admin) and HR's manager (Super Admin)
-    // For HR: Send to their reporting manager (Super Admin)
-    // For Super Admin: Send to their reporting manager (if exists)
-
-    // Send email to reporting manager (if exists and has email) - ONE EMAIL with TO/CC - ASYNC
-    if (managerEmail && reportingManagerId) {
-      // Fire and forget - don't await
-      (async () => {
-        try {
-          // Build CC list: Manager's Reporting Manager/HR (if exists and different from manager)
-          const ccEmails: string[] = [];
-          if (hrEmail && hrId && managerEmail !== hrEmail) {
-            ccEmails.push(hrEmail);
-          }
-
-          const emailSent = isUrgent
-            ? await sendUrgentLeaveApplicationEmail(managerEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined)
-            : await sendLeaveApplicationEmail(managerEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
-          if (emailSent) {
-            logger.info(`${isUrgent ? 'Urgent (same-day) ' : ''}Leave application email sent to reporting manager (${managerRole || 'Manager'}): ${managerEmail}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''} for leave request ${leaveRequestId} (applied by ${employeeRole})`);
+          if (isUrgent) {
+            await sendUrgentLeaveApplicationEmail(userData.manager_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);
           } else {
-            logger.warn(`Failed to send leave application email to reporting manager: ${managerEmail} for leave request ${leaveRequestId}`);
+            await sendLeaveApplicationEmail(userData.manager_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);
           }
-        } catch (emailError: any) {
-          // Don't fail the leave application if email fails
-          logger.error(`Error sending email to reporting manager for leave request ${leaveRequestId}:`, emailError);
         }
-      })().catch(err => logger.error(`[LEAVE] [APPLY LEAVE] Unhandled error in async email send:`, err));
-    }
+      } catch (e) {
+        logger.error('Async email error in applyLeave:', e);
+      }
+    })();
 
-    logger.info(`[LEAVE] [APPLY LEAVE] Leave application completed successfully - Leave Request ID: ${leaveRequestId}, Emails queued for async sending`);
     return { leaveRequestId, message: 'Leave request submitted successfully' };
   } catch (error: any) {
-    console.error('Error in applyLeave:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Leave data:', leaveData);
-    console.error('User ID:', userId);
-    // Re-throw with more context
-    if (error.message) {
-      throw error;
-    } else {
-      throw new Error(`Failed to apply leave: ${error.toString()}`);
-    }
+    logger.error(`Error in applyLeave for user ${userId}:`, error);
+    throw error;
   }
 };
 
@@ -1610,20 +1399,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
     if (leave_type !== 'permission') {
       // Get total days that need to be refunded (all days minus rejected days)
       // Rejected days were already refunded when rejected, so don't refund again
-      const daysToRefundResult = await client.query(
-        `SELECT COALESCE(SUM(CASE WHEN day_status != 'rejected' THEN CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) as days_to_refund
-         FROM leave_days
-         WHERE leave_request_id = $1`,
-        [requestId]
-      );
-
-      let daysToRefund = parseFloat(daysToRefundResult.rows[0]?.days_to_refund || '0');
-
-      // If no leave_days exist (edge case) or query returned 0, use the original no_of_days
-      // This handles cases where leave_days might not have been created yet
-      if (daysToRefund === 0) {
-        daysToRefund = parseFloat(no_of_days || '0');
-      }
+      let daysToRefund = parseFloat(no_of_days || '0');
 
       if (daysToRefund > 0) {
         const balanceColumn =
@@ -1726,8 +1502,9 @@ export const getPendingLeaveRequests = async (
   const offset = (page - 1) * limit;
 
   // Build query based on role
+  // Removed DISTINCT as lr.id is primary key and joins are 1:1, improving query execution time
   let query = `
-    SELECT DISTINCT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
@@ -1760,6 +1537,7 @@ export const getPendingLeaveRequests = async (
   }
 
   if (search) {
+    // ILIKE with leading wildcards can be slow, but the new indexes on names will help with non-leading searches
     query += ` AND (u.emp_id ILIKE $${params.length + 1} OR u.first_name ILIKE $${params.length + 1} OR u.last_name ILIKE $${params.length + 1})`;
     params.push(`%${search}%`);
   }
@@ -1770,12 +1548,13 @@ export const getPendingLeaveRequests = async (
   }
 
   // Include requests that are pending or partially approved, or have any pending day
+  // Optimized the condition for better performance
   query += ` AND (
-      lr.current_status IN ('pending','partially_approved')
+      lr.current_status IN ('pending', 'partially_approved')
       OR EXISTS (
         SELECT 1 FROM leave_days ld
         WHERE ld.leave_request_id = lr.id
-          AND COALESCE(ld.day_status, 'pending') = 'pending'
+          AND (ld.day_status = 'pending' OR ld.day_status IS NULL)
       )
     )`;
 

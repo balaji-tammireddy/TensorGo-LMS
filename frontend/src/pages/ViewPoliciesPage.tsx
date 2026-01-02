@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
     FaLaptop,
     FaComments,
@@ -10,7 +10,8 @@ import {
     FaFileAlt
 } from 'react-icons/fa';
 import AppLayout from '../components/layout/AppLayout';
-import { getPolicies, PolicyData } from '../services/policyService';
+import { useQuery } from 'react-query';
+import { getPolicies } from '../services/policyService';
 import './ViewPoliciesPage.css';
 
 interface PolicyDisplay {
@@ -21,9 +22,6 @@ interface PolicyDisplay {
 }
 
 const ViewPoliciesPage: React.FC = () => {
-    const [policies, setPolicies] = useState<PolicyDisplay[]>([]);
-    const [loading, setLoading] = useState(true);
-
     const getIconForTitle = (title: string) => {
         const lowerTitle = title.toLowerCase();
         if (lowerTitle.includes('asset')) return <FaLaptop />;
@@ -35,32 +33,28 @@ const ViewPoliciesPage: React.FC = () => {
         return <FaFileAlt />;
     };
 
-    useEffect(() => {
-        const fetchPolicies = async () => {
-            try {
-                const data: PolicyData[] = await getPolicies();
+    const { data: policies, isLoading: loading } = useQuery(
+        ['policies'],
+        getPolicies,
+        {
+            staleTime: 24 * 60 * 60 * 1000, // 24 hours
+            cacheTime: 24 * 60 * 60 * 1000,
+            select: (data) => {
                 if (data && data.length > 0) {
-                    const mapped = data.map(p => ({
+                    return data.map((p: any) => ({
                         id: p.id,
                         title: p.title,
                         icon: getIconForTitle(p.title),
                         link: p.public_url
                     }));
-                    setPolicies(mapped);
-                } else {
-                    // Fallback to defaults if none in DB
-                    setPolicies(defaultPolicies);
                 }
-            } catch (error) {
+                return defaultPolicies;
+            },
+            onError: (error) => {
                 console.error('Error fetching policies:', error);
-                setPolicies(defaultPolicies);
-            } finally {
-                setLoading(false);
             }
-        };
-
-        fetchPolicies();
-    }, []);
+        }
+    );
 
     const defaultPolicies: PolicyDisplay[] = [
         {
@@ -121,7 +115,7 @@ const ViewPoliciesPage: React.FC = () => {
                     <div className="vp-loading">Loading policies...</div>
                 ) : (
                     <div className="vp-grid">
-                        {policies.map((policy) => (
+                        {policies?.map((policy: PolicyDisplay) => (
                             <div key={policy.id} className="vp-card">
                                 <div className="vp-icon-wrapper">
                                     {policy.icon}
@@ -138,7 +132,7 @@ const ViewPoliciesPage: React.FC = () => {
                     </div>
                 )}
 
-                {policies.length === 0 && !loading && (
+                {(!policies || policies.length === 0) && !loading && (
                     <div className="vp-no-data">
                         <p>No policies available at the moment.</p>
                     </div>

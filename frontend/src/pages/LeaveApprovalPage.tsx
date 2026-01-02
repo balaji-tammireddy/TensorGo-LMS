@@ -33,13 +33,22 @@ const LeaveApprovalPage: React.FC = () => {
   const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+    }, 500); // 500ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
     () => leaveService.getPendingLeaveRequests(1, 10, search || undefined, filter || undefined),
     {
       retry: false,
-      staleTime: 0,
-      refetchInterval: 15000, // Polling every 15 seconds
+      staleTime: 5000, // Cache for 5 seconds to reduce redundant hits
+      refetchInterval: 30000, // Poll every 30 seconds instead of 15
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {
@@ -56,8 +65,8 @@ const LeaveApprovalPage: React.FC = () => {
     () => leaveService.getApprovedLeaves(1, 10),
     {
       retry: false,
-      staleTime: 0,
-      refetchInterval: 15000, // Polling every 15 seconds
+      staleTime: 5000, // Cache for 5 seconds
+      refetchInterval: 30000, // Poll every 30 seconds
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {

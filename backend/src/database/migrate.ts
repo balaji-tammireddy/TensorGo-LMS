@@ -140,6 +140,21 @@ async function migrate() {
       }
     }
 
+    // Run performance indexes migration
+    try {
+      const perfIndexesFile = readFileSync(
+        join(__dirname, 'migrations', '005_performance_indexes.sql'),
+        'utf-8'
+      );
+      await pool.query(perfIndexesFile);
+      console.log('Performance indexes migration completed');
+    } catch (perfError: any) {
+      // If index already exists, that's fine
+      if (!perfError.message.includes('already exists')) {
+        console.warn('Performance indexes migration warning:', perfError.message);
+      }
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);
