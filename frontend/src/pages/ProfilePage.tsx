@@ -1082,6 +1082,7 @@ const ProfilePage: React.FC = () => {
                   })}
                   disabled
                   placeholder="Select date of joining"
+                  isEmployeeVariant={true}
                 />
               </div>
             </div>
