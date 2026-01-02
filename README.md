@@ -1,4 +1,4 @@
-# TensorGo LMS - HR Leave Management System
+# TensorGo LMS - HR Management System
 
 A comprehensive, production-ready HR Leave Management System (LMS) designed to streamline employee leave tracking, approvals, and personnel management. Built with a modern tech stack ensuring performance, scalability, and a premium user experience.
 
