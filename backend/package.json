@@ -1,7 +1,7 @@
 {
   "name": "hr-lms-backend",
   "version": "1.0.0",
-  "description": "HR Leave Management System Backend",
+  "description": "HR Management System Backend",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

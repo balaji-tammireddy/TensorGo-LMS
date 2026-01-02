@@ -33,11 +33,11 @@ const LoginPage: React.FC = () => {
     logout().catch(() => {
       // Ignore errors - just clear local storage
     });
-    
+
     // Prevent body scroll when login page is mounted
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
-    
+
     // Cleanup: restore scroll when component unmounts
     return () => {
       document.body.style.overflow = '';
@@ -54,7 +54,7 @@ const LoginPage: React.FC = () => {
       // Trim email and convert to lowercase to avoid case sensitivity issues
       const trimmedEmail = email.trim().toLowerCase();
       const trimmedPassword = password.trim();
-      
+
       const loggedInUser = await login(trimmedEmail, trimmedPassword);
       if (loggedInUser.role === 'super_admin') {
         navigate('/leave-approval');
@@ -78,7 +78,7 @@ const LoginPage: React.FC = () => {
           const field = path[path.length - 1]; // Get the last part (e.g., 'email' from 'body.email')
           return field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
         };
-        
+
         // Remove duplicates and format messages
         const uniqueMessages = new Map<string, string>();
         errorData.details.forEach((d: any) => {
@@ -89,7 +89,7 @@ const LoginPage: React.FC = () => {
             uniqueMessages.set(key, `${fieldName}: ${message}`);
           }
         });
-        
+
         const detailMessages = Array.from(uniqueMessages.values()).join('\n');
         showError(detailMessages || errorData.message || 'Validation failed');
       } else {
@@ -190,8 +190,8 @@ const LoginPage: React.FC = () => {
         {/* Left Section - Image/Visual */}
         <div className="login-image-section">
           <div className="login-image-content">
-            <img 
-              src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/portrait-professional-elegant-businessman.jpg" 
+            <img
+              src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/portrait-professional-elegant-businessman.jpg"
               alt="Professional Businessman"
               className="login-side-image"
               loading="eager"
@@ -213,7 +213,7 @@ const LoginPage: React.FC = () => {
                   <div className="login-logo">
                     <FaBriefcase />
                   </div>
-                  <h1>HR Leave Management System</h1>
+                  <h1>HR Management System</h1>
                 </div>
                 <div className="error-message" style={{ marginTop: 16 }}>
                   You are no longer active employee of this organisation.
@@ -235,7 +235,7 @@ const LoginPage: React.FC = () => {
                   <div className="login-logo">
                     <FaBriefcase />
                   </div>
-                  <h1>HR Leave Management System</h1>
+                  <h1>HR Management System</h1>
                 </div>
                 <form onSubmit={handleSubmit} className="login-form">
                   <div className="form-group">
