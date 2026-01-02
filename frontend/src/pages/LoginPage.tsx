@@ -284,88 +284,6 @@ const LoginPage: React.FC = () => {
                 </button>
               </div>
 
-<<<<<<< HEAD
-            <div className="forgot-password-content">
-              {forgotPasswordStep === 'email' && (
-                <>
-                  <p className="forgot-password-description">
-                    Enter your registered email address. We'll send you an OTP to reset your password.
-                  </p>
-                  <div className="form-group">
-                    <label>Email</label>
-                    <input
-                      type="email"
-                      value={forgotPasswordEmail}
-                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      disabled={forgotPasswordLoading}
-                    />
-                  </div>
-                  <div className="forgot-password-actions">
-                    <button
-                      type="button"
-                      onClick={handleForgotPassword}
-                      disabled={forgotPasswordLoading}
-                      className="forgot-password-submit-button"
-                    >
-                      {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {forgotPasswordStep === 'otp' && (
-                <>
-                  <p className="forgot-password-description">
-                    Enter the 6-digit OTP sent to <strong>{forgotPasswordEmail}</strong>
-                  </p>
-                  <div className="form-group">
-                    <label>OTP</label>
-                    <input
-                      type="text"
-                      value={otp}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setOtp(value);
-                      }}
-                      maxLength={6}
-                      disabled={forgotPasswordLoading}
-                      style={{ textAlign: 'center', letterSpacing: '8px', fontFamily: 'monospace', fontSize: '20px' }}
-                    />
-                  </div>
-                  <div className="forgot-password-actions">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForgotPasswordStep('email');
-                        setOtp('');
-                      }}
-                      className="forgot-password-back-button"
-                      disabled={forgotPasswordLoading}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleVerifyOTP}
-                      disabled={forgotPasswordLoading || otp.length !== 6}
-                      className="forgot-password-submit-button"
-                    >
-                      {forgotPasswordLoading ? 'Verifying...' : 'Verify OTP'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {forgotPasswordStep === 'password' && (
-                <>
-                  <p className="forgot-password-description">
-                    Enter your new password
-                  </p>
-                  <div className="form-group">
-                    <label>New Password</label>
-                    <div className="password-field">
-=======
               <div className="forgot-password-content">
                 {forgotPasswordStep === 'email' && (
                   <>
@@ -374,7 +292,6 @@ const LoginPage: React.FC = () => {
                     </p>
                     <div className="form-group">
                       <label>Email</label>
->>>>>>> 81e0c8989d2778612377b836ae143eabb51a91a4
                       <input
                         type="email"
                         value={forgotPasswordEmail}
@@ -383,14 +300,16 @@ const LoginPage: React.FC = () => {
                         disabled={forgotPasswordLoading}
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleForgotPassword}
-                      disabled={forgotPasswordLoading}
-                      className="forgot-password-submit-button"
-                    >
-                      {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
-                    </button>
+                    <div className="forgot-password-actions">
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        disabled={forgotPasswordLoading}
+                        className="forgot-password-submit-button"
+                      >
+                        {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
+                      </button>
+                    </div>
                   </>
                 )}
 
