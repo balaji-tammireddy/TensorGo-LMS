@@ -70,7 +70,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 
     // Check if it's an integer or .5
     if (countNum % 1 !== 0 && countNum % 1 !== 0.5) {
-      setValidationError('Only whole numbers or .5 increments are allowed');
+      setValidationError('Only whole numbers or 0.5 increments are allowed');
       return;
     }
 
