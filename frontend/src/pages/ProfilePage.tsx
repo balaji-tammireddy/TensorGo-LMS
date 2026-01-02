@@ -769,7 +769,7 @@ const ProfilePage: React.FC = () => {
                     personalInfo: { ...formData.personalInfo, dateOfBirth: date }
                   })}
                   disabled={!isEditMode}
-                  placeholder="dd - mm - yyyy"
+                  placeholder="DD-MM-YYYY"
                   isEmployeeVariant={true}
                   allowManualEntry={true}
                 />

@@ -141,7 +141,7 @@ const HolidayManagementPage: React.FC = () => {
                                 <DatePicker
                                     value={formData.holidayDate}
                                     onChange={handleDateChange}
-                                    placeholder="dd - mm - yyyy"
+                                    placeholder="DD - MM - YYYY"
                                     min={new Date().toISOString().split('T')[0]}
                                     disabledDates={(date) => {
                                         // Check if date is in existing holidays
@@ -159,9 +159,7 @@ const HolidayManagementPage: React.FC = () => {
                                 <input
                                     type="text"
                                     value={formData.holidayName}
-                                    onChange={(e) => setFormData({ ...formData, holidayName: e.target.value })}
-                                    placeholder="Enter holiday name"
-                                    maxLength={100}
+                                    onChange={(e) => setFormData({ ...formData, holidayName: e.target.value })}                                    maxLength={100}
                                 />
                             </div>
                             <div className="hm-form-actions">
