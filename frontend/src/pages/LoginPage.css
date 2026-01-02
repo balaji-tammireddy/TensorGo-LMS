@@ -45,7 +45,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
+  background:
     radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
     radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
   pointer-events: none;
@@ -76,7 +76,7 @@
   justify-content: center;
   padding: 40px;
   background: #f5f5f5;
-  background-image: 
+  background-image:
     linear-gradient(30deg, rgba(0, 0, 0, 0.02) 12%, transparent 12.5%, transparent 87%, rgba(0, 0, 0, 0.02) 87.5%, rgba(0, 0, 0, 0.02)),
     linear-gradient(150deg, rgba(0, 0, 0, 0.02) 12%, transparent 12.5%, transparent 87%, rgba(0, 0, 0, 0.02) 87.5%, rgba(0, 0, 0, 0.02));
   background-size: 60px 100px;
@@ -111,6 +111,7 @@
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -137,9 +138,12 @@
 }
 
 @keyframes logoFloat {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-8px);
   }
@@ -284,7 +288,7 @@
   text-align: center;
   padding: 12px 16px;
   background: rgba(211, 47, 47, 0.08);
-  border-radius: 10px;
+  border-radius: 4px;
   border: 1px solid rgba(211, 47, 47, 0.2);
   margin: 16px 0;
 }
@@ -414,6 +418,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -421,7 +426,7 @@
 
 .forgot-password-modal {
   background: white;
-  border-radius: 12px;
+  border-radius: 4px;
   width: 100%;
   max-width: 450px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
@@ -433,6 +438,7 @@
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -496,7 +502,7 @@
   background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: #fff;
   border: none;
-  border-radius: 10px;
+  border-radius: 4px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -520,7 +526,7 @@
   background: #f3f4f6;
   color: #374151;
   border: 1px solid #d1d5db;
-  border-radius: 10px;
+  border-radius: 4px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -610,5 +616,3 @@
     padding: 20px;
   }
 }
-
-

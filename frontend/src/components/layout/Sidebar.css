@@ -26,7 +26,8 @@
 
 .sidebar-user {
   margin-top: auto;
-  padding: 12px 8px 20px; /* increase top spacing, pull avatar upward */
+  padding: 12px 8px 20px;
+  /* increase top spacing, pull avatar upward */
   width: 100%;
   display: flex;
   justify-content: center;
@@ -58,12 +59,15 @@
 }
 
 .user-menu {
-  position: fixed; /* place on main screen */
-  bottom: 32px; /* align vertically near the avatar */
-  left: 112px; /* offset just right of the sidebar */
+  position: fixed;
+  /* place on main screen */
+  bottom: 32px;
+  /* align vertically near the avatar */
+  left: 112px;
+  /* offset just right of the sidebar */
   background: #ffffff;
   border: 1px solid #d5ddf0;
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 12px 14px;
   box-shadow: 0 12px 28px rgba(14, 42, 98, 0.22);
   width: 180px;
@@ -94,7 +98,7 @@
   border-width: 8px 8px 8px 0;
   border-style: solid;
   border-color: transparent #ffffff transparent transparent;
-  filter: drop-shadow(-2px 2px 4px rgba(14,42,98,0.12));
+  filter: drop-shadow(-2px 2px 4px rgba(14, 42, 98, 0.12));
 }
 
 .role-text {
@@ -115,10 +119,11 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  justify-content: center; /* center align text/icon */
+  justify-content: center;
+  /* center align text/icon */
   gap: 6px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   width: 100%;
   text-align: center;
 }
@@ -211,4 +216,3 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   color: #ffffff;
 }
-

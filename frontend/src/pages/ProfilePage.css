@@ -26,7 +26,7 @@
   background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: #fff;
   border: 1px solid #2951c8;
-  border-radius: 6px;
+  border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
@@ -189,12 +189,12 @@
 .form-group input,
 .form-group select {
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
   font-size: 14px;
   line-height: 1.5;
   height: 42px;
-  background: transparent;
+  background-color: #ffffff;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   box-sizing: border-box;
@@ -202,23 +202,45 @@
 
 .form-group textarea {
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
   font-size: 14px;
   line-height: 1.5;
   min-height: 42px;
   resize: none;
-  background: transparent;
+  background-color: #ffffff;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   box-sizing: border-box;
 }
 
+.profile-field-trigger {
+  width: 100%;
+  display: flex !important;
+  justify-content: space-between !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+  font-family: 'Poppins', sans-serif !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  background-color: #ffffff !important;
+  color: #1f2a3d !important;
+  height: 42px !important;
+}
+
+.profile-field-trigger:disabled {
+  background-color: #f0f0f0 !important;
+  color: #888 !important;
+  border: 1px solid #d1d1d1 !important;
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
 .form-group .date-picker-input-field {
   padding: 10px 12px;
   padding-right: 35px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
   background: transparent;
   font-size: 14px;
   line-height: 1.5;
@@ -252,11 +274,28 @@
   z-index: 1;
 }
 
+.date-picker-input-disabled .date-picker-icon-container {
+  color: #888 !important;
+  opacity: 0.6;
+}
+
+.date-picker-input-disabled {
+  background-color: #f0f0f0 !important;
+  border: 1px solid #d1d1d1 !important;
+  border-radius: 4px !important;
+  opacity: 1 !important;
+}
+
 .form-group input:disabled,
 .form-group select:disabled,
-.form-group textarea:disabled {
-  background-color: #f9f9f9;
-  cursor: default;
+.form-group textarea:disabled,
+.form-group .date-picker-input-field:disabled {
+  background-color: #f0f0f0 !important;
+  color: #888 !important;
+  border: 1px solid #d1d1d1 !important;
+  border-radius: 4px !important;
+  cursor: default !important;
+  opacity: 1 !important;
 }
 
 .checkbox-group {
@@ -353,13 +392,16 @@
 .education-table input {
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid #dcdcdc;
-  border-radius: 2px;
+  border: 1px solid #dcdcdc !important;
+  border-radius: 4px !important;
   font-size: 12px;
 }
 
 .education-table input:disabled {
-  background-color: #f9f9f9;
+  background-color: #f0f0f0 !important;
+  color: #888 !important;
+  border: 1px solid #d1d1d1 !important;
+  opacity: 1 !important;
 }
 
 .education-table tr:hover {
@@ -428,7 +470,7 @@
 .skeleton-card {
   background: white;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
@@ -436,7 +478,8 @@
 .skeleton-title {
   height: 32px;
   width: 200px;
-  border-radius: 8px;
+  border-radius: 4px;
+  font-size: 11px;
   background: linear-gradient(90deg,
       #e0e5f2 0%,
       #f0f4fa 20%,
@@ -468,7 +511,7 @@
 
 .skeleton-input {
   height: 44px;
-  border-radius: 4px;
+  border-radius: 4px !important;
   background: linear-gradient(90deg,
       #f0f0f0 0%,
       #f8f8f8 20%,
@@ -481,7 +524,7 @@
 .skeleton-button {
   height: 40px;
   width: 120px;
-  border-radius: 6px;
+  border-radius: 4px;
   background: linear-gradient(90deg,
       #e0e5f2 0%,
       #f0f4fa 20%,
