@@ -319,14 +319,16 @@ const LoginPage: React.FC = () => {
                       disabled={forgotPasswordLoading}
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleForgotPassword}
-                    disabled={forgotPasswordLoading}
-                    className="forgot-password-submit-button"
-                  >
-                    {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
-                  </button>
+                  <div className="forgot-password-actions">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={forgotPasswordLoading}
+                      className="forgot-password-submit-button"
+                    >
+                      {forgotPasswordLoading ? 'Sending...' : 'Send OTP'}
+                    </button>
+                  </div>
                 </>
               )}
 
