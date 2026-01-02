@@ -125,7 +125,8 @@
 
 .login-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 12px;
+  /* Reduced since H1 is moved */
   animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 
@@ -163,7 +164,8 @@
 }
 
 .login-container h1 {
-  margin: 0 0 32px 0;
+  margin: 0 0 8px 0;
+  /* Reduced margin to tighten layout */
   color: #1a1f36;
   font-size: 26px;
   font-weight: 700;

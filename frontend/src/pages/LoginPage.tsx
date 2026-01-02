@@ -195,8 +195,8 @@ const LoginPage: React.FC = () => {
               <div className="login-logo">
                 <img src="/uploads/TensorGo logo black bg.png" alt="TensorGo logo" />
               </div>
-              <h1>HR Management System</h1>
             </div>
+            <h1>HR Management System</h1>
             <div className="error-message" style={{ marginTop: 16 }}>
               You are no longer active employee of this organisation.
             </div>
@@ -217,9 +217,9 @@ const LoginPage: React.FC = () => {
               <div className="login-logo">
                 <img src="/uploads/TensorGo logo black bg.png" alt="TensorGo logo" />
               </div>
-              <h1>HR Management System</h1>
             </div>
             <form onSubmit={handleSubmit} className="login-form">
+              <h1>HR Management System</h1>
               <div className="form-group">
                 <label>Email</label>
                 <input
