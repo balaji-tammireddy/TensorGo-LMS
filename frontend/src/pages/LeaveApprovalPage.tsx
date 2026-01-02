@@ -241,7 +241,7 @@ const LeaveApprovalPage: React.FC = () => {
           });
         }
       },
-      onError: (error: any, requestId, context) => {
+      onError: (error: any, _requestId, context) => {
         // Rollback on error
         if (context?.previousPending) {
           queryClient.setQueryData(['pendingLeaves'], context.previousPending);
@@ -775,6 +775,7 @@ const LeaveApprovalPage: React.FC = () => {
                     <th>LEAVE TYPE</th>
                     <th>NO OF DAYS</th>
                     <th>STATUS</th>
+                    <th>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
