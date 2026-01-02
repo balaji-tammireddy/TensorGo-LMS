@@ -863,6 +863,17 @@ const LeaveApplyPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Basic validation
+    if (!formData.startDate) {
+      showWarning('Please select a start date');
+      return;
+    }
+
+    if (formData.leaveType !== 'permission' && !formData.endDate) {
+      showWarning('Please select an end date');
+      return;
+    }
+
     // Check for date overlaps with existing leave requests
     const overlapError = checkDateOverlap();
     if (overlapError) {
@@ -1961,9 +1972,9 @@ const LeaveApplyPage: React.FC = () => {
                   [...(myRequests.requests || [])]
                     .sort((a: any, b: any) => {
                       // Sort by start date in ascending order (earliest/upcoming dates first)
-                      const dateA = new Date(a.startDate + 'T12:00:00').getTime();
-                      const dateB = new Date(b.startDate + 'T12:00:00').getTime();
-                      return dateA - dateB; // Ascending order (earliest dates first)
+                      const dateA = a.startDate ? new Date(a.startDate + 'T12:00:00').getTime() : 0;
+                      const dateB = b.startDate ? new Date(b.startDate + 'T12:00:00').getTime() : 0;
+                      return dateA - dateB;
                     })
                     .map((request: any, idx: number) => {
                       const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
@@ -1975,19 +1986,19 @@ const LeaveApplyPage: React.FC = () => {
                           className={isUpdating ? 'updating-row' : ''}
                         >
                           <td>{idx + 1}</td>
-                          <td>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                          <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}</td>
                           <td>
                             <div className="reason-cell">
                               {request.leaveReason}
                             </div>
                           </td>
                           <td>
-                            {format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}
-                            {request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
+                            {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                            {request.startDate && request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
                           </td>
                           <td>
-                            {format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}
-                            {request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
+                            {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                            {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
                           </td>
                           <td>{request.noOfDays}</td>
                           <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType}</td>
