@@ -8,10 +8,10 @@ async function migrate() {
       join(__dirname, 'migrations', '001_initial_schema.sql'),
       'utf-8'
     );
-    
+
     await pool.query(migrationFile);
     console.log('Migration completed successfully');
-    
+
     // Ensure current_status supports partially_approved (idempotent)
     await pool.query(`
       ALTER TABLE leave_requests
@@ -42,7 +42,7 @@ async function migrate() {
       ALTER TABLE leave_requests
       ADD COLUMN IF NOT EXISTS doctor_note TEXT;
     `);
-    
+
     // Add last_updated_by and last_updated_by_role columns for tracking last approver (idempotent)
     await pool.query(`
       ALTER TABLE leave_requests
@@ -50,7 +50,7 @@ async function migrate() {
       ALTER TABLE leave_requests
       ADD COLUMN IF NOT EXISTS last_updated_by_role VARCHAR(20) CHECK (last_updated_by_role IN ('manager', 'hr', 'super_admin'));
     `);
-    
+
     // Ensure LOP balance never exceeds 10 (idempotent)
     await pool.query(`
       ALTER TABLE leave_balances
@@ -59,7 +59,7 @@ async function migrate() {
       ADD CONSTRAINT leave_balances_lop_balance_max_check
       CHECK (lop_balance <= 10);
     `);
-    
+
     // Leave rules insertion disabled - rules cannot be changed until explicitly enabled
     // await pool.query(`
     //   INSERT INTO leave_rules (leave_required_min, leave_required_max, prior_information_days, is_active)
@@ -69,7 +69,7 @@ async function migrate() {
     //     (10, NULL, 30, true)
     //   ON CONFLICT DO NOTHING
     // `);
-    
+
     // Insert sample holidays (2025 calendar)
     await pool.query(`
       INSERT INTO holidays (holiday_date, holiday_name, is_active)
@@ -86,7 +86,7 @@ async function migrate() {
         ('2025-12-25', 'Christmas', true)
       ON CONFLICT (holiday_date) DO NOTHING
     `);
-    
+
     // Update existing employees' casual and sick leave balances to 0 (remove defaults)
     const updateResult = await pool.query(`
       UPDATE leave_balances
@@ -96,7 +96,7 @@ async function migrate() {
       WHERE casual_balance != 0 OR sick_balance != 0
     `);
     console.log(`Updated ${updateResult.rowCount} employee leave balance records (casual and sick set to 0)`);
-    
+
     // Run password reset OTP migration
     try {
       const otpMigrationFile = readFileSync(
@@ -111,7 +111,7 @@ async function migrate() {
         console.warn('OTP migration warning:', otpError.message);
       }
     }
-    
+
     // Run urgent flag migration
     try {
       const urgentMigrationFile = readFileSync(
@@ -121,12 +121,25 @@ async function migrate() {
       await pool.query(urgentMigrationFile);
       console.log('Urgent flag migration completed');
     } catch (urgentError: any) {
-      // If column already exists, that's fine
       if (!urgentError.message.includes('already exists') && !urgentError.message.includes('duplicate')) {
         console.warn('Urgent flag migration warning:', urgentError.message);
       }
     }
-    
+
+    // Run policies table migration
+    try {
+      const policiesMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '004_create_policies_table.sql'),
+        'utf-8'
+      );
+      await pool.query(policiesMigrationFile);
+      console.log('Policies table migration completed');
+    } catch (policiesError: any) {
+      if (!policiesError.message.includes('already exists')) {
+        console.warn('Policies migration warning:', policiesError.message);
+      }
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);
