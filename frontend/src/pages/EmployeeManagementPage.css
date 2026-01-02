@@ -219,9 +219,9 @@
 
 .status-pending,
 .status-applied {
-  background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
+  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: #fff;
-  border: 1px solid #ffb300;
+  border: 1px solid #2951c8;
 }
 
 .status-approved {
