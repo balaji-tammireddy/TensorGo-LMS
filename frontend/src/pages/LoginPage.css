@@ -5,12 +5,12 @@
   top: 0;
   left: 0;
   overflow: hidden;
-  background-color: #f8fafc;
+  background-color: #f3f7ff;
   background-image:
-    radial-gradient(at 0% 0%, rgba(60, 111, 242, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(147, 51, 234, 0.05) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(60, 111, 242, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(255, 145, 0, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(60, 111, 242, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(255, 145, 0, 0.05) 0px, transparent 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,9 +27,11 @@
   width: 100%;
   height: 100%;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.03;
+  opacity: 0.04;
+  /* Slightly more visible for premium texture */
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
+  mix-blend-mode: overlay;
 }
 
 /* Ambient Light Blobs */
@@ -47,14 +49,14 @@
 .blob-1 {
   top: -400px;
   left: -400px;
-  background: radial-gradient(circle, rgba(60, 111, 242, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(60, 111, 242, 0.2) 0%, transparent 70%);
   animation: bgFloat 30s infinite alternate linear;
 }
 
 .blob-2 {
   bottom: -400px;
   right: -400px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 145, 0, 0.1) 0%, transparent 70%);
   animation: bgFloat 35s infinite alternate-reverse linear;
 }
 
@@ -96,26 +98,29 @@
 }
 
 .login-container {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   padding: 48px 40px;
-  border-radius: 24px;
+  border-radius: 28px;
   box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.05),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05),
-    0 25px 50px -12px rgba(0, 0, 0, 0.15),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    0 4px 6px -1px rgba(0, 0, 0, 0.02),
+    0 10px 15px -3px rgba(0, 0, 0, 0.03),
+    0 20px 25px -5px rgba(0, 0, 0, 0.05),
+    0 30px 60px -12px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
   width: 100%;
   max-width: 440px;
   position: relative;
   z-index: 10;
-  animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  margin-top: 60px;
-  /* Precise "middle-little-bottom" positioning */
+  margin-top: 80px;
+  /* Glowing Border Effect */
+  border: 1px solid rgba(60, 111, 242, 0.08);
+  outline: 1px solid rgba(255, 255, 255, 0.5);
+  outline-offset: -1px;
 }
 
 .login-header {
@@ -126,8 +131,9 @@
 
 .login-logo {
   width: auto;
-  height: 54px;
-  margin: 0 auto 24px;
+  height: 64px;
+  /* Larger to match screenshot presence */
+  margin: 0 auto 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,11 +163,12 @@
 }
 
 .login-container h1 {
-  margin: 0;
-  color: #1f2a3d;
-  font-size: 22px;
+  margin: 0 0 32px 0;
+  color: #1a1f36;
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  text-align: center;
 }
 
 .login-form {
@@ -182,29 +189,33 @@
 
 .form-group label {
   font-weight: 600;
-  color: #1f2a3d;
+  color: #1a1f36;
   font-size: 14px;
-  margin-bottom: 2px;
+  margin-bottom: 8px;
 }
 
 .form-group input {
   padding: 14px 16px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 15px;
-  background: #ffffff;
-  color: #1f2a3d;
+  border: 1px solid rgba(60, 111, 242, 0.1);
+  border-radius: 8px;
+  font-size: 16px;
+  background: #eef4ff;
+  /* Matching user's screenshot background */
+  color: #1a1f36;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  font-family: 'Poppins', sans-serif;
+  font-family: inherit;
   box-sizing: border-box;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #3c6ff2;
-  box-shadow: 0 0 0 4px rgba(60, 111, 242, 0.08);
   background: #ffffff;
+  box-shadow:
+    0 0 0 4px rgba(60, 111, 242, 0.05),
+    0 4px 12px rgba(60, 111, 242, 0.05);
+  transform: translateY(-1px);
 }
 
 .password-field {
@@ -216,22 +227,26 @@
 
 .password-field input {
   padding: 14px 48px 14px 16px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 15px;
-  background: #ffffff;
-  color: #1f2a3d;
+  border: 1px solid rgba(60, 111, 242, 0.1);
+  border-radius: 8px;
+  font-size: 16px;
+  background: #eef4ff;
+  /* Matching user's screenshot background */
+  color: #1a1f36;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  font-family: 'Poppins', sans-serif;
+  font-family: inherit;
   box-sizing: border-box;
 }
 
 .password-field input:focus {
   outline: none;
   border-color: #3c6ff2;
-  box-shadow: 0 0 0 4px rgba(60, 111, 242, 0.08);
   background: #ffffff;
+  box-shadow:
+    0 0 0 4px rgba(60, 111, 242, 0.05),
+    0 4px 12px rgba(60, 111, 242, 0.05);
+  transform: translateY(-1px);
 }
 
 .toggle-password {
@@ -277,19 +292,17 @@
 }
 
 .login-button {
-  padding: 14px 24px;
-  background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
+  padding: 16px 24px;
+  background: #3c6ff2;
+  /* Solid professional blue from screenshot */
   color: #fff;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(60, 111, 242, 0.2);
-  position: relative;
-  overflow: hidden;
-  margin-top: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 12px;
   width: 100%;
   text-align: center;
   display: flex;
@@ -321,9 +334,11 @@
 }
 
 .login-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(60, 111, 242, 0.3);
-  filter: brightness(1.05);
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 24px rgba(60, 111, 242, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
+  filter: brightness(1.1);
 }
 
 .login-button:active:not(:disabled) {
@@ -352,18 +367,16 @@
 .forgot-password-button {
   background: none;
   border: none;
-  color: #4285f4;
-  font-size: 15px;
+  color: #3c6ff2;
+  font-size: 16px;
   cursor: pointer;
-  padding: 10px 16px;
+  padding: 12px 16px;
   text-decoration: none;
   font-weight: 600;
   transition: all 0.2s ease;
-  border-radius: 6px;
+  border-radius: 8px;
   display: inline-block;
   width: auto;
-  position: relative;
-  z-index: 10;
 }
 
 .forgot-password-button:hover {
