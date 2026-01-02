@@ -214,7 +214,7 @@ const ProfilePage: React.FC = () => {
       };
 
       setFormData(nextFormData);
-      setInitialFormData(nextFormData);
+      setInitialFormData(JSON.parse(JSON.stringify(nextFormData)));
     }
   }, [profile]);
 
@@ -393,10 +393,6 @@ const ProfilePage: React.FC = () => {
     setIsEditMode(false);
   };
 
-  const hasChanges =
-    isEditMode &&
-    initialFormData &&
-    JSON.stringify(formData) !== JSON.stringify(initialFormData);
 
   const handleSameAsCurrentAddress = (checked: boolean) => {
     setIsSameAddress(checked);
@@ -512,30 +508,30 @@ const ProfilePage: React.FC = () => {
                   Edit Profile
                 </button>
               )}
-              {isEditMode && !hasChanges && (
-                <button
-                  className="cancel-button"
-                  onClick={handleCancelEdit}
-                  disabled={updateMutation.isLoading}
-                >
-                  Cancel
-                </button>
-              )}
-              {isEditMode && hasChanges && (
-                <button
-                  className="save-button"
-                  onClick={handleSave}
-                  disabled={updateMutation.isLoading || uploadPhotoMutation.isLoading || deletePhotoMutation.isLoading}
-                >
-                  {updateMutation.isLoading ? (
-                    <>
-                      <span className="loading-spinner"></span>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </button>
+              {isEditMode && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="cancel-button"
+                    onClick={handleCancelEdit}
+                    disabled={updateMutation.isLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="save-button"
+                    onClick={handleSave}
+                    disabled={updateMutation.isLoading || uploadPhotoMutation.isLoading || deletePhotoMutation.isLoading}
+                  >
+                    {updateMutation.isLoading ? (
+                      <>
+                        <span className="loading-spinner"></span>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>

@@ -71,10 +71,10 @@ export const getProfile = async (userId: number) => {
     reportingManager:
       user.reporting_manager_name || user.reporting_manager_id
         ? {
-            id: user.reporting_manager_id || null,
-            name: user.reporting_manager_name || user.reporting_manager_full_name,
-            empId: user.reporting_manager_emp_id || null
-          }
+          id: user.reporting_manager_id || null,
+          name: user.reporting_manager_name || user.reporting_manager_full_name,
+          empId: user.reporting_manager_emp_id || null
+        }
         : null,
     // Always use OVHcloud keys - no local URLs
     // If profile_photo_url is an OVHcloud key (starts with 'profile-photos/'), return it as profilePhotoKey
@@ -90,7 +90,7 @@ export const updateProfile = async (userId: number, profileData: any) => {
   logger.info(`[PROFILE] [UPDATE PROFILE] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [UPDATE PROFILE] User ID: ${userId}`);
   logger.info(`[PROFILE] [UPDATE PROFILE] Sections to update: ${Object.keys(profileData).join(', ')}`);
-  
+
   // Validate date of birth - employee must be at least 18 years old
   if (profileData.personalInfo?.dateOfBirth) {
     logger.info(`[PROFILE] [UPDATE PROFILE] Validating date of birth`);
@@ -137,11 +137,20 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Update personal info
   if (profileData.personalInfo) {
+    const requiredPersonalInfo = ['firstName', 'lastName', 'email', 'contactNumber', 'dateOfBirth', 'gender', 'bloodGroup', 'maritalStatus'];
     for (const [key, value] of Object.entries(profileData.personalInfo)) {
       const dbKey = fieldMap[key] || key;
-      if (value !== undefined && value !== null) {
+      if (value !== undefined) {
+        // Treat empty strings as null
+        const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        // Check for required fields
+        if (requiredPersonalInfo.includes(key) && finalValue === null) {
+          throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
+        }
+
         updates.push(`${dbKey} = $${paramCount}`);
-        values.push(value);
+        values.push(finalValue);
         paramCount++;
       }
     }
@@ -149,11 +158,18 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Update employment info (only for HR/Super Admin)
   if (profileData.employmentInfo) {
+    const requiredEmploymentInfo = ['designation', 'department', 'dateOfJoining'];
     for (const [key, value] of Object.entries(profileData.employmentInfo)) {
       const dbKey = fieldMap[key] || key;
-      if (value !== undefined && value !== null) {
+      if (value !== undefined) {
+        const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        if (requiredEmploymentInfo.includes(key) && finalValue === null) {
+          throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
+        }
+
         updates.push(`${dbKey} = $${paramCount}`);
-        values.push(value);
+        values.push(finalValue);
         paramCount++;
       }
     }
@@ -161,26 +177,30 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Update documents
   if (profileData.documents) {
+    const requiredDocuments = ['aadharNumber', 'panNumber'];
     for (const [key, value] of Object.entries(profileData.documents)) {
       const dbKey = fieldMap[key] || key;
-      if (value !== undefined && value !== null) {
-        updates.push(`${dbKey} = $${paramCount}`);
-        if (dbKey === 'pan_number' && typeof value === 'string') {
-          const pan = value.trim().toUpperCase();
-          // Validate PAN format: 5 letters, 4 digits, 1 letter
-          if (pan && pan.length !== 10) {
+      if (value !== undefined) {
+        let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        if (requiredDocuments.includes(key) && finalValue === null) {
+          throw new Error(`${key === 'aadharNumber' ? 'Aadhar' : 'PAN'} number is required`);
+        }
+
+        if (dbKey === 'pan_number' && typeof finalValue === 'string') {
+          const panValue = finalValue.trim().toUpperCase();
+          if (panValue.length !== 10) {
             throw new Error('PAN number must be exactly 10 characters long');
           }
-          if (pan && pan.length === 10) {
-            const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-            if (!panRegex.test(pan)) {
-              throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
-            }
+          const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+          if (!panRegex.test(panValue)) {
+            throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
           }
-          values.push(pan || null);
-        } else {
-          values.push(value);
+          finalValue = panValue;
         }
+
+        updates.push(`${dbKey} = $${paramCount}`);
+        values.push(finalValue);
         paramCount++;
       }
     }
@@ -188,11 +208,18 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Update address
   if (profileData.address) {
+    const requiredAddress = ['currentAddress', 'permanentAddress'];
     for (const [key, value] of Object.entries(profileData.address)) {
       const dbKey = fieldMap[key] || key;
-      if (value !== undefined && value !== null) {
+      if (value !== undefined) {
+        const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        if (requiredAddress.includes(key) && finalValue === null) {
+          throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
+        }
+
         updates.push(`${dbKey} = $${paramCount}`);
-        values.push(value);
+        values.push(finalValue);
         paramCount++;
       }
     }
@@ -229,7 +256,7 @@ export const updateProfile = async (userId: number, profileData: any) => {
             throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
           }
         }
-        
+
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -258,7 +285,7 @@ export const updateProfile = async (userId: number, profileData: any) => {
 export const updateProfilePhoto = async (userId: number, photoUrl: string) => {
   logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] User ID: ${userId}, Photo URL: ${photoUrl}`);
-  
+
   await pool.query(
     'UPDATE users SET profile_photo_url = $1 WHERE id = $2',
     [photoUrl, userId]
@@ -270,7 +297,7 @@ export const updateProfilePhoto = async (userId: number, photoUrl: string) => {
 export const deleteProfilePhoto = async (userId: number) => {
   logger.info(`[PROFILE] [DELETE PROFILE PHOTO] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [DELETE PROFILE PHOTO] User ID: ${userId}`);
-  
+
   await pool.query(
     'UPDATE users SET profile_photo_url = NULL WHERE id = $1',
     [userId]
@@ -282,7 +309,7 @@ export const deleteProfilePhoto = async (userId: number) => {
 export const getReportingManagers = async (search?: string, employeeRole?: string, excludeEmployeeId?: number) => {
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
-  
+
   // Reporting manager rules:
   // - For managers, their reporting manager should be HR
   // - For HR, their reporting manager should be super admin
@@ -295,7 +322,7 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   } else {
     targetRole = 'manager';
   }
-  
+
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
     FROM users
@@ -321,7 +348,7 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Querying database for target role: ${targetRole}`);
   const result = await pool.query(query, params);
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Found ${result.rows.length} reporting managers`);
-  
+
   return {
     managers: result.rows.map(row => ({
       id: row.id,

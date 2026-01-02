@@ -173,6 +173,12 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       }
     }
 
+    if (val === '') {
+      setSelectedDate(undefined);
+      onChange('');
+      return;
+    }
+
     if (parsedDate && !isDateDisabled(parsedDate)) {
       setSelectedDate(parsedDate);
       onChange(format(parsedDate, 'yyyy-MM-dd'));
