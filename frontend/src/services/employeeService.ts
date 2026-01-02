@@ -55,8 +55,8 @@ export const deleteEmployee = async (id: number) => {
   return response.data;
 };
 
-export const addLeavesToEmployee = async (employeeId: number, leaveType: 'casual' | 'sick' | 'lop', count: number) => {
-  const response = await api.post(`/employees/${employeeId}/leaves`, { leaveType, count });
+export const addLeavesToEmployee = async (employeeId: number, leaveType: 'casual' | 'sick' | 'lop', count: number, comment?: string) => {
+  const response = await api.post(`/employees/${employeeId}/leaves`, { leaveType, count, comment });
   return response.data;
 };
 

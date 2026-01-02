@@ -715,6 +715,7 @@ export interface LeaveAllocationEmailData {
   newBalance: number;
   allocatedBy: string;
   allocationDate: string;
+  comment?: string; // Optional comment from the person allocating leaves
   conversionNote?: string; // Optional note for LOP to casual conversions
 }
 
@@ -801,6 +802,12 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
                     <td style="padding: 12px 0; color: #6b7280; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top;">Allocation Date:</td>
                     <td style="padding: 12px 0; color: #111827; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600;">${allocationDateDisplay}</td>
                   </tr>
+                  ${data.comment ? `
+                  <tr>
+                    <td style="padding: 12px 0; color: #6b7280; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top;">Comment:</td>
+                    <td style="padding: 12px 0; color: #111827; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6;">${data.comment}</td>
+                  </tr>
+                  ` : ''}
                 </table>
                 ${data.conversionNote ? `
                 <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #d1fae5;">
@@ -856,7 +863,7 @@ Allocation Details:
 - New Balance: ${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}
 - Allocated By: ${data.allocatedBy}
 - Allocation Date: ${allocationDateDisplay}
-${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}
+${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}
 
 Best regards,
 TensorGo

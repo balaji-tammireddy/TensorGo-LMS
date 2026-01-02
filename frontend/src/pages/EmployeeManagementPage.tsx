@@ -291,8 +291,8 @@ const EmployeeManagementPage: React.FC = () => {
   );
 
   const addLeavesMutation = useMutation(
-    ({ employeeId, leaveType, count }: { employeeId: number; leaveType: 'casual' | 'sick' | 'lop'; count: number }) =>
-      employeeService.addLeavesToEmployee(employeeId, leaveType, count),
+    ({ employeeId, leaveType, count, comment }: { employeeId: number; leaveType: 'casual' | 'sick' | 'lop'; count: number; comment?: string }) =>
+      employeeService.addLeavesToEmployee(employeeId, leaveType, count, comment),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('employees');
@@ -589,12 +589,13 @@ const EmployeeManagementPage: React.FC = () => {
     setAddLeavesModalOpen(true);
   };
 
-  const handleAddLeavesSubmit = (leaveType: 'casual' | 'sick' | 'lop', count: number) => {
+  const handleAddLeavesSubmit = (leaveType: 'casual' | 'sick' | 'lop', count: number, comment?: string) => {
     if (selectedEmployeeForLeaves) {
       addLeavesMutation.mutate({
         employeeId: selectedEmployeeForLeaves.id,
         leaveType,
-        count
+        count,
+        comment
       });
     }
   };

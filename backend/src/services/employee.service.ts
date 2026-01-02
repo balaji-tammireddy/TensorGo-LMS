@@ -705,7 +705,8 @@ export const addLeavesToEmployee = async (
   employeeId: number,
   leaveType: 'casual' | 'sick' | 'lop',
   count: number,
-  updatedBy: number
+  updatedBy: number,
+  comment?: string
 ) => {
   logger.info(`[EMPLOYEE] [ADD LEAVES] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [ADD LEAVES] Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}, Updated By: ${updatedBy}`);
@@ -815,7 +816,8 @@ export const addLeavesToEmployee = async (
           previousBalance: previousBalance,
           newBalance: newBalance,
           allocatedBy: employee.approver_name || 'HR/Admin',
-          allocationDate: new Date().toISOString().split('T')[0]
+          allocationDate: new Date().toISOString().split('T')[0],
+          comment: comment
         });
         logger.info(`✅ Leave allocation email sent to employee: ${employee.email}`);
       }

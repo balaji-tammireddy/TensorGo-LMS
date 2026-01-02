@@ -18,7 +18,7 @@ import './AddLeavesModal.css';
 interface AddLeavesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (leaveType: 'casual' | 'sick' | 'lop', count: number) => void;
+  onAdd: (leaveType: 'casual' | 'sick' | 'lop', count: number, comment?: string) => void;
   employeeId: number;
   employeeName: string;
   isLoading?: boolean;
@@ -34,6 +34,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 }) => {
   const [leaveType, setLeaveType] = useState<'casual' | 'sick' | 'lop'>('casual');
   const [count, setCount] = useState<string>('');
+  const [comment, setComment] = useState<string>('');
   const [validationError, setValidationError] = useState<string>('');
   const { showWarning } = useToast();
   const { user } = useAuth();
@@ -53,6 +54,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     if (!isOpen) {
       setLeaveType('casual');
       setCount('');
+      setComment('');
       setValidationError('');
     }
   }, [isOpen, employeeId]);
@@ -98,7 +100,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     }
 
     setValidationError('');
-    onAdd(leaveType, countNum);
+    onAdd(leaveType, countNum, comment);
   };
 
   const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,6 +148,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   const handleClose = () => {
     setLeaveType('casual');
     setCount('');
+    setComment('');
     onClose();
   };
 
@@ -163,7 +166,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           {balancesLoading ? (
             <div style={{ textAlign: 'center', padding: '20px' }}>Loading balances...</div>
           ) : (
-            <form onSubmit={handleSubmit}>
+            <form id="add-leaves-form" onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
                 <DropdownMenu>
@@ -243,20 +246,43 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                   </div>
                 )}
               </div>
-              <div className="modal-actions">
-                <button type="button" className="cancel-button" onClick={handleClose} disabled={isLoading}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="submit-button"
-                  disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !!validationError}
-                >
-                  {isLoading ? 'Adding...' : 'Add Leaves'}
-                </button>
+              <div className="form-group">
+                <label htmlFor="comment">Comment</label>
+                <textarea
+                  id="comment"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  disabled={isLoading || balancesLoading}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    fontFamily: 'Poppins, sans-serif',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    resize: 'none',
+                    marginTop: '5px',
+                    height: '80px',
+                    boxSizing: 'border-box'
+                  }}
+                />
               </div>
             </form>
           )}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="cancel-button" onClick={handleClose} disabled={isLoading}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="add-leaves-form"
+            className="submit-button"
+            disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !!validationError}
+          >
+            {isLoading ? 'Adding...' : 'Add Leaves'}
+          </button>
         </div>
       </div>
     </div>

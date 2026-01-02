@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
 export const getEmployees = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] User ID: ${req.user!.id}, Role: ${req.user!.role}, Page: ${req.query.page || 1}, Limit: ${req.query.limit || 20}, Search: ${req.query.search || 'none'}`);
-  
+
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -33,7 +33,7 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
 export const getEmployeeById = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEE BY ID] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEE BY ID] Employee ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
-  
+
   try {
     const employeeId = parseInt(req.params.id);
     const employee = await employeeService.getEmployeeById(employeeId);
@@ -53,7 +53,7 @@ export const getEmployeeById = async (req: AuthRequest, res: Response) => {
 export const getNextEmployeeId = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] User ID: ${req.user!.id}, Role: ${req.user!.role}`);
-  
+
   try {
     const nextId = await employeeService.getNextEmployeeId();
     logger.info(`[CONTROLLER] [EMPLOYEE] [GET NEXT EMPLOYEE ID] Next employee ID: ${nextId}`);
@@ -72,7 +72,7 @@ export const getNextEmployeeId = async (req: AuthRequest, res: Response) => {
 export const createEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] User ID: ${req.user!.id}, Role: ${req.user!.role}, Employee ID: ${req.body.empId}, Email: ${req.body.email}`);
-  
+
   try {
     const result = await employeeService.createEmployee(req.body);
     logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] Employee created successfully - Employee ID: ${result.employeeId}`);
@@ -91,12 +91,12 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
 export const updateEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [UPDATE EMPLOYEE] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Fields: ${Object.keys(req.body).join(', ')}`);
-  
+
   try {
     const employeeId = parseInt(req.params.id);
     const result = await employeeService.updateEmployee(
-      employeeId, 
-      req.body, 
+      employeeId,
+      req.body,
       req.user?.role,
       req.user?.id
     );
@@ -116,7 +116,7 @@ export const updateEmployee = async (req: AuthRequest, res: Response) => {
 export const deleteEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
-  
+
   try {
     // Ensure only super_admin can delete
     if (req.user?.role !== 'super_admin') {
@@ -129,7 +129,7 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
       });
     }
     const employeeId = parseInt(req.params.id);
-    
+
     // Prevent super admin from deleting themselves
     if (req.user?.id === employeeId) {
       logger.warn(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Super Admin attempted to delete themselves - User ID: ${req.user.id}`);
@@ -140,7 +140,7 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
         }
       });
     }
-    
+
     const result = await employeeService.deleteEmployee(employeeId);
     logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee deleted successfully - Employee ID: ${employeeId}`);
     res.json(result);
@@ -158,7 +158,7 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
 export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Leave Type: ${req.body.leaveType}, Count: ${req.body.count}`);
-  
+
   try {
     // Ensure only HR and super_admin can add leaves
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
@@ -172,7 +172,7 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
     }
 
     const employeeId = parseInt(req.params.id);
-    const { leaveType, count } = req.body;
+    const { leaveType, count, comment } = req.body;
 
     // Prevent Super Admin from adding leaves to themselves
     if (req.user?.role === 'super_admin' && req.user?.id === employeeId) {
@@ -249,7 +249,8 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
       employeeId,
       leaveType,
       parseFloat(count),
-      req.user!.id
+      req.user!.id,
+      comment
     );
     logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Leaves added successfully - Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}`);
     res.json(result);
@@ -267,7 +268,7 @@ export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
 export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
-  
+
   try {
     // Ensure only HR and super_admin can view employee leave balances
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
@@ -302,7 +303,7 @@ export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) 
 export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Previous Year: ${req.query.previousYear || 'auto'}, New Year: ${req.query.newYear || 'auto'}`);
-  
+
   try {
     // Ensure only HR and super_admin can send carryforward emails
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
@@ -320,7 +321,7 @@ export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) =>
     const newYear = req.query.newYear ? parseInt(req.query.newYear as string) : undefined;
 
     const result = await sendCarryForwardEmailsToAll(previousYear, newYear);
-    
+
     logger.info(`[CONTROLLER] [EMPLOYEE] [SEND CARRY FORWARD EMAILS] Emails sent successfully - Sent: ${result.sent}, Errors: ${result.errors}`);
     res.json({
       success: true,
@@ -347,7 +348,7 @@ export const sendCarryForwardEmails = async (req: AuthRequest, res: Response) =>
 export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Count: ${req.body.count}`);
-  
+
   try {
     // Ensure only HR and super_admin can convert LOP to casual
     if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
@@ -431,7 +432,7 @@ export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
       parseFloat(count),
       req.user!.id
     );
-    
+
     logger.info(`[CONTROLLER] [EMPLOYEE] [CONVERT LOP TO CASUAL] Conversion successful - Employee ID: ${employeeId}, Count: ${count}`);
     res.json({
       success: true,
@@ -448,10 +449,10 @@ export const convertLopToCasual = async (req: AuthRequest, res: Response) => {
       error.message.includes('Cannot convert') ||
       error.message.includes('no LOP balance')
     );
-    
+
     const statusCode = isValidationError ? 400 : 500;
     const errorCode = isValidationError ? 'BAD_REQUEST' : 'SERVER_ERROR';
-    
+
     res.status(statusCode).json({
       error: {
         code: errorCode,
