@@ -781,7 +781,7 @@ const LeaveApprovalPage: React.FC = () => {
                 <tbody>
                   {approvedLoading && !approvedData ? (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={9}>
                         <div className="skeleton-table">
                           <div className="skeleton-table-row"></div>
                           <div className="skeleton-table-row"></div>
@@ -790,7 +790,7 @@ const LeaveApprovalPage: React.FC = () => {
                     </tr>
                   ) : !approvedData?.requests || approvedData.requests.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: 0 }}>
+                      <td colSpan={9} style={{ padding: 0 }}>
                         <EmptyState
                           title="No Recent Activity"
                           description="No recently approved or rejected leave requests found."

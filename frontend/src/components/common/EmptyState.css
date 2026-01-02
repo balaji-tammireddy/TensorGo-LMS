@@ -5,10 +5,13 @@
   justify-content: center;
   padding: 3rem 2rem;
   text-align: center;
-  background-color: #f8fafc; /* Very light gray/slate background */
+  background-color: #f8fafc;
+  /* Very light gray/slate background */
   border-radius: 12px;
-  border: 1px dashed #cbd5e1; /* Subtle dashed border */
-  margin: 1rem 0;
+  border: 1px dashed #cbd5e1;
+  /* Subtle dashed border */
+  width: 100%;
+  box-sizing: border-box;
   animation: slideUpFade 0.5s ease-out forwards;
 }
 
@@ -18,32 +21,60 @@
   justify-content: center;
   width: 64px;
   height: 64px;
-  background-color: #e2e8f0; /* Light gray circle */
+  background-color: #e2e8f0;
+  /* Light gray circle */
   border-radius: 50%;
   margin-bottom: 1rem;
-  color: #64748b; /* Slate-500 for icon */
+  color: #64748b;
+  /* Slate-500 for icon */
   transition: transform 0.3s ease;
 }
 
 .empty-state-container:hover .empty-state-icon-wrapper {
-  transform: scale(1.05); /* Subtle zoom on hover */
+  transform: scale(1.05);
+  /* Subtle zoom on hover */
   background-color: #cbd5e1;
 }
 
 .empty-state-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 1.125rem; /* 18px */
+  font-size: 1.125rem;
+  /* 18px */
   font-weight: 600;
-  color: #334155; /* Slate-700 */
+  color: #334155;
+  /* Slate-700 */
   margin-bottom: 0.5rem;
 }
 
 .empty-state-description {
-  font-family: 'Inter', sans-serif; /* Or inherited font */
-  font-size: 0.875rem; /* 14px */
-  color: #64748b; /* Slate-500 */
+  font-family: 'Inter', sans-serif;
+  /* Or inherited font */
+  font-size: 0.875rem;
+  /* 14px */
+  color: #64748b;
+  /* Slate-500 */
   max-width: 300px;
   line-height: 1.5;
+}
+
+/* Small variant styles */
+.empty-state-container.empty-state-small {
+  padding: 1.5rem 1rem;
+}
+
+.empty-state-container.empty-state-small .empty-state-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0.75rem;
+}
+
+.empty-state-container.empty-state-small .empty-state-title {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state-container.empty-state-small .empty-state-description {
+  font-size: 0.8125rem;
 }
 
 @keyframes slideUpFade {
@@ -51,6 +82,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
