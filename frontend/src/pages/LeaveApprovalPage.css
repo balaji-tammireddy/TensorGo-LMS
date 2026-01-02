@@ -1,14 +1,12 @@
-.leave-approval-page {
-  max-width: 1400px;
-  margin: 0 auto;
+.leave-approval-page * {
+  font-family: 'Poppins', sans-serif !important;
 }
-
-
 
 .search-filter-bar {
   display: flex;
   gap: 15px;
   margin-bottom: 20px;
+  align-items: center;
 }
 
 .search-box,
@@ -19,12 +17,34 @@
 }
 
 .search-box input {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 10px 12px;
+  border: 1px solid #d7deec;
+  border-radius: 10px;
   font-size: 14px;
   width: 300px;
   padding-right: 32px;
+  background-color: #f8f9fc;
+  height: 42px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.leave-filter-dropdown {
+  height: 42px !important;
+  border: 1px solid #d7deec !important;
+  border-radius: 10px !important;
+  background-color: #f8f9fc !important;
+  font-size: 14px !important;
+  color: #1f2a3d !important;
+  padding: 0 12px !important;
+  width: 150px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leave-filter-dropdown:hover {
+  background-color: #ffffff !important;
+  border-color: #3c6ff2 !important;
 }
 
 .search-box {
@@ -47,14 +67,6 @@
 
 .search-clear:hover {
   color: #3c6ff2;
-}
-
-.filter-box select {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  min-width: 180px;
 }
 
 .pending-requests-section,
@@ -121,23 +133,8 @@
 .requests-table td {
   padding: 12px;
   border-bottom: 1px solid #ddd;
-  vertical-align: top;
-}
-
-.requests-table th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-/* Status column center (both pending and approved tables share markup) */
-.requests-table th:nth-child(9),
-.requests-table td:nth-child(9),
-.requests-table th:nth-child(8),
-.requests-table td:nth-child(8) {
-  text-align: center;
+  vertical-align: middle;
+  font-size: 14px;
 }
 
 .leave-approval-page .actions-cell {
@@ -146,15 +143,32 @@
   justify-content: center;
 }
 
-.status-applied {
-  background-color: #3c6ff2;
-  /* Blue */
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+  min-width: 80px;
+  text-transform: uppercase;
+}
+
+.status-applied,
+.status-pending {
+  background-color: #ffab00;
+  /* Yellow/Amber for Pending */
   color: #fff;
 }
 
-.status-pending {
-  background-color: #3c6ff2;
-  /* Blue */
+.status-approved {
+  background-color: #00c853;
+  /* Green */
+  color: #fff;
+}
+
+.status-rejected {
+  background-color: #ff5252;
+  /* Red */
   color: #fff;
 }
 

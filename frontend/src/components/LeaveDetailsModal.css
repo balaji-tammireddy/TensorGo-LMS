@@ -17,6 +17,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -40,6 +41,7 @@
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -202,22 +204,8 @@
   border-radius: 12px;
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+/* Using global status badges */
 
-.status-badge:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
 
 .status-dropdown {
   width: 100%;
@@ -293,35 +281,8 @@
   opacity: 0.6;
 }
 
-.status-pending {
-  background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
-  color: #fff;
-  border: 1px solid #ffb300;
-}
+/* Using global status badges */
 
-.status-approved {
-  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-  color: white;
-  border: 1px solid #45a049;
-}
-
-.status-rejected {
-  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
-  color: white;
-  border: 1px solid #c62828;
-}
-
-.status-partially-approved {
-  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-  color: white;
-  border: 1px solid #f57c00;
-}
-
-.status-applied {
-  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
-  color: white;
-  border: 1px solid #1976d2;
-}
 
 .date-range-picker-container {
   margin-top: 12px;
@@ -681,8 +642,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Employee Leave Details Modal Styles */
@@ -857,4 +823,3 @@
   color: #f57c00;
   border: 1px solid #ffcc80;
 }
-

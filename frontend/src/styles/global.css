@@ -119,17 +119,6 @@ tr:hover {
   background-color: #f8f9fa;
 }
 
-/* Loading Spinner */
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
 .loading-spinner {
   display: inline-block;
   width: 14px;
@@ -140,6 +129,63 @@ tr:hover {
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
   vertical-align: middle;
+}
+
+/* Status Badges - Global Styles */
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+  min-width: 80px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #fff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-pending {
+  background: #ffab00;
+  /* Yellow/Amber for Pending */
+  border: 1px solid #ff9100;
+}
+
+.status-applied {
+  background: #3c6ff2;
+  /* Blue for Applied */
+  border: 1px solid #2c5dd8;
+}
+
+.status-approved {
+  background: #00c853;
+  /* Green */
+  border: 1px solid #00b248;
+}
+
+.status-rejected {
+  background: #ff5252;
+  /* Red */
+  border: 1px solid #e53935;
+}
+
+.status-partial,
+.status-partially-approved {
+  background: #ff9800;
+  /* Orange */
+  border: 1px solid #f57c00;
+}
+
+.status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure consistent font for table data */
+th,
+td {
+  font-family: 'Poppins', sans-serif;
 }
 
 button:disabled {
