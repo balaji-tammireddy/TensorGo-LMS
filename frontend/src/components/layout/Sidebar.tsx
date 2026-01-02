@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, memo } from 'react';
+import React, { useMemo, useState, useCallback, memo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook } from 'react-icons/fa';
@@ -9,6 +9,23 @@ const Sidebar: React.FC = memo(() => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
 
   const getRoleDisplayName = useCallback((role: string) => {
     const roleMap: Record<string, string> = {
@@ -80,7 +97,7 @@ const Sidebar: React.FC = memo(() => {
         ))}
       </div>
 
-      <div className="sidebar-user">
+      <div className="sidebar-user" ref={userMenuRef}>
         {user && (
           <div className="user-toggle" onClick={() => setShowUserMenu((prev) => !prev)}>
             <div className="user-avatar">{userInitial || 'U'}</div>
