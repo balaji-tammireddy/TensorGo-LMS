@@ -195,7 +195,7 @@ npm run dev        # Starts client on port 5173 (or 3000)
 
 | Role | Email | Password |
 |------|-------|----------|
-| **Super Admin** | admin@tensorgo.com | admin123 |
-| **HR** | hr@tensorgo.com | hr1234 |
-| **Manager** | balaji@tensorgo.com | manager123 |
-| **Employee** | jaiwanth@tensorgo.com | emp123 |
+| **Super Admin** | balajiganesh.tammireddy@tensorgo.co.in | tensorgo@123 |
+| **HR** | jaiwanth888@gmail.com | tensorgo@123 |
+| **Manager** |balajitammireddy@gmail.com | tensorgo@123|
+| **Employee** | jaiwanth.gannavarapu@tensorgo.co.in | tensorgo@123 |
