@@ -389,11 +389,12 @@ export const applyLeave = async (
 
     try {
       await client.query('BEGIN');
+      // Store RAW types in DB to preserve UI state (first_half vs second_half)
+      // Constraint has been updated to allow these values.
       const leaveRequestResult = await client.query(
         `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-        [userId, leaveData.leaveType, checkStartDateStr, normalizedStartType, checkEndDateStr, normalizedEndType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null]
-
+        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null]
       );
       leaveRequestId = leaveRequestResult.rows[0].id;
 
@@ -1028,18 +1029,39 @@ export const updateLeaveRequest = async (
 
   // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
   if (leaveData.leaveType !== 'permission') {
-    const balance = await getLeaveBalances(userId);
-    const balanceKey = `${leaveData.leaveType}` as keyof LeaveBalance;
-    let currentBalance = balance[balanceKey];
+    const balances = await getLeaveBalances(userId);
+    let requestedDays = days; // Default to calculated days
+    let availableBalance = 0;
 
-    // If updating the same leave type, add back the days from the current request to check availability
-    // because we will "refund" them in the transaction before dedicating the new amount
-    if (leaveData.leaveType === oldLeaveType) {
-      currentBalance += oldDays;
+    // Fetch the original request to handle "balance refund" logic during edit
+    const originalRequestResult = await pool.query(
+      'SELECT leave_type, no_of_days FROM leave_requests WHERE id = $1',
+      [requestId]
+    );
+    const originalRequest = originalRequestResult.rows[0];
+
+    // Determine the relevant balance
+    // Determine the relevant balance
+    if (leaveData.leaveType === 'casual') availableBalance = Number(balances.casual);
+    else if (leaveData.leaveType === 'sick') availableBalance = Number(balances.sick);
+    else if (leaveData.leaveType === 'lop') availableBalance = Number(balances.lop);
+
+    // If we are updating the SAME leave type, valid available balance = current + old days
+    // (Because the old days will be refunded when this update succeeds)
+    if (originalRequest && originalRequest.leave_type === leaveData.leaveType) {
+      availableBalance += Number(originalRequest.no_of_days);
     }
 
-    if (currentBalance < days) {
-      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+    if (leaveData.leaveType !== 'lop' && availableBalance < requestedDays) {
+      // Special check: if balance is 0 but we have enough "effective" balance, it should pass.
+      // But we already added it to availableBalance above.
+
+      // Formatting for error message
+      const balanceName = leaveData.leaveType.charAt(0).toUpperCase() + leaveData.leaveType.slice(1);
+      if (availableBalance <= 0) {
+        throw new Error(`${balanceName} leave balance is zero. You cannot apply ${leaveData.leaveType} leave.`);
+      }
+      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${originalRequest && originalRequest.leave_type === leaveData.leaveType ? (availableBalance - Number(originalRequest.no_of_days)) : availableBalance}, Requested: ${requestedDays}.`);
     }
   }
 
@@ -1070,9 +1092,12 @@ export const updateLeaveRequest = async (
     const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
     // Update leave request
+    // We pass the RAW start/end type to the database for the request record (to preserve 1st/2nd half info)
+    // But we pass NORMALIZED types to calculateLeaveDays (as it expects 'full' or 'half')
+
     await client.query(
       `UPDATE leave_requests 
-       SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5,
+       SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5, 
            reason = $6, no_of_days = $7, time_for_permission_start = $8, time_for_permission_end = $9,
            doctor_note = $10, updated_at = CURRENT_TIMESTAMP,
            current_status = 'pending',
@@ -1081,9 +1106,9 @@ export const updateLeaveRequest = async (
       [
         leaveData.leaveType,
         startDateStr,
-        normalizedStartType,
+        leaveData.startType, // Pass RAW type to DB
         endDateStr,
-        normalizedEndType,
+        leaveData.endType,   // Pass RAW type to DB
         leaveData.reason,
         days,
         leaveData.timeForPermission?.start || null,

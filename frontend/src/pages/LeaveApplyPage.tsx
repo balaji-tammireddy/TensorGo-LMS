@@ -321,6 +321,22 @@ const LeaveApplyPage: React.FC = () => {
     }
   }, [formData.leaveType]);
 
+  // Set default dates on component mount if not editing/viewing
+  useEffect(() => {
+    if (!editingId && !deleteRequestId && !viewModalOpen && !formData.startDate) {
+      // Default to Casual leave logic (Today + 3 days)
+      const today = new Date();
+      const futureDate = addDays(today, 3);
+      const futureDateStr = format(futureDate, 'yyyy-MM-dd');
+
+      setFormData(prev => ({
+        ...prev,
+        startDate: futureDateStr,
+        endDate: futureDateStr
+      }));
+    }
+  }, [editingId, deleteRequestId, viewModalOpen]); // Run once on mount (effectively) when IDs are checked
+
   // When the leave spans a single day (start === end and not permission), force endType to follow startType
   useEffect(() => {
     if (
@@ -925,33 +941,47 @@ const LeaveApplyPage: React.FC = () => {
 
     // Client-side balance guard
     if (balances) {
+      // Find the original request if we're editing, to account for "refunded" days
+      const originalRequest = editingId ? myRequests?.requests?.find((r: any) => r.id === editingId) : null;
+      const isSameType = originalRequest && originalRequest.leaveType === formData.leaveType;
+      const originalDays = originalRequest ? Number(originalRequest.noOfDays) : 0;
+
       if (formData.leaveType === 'casual') {
-        if ((balances.casual || 0) <= 0) {
+        const currentBalance = Number(balances.casual || 0);
+        const effectiveBalance = isSameType ? (currentBalance + originalDays) : currentBalance;
+
+        if (effectiveBalance <= 0) {
           showWarning('Casual leave balance is zero. You cannot apply casual leave.');
           return;
         }
-        if (requestedDays > (balances.casual || 0)) {
-          showWarning(`Insufficient casual leave balance. Available: ${balances.casual || 0}, Required: ${requestedDays}`);
+        if (requestedDays > effectiveBalance) {
+          showWarning(`Insufficient casual leave balance. Available: ${effectiveBalance}, Required: ${requestedDays}`);
           return;
         }
       }
       if (formData.leaveType === 'sick') {
-        if ((balances.sick || 0) <= 0) {
+        const currentBalance = Number(balances.sick || 0);
+        const effectiveBalance = isSameType ? (currentBalance + originalDays) : currentBalance;
+
+        if (effectiveBalance <= 0) {
           showWarning('Sick leave balance is zero. You cannot apply sick leave.');
           return;
         }
-        if (requestedDays > (balances.sick || 0)) {
-          showWarning(`Insufficient sick leave balance. Available: ${balances.sick || 0}, Required: ${requestedDays}`);
+        if (requestedDays > effectiveBalance) {
+          showWarning(`Insufficient sick leave balance. Available: ${effectiveBalance}, Required: ${requestedDays}`);
           return;
         }
       }
       if (formData.leaveType === 'lop') {
-        if ((balances.lop || 0) <= 0) {
+        const currentBalance = Number(balances.lop || 0);
+        const effectiveBalance = isSameType ? (currentBalance + originalDays) : currentBalance;
+
+        if (effectiveBalance <= 0) {
           showWarning('LOP balance is zero. You cannot apply LOP leave.');
           return;
         }
-        if (requestedDays > (balances.lop || 0)) {
-          showWarning(`Insufficient LOP balance. Available: ${balances.lop || 0}, Required: ${requestedDays}`);
+        if (requestedDays > effectiveBalance) {
+          showWarning(`Insufficient LOP balance. Available: ${effectiveBalance}, Required: ${requestedDays}`);
           return;
         }
       }
@@ -1110,32 +1140,38 @@ const LeaveApplyPage: React.FC = () => {
   };
 
   const handleLeaveTypeChange = (newType: 'casual' | 'sick' | 'lop' | 'permission') => {
-    // If editing, clear all fields when changing type to ensure no invalid data persists
+    // Calculate default dates
+    const today = new Date();
+    let defaultStartStr = '';
+    let defaultEndStr = '';
+
+    if (newType === 'casual') {
+      const futureDate = addDays(today, 3);
+      const futureDateStr = format(futureDate, 'yyyy-MM-dd');
+      defaultStartStr = futureDateStr;
+      defaultEndStr = futureDateStr;
+    } else {
+      // Sick, LOP, Permission defaults to today
+      const todayStr = format(today, 'yyyy-MM-dd');
+      defaultStartStr = todayStr;
+      defaultEndStr = todayStr;
+    }
+
+    // Update form data with new type and default dates
+    setFormData({
+      ...formData, // Keep other fields if needed, but we override dates/types
+      leaveType: newType,
+      startDate: defaultStartStr,
+      startType: 'full',
+      endDate: defaultEndStr,
+      endType: 'full',
+      reason: editingId ? formData.reason : '', // Preserve reason if editing
+      timeForPermission: { start: '', end: '' }
+    });
+
     if (editingId) {
-      setFormData({
-        leaveType: newType,
-        startDate: '',
-        startType: 'full',
-        endDate: '',
-        endType: 'full',
-        reason: formData.reason,
-        timeForPermission: { start: '', end: '' }
-      });
       setDoctorNoteFile(null);
       setExistingDoctorNote(null);
-    } else {
-      // Logic for Create mode (preserve existing data where possible)
-      if (newType === 'permission') {
-        setFormData({
-          ...formData,
-          leaveType: newType,
-          startType: 'full',
-          endDate: formData.startDate || '',
-          endType: 'full'
-        });
-      } else {
-        setFormData({ ...formData, leaveType: newType });
-      }
     }
   };
 
@@ -1463,8 +1499,12 @@ const LeaveApplyPage: React.FC = () => {
                     // For permission, update end date to match start date
                     if (formData.leaveType === 'permission') {
                       setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
+                    } else if (formData.startType === 'first_half') {
+                      // If start type is first half, end date must match start date
+                      setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
                     } else {
-                      setFormData({ ...formData, startDate: newStartDate });
+                      // Default behavior: Set end date to start date (user can change it later if allowed)
+                      setFormData({ ...formData, startDate: newStartDate, endDate: newStartDate });
                     }
                   }}
                   min={minStartDate}
@@ -1515,13 +1555,30 @@ const LeaveApplyPage: React.FC = () => {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => setFormData({ ...formData, startType: 'first_half' })}
+                        onClick={() => {
+                          // If First Half is selected, strictly set End Date = Start Date and End Type = First Half
+                          // This effectively enforces a single half-day leave
+                          setFormData({
+                            ...formData,
+                            startType: 'first_half',
+                            endDate: formData.startDate, // Force end date to match start date
+                            endType: 'first_half'        // Force end type to match start type
+                          });
+                        }}
                       >
                         First half
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => setFormData({ ...formData, startType: 'second_half' })}
+                        onClick={() => {
+                          const shouldResetEndDate = formData.endType === 'second_half';
+                          setFormData({
+                            ...formData,
+                            startType: 'second_half',
+                            // If end type is also second half, force end date = start date
+                            endDate: shouldResetEndDate ? formData.startDate : formData.endDate
+                          });
+                        }}
                       >
                         Second half
                       </DropdownMenuItem>
@@ -1556,9 +1613,17 @@ const LeaveApplyPage: React.FC = () => {
 
                         setFormData({ ...formData, endDate: newEndDate });
                       }}
-                      min={formData.startDate || minStartDate}
+                      min={
+                        (formData.startType === 'second_half' && formData.endType !== 'second_half' && formData.startDate)
+                          ? format(addDays(new Date(formData.startDate), 1), 'yyyy-MM-dd')
+                          : (formData.startDate || minStartDate)
+                      }
                       max={maxStartDate}
                       placeholder="Select end date"
+                      disabled={
+                        formData.startType === 'first_half' ||
+                        (formData.startType === 'second_half' && formData.endType === 'second_half')
+                      }
                       disabledDates={(date) => {
                         const dateStr = format(date, 'yyyy-MM-dd');
                         const isLop = formData.leaveType?.toLowerCase() === 'lop';
@@ -1579,9 +1644,7 @@ const LeaveApplyPage: React.FC = () => {
                           variant="outline"
                           className="leave-type-dropdown-trigger"
                           disabled={
-                            !!formData.startDate &&
-                            !!formData.endDate &&
-                            formData.startDate === formData.endDate
+                            formData.startType === 'first_half'
                           }
                           style={{
                             width: '100%',
@@ -1602,19 +1665,41 @@ const LeaveApplyPage: React.FC = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="leave-type-dropdown-content">
                         <DropdownMenuItem
-                          onClick={() => setFormData({ ...formData, endType: 'full' })}
+                          onClick={() => {
+                            let newEndDate = formData.endDate;
+                            if (formData.startType === 'second_half' && formData.startDate) {
+                              const nextDate = addDays(new Date(formData.startDate), 1);
+                              newEndDate = format(nextDate, 'yyyy-MM-dd');
+                            }
+                            setFormData({ ...formData, endType: 'full', endDate: newEndDate });
+                          }}
                         >
                           Full day
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => setFormData({ ...formData, endType: 'first_half' })}
+                          onClick={() => {
+                            let newEndDate = formData.endDate;
+                            if (formData.startType === 'second_half' && formData.startDate) {
+                              const nextDate = addDays(new Date(formData.startDate), 1);
+                              newEndDate = format(nextDate, 'yyyy-MM-dd');
+                            }
+                            setFormData({ ...formData, endType: 'first_half', endDate: newEndDate });
+                          }}
                         >
                           First half
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => setFormData({ ...formData, endType: 'second_half' })}
+                          onClick={() => {
+                            const shouldResetEndDate = formData.startType === 'second_half';
+                            setFormData({
+                              ...formData,
+                              endType: 'second_half',
+                              // If start type is second half, force end date = start date
+                              endDate: shouldResetEndDate ? formData.startDate : formData.endDate
+                            });
+                          }}
                         >
                           Second half
                         </DropdownMenuItem>
