@@ -13,6 +13,7 @@
   width: 100%;
   box-sizing: border-box;
   animation: slideUpFade 0.5s ease-out forwards;
+  margin: 2rem 0;
 }
 
 .empty-state-icon-wrapper {
