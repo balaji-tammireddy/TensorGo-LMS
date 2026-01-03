@@ -713,7 +713,7 @@ const LeaveApprovalPage: React.FC = () => {
                           <td>{request.empName}</td>
                           <td>{formatDateSafe(request.appliedDate)}</td>
                           <td>{leaveDateRange}</td>
-                          <td>{request.leaveType}</td>
+                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                           <td>{request.noOfDays}</td>
                           <td>{request.leaveReason}</td>
                           <td>
@@ -818,7 +818,7 @@ const LeaveApprovalPage: React.FC = () => {
                             <td>{request.empName}</td>
                             <td>{formatDateSafe(request.appliedDate)}</td>
                             <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
-                            <td>{request.leaveType}</td>
+                            <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                             <td>{request.noOfDays}</td>
                             <td>
                               {request.leaveStatus === 'pending' ? (

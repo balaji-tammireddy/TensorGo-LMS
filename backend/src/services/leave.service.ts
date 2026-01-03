@@ -3049,182 +3049,182 @@ export const updateLeaveStatus = async (
     throw new Error('Not authorized to update leave status');
   }
 
-  const leaveResult = await pool.query(
-    `SELECT lr.*, u.role as employee_role, u.email as employee_email,
-            u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-            approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
-            lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date
-     FROM leave_requests lr
-     JOIN users u ON lr.employee_id = u.id
-     LEFT JOIN users approver ON approver.id = $2
-     WHERE lr.id = $1`,
-    [leaveRequestId, approverId]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  if (leaveResult.rows.length === 0) {
-    throw new Error('Leave request not found');
-  }
+    const leaveResult = await client.query(
+      `SELECT lr.*, u.role as employee_role, u.email as employee_email,
+              u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+              approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+              lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date
+       FROM leave_requests lr
+       JOIN users u ON lr.employee_id = u.id
+       LEFT JOIN users approver ON approver.id = $2
+       WHERE lr.id = $1`,
+      [leaveRequestId, approverId]
+    );
 
-  const leave = leaveResult.rows[0];
-
-  // Check who last updated the leave using last_updated_by_role
-  const lastUpdaterRole = leave.last_updated_by_role;
-
-  // Validate hierarchy: Check if current user can update based on who last updated
-  if (lastUpdaterRole === 'super_admin') {
-    // If super admin updated, only super admin can update
-    if (approverRole !== 'super_admin') {
-      throw new Error('Super Admin has updated the status of this leave. You cannot update it now.');
+    if (leaveResult.rows.length === 0) {
+      throw new Error('Leave request not found');
     }
-  } else if (lastUpdaterRole === 'hr') {
-    // If HR updated, both HR and super admin can update (manager check already done at function start)
-    // No additional check needed since approverRole is already restricted to 'hr' | 'super_admin'
-  }
-  // If manager updated (or no one updated yet), HR and super admin can update (already checked at function start)
 
-  // Get all leave days
-  const leaveDaysResult = await pool.query(
-    'SELECT id, leave_date, day_status, day_type FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
-    [leaveRequestId]
-  );
-  const allLeaveDays = leaveDaysResult.rows || [];
+    const leave = leaveResult.rows[0];
 
-  if (newStatus === 'approved') {
-    // Approve all days
-    await pool.query(
-      `UPDATE leave_days SET day_status = 'approved' WHERE leave_request_id = $1`,
+    // Check who last updated the leave using last_updated_by_role
+    const lastUpdaterRole = leave.last_updated_by_role;
+
+    // Validate hierarchy: Check if current user can update based on who last updated
+    if (lastUpdaterRole === 'super_admin') {
+      // If super admin updated, only super admin can update
+      if (approverRole !== 'super_admin') {
+        throw new Error('Super Admin has updated the status of this leave. You cannot update it now.');
+      }
+    }
+
+    // Get all leave days before update
+    const leaveDaysResult = await client.query(
+      'SELECT id, leave_date, day_status, day_type FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
       [leaveRequestId]
     );
+    const allLeaveDays = leaveDaysResult.rows || [];
 
-    // Update leave request status and reason
-    // Clear rejection comments when changing to approved
-    // Update the appropriate approval field based on role
+    // 1. Identify new status for each day and calculate balance refund/deduction
+    let refundAmount = 0;
+    const dayUpdates: { id: number, status: string }[] = [];
+
+    for (const day of allLeaveDays) {
+      let nextDayStatus = day.day_status;
+      if (newStatus === 'approved') {
+        nextDayStatus = 'approved';
+      } else if (newStatus === 'rejected') {
+        nextDayStatus = 'rejected';
+      } else if (newStatus === 'partially_approved') {
+        if (!selectedDayIds) throw new Error('Selected day IDs must be provided for partial approval');
+        nextDayStatus = selectedDayIds.includes(Number(day.id)) ? 'approved' : 'rejected';
+      } else {
+        throw new Error('Invalid status update requested');
+      }
+
+      // Logic: Refund if changing from non-rejected to rejected. Deduct if changing from rejected to non-rejected.
+      const wasRejected = day.day_status === 'rejected';
+      const isNowRejected = nextDayStatus === 'rejected';
+      const dayWeight = day.day_type === 'half' ? 0.5 : 1;
+
+      if (!wasRejected && isNowRejected) {
+        refundAmount += dayWeight;
+      } else if (wasRejected && !isNowRejected) {
+        refundAmount -= dayWeight;
+      }
+
+      dayUpdates.push({ id: day.id, status: nextDayStatus });
+    }
+
+    // 2. Perform updates to leave_days
+    for (const update of dayUpdates) {
+      await client.query(
+        'UPDATE leave_days SET day_status = $1 WHERE id = $2',
+        [update.status, update.id]
+      );
+    }
+
+    // 3. Perform updates to leave_balances (except for permission)
+    if (refundAmount !== 0 && leave.leave_type !== 'permission') {
+      const balanceColumn =
+        leave.leave_type === 'casual'
+          ? 'casual_balance'
+          : leave.leave_type === 'sick'
+            ? 'sick_balance'
+            : 'lop_balance';
+
+      if (leave.leave_type === 'lop') {
+        const currentBalanceResult = await client.query(
+          'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+          [leave.employee_id]
+        );
+        const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+        let newLopBalance = currentLop + refundAmount;
+
+        // Cap LOP balance at 10
+        if (newLopBalance > 10) newLopBalance = 10;
+        // Don't allow LOP balance to go below 0 (shouldn't happen with valid requests, but safe)
+        if (newLopBalance < 0) newLopBalance = 0;
+
+        await client.query(
+          `UPDATE leave_balances SET lop_balance = $1 WHERE employee_id = $2`,
+          [newLopBalance, leave.employee_id]
+        );
+      } else {
+        // For Casual/Sick, we just apply the adjustment
+        await client.query(
+          `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+          [refundAmount, leave.employee_id]
+        );
+      }
+      logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Adjusted ${balanceColumn} by ${refundAmount} for employee ${leave.employee_id}`);
+    }
+
+    // 4. Update leave_requests header status
+    // Determine the header status based on the final state of all days
+    const finalApprovedDays = dayUpdates.filter(d => d.status === 'approved').length;
+    let finalRequestStatus = newStatus;
+
+    if (newStatus === 'partially_approved') {
+      if (finalApprovedDays === 0) {
+        finalRequestStatus = 'rejected';
+      } else if (finalApprovedDays === dayUpdates.length) {
+        finalRequestStatus = 'approved';
+      } else {
+        finalRequestStatus = 'partially_approved';
+      }
+    }
+
     if (approverRole === 'super_admin') {
-      await pool.query(
+      await client.query(
         `UPDATE leave_requests 
-         SET current_status = 'approved',
-             super_admin_approval_status = 'approved',
+         SET current_status = $1,
+             super_admin_approval_status = $2,
              super_admin_approval_date = CURRENT_TIMESTAMP,
-             super_admin_approval_comment = $1,
-             super_admin_approved_by = $2,
+             super_admin_approval_comment = $3,
+             super_admin_approved_by = $4,
              manager_approval_comment = NULL,
              hr_approval_comment = NULL,
-             last_updated_by = $2,
+             last_updated_by = $4,
              last_updated_by_role = 'super_admin'
-         WHERE id = $3`,
-        [`Status updated by Super Admin`, approverId, leaveRequestId]
+         WHERE id = $5`,
+        [finalRequestStatus,
+          finalRequestStatus === 'rejected' ? 'rejected' : 'approved',
+          newStatus === 'rejected' ? (rejectReason || 'Status updated by Super Admin') : `Status updated by Super Admin`,
+          approverId, leaveRequestId]
       );
     } else if (approverRole === 'hr') {
-      await pool.query(
+      await client.query(
         `UPDATE leave_requests 
-         SET current_status = 'approved',
-             hr_approval_status = 'approved',
+         SET current_status = $1,
+             hr_approval_status = $2,
              hr_approval_date = CURRENT_TIMESTAMP,
-             hr_approval_comment = $1,
-             hr_approved_by = $2,
+             hr_approval_comment = $3,
+             hr_approved_by = $4,
              manager_approval_comment = NULL,
-             last_updated_by = $2,
+             last_updated_by = $4,
              last_updated_by_role = 'hr'
-         WHERE id = $3`,
-        [`Status updated by HR`, approverId, leaveRequestId]
+         WHERE id = $5`,
+        [finalRequestStatus,
+          finalRequestStatus === 'rejected' ? 'rejected' : 'approved',
+          newStatus === 'rejected' ? (rejectReason || 'Status updated by HR') : `Status updated by HR`,
+          approverId, leaveRequestId]
       );
     }
 
-  } else if (newStatus === 'rejected') {
-    // Reject all days
-    await pool.query(
-      `UPDATE leave_days SET day_status = 'rejected' WHERE leave_request_id = $1`,
-      [leaveRequestId]
-    );
+    await client.query('COMMIT');
+    logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Transaction committed successfully for Request ID: ${leaveRequestId}`);
 
-    // Update leave request status and reason
-    // Update the appropriate approval field based on role
-    if (approverRole === 'super_admin') {
-      await pool.query(
-        `UPDATE leave_requests 
-         SET current_status = 'rejected',
-             super_admin_approval_status = 'rejected',
-             super_admin_approval_date = CURRENT_TIMESTAMP,
-             super_admin_approval_comment = $1,
-             super_admin_approved_by = $2,
-             manager_approval_comment = NULL,
-             hr_approval_comment = NULL,
-             last_updated_by = $2,
-             last_updated_by_role = 'super_admin'
-         WHERE id = $3`,
-        [rejectReason || 'Status updated by Super Admin', approverId, leaveRequestId]
-      );
-    } else if (approverRole === 'hr') {
-      await pool.query(
-        `UPDATE leave_requests 
-         SET current_status = 'rejected',
-             hr_approval_status = 'rejected',
-             hr_approval_date = CURRENT_TIMESTAMP,
-             hr_approval_comment = $1,
-             hr_approved_by = $2,
-             manager_approval_comment = NULL,
-             last_updated_by = $2,
-             last_updated_by_role = 'hr'
-         WHERE id = $3`,
-        [rejectReason || 'Status updated by HR', approverId, leaveRequestId]
-      );
-    }
-
-  } else if (newStatus === 'partially_approved' && selectedDayIds && selectedDayIds.length > 0) {
-    // Approve selected days, reject remaining
-    const allDayIds = allLeaveDays.map(d => d.id);
-    const daysToReject = allDayIds.filter(id => !selectedDayIds.includes(id));
-
-    // Approve selected days
-    await pool.query(
-      `UPDATE leave_days SET day_status = 'approved' WHERE id = ANY($1::int[]) AND leave_request_id = $2`,
-      [selectedDayIds, leaveRequestId]
-    );
-
-    // Reject remaining days
-    if (daysToReject.length > 0) {
-      await pool.query(
-        `UPDATE leave_days SET day_status = 'rejected' WHERE id = ANY($1::int[]) AND leave_request_id = $2`,
-        [daysToReject, leaveRequestId]
-      );
-    }
-
-    // Update leave request and reason
-    // Clear rejection comments when partially approving
-    // Update the appropriate approval field based on role
-    if (approverRole === 'super_admin') {
-      await pool.query(
-        `UPDATE leave_requests 
-         SET super_admin_approval_status = 'approved',
-             super_admin_approval_date = CURRENT_TIMESTAMP,
-             super_admin_approval_comment = $1,
-             super_admin_approved_by = $2,
-             manager_approval_comment = NULL,
-             hr_approval_comment = NULL,
-             last_updated_by = $2,
-             last_updated_by_role = 'super_admin'
-         WHERE id = $3`,
-        [`Status updated by Super Admin`, approverId, leaveRequestId]
-      );
-    } else if (approverRole === 'hr') {
-      await pool.query(
-        `UPDATE leave_requests 
-         SET hr_approval_status = 'approved',
-             hr_approval_date = CURRENT_TIMESTAMP,
-             hr_approval_comment = $1,
-             hr_approved_by = $2,
-             manager_approval_comment = NULL,
-             last_updated_by = $2,
-             last_updated_by_role = 'hr'
-         WHERE id = $3`,
-        [`Status updated by HR`, approverId, leaveRequestId]
-      );
-    }
-
-    // Recalculate status
-    await recalcLeaveRequestStatus(leaveRequestId);
-  } else {
-    throw new Error('Invalid status or missing required parameters');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error(`[LEAVE] [UPDATE LEAVE STATUS] Transaction rolled back for Request ID: ${leaveRequestId}. Error:`, error);
+    throw error;
+  } finally {
+    client.release();
   }
 
   // Send email notifications for status updates (approved/partially_approved/rejected)

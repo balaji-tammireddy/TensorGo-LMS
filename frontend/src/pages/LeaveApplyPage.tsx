@@ -2129,7 +2129,7 @@ const LeaveApplyPage: React.FC = () => {
                             {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
                           </td>
                           <td>{request.noOfDays}</td>
-                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType}</td>
+                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                           <td>
                             {(() => {
                               const approvedDates = (request.leaveDays || [])

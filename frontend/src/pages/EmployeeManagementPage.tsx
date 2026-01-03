@@ -1003,7 +1003,7 @@ const EmployeeManagementPage: React.FC = () => {
                               return (
                                 <tr key={request.id} style={{ borderBottom: '1px solid #e5e5e5' }}>
                                   <td style={{ padding: '8px' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px', textTransform: 'capitalize' }}>{request.leaveType}</td>
+                                  <td style={{ padding: '8px' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                                   <td style={{ padding: '8px' }}>{format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
                                   <td style={{ padding: '8px' }}>{format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
                                   <td style={{ padding: '8px' }}>{request.noOfDays}</td>

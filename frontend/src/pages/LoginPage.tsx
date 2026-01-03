@@ -130,7 +130,9 @@ const LoginPage: React.FC = () => {
     try {
       await verifyOTP({ email: forgotPasswordEmail.trim(), otp: otp.trim() });
       showSuccess('OTP verified successfully');
-      setForgotPasswordStep('password');
+      // Redirect to change-password with state protection
+      navigate('/change-password', { state: { fromForgotPassword: true } });
+      setShowForgotPassword(false);
     } catch (err: any) {
       const errorData = err.response?.data?.error;
       const message = errorData?.message || err.message || 'Invalid or expired OTP';

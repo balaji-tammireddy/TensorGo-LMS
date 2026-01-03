@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
@@ -8,6 +9,8 @@ import './LoginPage.css';
 const ChangePasswordPage: React.FC = () => {
   const { user, logout } = useAuth();
   const { showSuccess, showError, showWarning } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,6 +18,17 @@ const ChangePasswordPage: React.FC = () => {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Protect route: only accessible from forgot password flow
+  useEffect(() => {
+    if (!location.state?.fromForgotPassword) {
+      navigate('/login');
+    }
+  }, [location.state, navigate]);
+
+  if (!location.state?.fromForgotPassword) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,11 +69,6 @@ const ChangePasswordPage: React.FC = () => {
     <div className="login-page">
       <div className="login-container">
         <h1>Change Password</h1>
-        <p className="login-subtitle">
-          {user?.mustChangePassword
-            ? 'For security, please set a new password before using the portal.'
-            : 'Update your account password.'}
-        </p>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
             <label>Current Password</label>
