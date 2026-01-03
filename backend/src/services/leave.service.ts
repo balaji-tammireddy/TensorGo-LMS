@@ -372,13 +372,27 @@ export const applyLeave = async (
     }
 
     const userResult = await pool.query(
-      `SELECT u.role as employee_role, u.reporting_manager_id, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-        u.emp_id as employee_emp_id, rm.email as manager_email, rm.first_name || ' ' || COALESCE(rm.last_name, '') as manager_name,
-        rm.role as manager_role, rm.reporting_manager_id as hr_id, hr.email as hr_email,
-        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name, hr.role as hr_role
+      `SELECT u.role as employee_role, 
+              COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
+              u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+              u.emp_id as employee_emp_id, 
+              COALESCE(rm.email, sa.sa_email) as manager_email, 
+              COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as manager_name,
+              COALESCE(rm.role, 'super_admin') as manager_role, 
+              rm.reporting_manager_id as hr_id, 
+              hr.email as hr_email,
+              hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name, 
+              hr.role as hr_role
       FROM users u
       LEFT JOIN users rm ON u.reporting_manager_id = rm.id
       LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
+      LEFT JOIN LATERAL (
+        SELECT id as sa_id, email as sa_email, first_name || ' ' || COALESCE(last_name, '') as sa_full_name
+        FROM users 
+        WHERE role = 'super_admin'
+        ORDER BY id ASC
+        LIMIT 1
+      ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
       WHERE u.id = $1`,
       [userId]
     );

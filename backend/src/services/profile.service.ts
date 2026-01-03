@@ -7,11 +7,18 @@ export const getProfile = async (userId: number) => {
   logger.info(`[PROFILE] [GET PROFILE] User ID: ${userId}`);
   const result = await pool.query(
     `SELECT u.*, 
-            rm.id as reporting_manager_id, 
-            rm.first_name || ' ' || COALESCE(rm.last_name, '') as reporting_manager_full_name,
-            rm.emp_id as reporting_manager_emp_id
+            COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
+            COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
+            COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id
      FROM users u
      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
+     LEFT JOIN LATERAL (
+       SELECT id as sa_id, first_name || ' ' || COALESCE(last_name, '') as sa_full_name, emp_id as sa_emp_id
+       FROM users 
+       WHERE role = 'super_admin'
+       ORDER BY id ASC
+       LIMIT 1
+     ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
      WHERE u.id = $1`,
     [userId]
   );
