@@ -146,10 +146,10 @@ const LeaveApplyPage: React.FC = () => {
 
     // Clamp to office hours (10:00-18:00 for start time)
     if (roundedStartTime < '10:00') {
-      showWarning('Start time must be within office hours (10:00 AM - 6:00 PM). Setting to 10:00.');
+      showWarning('Start time set to 10:00 AM (Office Hours).');
       roundedStartTime = '10:00';
     } else if (roundedStartTime > '18:00') {
-      showWarning('Start time must be within office hours (10:00 AM - 6:00 PM). Setting to 18:00.');
+      showWarning('Start time set to 6:00 PM (Office Hours).');
       roundedStartTime = '18:00';
     }
 
@@ -162,7 +162,7 @@ const LeaveApplyPage: React.FC = () => {
 
       if (selectedTime < now) {
         const nextSlot = clampToOfficeHours(getNext15MinuteSlot(), true);
-        showWarning('Start time cannot be in the past. Setting to next available 15-minute slot within office hours.');
+        showWarning('Start time cannot be in the past. Moved to next open slot.');
         setFormData({
           ...formData,
           timeForPermission: {
@@ -255,7 +255,7 @@ const LeaveApplyPage: React.FC = () => {
 
     // Validate end time is after start time
     if (diffHours <= 0) {
-      showWarning('End time must be after start time.');
+      showWarning('End time must be after start.');
       // Reset to 2 hours after start, rounded to 15 minutes, within office hours
       const calculatedEndTime = new Date(startTime);
       calculatedEndTime.setHours(calculatedEndTime.getHours() + 2);
@@ -281,7 +281,7 @@ const LeaveApplyPage: React.FC = () => {
 
     // Validate duration doesn't exceed 2 hours
     if (diffHours > 2) {
-      showWarning('Permission duration cannot exceed 2 hours. Maximum end time is 2 hours after start time.');
+      showWarning('Permission limited to 2 hours max.');
       // Reset to 2 hours after start, rounded to 15 minutes, within office hours
       const calculatedEndTime = new Date(startTime);
       calculatedEndTime.setHours(calculatedEndTime.getHours() + 2);
@@ -758,7 +758,7 @@ const LeaveApplyPage: React.FC = () => {
         queryClient.invalidateQueries('leaveBalances');
         queryClient.invalidateQueries('myLeaveRequests');
 
-        showSuccess(variables.id ? 'Leave updated successfully!' : 'Leave applied successfully!');
+        showSuccess(variables.id ? 'Leave updated!' : 'Leave applied!');
         setFormData({
           leaveType: 'casual',
           startDate: '',

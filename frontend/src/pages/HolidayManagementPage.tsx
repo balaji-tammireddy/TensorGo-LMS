@@ -62,13 +62,13 @@ const HolidayManagementPage: React.FC = () => {
             leaveService.createHoliday(holidayDate, holidayName),
         {
             onSuccess: () => {
-                showSuccess('Holiday created successfully!');
+                showSuccess('Holiday created!');
                 setFormData({ holidayDate: '', holidayName: '' });
                 queryClient.invalidateQueries(['holidays', selectedYear]);
                 queryClient.invalidateQueries('holidays');
             },
             onError: (error: any) => {
-                const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to create holiday';
+                const errorMessage = error.response?.data?.error?.message || error.message || 'Creation failed';
                 showError(errorMessage);
             }
         }
@@ -79,14 +79,14 @@ const HolidayManagementPage: React.FC = () => {
         (holidayId: number) => leaveService.deleteHoliday(holidayId),
         {
             onSuccess: () => {
-                showSuccess('Holiday deleted successfully!');
+                showSuccess('Holiday deleted!');
                 queryClient.invalidateQueries(['holidays', selectedYear]);
                 queryClient.invalidateQueries('holidays');
                 setDeleteConfirmOpen(false);
                 setSelectedHoliday(null);
             },
             onError: (error: any) => {
-                const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to delete holiday';
+                const errorMessage = error.response?.data?.error?.message || error.message || 'Delete failed';
                 showError(errorMessage);
                 setDeleteConfirmOpen(false);
             }
@@ -97,7 +97,7 @@ const HolidayManagementPage: React.FC = () => {
         e.preventDefault();
 
         if (!formData.holidayDate || !formData.holidayName.trim()) {
-            showError('Please fill in all fields');
+            showError('All fields required');
             return;
         }
 
@@ -159,7 +159,7 @@ const HolidayManagementPage: React.FC = () => {
                                 <input
                                     type="text"
                                     value={formData.holidayName}
-                                    onChange={(e) => setFormData({ ...formData, holidayName: e.target.value })}                                    maxLength={100}
+                                    onChange={(e) => setFormData({ ...formData, holidayName: e.target.value })} maxLength={100}
                                 />
                             </div>
                             <div className="hm-form-actions">

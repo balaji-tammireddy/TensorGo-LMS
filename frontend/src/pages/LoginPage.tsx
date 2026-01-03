@@ -71,7 +71,7 @@ const LoginPage: React.FC = () => {
         setIsInactive(true);
       } else if (status === 429) {
         // Too many requests (rate limiting)
-        showWarning('Too many requests. Please try again later.');
+        showWarning('Too many requests. Try again later.');
       } else if (errorData?.details && Array.isArray(errorData.details)) {
         // Show validation details if available
         const formatFieldName = (path: string[]): string => {
@@ -109,7 +109,7 @@ const LoginPage: React.FC = () => {
     setForgotPasswordLoading(true);
     try {
       await forgotPassword({ email: forgotPasswordEmail.trim() });
-      showSuccess('If the email exists, an OTP has been sent to your registered email address.');
+      showSuccess('OTP sent to your email (if registered).');
       setForgotPasswordStep('otp');
     } catch (err: any) {
       const errorData = err.response?.data?.error;
@@ -158,7 +158,7 @@ const LoginPage: React.FC = () => {
         otp: otp.trim(),
         newPassword: newPassword.trim()
       });
-      showSuccess('Password reset successfully. Please login with your new password.');
+      showSuccess('Password reset successful. Please login.');
       // Reset forgot password state
       setShowForgotPassword(false);
       setForgotPasswordStep('email');

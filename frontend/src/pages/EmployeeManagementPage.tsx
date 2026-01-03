@@ -112,13 +112,13 @@ const emptyEmployeeForm = {
   middleName: '',
   lastName: '',
   contactNumber: '',
-  altContact: '',
+  alternateContactNumber: '',
   dateOfBirth: '',
   gender: '',
   bloodGroup: '',
   maritalStatus: '',
   emergencyContactName: '',
-  emergencyContactNo: '',
+  emergencyContactNumber: '',
   emergencyContactRelation: '',
   designation: '',
   department: '',
@@ -249,10 +249,10 @@ const EmployeeManagementPage: React.FC = () => {
       setIsModalOpen(false);
       setNewEmployee(emptyEmployeeForm);
       setIsSameAddress(false);
-      showSuccess('Employee created successfully!');
+      showSuccess('Employee created!');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.error?.message || 'Failed to create employee');
+      showError(error.response?.data?.error?.message || 'CreationFailed');
     }
   });
 
@@ -267,10 +267,10 @@ const EmployeeManagementPage: React.FC = () => {
         setIsSameAddress(false);
         setIsEditMode(false);
         setEditingEmployeeId(null);
-        showSuccess('Employee updated successfully!');
+        showSuccess('Employee updated!');
       },
       onError: (error: any) => {
-        showError(error.response?.data?.error?.message || 'Failed to update employee');
+        showError(error.response?.data?.error?.message || 'Update failed');
       }
     }
   );
@@ -282,10 +282,10 @@ const EmployeeManagementPage: React.FC = () => {
         queryClient.invalidateQueries('employees');
         setDeleteConfirmOpen(false);
         setDeleteEmployeeId(null);
-        showSuccess('Employee and all related data deleted successfully!');
+        showSuccess('Employee deleted!');
       },
       onError: (error: any) => {
-        showError(error.response?.data?.error?.message || 'Failed to delete employee');
+        showError(error.response?.data?.error?.message || 'Delete failed');
       }
     }
   );
@@ -298,7 +298,7 @@ const EmployeeManagementPage: React.FC = () => {
         queryClient.invalidateQueries('employees');
         setAddLeavesModalOpen(false);
         setSelectedEmployeeForLeaves(null);
-        showSuccess('Leaves added successfully!');
+        showSuccess('Leaves added!');
       },
       onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Failed to add leaves');
@@ -346,7 +346,7 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.empId)) {
       missingFields.push('Employee ID');
     } else if (newEmployee.empId.length > 6) {
-      showWarning('Employee ID must be maximum 6 characters');
+      showWarning('Employee ID max 6 chars');
       return;
     }
     if (isEmpty(newEmployee.email)) {
@@ -354,12 +354,12 @@ const EmployeeManagementPage: React.FC = () => {
     } else {
       const email = newEmployee.email.toLowerCase();
       if (!email.endsWith('@tensorgo.com') && !email.endsWith('@tensorgo.co.in')) {
-        showWarning('Only organization mail should be used');
+        showWarning('Use organization email');
         return;
       }
     }
     if (isEmpty(newEmployee.contactNumber)) missingFields.push('Contact Number');
-    if (isEmpty(newEmployee.altContact)) missingFields.push('Alt Contact');
+    if (isEmpty(newEmployee.alternateContactNumber)) missingFields.push('Alternate Contact Number');
     if (isEmpty(newEmployee.dateOfBirth)) missingFields.push('Date of Birth');
 
     // Validate age - employee must be at least 18 years old
@@ -372,7 +372,7 @@ const EmployeeManagementPage: React.FC = () => {
         age--;
       }
       if (age < 18) {
-        showWarning('Employee must be at least 18 years old');
+        showWarning('Must be 18+ years old');
         return;
       }
     }
@@ -382,8 +382,8 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.maritalStatus)) missingFields.push('Marital Status');
     if (isEmpty(newEmployee.emergencyContactName))
       missingFields.push('Emergency Contact Name');
-    if (isEmpty(newEmployee.emergencyContactNo))
-      missingFields.push('Emergency Contact No');
+    if (isEmpty(newEmployee.emergencyContactNumber))
+      missingFields.push('Emergency Contact Number');
     if (isEmpty(newEmployee.emergencyContactRelation))
       missingFields.push('Emergency Contact Relation');
 
@@ -435,7 +435,7 @@ const EmployeeManagementPage: React.FC = () => {
           const year = parseInt(edu.year, 10);
           if (isNaN(year) || year < 1950 || year > maxYear) {
             if (!yearValidationError) {
-              yearValidationError = `Graduation Year must be between 1950 and ${maxYear}`;
+              yearValidationError = `Graduation Year: 1950 - ${maxYear}`;
             }
           }
         }
@@ -451,12 +451,12 @@ const EmployeeManagementPage: React.FC = () => {
     }
 
     if (missingFields.length > 0) {
-      showWarning('Please fill all the mandatory fields.');
+      showWarning('Fill mandatory fields');
       return;
     }
 
     if (newEmployee.aadharNumber && newEmployee.aadharNumber.length !== 12) {
-      showWarning('Aadhar Number must be exactly 12 digits.');
+      showWarning('Aadhar must be 12 digits');
       return;
     }
 
@@ -466,19 +466,19 @@ const EmployeeManagementPage: React.FC = () => {
         label: 'Contact Number'
       },
       {
-        value: newEmployee.altContact as string | undefined,
-        label: 'Alt Contact'
+        value: newEmployee.alternateContactNumber as string | undefined,
+        label: 'Alternate Contact Number'
       },
       {
-        value: newEmployee.emergencyContactNo as string | undefined,
-        label: 'Emergency Contact No'
+        value: newEmployee.emergencyContactNumber as string | undefined,
+        label: 'Emergency Contact Number'
       }
     ];
 
     for (const field of phoneFields) {
       const v = field.value || '';
       if (v.length !== 10) {
-        showWarning(`${field.label} must be exactly 10 digits.`);
+        showWarning(`${field.label} must be 10 digits`);
         return;
       }
     }
@@ -564,7 +564,7 @@ const EmployeeManagementPage: React.FC = () => {
       setEditingEmployeeId(employeeId);
       setIsModalOpen(true);
     } catch (error: any) {
-      showError(error?.response?.data?.error?.message || 'Failed to load employee details');
+      showError(error?.response?.data?.error?.message || 'Load failed');
     } finally {
       setIsDetailLoading(false);
     }
@@ -676,7 +676,7 @@ const EmployeeManagementPage: React.FC = () => {
                 if (e.key === 'Enter') {
                   const value = e.currentTarget.value.trim();
                   if (value.length < 3) {
-                    showWarning('Please type at least 3 characters to search.');
+                    showWarning('Type 3+ chars to search');
                     return;
                   }
                   setAppliedSearch(value);
@@ -1125,7 +1125,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className="employee-modal-field">
                           <label>
-                            Alt Contact<span className="required-indicator">*</span>
+                            Alternate Contact Number<span className="required-indicator">*</span>
                           </label>
                           <input
                             type="text"
@@ -1337,7 +1337,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className="employee-modal-field">
                           <label>
-                            Emergency Contact No<span className="required-indicator">*</span>
+                            Emergency Contact Number<span className="required-indicator">*</span>
                           </label>
                           <input
                             type="text"

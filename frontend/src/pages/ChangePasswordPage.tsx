@@ -20,19 +20,19 @@ const ChangePasswordPage: React.FC = () => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      showWarning('New password and confirm password do not match.');
+      showWarning('Passwords do not match.');
       return;
     }
 
     if (newPassword.length < 6) {
-      showWarning('New password must be at least 6 characters.');
+      showWarning('Password too short (min 6 chars).');
       return;
     }
 
     try {
       setLoading(true);
       await api.post('/auth/change-password', { oldPassword, newPassword });
-      showSuccess('Password updated successfully. Please log in again with your new password.');
+      showSuccess('Password updated. Please login again.');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -44,7 +44,7 @@ const ChangePasswordPage: React.FC = () => {
       }, 1500);
     } catch (err: any) {
       const message =
-        err.response?.data?.error?.message || err.message || 'Failed to change password.';
+        err.response?.data?.error?.message || err.message || 'Update failed.';
       showError(message);
     } finally {
       setLoading(false);

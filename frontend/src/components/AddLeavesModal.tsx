@@ -66,13 +66,13 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     const countNum = parseFloat(count);
 
     if (isNaN(countNum) || countNum <= 0) {
-      setValidationError('Please enter a valid number greater than 0');
+      setValidationError('Enter a number greater than 0');
       return;
     }
 
     // Check if it's an integer or .5
     if (countNum % 1 !== 0 && countNum % 1 !== 0.5) {
-      setValidationError('Only whole numbers or 0.5 increments are allowed');
+      setValidationError('Use whole numbers or .5');
       return;
     }
 
@@ -85,7 +85,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 
     // Check if count is 3 digits or more (100+)
     if (countNum >= 100) {
-      const errorMsg = 'Cannot enter 3-digit numbers.';
+      const errorMsg = 'Max 2 digits allowed.';
       setValidationError(errorMsg);
       showWarning(errorMsg);
       return;
@@ -93,7 +93,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 
     // Check if total would exceed 99
     if (newTotal > 99) {
-      const errorMsg = `Cannot add ${countNum} leaves. Current ${leaveType} balance: ${currentBalance}, Maximum limit: 99. Total would be: ${newTotal}`;
+      const errorMsg = `Limit exceeded. Max: 99.`;
       setValidationError(errorMsg);
       showWarning(errorMsg);
       return;
@@ -122,7 +122,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 
     // Prevent 3-digit numbers (100 and above)
     if (!isNaN(countNum) && countNum >= 100) {
-      setValidationError('Cannot enter 3-digit numbers.');
+      setValidationError('Max 2 digits allowed.');
       return;
     }
 
@@ -134,7 +134,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
       const newTotal = currentBalance + countNum;
 
       if (newTotal > 99) {
-        setValidationError(`Total would exceed 99 (current: ${currentBalance} + ${countNum} = ${newTotal})`);
+        setValidationError(`Total exceeds 99.`);
       }
     }
   };

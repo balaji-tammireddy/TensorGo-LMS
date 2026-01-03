@@ -13,9 +13,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px;
+  padding: 18px 24px;
   min-width: 300px;
-  max-width: 400px;
+  max-width: 450px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -36,6 +36,7 @@
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -85,7 +86,7 @@
 
 .toast-message {
   flex: 1;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: #203050;
   line-height: 1.4;
@@ -110,4 +111,3 @@
   background: rgba(0, 0, 0, 0.05);
   color: #203050;
 }
-

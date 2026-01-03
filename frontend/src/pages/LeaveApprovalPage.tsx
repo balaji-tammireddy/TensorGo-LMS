@@ -112,7 +112,7 @@ const LeaveApprovalPage: React.FC = () => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
-        showSuccess('Leave approved successfully!');
+        showSuccess('Leave approved!');
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
@@ -124,7 +124,7 @@ const LeaveApprovalPage: React.FC = () => {
         if (context?.previousApproved) {
           queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
         }
-        showError(error.response?.data?.error?.message || 'Failed to approve leave');
+        showError(error.response?.data?.error?.message || 'Approval failed');
       },
       onSettled: (_, __, { id }) => {
         setUpdatingRequestIds(prev => {
@@ -171,7 +171,7 @@ const LeaveApprovalPage: React.FC = () => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
-        showSuccess('Leave rejected successfully!');
+        showSuccess('Leave rejected!');
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
@@ -183,7 +183,7 @@ const LeaveApprovalPage: React.FC = () => {
         if (context?.previousApproved) {
           queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
         }
-        showError(error.response?.data?.error?.message || 'Failed to reject leave');
+        showError(error.response?.data?.error?.message || 'Rejection failed');
       },
       onSettled: (_, __, { id }) => {
         setUpdatingRequestIds(prev => {
@@ -210,7 +210,7 @@ const LeaveApprovalPage: React.FC = () => {
 
   const handleModalReject = (requestId: number, selectedDayIds?: number[], reason?: string) => {
     if (!reason) {
-      showError('Rejection reason is required');
+      showError('Rejection reason required');
       return;
     }
     rejectMutation.mutate({ id: requestId, dayIds: selectedDayIds, comment: reason });
@@ -241,7 +241,7 @@ const LeaveApprovalPage: React.FC = () => {
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         queryClient.invalidateQueries(['leaveBalances']);
-        showSuccess('Leave request converted from LOP to Casual successfully!');
+        showSuccess('Converted LOP to Casual successfully!');
         // Update selected request if modal is open
         if (selectedRequest && selectedRequest.id === requestId) {
           setSelectedRequest({
@@ -255,7 +255,7 @@ const LeaveApprovalPage: React.FC = () => {
         if (context?.previousPending) {
           queryClient.setQueryData(['pendingLeaves'], context.previousPending);
         }
-        showError(error.response?.data?.error?.message || 'Failed to convert leave request');
+        showError(error.response?.data?.error?.message || 'Conversion failed');
       }
     }
   );
@@ -295,7 +295,7 @@ const LeaveApprovalPage: React.FC = () => {
         setIsModalOpen(true);
       }
     } catch (error: any) {
-      showError(error.response?.data?.error?.message || 'Failed to load leave details');
+      showError(error.response?.data?.error?.message || 'Failed to load details');
     }
   };
 
@@ -305,7 +305,7 @@ const LeaveApprovalPage: React.FC = () => {
       // Check permissions before opening modal
       const fullRequest = approvedData?.requests?.find((r: any) => r.id === requestId);
       if (!fullRequest) {
-        showError('Leave request not found');
+        showError('Request not found');
         setEditingRequestId(null);
         return;
       }
@@ -315,13 +315,13 @@ const LeaveApprovalPage: React.FC = () => {
       const lastUpdatedByRole = fullRequest.lastUpdatedByRole;
       if (lastUpdatedByRole === 'super_admin') {
         if (user?.role !== 'super_admin') {
-          showError('Super Admin has updated the status of this leave. You cannot update it now.');
+          showError('Super Admin updated this. Cannot edit.');
           setEditingRequestId(null);
           return;
         }
       } else if (lastUpdatedByRole === 'hr') {
         if (user?.role === 'manager') {
-          showError('HR has updated the status of this leave. You cannot update it now.');
+          showError('HR updated this. Cannot edit.');
           setEditingRequestId(null);
           return;
         }
@@ -352,7 +352,7 @@ const LeaveApprovalPage: React.FC = () => {
       setIsEditMode((user?.role === 'hr' || user?.role === 'super_admin') && fullRequest.canEdit);
       setIsModalOpen(true);
     } catch (error: any) {
-      showError(error.response?.data?.error?.message || 'Failed to load leave for editing');
+      showError(error.response?.data?.error?.message || 'Failed to load for editing');
     } finally {
       setEditingRequestId(null);
     }
@@ -399,7 +399,7 @@ const LeaveApprovalPage: React.FC = () => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
-        showSuccess('Leave status updated successfully!');
+        showSuccess('Status updated!');
         setIsModalOpen(false);
         setSelectedRequest(null);
         setIsEditMode(false);
@@ -412,7 +412,7 @@ const LeaveApprovalPage: React.FC = () => {
         if (context?.previousApproved) {
           queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
         }
-        showError(error.response?.data?.error?.message || 'Failed to update leave status');
+        showError(error.response?.data?.error?.message || 'Update failed');
       },
       onSettled: (_, __, { id }) => {
         setUpdatingRequestIds(prev => {

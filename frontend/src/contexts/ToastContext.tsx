@@ -37,7 +37,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const showToast = useCallback(
-    (message: string, type: ToastType = 'info', duration: number = 3000) => {
+    (message: string, type: ToastType = 'info', duration: number = 6000) => {
       const id = Math.random().toString(36).substring(7);
       const newToast: Toast = { id, message, type, duration };
 

@@ -161,27 +161,27 @@ const ProfilePage: React.FC = () => {
       setIsEditMode(false);
     },
     onError: (error: any) => {
-      showError(error.response?.data?.error?.message || 'Failed to update profile');
+      showError(error.response?.data?.error?.message || 'Update failed');
     }
   });
 
   const uploadPhotoMutation = useMutation(profileService.uploadProfilePhoto, {
     onSuccess: () => {
       queryClient.invalidateQueries('profile');
-      showSuccess('Profile photo updated successfully!');
+      showSuccess('Photo updated!');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.error?.message || 'Failed to upload profile photo');
+      showError(error.response?.data?.error?.message || 'Upload failed');
     }
   });
 
   const deletePhotoMutation = useMutation(profileService.deleteProfilePhoto, {
     onSuccess: () => {
       queryClient.invalidateQueries('profile');
-      showSuccess('Profile photo deleted successfully!');
+      showSuccess('Photo deleted!');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.error?.message || 'Failed to delete profile photo');
+      showError(error.response?.data?.error?.message || 'Delete failed');
     }
   });
 
@@ -234,7 +234,7 @@ const ProfilePage: React.FC = () => {
     if (isEmpty(formData.personalInfo?.empId)) missingFields.push('Employee ID');
     if (isEmpty(formData.personalInfo?.email)) missingFields.push('Official Email');
     if (isEmpty(formData.personalInfo?.contactNumber)) missingFields.push('Contact Number');
-    if (isEmpty(formData.personalInfo?.altContact)) missingFields.push('Alt Contact');
+    if (isEmpty(formData.personalInfo?.alternateContactNumber)) missingFields.push('Alternate Contact Number');
     if (isEmpty(formData.personalInfo?.dateOfBirth)) missingFields.push('Date of Birth');
 
     // Validate age - employee must be at least 18 years old
@@ -247,7 +247,7 @@ const ProfilePage: React.FC = () => {
         age--;
       }
       if (age < 18) {
-        showWarning('Employee must be at least 18 years old');
+        showWarning('Must be 18+ years old');
         return;
       }
     }
@@ -256,7 +256,7 @@ const ProfilePage: React.FC = () => {
     if (isEmpty(formData.personalInfo?.bloodGroup)) missingFields.push('Blood Group');
     if (isEmpty(formData.personalInfo?.maritalStatus)) missingFields.push('Marital Status');
     if (isEmpty(formData.personalInfo?.emergencyContactName)) missingFields.push('Emergency Contact Name');
-    if (isEmpty(formData.personalInfo?.emergencyContactNo)) missingFields.push('Emergency Contact No');
+    if (isEmpty(formData.personalInfo?.emergencyContactNumber)) missingFields.push('Emergency Contact Number');
     if (isEmpty(formData.personalInfo?.emergencyContactRelation)) missingFields.push('Emergency Contact Relation');
 
     // Employment information
@@ -301,7 +301,7 @@ const ProfilePage: React.FC = () => {
           const year = parseInt(edu.year, 10);
           if (isNaN(year) || year < 1950 || year > maxYear) {
             if (!yearValidationError) {
-              yearValidationError = `Graduation Year must be between 1950 and ${maxYear}`;
+              yearValidationError = `Graduation Year: 1950 - ${maxYear}`;
             }
           }
         }
@@ -316,13 +316,13 @@ const ProfilePage: React.FC = () => {
     }
 
     if (missingFields.length > 0) {
-      showWarning('Please fill all the mandatory fields.');
+      showWarning('Fill mandatory fields');
       return;
     }
 
     const aadhar = formData.documents?.aadharNumber as string | undefined;
     if (aadhar && aadhar.length !== 12) {
-      showWarning('Aadhar Number must be exactly 12 digits.');
+      showWarning('Aadhar must be 12 digits');
       return;
     }
 
@@ -332,19 +332,19 @@ const ProfilePage: React.FC = () => {
         label: 'Contact Number'
       },
       {
-        value: formData.personalInfo?.altContact as string | undefined,
-        label: 'Alt Contact'
+        value: formData.personalInfo?.alternateContactNumber as string | undefined,
+        label: 'Alternate Contact Number'
       },
       {
-        value: formData.personalInfo?.emergencyContactNo as string | undefined,
-        label: 'Emergency Contact No'
+        value: formData.personalInfo?.emergencyContactNumber as string | undefined,
+        label: 'Emergency Contact Number'
       }
     ];
 
     for (const field of phoneFields) {
       const v = field.value || '';
       if (v.length !== 10) {
-        showWarning(`${field.label} must be exactly 10 digits.`);
+        showWarning(`${field.label} must be 10 digits`);
         return;
       }
     }
@@ -711,7 +711,7 @@ const ProfilePage: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>
-                  Alt Contact
+                  Alternate Contact Number
                   {isEditMode && <span className="required-indicator">*</span>}
                 </label>
                 <input
@@ -925,7 +925,7 @@ const ProfilePage: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>
-                  Emergency Contact No
+                  Emergency Contact Number
                   {isEditMode && <span className="required-indicator">*</span>}
                 </label>
                 <input
