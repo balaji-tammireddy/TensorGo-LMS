@@ -331,6 +331,27 @@ const ProfilePage: React.FC = () => {
         setFormErrors(fieldErrors);
         return;
       }
+
+      // Chronological validation: 12th < UG < PG
+      const pgYear = parseInt(formData.education.find((e: any) => e.level === 'PG')?.year, 10);
+      const ugYear = parseInt(formData.education.find((e: any) => e.level === 'UG')?.year, 10);
+      const hscYear = parseInt(formData.education.find((e: any) => e.level === '12th')?.year, 10);
+
+      if (!isNaN(ugYear) && !isNaN(hscYear) && hscYear >= ugYear) {
+        showWarning('12th Graduation Year must be before UG Graduation Year');
+        const hscIndex = formData.education.findIndex((e: any) => e.level === '12th');
+        fieldErrors[`edu_${hscIndex}_year`] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+
+      if (!isNaN(pgYear) && !isNaN(ugYear) && ugYear >= pgYear) {
+        showWarning('UG Graduation Year must be before PG Graduation Year');
+        const ugIndex = formData.education.findIndex((e: any) => e.level === 'UG');
+        fieldErrors[`edu_${ugIndex}_year`] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
     }
 
     setFormErrors(fieldErrors);

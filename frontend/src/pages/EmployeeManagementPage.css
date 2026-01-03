@@ -422,44 +422,72 @@
 
 .education-table {
   width: 100%;
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: 12px;
+  font-size: 13px;
   border-collapse: collapse;
+  border: 1px solid #e0e0e0;
 }
 
 .education-table th,
 .education-table td {
   border: 1px solid #e0e0e0;
-  padding: 6px 8px;
+  padding: 10px 12px;
+  vertical-align: middle;
 }
 
 .education-table thead th {
-  background-color: #f8f9fa;
-  font-size: 11px;
-  font-weight: 600;
+  background-color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
   text-align: center;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  color: #333;
+  border-bottom: 2px solid #eee;
 }
 
 .education-level-col {
-  width: 60px;
+  width: 100px;
 }
 
 .education-level-cell {
-  width: 60px;
+  width: 100px;
   text-align: center;
-  background-color: #f7f7f7;
+  background-color: #ffffff;
   font-weight: 500;
+  color: #444;
+}
+
+.education-table td:nth-child(2),
+.education-table td:nth-child(3) {
+  text-align: left;
+}
+
+.education-table td:nth-child(4),
+.education-table td:nth-child(5) {
+  text-align: center;
+  width: 120px;
 }
 
 .education-table input {
   width: 100%;
-  padding: 4px 6px;
-  border: 1px solid #dcdcdc;
-  border-radius: 2px;
-  font-size: 12px;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: #f8f9fa;
+  transition: all 0.2s ease;
+  color: #333;
+}
+
+.education-table input:focus {
+  outline: none;
+  border-color: #3c6ff2;
+  background-color: #fff;
+  box-shadow: 0 0 0 2px rgba(60, 111, 242, 0.1);
+}
+
+.education-table td:nth-child(4) input,
+.education-table td:nth-child(5) input {
+  text-align: center;
 }
 
 .employee-modal-footer {
@@ -610,6 +638,12 @@
   }
 }
 
+.required-indicator {
+  color: #e53935;
+  margin-left: 2px;
+  font-weight: bold;
+}
+
 /* Local loading styles for employee management */
 .employees-table-wrapper {
   position: relative;
@@ -643,4 +677,8 @@
 
 .education-table tr.has-error input {
   border-color: #e53935;
+}
+.education-table td.has-error input {
+  border-color: #e53935 !important;
+  background-color: #fffcfc !important;
 }
