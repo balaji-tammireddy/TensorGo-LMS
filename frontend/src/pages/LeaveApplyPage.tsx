@@ -1285,7 +1285,7 @@ const LeaveApplyPage: React.FC = () => {
                 {rules.map((rule, idx) => (
                   <tr key={idx}>
                     <td>{rule.leaveRequired.replace('4.0', '4').replace('10.0', '10')}</td>
-                    <td>{rule.priorInformation.replace(/30\\s*Month/i, '30 days').replace('Month', 'days')}</td>
+                    <td>{rule.priorInformation}</td>
                   </tr>
                 ))}
               </tbody>

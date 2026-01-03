@@ -153,10 +153,15 @@
   text-transform: uppercase;
 }
 
-.status-applied,
 .status-pending {
   background-color: #ffab00;
   /* Yellow/Amber for Pending */
+  color: #fff;
+}
+
+.status-applied {
+  background-color: #3c6ff2;
+  /* Blue for Applied */
   color: #fff;
 }
 

@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
+
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -35,12 +35,9 @@ app.use(
   })
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // limit each IP to 200 requests per windowMs
-});
-app.use('/api/', limiter);
+// Rate limiting removed
+// const limiter = rateLimit({ ... });
+// app.use('/api/', limiter);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

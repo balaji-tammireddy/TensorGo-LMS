@@ -193,7 +193,7 @@ const LoginPage: React.FC = () => {
           <>
             <div className="login-header">
               <div className="login-logo">
-                <img src="/uploads/TensorGo logo black bg.png" alt="TensorGo logo" />
+                <img src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/logo.png" alt="TensorGo logo" />
               </div>
             </div>
             <h1>HR Management System</h1>
@@ -215,7 +215,7 @@ const LoginPage: React.FC = () => {
           <>
             <div className="login-header">
               <div className="login-logo">
-                <img src="/uploads/TensorGo logo black bg.png" alt="TensorGo logo" />
+                <img src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/logo.png" alt="TensorGo logo" />
               </div>
             </div>
             <form onSubmit={handleSubmit} className="login-form">

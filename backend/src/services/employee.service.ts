@@ -44,7 +44,7 @@ export const getEmployees = async (
     params.push(joiningDate);
   }
 
-  query += ` ORDER BY CAST(emp_id AS INTEGER) ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  query += ` ORDER BY emp_id ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
   const result = await pool.query(query, params);
@@ -286,22 +286,10 @@ export const createEmployee = async (employeeData: any) => {
   const userId = result.rows[0].id;
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee created successfully with User ID: ${userId}`);
 
-  // Calculate all leave credits based on join date
-  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Calculating leave credits for join date: ${employeeData.dateOfJoining}`);
-  // This includes:
-  // - Initial credits (given immediately on join date: before/after 15th)
-  // - Monthly credits (from next month onwards, following "next month credit" logic:
-  //   leaves for month M are credited on last working day of month M-1)
-  // - 3-year anniversary bonus (+3 casual, one-time, if anniversary has passed)
-  // - 5-year anniversary bonus (+5 casual, one-time, if anniversary has passed)
-  // - Year-end adjustments (applied at end of each calendar year: casual capped at 8, sick reset to 0)
-  const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
-  const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
-
-  // Initialize leave balance with calculated credits
-  // Ensure casual balance doesn't exceed 99 limit
-  const casualBalance = Math.min(allCredits.casual, 99);
-  const sickBalance = Math.min(allCredits.sick, 99);
+  // Initialize leave balances (set to 0 by default as per requirement to disable auto-add on joining)
+  // LOP balance defaults to 10
+  const casualBalance = 0;
+  const sickBalance = 0;
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
   await pool.query(
