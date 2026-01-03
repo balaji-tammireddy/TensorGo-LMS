@@ -81,11 +81,14 @@
 
 .date-picker-popover-portal {
   z-index: 9999;
+  min-width: 280px;
+  max-width: 90vw;
 }
 
 .date-picker-popover-top {
   top: auto;
-  bottom: calc(100% + 8px);
+  bottom: auto;
+  transform: translateY(-100%);
 }
 
 .date-picker-icon-container {
