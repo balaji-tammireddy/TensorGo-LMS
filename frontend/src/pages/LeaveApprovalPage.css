@@ -146,41 +146,39 @@
 .status-badge {
   padding: 6px 12px;
   border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   display: inline-block;
-  min-width: 80px;
+  min-width: 130px;
   text-transform: uppercase;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .status-pending {
   background-color: #ffab00;
-  /* Yellow/Amber for Pending */
   color: #fff;
 }
 
 .status-applied {
   background-color: #3c6ff2;
-  /* Blue for Applied */
   color: #fff;
 }
 
 .status-approved {
   background-color: #00c853;
-  /* Green */
   color: #fff;
 }
 
 .status-rejected {
   background-color: #ff5252;
-  /* Red */
   color: #fff;
 }
 
 .status-partial {
-  background-color: #ff9800;
-  /* Orange */
+  background: linear-gradient(90deg, #ff8c00 0%, #ffab00 100%);
   color: #fff;
+  border: none;
 }
 
 .edit-btn {

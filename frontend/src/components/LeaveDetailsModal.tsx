@@ -112,6 +112,9 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const pendingDays = leaveRequest.leaveDays?.filter(day => day.status === 'pending') || [];
   const approvedDays = leaveRequest.leaveDays?.filter(day => day.status === 'approved') || [];
   const rejectedDays = leaveRequest.leaveDays?.filter(day => day.status === 'rejected') || [];
+  const approvedDatesFormatted = approvedDays.map(day => day.date).sort();
+  const approvedStart = approvedDatesFormatted[0] || '';
+  const approvedEnd = approvedDatesFormatted[approvedDatesFormatted.length - 1] || '';
 
   // Get available dates for selection (only pending dates)
   const availableDates = pendingDays.map(day => day.date).sort();
@@ -452,6 +455,20 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 )}
               </div>
 
+              {/* Approved Dates - show if partially approved */}
+              {leaveRequest.currentStatus === 'partially_approved' && approvedStart && (
+                <>
+                  <div className="leave-detail-item">
+                    <label>Approved Date From</label>
+                    <div className="leave-detail-value">{formatDateSafe(approvedStart)}</div>
+                  </div>
+                  <div className="leave-detail-item">
+                    <label>Approved Date To</label>
+                    <div className="leave-detail-value">{formatDateSafe(approvedEnd)}</div>
+                  </div>
+                </>
+              )}
+
               <div className="leave-detail-item leave-detail-item-full">
                 <label>Leave Reason</label>
                 <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
@@ -474,7 +491,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                   <div className="leave-detail-value">
                     {leaveRequest.approverName}
                     {leaveRequest.approverRole && (
-                      <span className="approver-role-badge"> ({leaveRequest.approverRole})</span>
+                      <span className="approver-role-badge"> {leaveRequest.approverRole}</span>
                     )}
                   </div>
                 </div>
@@ -584,9 +601,19 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 <div className="leave-detail-item leave-detail-item-full">
                   <label>Select Date Range to Approve/Reject</label>
                   <div className="date-range-picker-container">
+                    {!fromDate && !toDate && (
+                      <div className="date-range-selection-hint">
+                        Select a date range above to approve specific dates, or leave empty to process all pending dates. Note: Reject can only be used for all pending dates.
+                      </div>
+                    )}
+                    {fromDate && toDate && (
+                      <div className="date-range-selection-hint">
+                        Partial approval selected. Remaining dates will be automatically rejected.
+                      </div>
+                    )}
                     <div className="date-range-inputs">
                       <div className="date-range-input-group">
-                        <label>From Date</label>
+                        <label>Approved Date From</label>
                         <DatePicker
                           value={fromDate}
                           onChange={handleFromDateChange}
@@ -594,10 +621,10 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           max={maxDate}
                           disabled={isLoading}
                           placeholder="DD-MM-YYYY"
-                          />
+                        />
                       </div>
                       <div className="date-range-input-group">
-                        <label>To Date</label>
+                        <label>Approved Date To</label>
                         <DatePicker
                           value={toDate}
                           onChange={handleToDateChange}
@@ -614,16 +641,6 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         ({getSelectedDayIds().length} day(s))
                       </div>
                     )}
-                    {!fromDate && !toDate && (
-                      <div className="date-range-selection-hint">
-                        Select a date range above to approve specific dates, or leave empty to process all pending dates. Note: Reject can only be used for all pending dates.
-                      </div>
-                    )}
-                    {fromDate && toDate && (
-                      <div className="date-range-selection-hint">
-                        Partial approval selected. Remaining dates will be automatically rejected.
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -633,12 +650,9 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 <div className="leave-detail-item leave-detail-item-full">
                   <label>Select Date Range to Approve</label>
                   <div className="date-range-picker-container">
-                    <div className="date-range-selection-hint">
-                      Select the date range to approve. Remaining dates will be rejected.
-                    </div>
                     <div className="date-range-inputs">
                       <div className="date-range-input-group">
-                        <label>From Date</label>
+                        <label>Approved Date From</label>
                         <DatePicker
                           value={fromDate}
                           min={convertToInputDate(leaveRequest.startDate)}
@@ -654,7 +668,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         />
                       </div>
                       <div className="date-range-input-group">
-                        <label>To Date</label>
+                        <label>Approved Date To</label>
                         <DatePicker
                           value={toDate}
                           min={fromDate || convertToInputDate(leaveRequest.startDate)}
@@ -744,7 +758,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                     onUpdate(leaveRequest.id, selectedStatus, allDayIds, undefined, undefined);
                   }
                 }}
-                disabled={isLoading || selectedStatus === leaveRequest.currentStatus || (selectedStatus === 'partially_approved' && (!fromDate || !toDate))}
+                disabled={isLoading || (selectedStatus === 'partially_approved' ? (!fromDate || !toDate) : (selectedStatus === leaveRequest.currentStatus))}
               >
                 {isLoading ? (
                   <>

@@ -135,51 +135,49 @@ tr:hover {
 .status-badge {
   padding: 6px 12px;
   border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   display: inline-block;
-  min-width: 80px;
+  min-width: 130px;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   color: #fff;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .status-pending {
   background: #ffab00;
-  /* Yellow/Amber for Pending */
-  border: 1px solid #ff9100;
+  border: none;
 }
 
 .status-applied {
   background: #3c6ff2;
-  /* Blue for Applied */
-  border: 1px solid #2c5dd8;
+  border: none;
 }
 
 .status-approved {
   background: #00c853;
-  /* Green */
-  border: 1px solid #00b248;
+  border: none;
 }
 
 .status-rejected {
   background: #ff5252;
-  /* Red */
-  border: 1px solid #e53935;
+  border: none;
 }
 
 .status-partial,
 .status-partially-approved {
-  background: #ff9800;
-  /* Orange */
-  border: 1px solid #f57c00;
+  background: linear-gradient(90deg, #ff8c00 0%, #ffab00 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
 }
 
 .status-badge:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Ensure consistent font for table data */
