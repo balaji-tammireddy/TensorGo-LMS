@@ -1877,7 +1877,12 @@ const EmployeeManagementPage: React.FC = () => {
                                   <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent className="leave-type-dropdown-content" style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '250px' }}>
+                              <DropdownMenuContent
+                                side="top"
+                                align="start"
+                                className="leave-type-dropdown-content"
+                                style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '250px' }}
+                              >
                                 <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
                                   <input
                                     type="text"
