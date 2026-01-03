@@ -50,17 +50,17 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     const scrollY = window.pageYOffset || document.documentElement.scrollTop;
     const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
 
-    const popoverHeight = 240; // Lower threshold to prefer showing below
+    const popoverHeight = 320; // Increased threshold for better estimation
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
 
     let newPosition: 'top' | 'bottom' = 'bottom';
     let topValue = 0;
 
-    // Only show above if there is significantly more space above AND very little space below
+    // Flip to top if not enough space below AND more space above
     if (spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
       newPosition = 'top';
-      topValue = rect.top + scrollY - 264; // Approximate height when compact
+      topValue = rect.top + scrollY - 8; // Coordinate for bottom-aligned placement, CSS handles shift
     } else {
       newPosition = 'bottom';
       topValue = rect.bottom + scrollY + 4;
@@ -73,6 +73,17 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       width: rect.width
     });
   }, []);
+
+  // Body Scroll Locking
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (value) {
