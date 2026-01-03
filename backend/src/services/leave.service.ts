@@ -392,7 +392,8 @@ export const applyLeave = async (
       const leaveRequestResult = await client.query(
         `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null]
+        [userId, leaveData.leaveType, checkStartDateStr, normalizedStartType, checkEndDateStr, normalizedEndType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null]
+
       );
       leaveRequestId = leaveRequestResult.rows[0].id;
 
@@ -746,7 +747,7 @@ export const updateLeaveRequest = async (
   logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}, Leave Type: ${leaveData.leaveType}, Start: ${leaveData.startDate}, End: ${leaveData.endDate}`);
   // Verify the request and authorization
   const checkResult = await pool.query(
-    'SELECT current_status, employee_id FROM leave_requests WHERE id = $1',
+    'SELECT current_status, employee_id, leave_type, no_of_days FROM leave_requests WHERE id = $1',
     [requestId]
   );
 
@@ -756,6 +757,8 @@ export const updateLeaveRequest = async (
 
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
+  const oldLeaveType = checkResult.rows[0].leave_type;
+  const oldDays = parseFloat(checkResult.rows[0].no_of_days);
 
   // HR and Super Admin can edit any leave (approved, rejected, etc.)
   // Regular users can only edit pending leaves
@@ -793,13 +796,16 @@ export const updateLeaveRequest = async (
   endDate.setHours(0, 0, 0, 0);
 
   // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
-  const startDayOfWeek = startDate.getDay();
-  const endDayOfWeek = endDate.getDay();
-  if (startDayOfWeek === 0 || startDayOfWeek === 6) {
-    throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
-  }
-  if (endDayOfWeek === 0 || endDayOfWeek === 6) {
-    throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+  // EXCEPTION: LOP leaves can start/end on weekends
+  if (leaveData.leaveType !== 'lop') {
+    const startDayOfWeek = startDate.getDay();
+    const endDayOfWeek = endDate.getDay();
+    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+    }
+    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
+      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+    }
   }
 
   // Validation: Sick leave can be applied for past 3 days (including today) or ONLY tomorrow for future dates
@@ -822,8 +828,8 @@ export const updateLeaveRequest = async (
     }
     // daysDifference === 1 is allowed (tomorrow only)
     // daysDifference between -3 and 0 is allowed (past 3 days + today)
-  } else if (leaveData.leaveType === 'lop') {
-    // LOP: today is allowed, but not past dates
+  } else if (leaveData.leaveType === 'lop' || leaveData.leaveType === 'permission') {
+    // LOP/Permission: today is allowed, but not past dates
     if (startDate < today) {
       throw new Error('Cannot apply for past dates.');
     }
@@ -880,13 +886,15 @@ export const updateLeaveRequest = async (
   const holidayStartDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
   const holidayEndDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-  if (holidayDates.has(holidayStartDateStr)) {
-    const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
-    throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
-  }
-  if (holidayDates.has(holidayEndDateStr)) {
-    const holidayName = holidayNames.get(holidayEndDateStr) || 'Holiday';
-    throw new Error(`Cannot select ${holidayName} (${holidayEndDateStr}) as end date. Please select a working day.`);
+  if (leaveData.leaveType !== 'lop') {
+    if (holidayDates.has(holidayStartDateStr)) {
+      const holidayName = holidayNames.get(holidayStartDateStr) || 'Holiday';
+      throw new Error(`Cannot select ${holidayName} (${holidayStartDateStr}) as start date. Please select a working day.`);
+    }
+    if (holidayDates.has(holidayEndDateStr)) {
+      const holidayName = holidayNames.get(holidayEndDateStr) || 'Holiday';
+      throw new Error(`Cannot select ${holidayName} (${holidayEndDateStr}) as end date. Please select a working day.`);
+    }
   }
 
   // Validation: For sick leave, end date has same restrictions as start date
@@ -933,7 +941,8 @@ export const updateLeaveRequest = async (
       startDate,
       endDate,
       normalizedStartType as 'full' | 'half',
-      normalizedEndType as 'full' | 'half'
+      normalizedEndType as 'full' | 'half',
+      leaveData.leaveType
     );
 
     for (const requestedDay of requestedLeaveDays) {
@@ -988,7 +997,8 @@ export const updateLeaveRequest = async (
     startDate,
     endDate,
     normalizedStartType as 'full' | 'half',
-    normalizedEndType as 'full' | 'half'
+    normalizedEndType as 'full' | 'half',
+    leaveData.leaveType
   );
 
   // Require timings for permission
@@ -1019,12 +1029,15 @@ export const updateLeaveRequest = async (
   // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
   if (leaveData.leaveType !== 'permission') {
     const balance = await getLeaveBalances(userId);
-    const balanceKey = `${leaveData.leaveType}_balance` as keyof LeaveBalance;
-    const currentBalance = balance[balanceKey];
+    const balanceKey = `${leaveData.leaveType}` as keyof LeaveBalance;
+    let currentBalance = balance[balanceKey];
 
-    if (currentBalance <= 0) {
-      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
+    // If updating the same leave type, add back the days from the current request to check availability
+    // because we will "refund" them in the transaction before dedicating the new amount
+    if (leaveData.leaveType === oldLeaveType) {
+      currentBalance += oldDays;
     }
+
     if (currentBalance < days) {
       throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${currentBalance}, Required: ${days}`);
     }
@@ -1038,6 +1051,20 @@ export const updateLeaveRequest = async (
     // Delete old leave days
     await client.query('DELETE FROM leave_days WHERE leave_request_id = $1', [requestId]);
 
+    // Update balances: Refund old days and Deduct new days
+    // 1. Refund old balance (if not permission AND not rejected)
+    // If status is rejected, the balance was already refunded (or never deducted), so don't refund again
+    if (oldLeaveType !== 'permission' && currentStatus !== 'rejected') {
+      const oldBalanceColumn = oldLeaveType === 'casual' ? 'casual_balance' : oldLeaveType === 'sick' ? 'sick_balance' : 'lop_balance';
+      await client.query(`UPDATE leave_balances SET ${oldBalanceColumn} = ${oldBalanceColumn} + $1 WHERE employee_id = $2`, [oldDays, userId]);
+    }
+
+    // 2. Deduct new balance (if not permission)
+    if (leaveData.leaveType !== 'permission') {
+      const newBalanceColumn = leaveData.leaveType === 'casual' ? 'casual_balance' : leaveData.leaveType === 'sick' ? 'sick_balance' : 'lop_balance';
+      await client.query(`UPDATE leave_balances SET ${newBalanceColumn} = ${newBalanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
+    }
+
     // Format dates as YYYY-MM-DD for database
     const startDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const endDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
@@ -1047,14 +1074,16 @@ export const updateLeaveRequest = async (
       `UPDATE leave_requests 
        SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5,
            reason = $6, no_of_days = $7, time_for_permission_start = $8, time_for_permission_end = $9,
-           doctor_note = $10, updated_at = CURRENT_TIMESTAMP
+           doctor_note = $10, updated_at = CURRENT_TIMESTAMP,
+           current_status = 'pending',
+           manager_approval_status = 'pending', hr_approval_status = 'pending', super_admin_approval_status = 'pending'
        WHERE id = $11`,
       [
         leaveData.leaveType,
         startDateStr,
-        leaveData.startType,
+        normalizedStartType,
         endDateStr,
-        leaveData.endType,
+        normalizedEndType,
         leaveData.reason,
         days,
         leaveData.timeForPermission?.start || null,

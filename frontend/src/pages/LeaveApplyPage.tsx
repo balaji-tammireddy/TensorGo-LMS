@@ -1109,6 +1109,37 @@ const LeaveApplyPage: React.FC = () => {
     }
   };
 
+  const handleLeaveTypeChange = (newType: 'casual' | 'sick' | 'lop' | 'permission') => {
+    // If editing, clear all fields when changing type to ensure no invalid data persists
+    if (editingId) {
+      setFormData({
+        leaveType: newType,
+        startDate: '',
+        startType: 'full',
+        endDate: '',
+        endType: 'full',
+        reason: formData.reason,
+        timeForPermission: { start: '', end: '' }
+      });
+      setDoctorNoteFile(null);
+      setExistingDoctorNote(null);
+    } else {
+      // Logic for Create mode (preserve existing data where possible)
+      if (newType === 'permission') {
+        setFormData({
+          ...formData,
+          leaveType: newType,
+          startType: 'full',
+          endDate: formData.startDate || '',
+          endType: 'full'
+        });
+      } else {
+        setFormData({ ...formData, leaveType: newType });
+      }
+    }
+  };
+
+
   const handleClear = () => {
     setFormData({
       leaveType: 'casual',
@@ -1381,40 +1412,25 @@ const LeaveApplyPage: React.FC = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="leave-type-dropdown-content">
                     <DropdownMenuItem
-                      onClick={() => {
-                        setFormData({ ...formData, leaveType: 'casual' });
-                      }}
+                      onClick={() => handleLeaveTypeChange('casual')}
                     >
                       Casual
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => {
-                        setFormData({ ...formData, leaveType: 'sick' });
-                      }}
+                      onClick={() => handleLeaveTypeChange('sick')}
                     >
                       Sick
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => {
-                        setFormData({ ...formData, leaveType: 'lop' });
-                      }}
+                      onClick={() => handleLeaveTypeChange('lop')}
                     >
                       LOP
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => {
-                        const newLeaveType = 'permission';
-                        setFormData({
-                          ...formData,
-                          leaveType: newLeaveType,
-                          startType: 'full',
-                          endDate: formData.startDate || '',
-                          endType: 'full'
-                        });
-                      }}
+                      onClick={() => handleLeaveTypeChange('permission')}
                     >
                       Permission
                     </DropdownMenuItem>
@@ -1929,7 +1945,7 @@ const LeaveApplyPage: React.FC = () => {
                   className="clear-button"
                   disabled={applyMutation.isLoading}
                 >
-                  Reset
+                  {editingId ? 'Cancel' : 'Reset'}
                 </button>
               </div>
             </div>
