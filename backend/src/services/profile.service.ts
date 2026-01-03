@@ -311,19 +311,19 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
 
   // Reporting manager rules:
-  // - For employees: show all managers, hrs and super admins
-  // - For managers: show all hr's and super admins
-  // - For hrs: it should show all super admins
+  // - For employees: show all managers
+  // - For managers: show all hr's
+  // - For hrs: show all super admins
   let targetRoles: string[];
   if (employeeRole === 'manager') {
-    targetRoles = ['hr', 'super_admin'];
+    targetRoles = ['hr'];
   } else if (employeeRole === 'hr') {
     targetRoles = ['super_admin'];
   } else if (employeeRole === 'super_admin') {
     targetRoles = []; // Super admins don't typically have reporting managers
   } else {
     // Default to 'employee'
-    targetRoles = ['manager', 'hr', 'super_admin'];
+    targetRoles = ['manager'];
   }
 
   if (targetRoles.length === 0) {

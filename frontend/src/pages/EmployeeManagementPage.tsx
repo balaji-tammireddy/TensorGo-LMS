@@ -112,13 +112,13 @@ const emptyEmployeeForm = {
   middleName: '',
   lastName: '',
   contactNumber: '',
-  alternateContactNumber: '',
+  altContact: '',
   dateOfBirth: '',
   gender: '',
   bloodGroup: '',
   maritalStatus: '',
   emergencyContactName: '',
-  emergencyContactNumber: '',
+  emergencyContactNo: '',
   emergencyContactRelation: '',
   designation: '',
   department: '',
@@ -390,7 +390,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
 
     checkField('contactNumber', 'Contact Number');
-    checkField('alternateContactNumber', 'Alternate Contact Number');
+    checkField('altContact', 'Alternate Contact Number');
     checkField('dateOfBirth', 'Date of Birth');
 
     // Validate age - employee must be at least 18 years old
@@ -414,7 +414,7 @@ const EmployeeManagementPage: React.FC = () => {
     checkField('bloodGroup', 'Blood Group');
     checkField('maritalStatus', 'Marital Status');
     checkField('emergencyContactName', 'Emergency Contact Name');
-    checkField('emergencyContactNumber', 'Emergency Contact Number');
+    checkField('emergencyContactNo', 'Emergency Contact Number');
     checkField('emergencyContactRelation', 'Emergency Contact Relation');
 
     // Employment information
@@ -529,14 +529,14 @@ const EmployeeManagementPage: React.FC = () => {
         key: 'contactNumber'
       },
       {
-        value: newEmployee.alternateContactNumber,
+        value: newEmployee.altContact,
         label: 'Alternate Contact Number',
-        key: 'alternateContactNumber'
+        key: 'altContact'
       },
       {
-        value: newEmployee.emergencyContactNumber,
+        value: newEmployee.emergencyContactNo,
         label: 'Emergency Contact Number',
-        key: 'emergencyContactNumber'
+        key: 'emergencyContactNo'
       }
     ];
 
@@ -549,8 +549,16 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
 
+    // Sanitize payload: remove any snake_case keys that might have leaked in
+    const sanitizedNewEmployee = Object.keys(newEmployee).reduce((acc: any, key) => {
+      if (!key.includes('_')) {
+        acc[key] = newEmployee[key];
+      }
+      return acc;
+    }, {});
+
     const payload = {
-      ...newEmployee,
+      ...sanitizedNewEmployee,
       role: newEmployee.role || 'employee'
     };
 
@@ -565,6 +573,7 @@ const EmployeeManagementPage: React.FC = () => {
     try {
       setIsDetailLoading(true);
       const data: any = await employeeService.getEmployeeById(employeeId);
+      console.log('Employee data received:', data);
 
       const educationFromApi = data.education || [];
       const education = baseEducationLevels.map((level) => {
@@ -597,15 +606,15 @@ const EmployeeManagementPage: React.FC = () => {
         firstName: data.first_name || '',
         middleName: data.middle_name || '',
         lastName: data.last_name || '',
-        contactNumber: data.contact_number || '',
-        altContact: data.alt_contact || '',
-        dateOfBirth: data.date_of_birth ? data.date_of_birth.split('T')[0] : '',
-        gender: data.gender || '',
-        bloodGroup: data.blood_group || '',
-        maritalStatus: data.marital_status || '',
-        emergencyContactName: data.emergency_contact_name || '',
-        emergencyContactNo: data.emergency_contact_no || '',
-        emergencyContactRelation: data.emergency_contact_relation || '',
+        contactNumber: data.contact_number || data.contactNumber || data.personalInfo?.contactNumber || data.personalInfo?.contact_number || '',
+        altContact: data.alt_contact || data.altContact || data.personalInfo?.altContact || data.personalInfo?.alt_contact || data.alternate_contact || data.alternateContactNumber || '',
+        dateOfBirth: data.date_of_birth ? (typeof data.date_of_birth === 'string' ? data.date_of_birth.split('T')[0] : data.date_of_birth.toISOString().split('T')[0]) : (data.dateOfBirth ? (typeof data.dateOfBirth === 'string' ? data.dateOfBirth.split('T')[0] : data.dateOfBirth.toISOString().split('T')[0]) : (data.personalInfo?.dateOfBirth ? (typeof data.personalInfo.dateOfBirth === 'string' ? data.personalInfo.dateOfBirth.split('T')[0] : data.personalInfo.dateOfBirth.toISOString().split('T')[0]) : '')),
+        gender: data.gender || data.personalInfo?.gender || '',
+        bloodGroup: data.blood_group || data.personalInfo?.bloodGroup || '',
+        maritalStatus: data.marital_status || data.personalInfo?.maritalStatus || '',
+        emergencyContactName: data.emergency_contact_name || data.emergencyContactName || data.personalInfo?.emergencyContactName || '',
+        emergencyContactNo: data.emergency_contact_no || data.emergencyContactNo || data.personalInfo?.emergencyContactNo || data.emergency_contact_number || data.emergencyContactNumber || '',
+        emergencyContactRelation: data.emergency_contact_relation || data.emergencyContactRelation || data.personalInfo?.emergencyContactRelation || '',
         designation: data.designation || '',
         department: data.department || '',
         dateOfJoining: data.date_of_joining
@@ -1071,8 +1080,8 @@ const EmployeeManagementPage: React.FC = () => {
                                       setNewEmployee({
                                         ...newEmployee,
                                         role: newRole,
-                                        reportingManagerId: newRole === 'super_admin' ? null : newEmployee.reportingManagerId,
-                                        reportingManagerName: newRole === 'super_admin' ? '' : newEmployee.reportingManagerName
+                                        reportingManagerId: null,
+                                        reportingManagerName: ''
                                       });
                                     }}
                                   >
@@ -1189,7 +1198,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className={`employee-modal-field ${formErrors.alternateContactNumber ? 'has-error' : ''}`}>
+                        <div className={`employee-modal-field ${formErrors.altContact ? 'has-error' : ''}`}>
                           <label>
                             Alternate Contact Number<span className="required-indicator">*</span>
                           </label>
@@ -1197,7 +1206,7 @@ const EmployeeManagementPage: React.FC = () => {
                             type="text"
                             inputMode="numeric"
                             maxLength={10}
-                            value={newEmployee.alternateContactNumber}
+                            value={newEmployee.altContact}
                             onChange={(e) => {
                               const input = e.target;
                               const cursorPosition = input.selectionStart || 0;
@@ -1205,7 +1214,7 @@ const EmployeeManagementPage: React.FC = () => {
 
                               setNewEmployee({
                                 ...newEmployee,
-                                alternateContactNumber: newValue
+                                altContact: newValue
                               });
 
                               // Restore cursor position after state update
@@ -1401,7 +1410,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className={`employee-modal-field ${formErrors.emergencyContactNumber ? 'has-error' : ''}`}>
+                        <div className={`employee-modal-field ${formErrors.emergencyContactNo ? 'has-error' : ''}`}>
                           <label>
                             Emergency Contact Number<span className="required-indicator">*</span>
                           </label>
@@ -1409,7 +1418,7 @@ const EmployeeManagementPage: React.FC = () => {
                             type="text"
                             inputMode="numeric"
                             maxLength={10}
-                            value={newEmployee.emergencyContactNumber}
+                            value={newEmployee.emergencyContactNo}
                             onChange={(e) => {
                               const input = e.target;
                               const cursorPosition = input.selectionStart || 0;
@@ -1429,7 +1438,7 @@ const EmployeeManagementPage: React.FC = () => {
 
                               setNewEmployee({
                                 ...newEmployee,
-                                emergencyContactNumber: newValue
+                                emergencyContactNo: newValue
                               });
 
                               // Restore cursor position after state update

@@ -202,8 +202,24 @@ const ProfilePage: React.FC = () => {
 
       setIsSameAddress(isInitiallySame);
 
+      const personalInfo = { ...profile.personalInfo };
+
+      // Dynamic bridging for legacy keys
+      if (!personalInfo.altContact && (profile.personalInfo as any).alt_contact) {
+        personalInfo.altContact = (profile.personalInfo as any).alt_contact;
+      }
+      if (!personalInfo.altContact && (profile.personalInfo as any).alternateContactNumber) {
+        personalInfo.altContact = (profile.personalInfo as any).alternateContactNumber;
+      }
+      if (!personalInfo.emergencyContactNo && (profile.personalInfo as any).emergency_contact_no) {
+        personalInfo.emergencyContactNo = (profile.personalInfo as any).emergency_contact_no;
+      }
+      if (!personalInfo.emergencyContactNo && (profile.personalInfo as any).emergencyContactNumber) {
+        personalInfo.emergencyContactNo = (profile.personalInfo as any).emergencyContactNumber;
+      }
+
       const nextFormData = {
-        personalInfo: { ...profile.personalInfo },
+        personalInfo,
         employmentInfo: { ...profile.employmentInfo },
         documents: { ...profile.documents },
         address: {

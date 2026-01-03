@@ -485,32 +485,73 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
+  const fieldMap: Record<string, string> = {
+    firstName: 'first_name',
+    middleName: 'middle_name',
+    lastName: 'last_name',
+    contactNumber: 'contact_number',
+    altContact: 'alt_contact',
+    alternateContactNumber: 'alt_contact', // Legacy support
+    dateOfBirth: 'date_of_birth',
+    gender: 'gender',
+    bloodGroup: 'blood_group',
+    maritalStatus: 'marital_status',
+    emergencyContactName: 'emergency_contact_name',
+    emergencyContactNo: 'emergency_contact_no',
+    emergencyContactNumber: 'emergency_contact_no', // Legacy support
+    emergencyContactRelation: 'emergency_contact_relation',
+    designation: 'designation',
+    department: 'department',
+    aadharNumber: 'aadhar_number',
+    panNumber: 'pan_number',
+    currentAddress: 'current_address',
+    permanentAddress: 'permanent_address',
+    status: 'status',
+    reportingManagerId: 'reporting_manager_id',
+    reportingManagerName: 'reporting_manager_name'
+  };
+
+  const processedKeys = new Set();
+
   for (const [key, value] of Object.entries(employeeData)) {
-    const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    // Determine dbKey
+    let dbKey = fieldMap[key];
+    if (!dbKey) {
+      // Fallback to regex mapping if not in map
+      dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    }
+
+    // Skip if already processed this column or not allowed
+    if (processedKeys.has(dbKey) || !allowedFields.includes(dbKey) || value === undefined) {
+      continue;
+    }
+
     // Employee ID cannot be changed once set
     if (dbKey === 'emp_id') {
-      continue; // Skip employee ID updates
+      continue;
     }
-    if (allowedFields.includes(dbKey) && value !== undefined) {
-      updates.push(`${dbKey} = $${paramCount}`);
-      if (dbKey === 'pan_number' && typeof value === 'string') {
-        const pan = value.trim().toUpperCase();
-        // Validate PAN format: 5 letters, 4 digits, 1 letter
-        if (pan && pan.length !== 10) {
-          throw new Error('PAN number must be exactly 10 characters long');
-        }
-        if (pan && pan.length === 10) {
-          const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-          if (!panRegex.test(pan)) {
-            throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
-          }
-        }
-        values.push(pan || null);
-      } else {
-        values.push(value);
+
+    updates.push(`${dbKey} = $${paramCount}`);
+    processedKeys.add(dbKey);
+
+    if (dbKey === 'pan_number' && typeof value === 'string') {
+      const pan = value.trim().toUpperCase();
+      if (pan && pan.length !== 10) {
+        throw new Error('PAN number must be exactly 10 characters long');
       }
-      paramCount++;
+      if (pan && pan.length === 10) {
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!panRegex.test(pan)) {
+          throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
+        }
+      }
+      values.push(pan || null);
+    } else {
+      // Treat empty strings as null for optional fields (except required ones)
+      const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+      values.push(finalValue);
     }
+    paramCount++;
   }
 
   if (updates.length === 0) {
@@ -520,7 +561,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   values.push(employeeId);
   const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
 
-  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Executing update query with ${updates.length} fields`);
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Executing update query: ${query}`);
+  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Query values: ${JSON.stringify(values)}`);
+
   await pool.query(query, values);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Database update completed successfully`);
 
