@@ -245,17 +245,14 @@ const LeaveApplyPage: React.FC = () => {
     const startTime = new Date(`2000-01-01T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00`);
     let endTime = new Date(`2000-01-01T${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`);
 
-    // Handle case where end time is next day (after midnight)
-    if (endTime < startTime) {
-      endTime.setDate(endTime.getDate() + 1);
-    }
-
+    // For permission, we don't allow next-day end times.
+    // End time must be on the same day as start time.
     const diffMs = endTime.getTime() - startTime.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
     // Validate end time is after start time
     if (diffHours <= 0) {
-      showWarning('End time must be after start.');
+      showWarning('End time must be after start time.');
       // Reset to 2 hours after start, rounded to 15 minutes, within office hours
       const calculatedEndTime = new Date(startTime);
       calculatedEndTime.setHours(calculatedEndTime.getHours() + 2);
@@ -1036,11 +1033,8 @@ const LeaveApplyPage: React.FC = () => {
       const startTime = new Date(`2000-01-01T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00`);
       const endTime = new Date(`2000-01-01T${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`);
 
-      // Handle case where end time is next day (after midnight)
-      if (endTime < startTime) {
-        endTime.setDate(endTime.getDate() + 1);
-      }
-
+      // For permission, we don't allow next-day end times.
+      // End time must be on the same day as start time.
       const diffMs = endTime.getTime() - startTime.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
 
@@ -1525,7 +1519,8 @@ const LeaveApplyPage: React.FC = () => {
                   }}
                   min={minStartDate}
                   max={maxStartDate}
-                  placeholder="Select start date"
+                  placeholder="dd-mm-yyyy"
+                  displayFormat="dd-MM-yyyy"
                   disabledDates={(date) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
                     const isLop = formData.leaveType?.toLowerCase() === 'lop';
@@ -1635,7 +1630,8 @@ const LeaveApplyPage: React.FC = () => {
                           : (formData.startDate || minStartDate)
                       }
                       max={maxStartDate}
-                      placeholder="Select end date"
+                      placeholder="dd-mm-yyyy"
+                      displayFormat="dd-MM-yyyy"
                       disabled={
                         formData.startType === 'first_half' ||
                         (formData.startType === 'second_half' && formData.endType === 'second_half')

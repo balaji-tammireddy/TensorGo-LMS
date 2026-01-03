@@ -16,6 +16,7 @@ interface DatePickerProps {
   disabledDates?: (date: Date) => boolean;
   allowManualEntry?: boolean;
   isEmployeeVariant?: boolean; // Toggle specific behavior for Add Employee
+  displayFormat?: string;
 }
 
 export const DatePicker: React.FC<DatePickerProps> = ({
@@ -28,7 +29,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   placeholder,
   disabledDates,
   allowManualEntry = false,
-  isEmployeeVariant = false
+  isEmployeeVariant = false,
+  displayFormat
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -89,12 +91,14 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     if (value) {
       const date = new Date(value + 'T00:00:00');
       setSelectedDate(date);
-      setInputValue(format(date, isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd'));
+      const defaultFormat = isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd';
+      // Update input value formatting to use displayFormat if provided, otherwise fallback to existing logic.
+      setInputValue(format(date, displayFormat || defaultFormat));
     } else {
       setSelectedDate(undefined);
       setInputValue('');
     }
-  }, [value, isEmployeeVariant]);
+  }, [value, isEmployeeVariant, displayFormat]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -136,7 +140,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const handleSelect = (date: Date | undefined) => {
     if (date) {
       const dateStrYMD = format(date, 'yyyy-MM-dd');
-      const dateStrDisplay = format(date, isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd');
+      const defaultFormat = isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd';
+      const dateStrDisplay = format(date, displayFormat || defaultFormat);
       setSelectedDate(date);
       setInputValue(dateStrDisplay);
       onChange(dateStrYMD);
