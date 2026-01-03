@@ -15,6 +15,8 @@ const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const ChangePasswordPage = lazy(() => import('../pages/ChangePasswordPage'));
 const HolidayManagementPage = lazy(() => import('../pages/HolidayManagementPage'));
 const ViewPoliciesPage = lazy(() => import('../pages/ViewPoliciesPage'));
+const AccessDeniedPage = lazy(() => import('../pages/AccessDeniedPage'));
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
 // Prefetch core data for authenticated users
 const DataPrefetcher: React.FC = () => {
@@ -120,7 +122,12 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/access-denied"
+          element={<AccessDeniedPage />}
+        />
         <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );
