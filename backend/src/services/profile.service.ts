@@ -311,24 +311,31 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
 
   // Reporting manager rules:
-  // - For managers, their reporting manager should be HR
-  // - For HR, their reporting manager should be super admin
-  // - For employees, their reporting manager should be a manager
-  let targetRole: string;
+  // - For employees: show all managers, hrs and super admins
+  // - For managers: show all hr's and super admins
+  // - For hrs: it should show all super admins
+  let targetRoles: string[];
   if (employeeRole === 'manager') {
-    targetRole = 'hr';
+    targetRoles = ['hr', 'super_admin'];
   } else if (employeeRole === 'hr') {
-    targetRole = 'super_admin';
+    targetRoles = ['super_admin'];
+  } else if (employeeRole === 'super_admin') {
+    targetRoles = []; // Super admins don't typically have reporting managers
   } else {
-    targetRole = 'manager';
+    // Default to 'employee'
+    targetRoles = ['manager', 'hr', 'super_admin'];
+  }
+
+  if (targetRoles.length === 0) {
+    return { managers: [] };
   }
 
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
     FROM users
-    WHERE role = $1 AND status = 'active'
+    WHERE role = ANY($1) AND status = 'active'
   `;
-  const params: any[] = [targetRole];
+  const params: any[] = [targetRoles];
   let paramIndex = 2;
 
   // Exclude the current employee if editing
@@ -343,9 +350,9 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
     params.push(`%${search}%`);
   }
 
-  query += ' ORDER BY first_name LIMIT 20';
+  query += ' ORDER BY emp_id LIMIT 20';
 
-  logger.info(`[PROFILE] [GET REPORTING MANAGERS] Querying database for target role: ${targetRole}`);
+  logger.info(`[PROFILE] [GET REPORTING MANAGERS] Querying database for target roles: ${targetRoles.join(', ')}`);
   const result = await pool.query(query, params);
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Found ${result.rows.length} reporting managers`);
 

@@ -620,3 +620,27 @@
   opacity: 0.7;
   pointer-events: none;
 }
+
+/* Form validation error styles */
+.employee-modal-field.has-error input,
+.employee-modal-field.has-error select,
+.employee-modal-field.has-error textarea,
+.employee-modal-field.has-error .leave-type-dropdown-trigger,
+.employee-modal-field.has-error .date-picker-input-field {
+  border-color: #e53935 !important;
+  background-color: #fffcfc !important;
+  box-shadow: 0 0 0 1px #e53935 !important;
+}
+
+.employee-modal-field.has-error label {
+  color: #e53935 !important;
+}
+
+.education-table tr.has-error td {
+  border-color: #e53935;
+  background-color: #fffcfc;
+}
+
+.education-table tr.has-error input {
+  border-color: #e53935;
+}

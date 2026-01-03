@@ -51,22 +51,22 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const showSuccess = useCallback(
-    (message: string, duration?: number) => showToast(message, 'success', duration),
+    (message: string, duration?: number) => showToast(message, 'success', duration || 10000),
     [showToast]
   );
 
   const showError = useCallback(
-    (message: string, duration?: number) => showToast(message, 'error', duration),
+    (message: string, duration?: number) => showToast(message, 'error', duration || 15000),
     [showToast]
   );
 
   const showInfo = useCallback(
-    (message: string, duration?: number) => showToast(message, 'info', duration),
+    (message: string, duration?: number) => showToast(message, 'info', duration || 10000),
     [showToast]
   );
 
   const showWarning = useCallback(
-    (message: string, duration?: number) => showToast(message, 'warning', duration),
+    (message: string, duration?: number) => showToast(message, 'warning', duration || 15000),
     [showToast]
   );
 

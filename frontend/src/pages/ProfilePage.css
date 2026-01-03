@@ -622,3 +622,30 @@
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
+
+/* Validation Highlights */
+.form-group.has-error label {
+  color: #e53935;
+}
+
+.form-group.has-error input,
+.form-group.has-error select,
+.form-group.has-error textarea,
+.form-group.has-error .date-picker-input-field,
+.form-group.has-error .profile-field-trigger {
+  border-color: #e53935 !important;
+  background-color: #fff8f8 !important;
+}
+
+.education-table tr.has-error {
+  background-color: #fff8f8;
+}
+
+.education-table tr.has-error td {
+  border-color: #ffcdd2;
+}
+
+.education-table td.has-error input {
+  border-color: #e53935 !important;
+  background-color: #fff !important;
+}

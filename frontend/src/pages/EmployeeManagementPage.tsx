@@ -158,10 +158,13 @@ const EmployeeManagementPage: React.FC = () => {
   const [addLeavesModalOpen, setAddLeavesModalOpen] = useState(false);
   const [selectedEmployeeForLeaves, setSelectedEmployeeForLeaves] = useState<{ id: number; name: string } | null>(null);
   const [showLeaveHistory, setShowLeaveHistory] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
+  const [managerSearch, setManagerSearch] = useState('');
+  const [appliedManagerSearch, setAppliedManagerSearch] = useState<string | undefined>(undefined);
 
   const { data: managersData } = useQuery(
-    ['reporting-managers', newEmployee.role, editingEmployeeId],
-    () => getReportingManagers(undefined, newEmployee.role, editingEmployeeId || undefined),
+    ['reporting-managers', newEmployee.role, editingEmployeeId, appliedManagerSearch],
+    () => getReportingManagers(appliedManagerSearch, newEmployee.role, editingEmployeeId || undefined),
     {
       retry: false,
       staleTime: 0,
@@ -220,6 +223,16 @@ const EmployeeManagementPage: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Debounce manager search input
+  useEffect(() => {
+    const term = managerSearch.trim();
+    const timer = setTimeout(() => {
+      setAppliedManagerSearch(term || undefined);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [managerSearch]);
 
   // Scroll modal body to top when showing leave history
   useEffect(() => {
@@ -313,6 +326,7 @@ const EmployeeManagementPage: React.FC = () => {
     setIsEditMode(false);
     setIsViewMode(false);
     setEditingEmployeeId(null);
+    setFormErrors({});
     setIsModalOpen(true);
   };
 
@@ -333,34 +347,51 @@ const EmployeeManagementPage: React.FC = () => {
 
   const handleCreateEmployee = () => {
     const missingFields: string[] = [];
+    const fieldErrors: Record<string, boolean> = {};
 
     const isEmpty = (value: any) =>
       value === undefined ||
       value === null ||
       (typeof value === 'string' && value.trim() === '');
 
+    const checkField = (field: string, label: string) => {
+      if (isEmpty(newEmployee[field])) {
+        missingFields.push(label);
+        fieldErrors[field] = true;
+      }
+    };
+
     // Personal information (except Middle Name)
-    if (isEmpty(newEmployee.role)) missingFields.push('Role');
-    if (isEmpty(newEmployee.firstName)) missingFields.push('First Name');
-    if (isEmpty(newEmployee.lastName)) missingFields.push('Last Name');
+    checkField('role', 'Role');
+    checkField('firstName', 'First Name');
+    checkField('lastName', 'Last Name');
+
     if (isEmpty(newEmployee.empId)) {
       missingFields.push('Employee ID');
+      fieldErrors['empId'] = true;
     } else if (newEmployee.empId.length > 6) {
       showWarning('Employee ID max 6 chars');
+      fieldErrors['empId'] = true;
+      setFormErrors(fieldErrors);
       return;
     }
+
     if (isEmpty(newEmployee.email)) {
       missingFields.push('Official Email');
+      fieldErrors['email'] = true;
     } else {
       const email = newEmployee.email.toLowerCase();
       if (!email.endsWith('@tensorgo.com') && !email.endsWith('@tensorgo.co.in')) {
         showWarning('Use organization email');
+        fieldErrors['email'] = true;
+        setFormErrors(fieldErrors);
         return;
       }
     }
-    if (isEmpty(newEmployee.contactNumber)) missingFields.push('Contact Number');
-    if (isEmpty(newEmployee.alternateContactNumber)) missingFields.push('Alternate Contact Number');
-    if (isEmpty(newEmployee.dateOfBirth)) missingFields.push('Date of Birth');
+
+    checkField('contactNumber', 'Contact Number');
+    checkField('alternateContactNumber', 'Alternate Contact Number');
+    checkField('dateOfBirth', 'Date of Birth');
 
     // Validate age - employee must be at least 18 years old
     if (newEmployee.dateOfBirth) {
@@ -373,44 +404,48 @@ const EmployeeManagementPage: React.FC = () => {
       }
       if (age < 18) {
         showWarning('Must be 18+ years old');
+        fieldErrors['dateOfBirth'] = true;
+        setFormErrors(fieldErrors);
         return;
       }
     }
 
-    if (isEmpty(newEmployee.gender)) missingFields.push('Gender');
-    if (isEmpty(newEmployee.bloodGroup)) missingFields.push('Blood Group');
-    if (isEmpty(newEmployee.maritalStatus)) missingFields.push('Marital Status');
-    if (isEmpty(newEmployee.emergencyContactName))
-      missingFields.push('Emergency Contact Name');
-    if (isEmpty(newEmployee.emergencyContactNumber))
-      missingFields.push('Emergency Contact Number');
-    if (isEmpty(newEmployee.emergencyContactRelation))
-      missingFields.push('Emergency Contact Relation');
+    checkField('gender', 'Gender');
+    checkField('bloodGroup', 'Blood Group');
+    checkField('maritalStatus', 'Marital Status');
+    checkField('emergencyContactName', 'Emergency Contact Name');
+    checkField('emergencyContactNumber', 'Emergency Contact Number');
+    checkField('emergencyContactRelation', 'Emergency Contact Relation');
 
     // Employment information
-    if (isEmpty(newEmployee.designation)) missingFields.push('Designation');
-    if (isEmpty(newEmployee.department)) missingFields.push('Department');
-    if (isEmpty(newEmployee.dateOfJoining)) missingFields.push('Date of Joining');
+    checkField('designation', 'Designation');
+    checkField('department', 'Department');
+    checkField('dateOfJoining', 'Date of Joining');
+
     // Super admin should not have a reporting manager
-    if (!newEmployee.reportingManagerId && newEmployee.role !== 'super_admin')
+    if (!newEmployee.reportingManagerId && newEmployee.role !== 'super_admin') {
       missingFields.push('Reporting Manager');
+      fieldErrors['reportingManagerId'] = true;
+    }
 
     // Document information
-    if (isEmpty(newEmployee.aadharNumber)) missingFields.push('Aadhar Number');
+    checkField('aadharNumber', 'Aadhar Number');
     if (isEmpty(newEmployee.panNumber)) {
       missingFields.push('PAN Number');
+      fieldErrors['panNumber'] = true;
     } else {
       const panError = validatePan(newEmployee.panNumber);
       if (panError) {
         showWarning(panError);
+        fieldErrors['panNumber'] = true;
+        setFormErrors(fieldErrors);
         return;
       }
     }
 
     // Address information
-    if (isEmpty(newEmployee.currentAddress)) missingFields.push('Current Address');
-    if (isEmpty(newEmployee.permanentAddress))
-      missingFields.push('Permanent Address');
+    checkField('currentAddress', 'Current Address');
+    checkField('permanentAddress', 'Permanent Address');
 
     // Education information (PG optional, UG and 12th mandatory)
     if (newEmployee.education && Array.isArray(newEmployee.education)) {
@@ -418,60 +453,69 @@ const EmployeeManagementPage: React.FC = () => {
       const maxYear = currentYear + 5;
       let yearValidationError: string | null = null;
 
-      for (const edu of newEmployee.education) {
+      newEmployee.education.forEach((edu: any, index: number) => {
         const levelLabel = edu.level || 'Education';
-        if (levelLabel === 'PG') {
-          // PG row is optional
-          continue;
-        }
-        if (isEmpty(edu.groupStream))
+        if (levelLabel === 'PG') return;
+
+        if (isEmpty(edu.groupStream)) {
           missingFields.push(`${levelLabel} - Group/Stream`);
-        if (isEmpty(edu.collegeUniversity))
+          fieldErrors[`edu_${index}_groupStream`] = true;
+        }
+        if (isEmpty(edu.collegeUniversity)) {
           missingFields.push(`${levelLabel} - College/University`);
+          fieldErrors[`edu_${index}_collegeUniversity`] = true;
+        }
         if (isEmpty(edu.year)) {
           missingFields.push(`${levelLabel} - Graduation Year`);
+          fieldErrors[`edu_${index}_year`] = true;
         } else {
-          // Validate year range (1950 to 5 years from current year)
           const year = parseInt(edu.year, 10);
           if (isNaN(year) || year < 1950 || year > maxYear) {
-            if (!yearValidationError) {
-              yearValidationError = `Graduation Year: 1950 - ${maxYear}`;
-            }
+            yearValidationError = `Graduation Year: 1950 - ${maxYear}`;
+            fieldErrors[`edu_${index}_year`] = true;
           }
         }
-        if (isEmpty(edu.scorePercentage))
+        if (isEmpty(edu.scorePercentage)) {
           missingFields.push(`${levelLabel} - Score %`);
-      }
+          fieldErrors[`edu_${index}_scorePercentage`] = true;
+        }
+      });
 
-      // Show year validation error once if any invalid year found
       if (yearValidationError) {
         showWarning(yearValidationError);
+        setFormErrors(fieldErrors);
         return;
       }
     }
 
+    setFormErrors(fieldErrors);
+
     if (missingFields.length > 0) {
-      showWarning('Fill mandatory fields');
+      showWarning(`Missing fields: ${missingFields.join(', ')}`);
       return;
     }
 
     if (newEmployee.aadharNumber && newEmployee.aadharNumber.length !== 12) {
       showWarning('Aadhar must be 12 digits');
+      setFormErrors({ ...fieldErrors, aadharNumber: true });
       return;
     }
 
     const phoneFields = [
       {
-        value: newEmployee.contactNumber as string | undefined,
-        label: 'Contact Number'
+        value: newEmployee.contactNumber,
+        label: 'Contact Number',
+        key: 'contactNumber'
       },
       {
-        value: newEmployee.alternateContactNumber as string | undefined,
-        label: 'Alternate Contact Number'
+        value: newEmployee.alternateContactNumber,
+        label: 'Alternate Contact Number',
+        key: 'alternateContactNumber'
       },
       {
-        value: newEmployee.emergencyContactNumber as string | undefined,
-        label: 'Emergency Contact Number'
+        value: newEmployee.emergencyContactNumber,
+        label: 'Emergency Contact Number',
+        key: 'emergencyContactNumber'
       }
     ];
 
@@ -479,6 +523,7 @@ const EmployeeManagementPage: React.FC = () => {
       const v = field.value || '';
       if (v.length !== 10) {
         showWarning(`${field.label} must be 10 digits`);
+        setFormErrors({ ...fieldErrors, [field.key]: true });
         return;
       }
     }
@@ -938,7 +983,7 @@ const EmployeeManagementPage: React.FC = () => {
                     <div className="employee-modal-section">
                       <h3>Personal Information</h3>
                       <div className="employee-modal-grid">
-                        <div className="employee-modal-field employee-id-field">
+                        <div className={`employee-modal-field employee-id-field ${formErrors.empId ? 'has-error' : ''}`}>
                           <label>
                             Employee ID<span className="required-indicator">*</span>
                           </label>
@@ -957,7 +1002,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isEditMode || isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field employee-role-field">
+                        <div className={`employee-modal-field employee-role-field ${formErrors.role ? 'has-error' : ''}`}>
                           <label>
                             Role<span className="required-indicator">*</span>
                           </label>
@@ -1022,7 +1067,7 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.firstName ? 'has-error' : ''}`}>
                           <label>
                             First Name<span className="required-indicator">*</span>
                           </label>
@@ -1052,7 +1097,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.lastName ? 'has-error' : ''}`}>
                           <label>
                             Last Name<span className="required-indicator">*</span>
                           </label>
@@ -1068,7 +1113,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.email ? 'has-error' : ''}`}>
                           <label>
                             Official Email<span className="required-indicator">*</span>
                           </label>
@@ -1081,7 +1126,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.contactNumber ? 'has-error' : ''}`}>
                           <label>
                             Contact Number<span className="required-indicator">*</span>
                           </label>
@@ -1123,7 +1168,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.alternateContactNumber ? 'has-error' : ''}`}>
                           <label>
                             Alternate Contact Number<span className="required-indicator">*</span>
                           </label>
@@ -1131,7 +1176,7 @@ const EmployeeManagementPage: React.FC = () => {
                             type="text"
                             inputMode="numeric"
                             maxLength={10}
-                            value={newEmployee.altContact}
+                            value={newEmployee.alternateContactNumber}
                             onChange={(e) => {
                               const input = e.target;
                               const cursorPosition = input.selectionStart || 0;
@@ -1139,7 +1184,7 @@ const EmployeeManagementPage: React.FC = () => {
 
                               setNewEmployee({
                                 ...newEmployee,
-                                altContact: newValue
+                                alternateContactNumber: newValue
                               });
 
                               // Restore cursor position after state update
@@ -1154,7 +1199,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.dateOfBirth ? 'has-error' : ''}`}>
                           <label>
                             Date of Birth<span className="required-indicator">*</span>
                           </label>
@@ -1170,7 +1215,7 @@ const EmployeeManagementPage: React.FC = () => {
                             isEmployeeVariant={true}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.gender ? 'has-error' : ''}`}>
                           <label>
                             Gender<span className="required-indicator">*</span>
                           </label>
@@ -1220,7 +1265,7 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.bloodGroup ? 'has-error' : ''}`}>
                           <label>
                             Blood Group<span className="required-indicator">*</span>
                           </label>
@@ -1263,7 +1308,7 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.maritalStatus ? 'has-error' : ''}`}>
                           <label>
                             Marital Status<span className="required-indicator">*</span>
                           </label>
@@ -1319,7 +1364,7 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.emergencyContactName ? 'has-error' : ''}`}>
                           <label>
                             Emergency Contact Name<span className="required-indicator">*</span>
                           </label>
@@ -1335,7 +1380,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.emergencyContactNumber ? 'has-error' : ''}`}>
                           <label>
                             Emergency Contact Number<span className="required-indicator">*</span>
                           </label>
@@ -1343,7 +1388,7 @@ const EmployeeManagementPage: React.FC = () => {
                             type="text"
                             inputMode="numeric"
                             maxLength={10}
-                            value={newEmployee.emergencyContactNo}
+                            value={newEmployee.emergencyContactNumber}
                             onChange={(e) => {
                               const input = e.target;
                               const cursorPosition = input.selectionStart || 0;
@@ -1363,7 +1408,7 @@ const EmployeeManagementPage: React.FC = () => {
 
                               setNewEmployee({
                                 ...newEmployee,
-                                emergencyContactNo: newValue
+                                emergencyContactNumber: newValue
                               });
 
                               // Restore cursor position after state update
@@ -1377,7 +1422,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.emergencyContactRelation ? 'has-error' : ''}`}>
                           <label>
                             Emergency Contact Relation<span className="required-indicator">*</span>
                           </label>
@@ -1399,7 +1444,7 @@ const EmployeeManagementPage: React.FC = () => {
                     <div className="employee-modal-section">
                       <h3>Employment Information</h3>
                       <div className="employee-modal-grid">
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
                           <label>
                             Designation<span className="required-indicator">*</span>
                           </label>
@@ -1415,7 +1460,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.department ? 'has-error' : ''}`}>
                           <label>
                             Department<span className="required-indicator">*</span>
                           </label>
@@ -1431,7 +1476,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.dateOfJoining ? 'has-error' : ''}`}>
                           <label>
                             Date of Joining<span className="required-indicator">*</span>
                           </label>
@@ -1504,7 +1549,7 @@ const EmployeeManagementPage: React.FC = () => {
                     <div className="employee-modal-section">
                       <h3>Document Information</h3>
                       <div className="employee-modal-grid">
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.aadharNumber ? 'has-error' : ''}`}>
                           <label>
                             Aadhar Number<span className="required-indicator">*</span>
                           </label>
@@ -1521,7 +1566,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className="employee-modal-field">
+                        <div className={`employee-modal-field ${formErrors.panNumber ? 'has-error' : ''}`}>
                           <label>
                             PAN Number<span className="required-indicator">*</span>
                           </label>
@@ -1556,7 +1601,7 @@ const EmployeeManagementPage: React.FC = () => {
 
                     <div className="employee-modal-section">
                       <h3>Address Details</h3>
-                      <div className="employee-modal-field full-width">
+                      <div className={`employee-modal-field full-width ${formErrors.permanentAddress ? 'has-error' : ''}`}>
                         <label>
                           Permanent Address<span className="required-indicator">*</span>
                         </label>
@@ -1575,7 +1620,7 @@ const EmployeeManagementPage: React.FC = () => {
                           disabled={isViewMode}
                         />
                       </div>
-                      <div className="employee-modal-field full-width">
+                      <div className={`employee-modal-field full-width ${formErrors.currentAddress ? 'has-error' : ''}`}>
                         <label>
                           Current Address<span className="required-indicator">*</span>
                         </label>
@@ -1616,14 +1661,14 @@ const EmployeeManagementPage: React.FC = () => {
                         </thead>
                         <tbody>
                           {newEmployee.education?.map((edu: any, idx: number) => (
-                            <tr key={edu.level}>
+                            <tr key={edu.level} className={(formErrors[`edu_${idx}_groupStream`] || formErrors[`edu_${idx}_collegeUniversity`] || formErrors[`edu_${idx}_year`] || formErrors[`edu_${idx}_scorePercentage`]) ? 'has-error' : ''}>
                               <td className="education-level-cell">
                                 {formatEducationLevel(edu.level)}
                                 {(edu.level === 'UG' || edu.level === '12th') && (
                                   <span className="required-indicator">*</span>
                                 )}
                               </td>
-                              <td>
+                              <td className={formErrors[`edu_${idx}_groupStream`] ? 'has-error' : ''}>
                                 <input
                                   type="text"
                                   value={edu.groupStream || ''}
@@ -1638,7 +1683,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   disabled={isViewMode}
                                 />
                               </td>
-                              <td>
+                              <td className={formErrors[`edu_${idx}_collegeUniversity`] ? 'has-error' : ''}>
                                 <input
                                   type="text"
                                   value={edu.collegeUniversity || ''}
@@ -1653,7 +1698,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   disabled={isViewMode}
                                 />
                               </td>
-                              <td>
+                              <td className={formErrors[`edu_${idx}_year`] ? 'has-error' : ''}>
                                 <input
                                   type="text"
                                   value={edu.year || ''}
@@ -1676,7 +1721,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   disabled={isViewMode}
                                 />
                               </td>
-                              <td>
+                              <td className={formErrors[`edu_${idx}_scorePercentage`] ? 'has-error' : ''}>
                                 <input
                                   type="text"
                                   value={
@@ -1730,7 +1775,7 @@ const EmployeeManagementPage: React.FC = () => {
                     {newEmployee.role !== 'super_admin' && (
                       <div className="employee-modal-section">
                         <h3>Reporting Hierarchy</h3>
-                        <div className="employee-modal-field full-width">
+                        <div className={`employee-modal-field full-width ${formErrors.reportingManagerId ? 'has-error' : ''}`}>
                           <label>
                             Reporting Manager<span className="required-indicator">*</span>
                           </label>
@@ -1756,7 +1801,7 @@ const EmployeeManagementPage: React.FC = () => {
                               <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                             </Button>
                           ) : (
-                            <DropdownMenu>
+                            <DropdownMenu onOpenChange={(open) => !open && setManagerSearch('')}>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="outline"
@@ -1785,23 +1830,48 @@ const EmployeeManagementPage: React.FC = () => {
                                   <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent className="leave-type-dropdown-content">
-                                {managersData?.map((manager: any, index: number) => (
-                                  <React.Fragment key={manager.id}>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setNewEmployee({
-                                          ...newEmployee,
-                                          reportingManagerId: manager.id,
-                                          reportingManagerName: manager.name
-                                        });
-                                      }}
-                                    >
-                                      {manager.name} ({manager.empId})
-                                    </DropdownMenuItem>
-                                    {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
-                                  </React.Fragment>
-                                ))}
+                              <DropdownMenuContent className="leave-type-dropdown-content" style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '250px' }}>
+                                <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search by name or ID..."
+                                    value={managerSearch}
+                                    onChange={(e) => setManagerSearch(e.target.value)}
+                                    autoFocus
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      fontSize: '13px',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '4px',
+                                      fontFamily: 'Poppins, sans-serif'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                {managersData?.length === 0 ? (
+                                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666' }}>
+                                    No managers found
+                                  </div>
+                                ) : (
+                                  managersData?.map((manager: any, index: number) => (
+                                    <React.Fragment key={manager.id}>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setNewEmployee({
+                                            ...newEmployee,
+                                            reportingManagerId: manager.id,
+                                            reportingManagerName: manager.name
+                                          });
+                                          setManagerSearch(''); // Reset search on select
+                                        }}
+                                      >
+                                        {manager.name} ({manager.empId})
+                                      </DropdownMenuItem>
+                                      {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
+                                    </React.Fragment>
+                                  ))
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
