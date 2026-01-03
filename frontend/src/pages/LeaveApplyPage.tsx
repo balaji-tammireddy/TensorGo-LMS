@@ -353,6 +353,16 @@ const LeaveApplyPage: React.FC = () => {
     }
   }, [formData.leaveType, formData.startType, formData.startDate, formData.endDate, formData.endType]);
 
+  // Handle end type constraints: "Second half" is only allowed if startType is "second_half"
+  useEffect(() => {
+    if (formData.startType !== 'second_half' && formData.endType === 'second_half') {
+      setFormData(prev => ({
+        ...prev,
+        endType: 'full'
+      }));
+    }
+  }, [formData.startType, formData.endType]);
+
   // Set default permission times when permission type is selected
   useEffect(() => {
     if (formData.leaveType === 'permission' && formData.startDate && !formData.timeForPermission.start) {
@@ -1689,20 +1699,24 @@ const LeaveApplyPage: React.FC = () => {
                         >
                           First half
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const shouldResetEndDate = formData.startType === 'second_half';
-                            setFormData({
-                              ...formData,
-                              endType: 'second_half',
-                              // If start type is second half, force end date = start date
-                              endDate: shouldResetEndDate ? formData.startDate : formData.endDate
-                            });
-                          }}
-                        >
-                          Second half
-                        </DropdownMenuItem>
+                        {formData.startType === 'second_half' && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const shouldResetEndDate = formData.startType === 'second_half';
+                                setFormData({
+                                  ...formData,
+                                  endType: 'second_half',
+                                  // If start type is second half, force end date = start date
+                                  endDate: shouldResetEndDate ? formData.startDate : formData.endDate
+                                });
+                              }}
+                            >
+                              Second half
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
