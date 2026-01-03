@@ -453,9 +453,41 @@ const EmployeeManagementPage: React.FC = () => {
       const maxYear = currentYear + 5;
       let yearValidationError: string | null = null;
 
+      let isPgValid = true;
       newEmployee.education.forEach((edu: any, index: number) => {
         const levelLabel = edu.level || 'Education';
-        if (levelLabel === 'PG') return;
+
+        if (levelLabel === 'PG') {
+          const pgFields = [
+            { value: edu.groupStream, label: 'Group/Stream', key: 'groupStream' },
+            { value: edu.collegeUniversity, label: 'College/University', key: 'collegeUniversity' },
+            { value: edu.year, label: 'Graduation Year', key: 'year' },
+            { value: edu.scorePercentage, label: 'Score %', key: 'scorePercentage' }
+          ];
+
+          const filledFields = pgFields.filter(f => !isEmpty(f.value));
+
+          if (filledFields.length > 0 && filledFields.length < pgFields.length) {
+            showWarning('Please fill complete details if you want to add PG details');
+            pgFields.forEach(f => {
+              if (isEmpty(f.value)) {
+                fieldErrors[`edu_${index}_${f.key}`] = true;
+              }
+            });
+            setFormErrors(fieldErrors);
+            isPgValid = false;
+            return;
+          }
+
+          if (!isEmpty(edu.year)) {
+            const year = parseInt(edu.year, 10);
+            if (isNaN(year) || year < 1950 || year > maxYear) {
+              yearValidationError = `PG Graduation Year: 1950 - ${maxYear}`;
+              fieldErrors[`edu_${index}_year`] = true;
+            }
+          }
+          return;
+        }
 
         if (isEmpty(edu.groupStream)) {
           missingFields.push(`${levelLabel} - Group/Stream`);
@@ -471,7 +503,7 @@ const EmployeeManagementPage: React.FC = () => {
         } else {
           const year = parseInt(edu.year, 10);
           if (isNaN(year) || year < 1950 || year > maxYear) {
-            yearValidationError = `Graduation Year: 1950 - ${maxYear}`;
+            yearValidationError = `${levelLabel} Graduation Year: 1950 - ${maxYear}`;
             fieldErrors[`edu_${index}_year`] = true;
           }
         }
@@ -480,6 +512,8 @@ const EmployeeManagementPage: React.FC = () => {
           fieldErrors[`edu_${index}_scorePercentage`] = true;
         }
       });
+
+      if (!isPgValid) return;
 
       if (yearValidationError) {
         showWarning(yearValidationError);
