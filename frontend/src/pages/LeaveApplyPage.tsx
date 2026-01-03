@@ -1187,17 +1187,23 @@ const LeaveApplyPage: React.FC = () => {
 
 
   const handleClear = () => {
+    // Default to Casual leave logic (Today + 3 days)
+    const today = new Date();
+    const futureDate = addDays(today, 3);
+    const futureDateStr = format(futureDate, 'yyyy-MM-dd');
+
     setFormData({
       leaveType: 'casual',
-      startDate: '',
+      startDate: futureDateStr,
       startType: 'full',
-      endDate: '',
+      endDate: futureDateStr,
       endType: 'full',
       reason: '',
       timeForPermission: { start: '', end: '' }
     });
     setDoctorNoteFile(null);
     setEditingId(null);
+    setEditingRequestId(null);
   };
 
   // Initial loading state (only for first-time page load)
@@ -1691,6 +1697,10 @@ const LeaveApplyPage: React.FC = () => {
                           onClick={() => {
                             let newEndDate = formData.endDate;
                             if (formData.startType === 'second_half' && formData.startDate) {
+                              const nextDate = addDays(new Date(formData.startDate), 1);
+                              newEndDate = format(nextDate, 'yyyy-MM-dd');
+                            } else if (formData.startType === 'full' && formData.startDate === formData.endDate) {
+                              // If start is full and we switch to first_half, end date must be next day
                               const nextDate = addDays(new Date(formData.startDate), 1);
                               newEndDate = format(nextDate, 'yyyy-MM-dd');
                             }
