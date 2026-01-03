@@ -32,6 +32,7 @@ const LeaveApprovalPage: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
+  const [isRefetchingRequest, setIsRefetchingRequest] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -236,18 +237,31 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending };
       },
-      onSuccess: (_response, requestId) => {
+      onSuccess: async (response, requestId) => {
         // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         queryClient.invalidateQueries(['leaveBalances']);
         showSuccess('Converted LOP to Casual successfully!');
-        // Update selected request if modal is open
+
+        // Update selected request if modal is open - fetch full updated request to get new leave day IDs
         if (selectedRequest && selectedRequest.id === requestId) {
-          setSelectedRequest({
-            ...selectedRequest,
-            leaveType: 'casual'
-          });
+          try {
+            setIsRefetchingRequest(true);
+            const updatedRequest = await leaveService.getLeaveRequest(requestId);
+            // We need to merge because leaveService.getLeaveRequest might not have all fields 
+            // used in LeaveApprovalPage (like empId, empName)
+            setSelectedRequest({
+              ...selectedRequest,
+              ...updatedRequest,
+              leaveType: 'casual', // Explicitly set to match state
+              leaveDays: updatedRequest.leaveDays || []
+            });
+          } catch (error) {
+            console.error('Failed to refetch request after conversion:', error);
+          } finally {
+            setIsRefetchingRequest(false);
+          }
         }
       },
       onError: (error: any, _requestId, context) => {
@@ -884,7 +898,7 @@ const LeaveApprovalPage: React.FC = () => {
         onReject={handleModalReject}
         onUpdate={handleUpdateStatus}
         onConvertLopToCasual={handleConvertLopToCasual}
-        isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading}
+        isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading || isRefetchingRequest}
         isConverting={convertLopToCasualMutation.isLoading}
         isEditMode={isEditMode}
         userRole={user?.role}

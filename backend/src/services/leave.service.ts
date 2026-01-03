@@ -632,11 +632,14 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   if (canViewAny) {
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
                 lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+                lr.no_of_days, lr.applied_date,
                 lr.current_status, lr.employee_id, lr.doctor_note,
                 lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
                 lr.last_updated_by, lr.last_updated_by_role,
+                u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
                 last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
          FROM leave_requests lr
+         JOIN users u ON u.id = lr.employee_id
          LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
          WHERE lr.id = $1`;
     params = [requestId];
@@ -644,9 +647,11 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     // Managers can view leaves of their direct reports
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
                 lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+                lr.no_of_days, lr.applied_date,
                 lr.current_status, lr.employee_id, lr.doctor_note,
                 lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
                 lr.last_updated_by, lr.last_updated_by_role,
+                u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
                 last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
          FROM leave_requests lr
          JOIN users u ON lr.employee_id = u.id
@@ -657,11 +662,14 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     // Others can only view their own leaves
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
             lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+            lr.no_of_days, lr.applied_date,
             lr.current_status, lr.employee_id, lr.doctor_note,
             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
             lr.last_updated_by, lr.last_updated_by_role,
+            u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
      FROM leave_requests lr
+     JOIN users u ON u.id = lr.employee_id
      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
      WHERE lr.id = $1 AND lr.employee_id = $2`;
     params = [requestId, userId];
@@ -710,9 +718,24 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   } else if (row.last_updated_by_role === 'manager') {
     approverRole = 'Manager';
   }
+  // Get leave days for this request
+  const daysResult = await pool.query(
+    'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
+    [requestId]
+  );
+
+  logger.info(`[LEAVE] [GET LEAVE REQUEST BY ID] Found ${daysResult.rows.length} leave days for request ${requestId}`);
+  daysResult.rows.forEach(d => {
+    logger.info(`[LEAVE] [GET LEAVE REQUEST BY ID] Day ID: ${d.id}, Date: ${d.leave_date}, Status: ${d.day_status}`);
+  });
 
   return {
     id: row.id,
+    empId: row.emp_id,
+    empName: row.emp_name,
+    appliedDate: formatDate(row.applied_date),
+    noOfDays: parseFloat(row.no_of_days),
+    currentStatus: row.current_status,
     leaveType: row.leave_type,
     startDate: formatDate(row.start_date),
     startType: row.start_type,
@@ -725,7 +748,13 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     timeForPermission: row.time_for_permission_start && row.time_for_permission_end ? {
       start: typeof row.time_for_permission_start === 'string' ? row.time_for_permission_start : row.time_for_permission_start.toString().substring(0, 5),
       end: typeof row.time_for_permission_end === 'string' ? row.time_for_permission_end : row.time_for_permission_end.toString().substring(0, 5)
-    } : undefined
+    } : undefined,
+    leaveDays: daysResult.rows.map(day => ({
+      id: day.id,
+      date: formatDate(day.leave_date),
+      type: day.day_type,
+      status: day.day_status || 'pending'
+    }))
   };
 };
 
@@ -1327,6 +1356,13 @@ export const convertLeaveRequestLopToCasual = async (
     );
 
     await client.query('COMMIT');
+
+    // Recalculate status just in case (to ensure current_status mirrors the new days)
+    try {
+      await recalcLeaveRequestStatus(requestId);
+    } catch (recalcError) {
+      logger.error(`Failed to recalculate status after conversion for request ${requestId}:`, recalcError);
+    }
 
     logger.info(
       `Leave request ${requestId} converted from LOP to Casual by ${userRole} (user ${userId}). ` +
@@ -2594,7 +2630,12 @@ export const approveLeaveDays = async (
   );
 
   const allPendingDayIds = allPendingDaysResult.rows.map(row => row.id);
+  logger.info(`[APPROVE LEAVE DAYS] All Pending Day IDs in DB for request ${leaveRequestId}: ${allPendingDayIds.join(', ')}`);
+  logger.info(`[APPROVE LEAVE DAYS] Day IDs received from frontend: ${dayIds.join(', ')}`);
+
   const daysToApprove = dayIds.filter(id => allPendingDayIds.includes(id));
+  logger.info(`[APPROVE LEAVE DAYS] Intersection (daysToApprove): ${daysToApprove.join(', ')}`);
+
   const daysToReject = allPendingDayIds.filter(id => !daysToApprove.includes(id));
 
   if (daysToApprove.length === 0) {
