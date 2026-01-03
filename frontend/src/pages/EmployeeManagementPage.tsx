@@ -549,6 +549,23 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
 
+    // Check for duplicate phone numbers
+    if (newEmployee.contactNumber === newEmployee.altContact) {
+      showWarning('Contact Number and Alternate Contact Number cannot be the same');
+      setFormErrors({ ...fieldErrors, altContact: true });
+      return;
+    }
+    if (newEmployee.altContact === newEmployee.emergencyContactNo) {
+      showWarning('Alternate Contact Number and Emergency Contact Number cannot be the same');
+      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
+      return;
+    }
+    if (newEmployee.contactNumber === newEmployee.emergencyContactNo) {
+      showWarning('Contact Number and Emergency Contact Number cannot be the same');
+      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
+      return;
+    }
+
     // Sanitize payload: remove any snake_case keys that might have leaked in
     const sanitizedNewEmployee = Object.keys(newEmployee).reduce((acc: any, key) => {
       if (!key.includes('_')) {

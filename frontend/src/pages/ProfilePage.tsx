@@ -411,6 +411,27 @@ const ProfilePage: React.FC = () => {
       }
     }
 
+    // Check for duplicate phone numbers
+    const contactNo = formData.personalInfo?.contactNumber;
+    const altNo = formData.personalInfo?.altContact;
+    const emergencyNo = formData.personalInfo?.emergencyContactNo;
+
+    if (contactNo === altNo) {
+      showWarning('Contact Number and Alternate Contact Number cannot be the same');
+      setFormErrors({ ...fieldErrors, altContact: true });
+      return;
+    }
+    if (altNo === emergencyNo) {
+      showWarning('Alternate Contact Number and Emergency Contact Number cannot be the same');
+      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
+      return;
+    }
+    if (contactNo === emergencyNo) {
+      showWarning('Contact Number and Emergency Contact Number cannot be the same');
+      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
+      return;
+    }
+
     const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
     if (!hasChanges) {
       setIsEditMode(false);

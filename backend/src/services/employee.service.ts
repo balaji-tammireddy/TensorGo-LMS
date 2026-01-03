@@ -220,6 +220,21 @@ export const createEmployee = async (employeeData: any) => {
     }
   }
 
+  // Validate unique contact numbers
+  const cNo = employeeData.contactNumber;
+  const aNo = employeeData.altContact;
+  const eNo = employeeData.emergencyContactNo;
+
+  if (cNo && aNo && cNo === aNo) {
+    throw new Error('Contact Number and Alternate Contact Number cannot be the same');
+  }
+  if (aNo && eNo && aNo === eNo) {
+    throw new Error('Alternate Contact Number and Emergency Contact Number cannot be the same');
+  }
+  if (cNo && eNo && cNo === eNo) {
+    throw new Error('Contact Number and Emergency Contact Number cannot be the same');
+  }
+
   // Default password for newly created employees (if none explicitly provided)
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Hashing password`);
   const passwordHash = await hashPassword(employeeData.password || 'tensorgo@2023');
@@ -483,6 +498,21 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     if (age < 18) {
       throw new Error('Employee must be at least 18 years old');
     }
+  }
+
+  // Validate unique contact numbers
+  const cNo = employeeData.contactNumber;
+  const aNo = employeeData.altContact || employeeData.alternateContactNumber;
+  const eNo = employeeData.emergencyContactNo || employeeData.emergencyContactNumber;
+
+  if (cNo && aNo && cNo === aNo) {
+    throw new Error('Contact Number and Alternate Contact Number cannot be the same');
+  }
+  if (aNo && eNo && aNo === eNo) {
+    throw new Error('Alternate Contact Number and Emergency Contact Number cannot be the same');
+  }
+  if (cNo && eNo && cNo === eNo) {
+    throw new Error('Contact Number and Emergency Contact Number cannot be the same');
   }
 
   const fieldMap: Record<string, string> = {

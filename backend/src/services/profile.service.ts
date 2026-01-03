@@ -137,6 +137,17 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Update personal info
   if (profileData.personalInfo) {
+    const { contactNumber, altContact, emergencyContactNo } = profileData.personalInfo;
+    if (contactNumber && altContact && contactNumber === altContact) {
+      throw new Error('Contact Number and Alternate Contact Number cannot be the same');
+    }
+    if (altContact && emergencyContactNo && altContact === emergencyContactNo) {
+      throw new Error('Alternate Contact Number and Emergency Contact Number cannot be the same');
+    }
+    if (contactNumber && emergencyContactNo && contactNumber === emergencyContactNo) {
+      throw new Error('Contact Number and Emergency Contact Number cannot be the same');
+    }
+
     const requiredPersonalInfo = ['firstName', 'lastName', 'email', 'contactNumber', 'dateOfBirth', 'gender', 'bloodGroup', 'maritalStatus'];
     for (const [key, value] of Object.entries(profileData.personalInfo)) {
       const dbKey = fieldMap[key] || key;
