@@ -353,6 +353,16 @@ const LeaveApplyPage: React.FC = () => {
     }
   }, [formData.leaveType, formData.startType, formData.startDate, formData.endDate, formData.endType]);
 
+  // Handle end type constraints: "Second half" is only allowed if startType is "second_half"
+  useEffect(() => {
+    if (formData.startType !== 'second_half' && formData.endType === 'second_half') {
+      setFormData(prev => ({
+        ...prev,
+        endType: 'full'
+      }));
+    }
+  }, [formData.startType, formData.endType]);
+
   // Set default permission times when permission type is selected
   useEffect(() => {
     if (formData.leaveType === 'permission' && formData.startDate && !formData.timeForPermission.start) {
@@ -1177,17 +1187,23 @@ const LeaveApplyPage: React.FC = () => {
 
 
   const handleClear = () => {
+    // Default to Casual leave logic (Today + 3 days)
+    const today = new Date();
+    const futureDate = addDays(today, 3);
+    const futureDateStr = format(futureDate, 'yyyy-MM-dd');
+
     setFormData({
       leaveType: 'casual',
-      startDate: '',
+      startDate: futureDateStr,
       startType: 'full',
-      endDate: '',
+      endDate: futureDateStr,
       endType: 'full',
       reason: '',
       timeForPermission: { start: '', end: '' }
     });
     setDoctorNoteFile(null);
     setEditingId(null);
+    setEditingRequestId(null);
   };
 
   // Initial loading state (only for first-time page load)
@@ -1683,26 +1699,34 @@ const LeaveApplyPage: React.FC = () => {
                             if (formData.startType === 'second_half' && formData.startDate) {
                               const nextDate = addDays(new Date(formData.startDate), 1);
                               newEndDate = format(nextDate, 'yyyy-MM-dd');
+                            } else if (formData.startType === 'full' && formData.startDate === formData.endDate) {
+                              // If start is full and we switch to first_half, end date must be next day
+                              const nextDate = addDays(new Date(formData.startDate), 1);
+                              newEndDate = format(nextDate, 'yyyy-MM-dd');
                             }
                             setFormData({ ...formData, endType: 'first_half', endDate: newEndDate });
                           }}
                         >
                           First half
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const shouldResetEndDate = formData.startType === 'second_half';
-                            setFormData({
-                              ...formData,
-                              endType: 'second_half',
-                              // If start type is second half, force end date = start date
-                              endDate: shouldResetEndDate ? formData.startDate : formData.endDate
-                            });
-                          }}
-                        >
-                          Second half
-                        </DropdownMenuItem>
+                        {formData.startType === 'second_half' && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const shouldResetEndDate = formData.startType === 'second_half';
+                                setFormData({
+                                  ...formData,
+                                  endType: 'second_half',
+                                  // If start type is second half, force end date = start date
+                                  endDate: shouldResetEndDate ? formData.startDate : formData.endDate
+                                });
+                              }}
+                            >
+                              Second half
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
