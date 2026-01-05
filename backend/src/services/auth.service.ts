@@ -13,6 +13,7 @@ export interface LoginResult {
     name: string;
     role: string;
     email: string;
+    status: string;
     mustChangePassword: boolean;
   };
 }
@@ -20,11 +21,11 @@ export interface LoginResult {
 export const login = async (email: string, password: string): Promise<LoginResult> => {
   logger.info(`[AUTH] [LOGIN] ========== FUNCTION CALLED ==========`);
   logger.info(`[AUTH] [LOGIN] Email: ${email}`);
-  
+
   // Normalize email: trim and convert to lowercase
   const normalizedEmail = email.trim().toLowerCase();
   logger.info(`[AUTH] [LOGIN] Normalized email: ${normalizedEmail}`);
-  
+
   const result = await pool.query(
     'SELECT id, emp_id, email, password_hash, role, first_name, last_name, status, must_change_password FROM users WHERE LOWER(TRIM(email)) = $1',
     [normalizedEmail]
@@ -39,7 +40,8 @@ export const login = async (email: string, password: string): Promise<LoginResul
   const user = result.rows[0];
   logger.info(`[AUTH] [LOGIN] User found - ID: ${user.id}, Role: ${user.role}, Status: ${user.status}`);
 
-  if (user.status !== 'active') {
+  // Allow 'on_notice' users to login as well
+  if (user.status !== 'active' && user.status !== 'on_notice') {
     logger.warn(`[AUTH] [LOGIN] Account is not active - User ID: ${user.id}, Status: ${user.status}`);
     throw new Error('Account is not active');
   }
@@ -53,7 +55,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
   }
 
   logger.info(`[AUTH] [LOGIN] Password validated successfully for user ID: ${user.id}`);
-  
+
   const tokenPayload = {
     userId: user.id,
     email: user.email,
@@ -74,10 +76,11 @@ export const login = async (email: string, password: string): Promise<LoginResul
       name: `${user.first_name} ${user.last_name || ''}`.trim(),
       role: user.role,
       email: user.email,
+      status: user.status,
       mustChangePassword: !!user.must_change_password
     }
   };
-  
+
   logger.info(`[AUTH] [LOGIN] Login successful for user ID: ${user.id}, Role: ${user.role}`);
   return loginResult;
 };
@@ -96,7 +99,7 @@ export const changePassword = async (
 ): Promise<void> => {
   logger.info(`[AUTH] [CHANGE PASSWORD] ========== FUNCTION CALLED ==========`);
   logger.info(`[AUTH] [CHANGE PASSWORD] User ID: ${userId}`);
-  
+
   const result = await pool.query(
     'SELECT password_hash FROM users WHERE id = $1',
     [userId]
@@ -156,7 +159,7 @@ export const changePassword = async (
     // Log error but don't fail password change
     logger.error(`[AUTH] [CHANGE PASSWORD] Error sending password change security email:`, emailError);
   }
-  
+
   logger.info(`[AUTH] [CHANGE PASSWORD] Password change completed successfully for User ID: ${userId}`);
 };
 
@@ -173,11 +176,11 @@ const generateOTP = (): string => {
 export const requestPasswordReset = async (email: string): Promise<void> => {
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] ========== FUNCTION CALLED ==========`);
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] Email: ${email}`);
-  
+
   // Normalize email
   const normalizedEmail = email.trim().toLowerCase();
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] Normalized email: ${normalizedEmail}`);
-  
+
   // Check if user exists and is active
   const userResult = await pool.query(
     'SELECT id, email, first_name, last_name, status FROM users WHERE LOWER(TRIM(email)) = $1',
@@ -336,7 +339,7 @@ Please do not reply to this email.
     logger.error(`[AUTH] [REQUEST PASSWORD RESET] Failed to send password reset OTP to ${normalizedEmail}`);
     throw new Error('Failed to send OTP email. Please try again later.');
   }
-  
+
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] Password reset request completed successfully for user ID: ${user.id}`);
 };
 
@@ -346,9 +349,9 @@ Please do not reply to this email.
 export const verifyPasswordResetOTP = async (email: string, otp: string): Promise<boolean> => {
   logger.info(`[AUTH] [VERIFY OTP] ========== FUNCTION CALLED ==========`);
   logger.info(`[AUTH] [VERIFY OTP] Email: ${email}`);
-  
+
   const normalizedEmail = email.trim().toLowerCase();
-  
+
   // Find valid OTP
   logger.info(`[AUTH] [VERIFY OTP] Searching for valid OTP`);
   const result = await pool.query(
@@ -384,9 +387,9 @@ export const resetPasswordWithOTP = async (
 ): Promise<void> => {
   logger.info(`[AUTH] [RESET PASSWORD WITH OTP] ========== FUNCTION CALLED ==========`);
   logger.info(`[AUTH] [RESET PASSWORD WITH OTP] Email: ${email}`);
-  
+
   const normalizedEmail = email.trim().toLowerCase();
-  
+
   // Verify OTP
   logger.info(`[AUTH] [RESET PASSWORD WITH OTP] Verifying OTP`);
   const otpResult = await pool.query(

@@ -372,7 +372,7 @@ export const applyLeave = async (
     }
 
     const userResult = await pool.query(
-      `SELECT u.role as employee_role, 
+      `SELECT u.role as employee_role, u.status,
               COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
               u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
               u.emp_id as employee_emp_id, 
@@ -398,6 +398,14 @@ export const applyLeave = async (
     );
 
     const userData = userResult.rows[0];
+
+    // Check for 'On Notice' status restrictions
+    if (userData.status === 'on_notice') {
+      if (leaveData.leaveType !== 'lop' && leaveData.leaveType !== 'permission') {
+        throw new Error('Employees on notice period can only apply for LOP or Permission.');
+      }
+    }
+
     const client = await pool.connect();
     let leaveRequestId: number;
 
