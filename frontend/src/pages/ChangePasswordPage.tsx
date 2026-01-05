@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
@@ -7,10 +6,9 @@ import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import './LoginPage.css';
 
 const ChangePasswordPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const { showSuccess, showError, showWarning } = useToast();
-  const location = useLocation();
-  const navigate = useNavigate();
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,16 +17,9 @@ const ChangePasswordPage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Protect route: only accessible from forgot password flow
-  useEffect(() => {
-    if (!location.state?.fromForgotPassword) {
-      navigate('/login');
-    }
-  }, [location.state, navigate]);
+  // Protect route: only accessible if authenticated (handled by ProtectedRoute)
+  // No additional checks needed here as ProtectedRoute ensures user is logged in
 
-  if (!location.state?.fromForgotPassword) {
-    return null;
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

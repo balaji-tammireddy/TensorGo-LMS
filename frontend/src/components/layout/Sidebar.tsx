@@ -32,6 +32,7 @@ const Sidebar: React.FC = memo(() => {
       employee: 'Employee',
       manager: 'Manager',
       hr: 'HR',
+      intern: 'Intern',
       super_admin: 'Super Admin'
     };
     return roleMap[role] || role;

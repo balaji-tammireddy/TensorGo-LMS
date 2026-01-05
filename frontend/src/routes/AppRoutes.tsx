@@ -80,7 +80,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path="/leave-apply"
           element={
-            <ProtectedRoute allowedRoles={['employee', 'manager', 'hr']}>
+            <ProtectedRoute allowedRoles={['employee', 'manager', 'hr', 'intern']}>
               <LeaveApplyPage />
             </ProtectedRoute>
           }

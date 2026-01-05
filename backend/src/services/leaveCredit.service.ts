@@ -22,14 +22,14 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
     // Get all active employees with their leave balances
     logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Fetching all active employees`);
     const employeesResult = await client.query(`
-      SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.status,
+      SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.status, u.role,
              COALESCE(lb.casual_balance, 0) as current_casual,
              COALESCE(lb.sick_balance, 0) as current_sick,
              lb.id as balance_id
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
       WHERE u.status IN ('active', 'on_notice')
-        AND u.role IN ('employee', 'manager', 'hr')
+        AND u.role IN ('employee', 'manager', 'hr', 'intern')
     `);
     logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Found ${employeesResult.rows.length} active employees`);
 
@@ -38,10 +38,18 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
         const currentCasual = parseFloat(employee.current_casual) || 0;
         const currentSick = parseFloat(employee.current_sick) || 0;
 
-        // Define credit amounts based on status
+        // Define credit amounts based on status and role
         // Active employees: +1 casual, +0.5 sick
+        // Interns: +0.5 casual, +0.5 sick
         // On Notice employees: 0 casual, +0.5 sick
-        const casualCredit = employee.status === 'on_notice' ? 0 : 1;
+
+        let casualCredit = 1;
+        if (employee.status === 'on_notice') {
+          casualCredit = 0;
+        } else if (employee.role === 'intern') {
+          casualCredit = 0.5;
+        }
+
         const sickCredit = 0.5;
 
         const newCasual = currentCasual + casualCredit;
@@ -77,7 +85,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
         }
 
         credited++;
-        logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Credited monthly leaves to employee ${employee.emp_id} (${employee.name}) Status: ${employee.status}: +${casualCredit} casual, +${sickCredit} sick`);
+        logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Credited monthly leaves to employee ${employee.emp_id} (${employee.name}) Role: ${employee.role}, Status: ${employee.status}: +${casualCredit} casual, +${sickCredit} sick`);
       } catch (error: any) {
         errors++;
         logger.error(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Failed to credit leaves for employee ${employee.emp_id}:`, error);
@@ -127,7 +135,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
       WHERE u.status IN ('active', 'on_notice')
-        AND u.role IN ('employee', 'manager', 'hr')
+        AND u.role IN ('employee', 'manager', 'hr', 'intern')
     `);
     logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Found ${employeesResult.rows.length} active employees`);
 
@@ -287,7 +295,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
     // Get all active employees with their leave balances and email
     logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Fetching all active employees with leave balances`);
     const employeesResult = await client.query(`
-      SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+      SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role,
              COALESCE(lb.casual_balance, 0) as current_casual,
              COALESCE(lb.sick_balance, 0) as current_sick,
              COALESCE(lb.lop_balance, 0) as current_lop,
@@ -295,7 +303,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
       WHERE u.status IN ('active', 'on_notice')
-        AND u.role IN ('employee', 'manager', 'hr')
+        AND u.role IN ('employee', 'manager', 'hr', 'intern')
     `);
     logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Found ${employeesResult.rows.length} active employees`);
 
@@ -320,8 +328,17 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
         // ============================================
         // STEP 2: ADD JANUARY LEAVES
         // ============================================
-        // Step 2: Add January monthly credits: +1 casual (Active only), +0.5 sick
-        const casualCredit = employee.status === 'on_notice' ? 0 : 1;
+        // Step 2: Add January monthly credits: 
+        // Active: +1 casual, +0.5 sick
+        // Intern: +0.5 casual, +0.5 sick
+        // On Notice: 0 casual, +0.5 sick
+
+        let casualCredit = 1;
+        if (employee.status === 'on_notice') {
+          casualCredit = 0;
+        } else if (employee.role === 'intern') {
+          casualCredit = 0.5;
+        }
         const finalCasual = carryForwardCasual + casualCredit;
         const finalSick = afterCarryForwardSick + 0.5;
         const finalLop = afterCarryForwardLop; // LOP stays at 10
@@ -537,7 +554,7 @@ export const sendCarryForwardEmailsToAll = async (
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
       WHERE u.status IN ('active', 'on_notice')
-        AND u.role IN ('employee', 'manager', 'hr')
+        AND u.role IN ('employee', 'manager', 'hr', 'intern')
         AND u.email IS NOT NULL
         AND u.email != ''
     `);
@@ -640,7 +657,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
          WHERE DATE(lb.last_updated) = $1 
            AND EXTRACT(HOUR FROM lb.last_updated) >= 19
            AND u.status IN ('active', 'on_notice')
-           AND u.role IN ('employee', 'manager', 'hr')
+           AND u.role IN ('employee', 'manager', 'hr', 'intern')
            AND lb.sick_balance >= 0.5`, // Check for January credit (sick should be 0.5 after year-end)
         [todayStr]
       );
@@ -682,7 +699,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
          WHERE DATE(lb.last_updated) = $1 
            AND EXTRACT(HOUR FROM lb.last_updated) >= 19
            AND u.status IN ('active', 'on_notice')
-           AND u.role IN ('employee', 'manager', 'hr')
+           AND u.role IN ('employee', 'manager', 'hr', 'intern')
            AND lb.casual_balance >= 1 
            AND lb.sick_balance >= 0.5`,
         [todayStr]

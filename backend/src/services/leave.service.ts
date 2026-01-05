@@ -1963,7 +1963,7 @@ export const approveLeave = async (
     if (employeeId === approverIdNum) {
       throw new Error('Cannot approve your own leave request');
     }
-    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager' && leave.employee_role !== 'intern') {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'super_admin') {
@@ -2504,7 +2504,7 @@ export const approveLeaveDay = async (
     if (employeeId === approverIdNum) {
       throw new Error('Cannot approve your own leave request');
     }
-    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager' && leave.employee_role !== 'intern') {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'super_admin') {
@@ -2726,7 +2726,7 @@ export const approveLeaveDays = async (
     if (employeeId === approverIdNum) {
       throw new Error('Cannot approve your own leave request');
     }
-    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager' && leave.employee_role !== 'intern') {
       throw new Error('Not authorized to approve this leave');
     }
   } else if (approverRole === 'super_admin') {
@@ -2978,7 +2978,7 @@ export const rejectLeaveDay = async (
     if (employeeId === approverIdNum) {
       throw new Error('Cannot reject your own leave request');
     }
-    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager') {
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager' && leave.employee_role !== 'intern') {
       throw new Error('Not authorized to reject this leave');
     }
   } else if (approverRole === 'super_admin') {

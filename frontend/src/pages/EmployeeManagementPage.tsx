@@ -1144,9 +1144,9 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="leave-type-dropdown-content">
                               {(user?.role === 'super_admin'
-                                ? ['employee', 'manager', 'hr', 'super_admin']
+                                ? ['intern', 'employee', 'manager', 'hr', 'super_admin']
                                 : user?.role === 'hr'
-                                  ? ['employee', 'manager', 'hr']
+                                  ? ['intern', 'employee', 'manager', 'hr']
                                   : ['employee']
                               ).map((role, index, array) => (
                                 <React.Fragment key={role}>
