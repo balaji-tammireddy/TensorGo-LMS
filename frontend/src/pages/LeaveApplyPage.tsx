@@ -72,12 +72,12 @@ const LeaveApplyPage: React.FC = () => {
     ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // only allow tomorrow for future sick leave
     : undefined; // no max date for other leave types
 
-  // Set default leave type to LOP if user is on notice
+  // Set default leave type to LOP if user is on notice and current type is causal
   useEffect(() => {
     if (user?.status === 'on_notice' && formData.leaveType === 'casual') {
       setFormData(prev => ({ ...prev, leaveType: 'lop' }));
     }
-  }, [user, formData.leaveType]);
+  }, [user?.status, formData.leaveType]);
 
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
@@ -1491,7 +1491,7 @@ const LeaveApplyPage: React.FC = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="leave-type-dropdown-content">
-                    {user?.status !== 'on_notice' && (
+                    {user?.status !== 'on_notice' ? (
                       <>
                         <DropdownMenuItem
                           onClick={() => handleLeaveTypeChange('casual')}
@@ -1499,6 +1499,15 @@ const LeaveApplyPage: React.FC = () => {
                           Casual
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('sick')}
+                        >
+                          Sick
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : (
+                      <>
                         <DropdownMenuItem
                           onClick={() => handleLeaveTypeChange('sick')}
                         >
@@ -2124,7 +2133,7 @@ const LeaveApplyPage: React.FC = () => {
                     <DatePicker
                       value={filterStartDate}
                       onChange={(date) => setFilterStartDate(date)}
-                      placeholder="dd - mm - yyyy"
+                      placeholder="DD-MM-YYYY"
                       allowManualEntry={true}
                       isEmployeeVariant={true}
                     />
@@ -2134,7 +2143,7 @@ const LeaveApplyPage: React.FC = () => {
                     <DatePicker
                       value={filterEndDate}
                       onChange={(date) => setFilterEndDate(date)}
-                      placeholder="dd - mm - yyyy"
+                      placeholder="DD-MM-YYYY"
                       allowManualEntry={true}
                       isEmployeeVariant={true}
                     />

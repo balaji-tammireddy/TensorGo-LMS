@@ -156,7 +156,7 @@ const EmployeeManagementPage: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<number | null>(null);
   const [addLeavesModalOpen, setAddLeavesModalOpen] = useState(false);
-  const [selectedEmployeeForLeaves, setSelectedEmployeeForLeaves] = useState<{ id: number; name: string } | null>(null);
+  const [selectedEmployeeForLeaves, setSelectedEmployeeForLeaves] = useState<{ id: number; name: string; status: string } | null>(null);
   const [showLeaveHistory, setShowLeaveHistory] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
   const [managerSearch, setManagerSearch] = useState('');
@@ -710,8 +710,8 @@ const EmployeeManagementPage: React.FC = () => {
     }
   };
 
-  const handleAddLeaves = (employeeId: number, employeeName: string) => {
-    setSelectedEmployeeForLeaves({ id: employeeId, name: employeeName });
+  const handleAddLeaves = (employeeId: number, employeeName: string, employeeStatus: string) => {
+    setSelectedEmployeeForLeaves({ id: employeeId, name: employeeName, status: employeeStatus });
     setAddLeavesModalOpen(true);
   };
 
@@ -966,12 +966,14 @@ const EmployeeManagementPage: React.FC = () => {
                             </span>
                           )}
                           {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
+                          {/* Also hide for inactive/resigned/terminated employees */}
                           {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
-                            (user?.role === 'super_admin' && employee.id !== user.id)) && (
+                            (user?.role === 'super_admin' && employee.id !== user.id)) &&
+                            (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned') && (
                               <span
                                 className="action-icon"
                                 title="Add Leaves"
-                                onClick={() => handleAddLeaves(employee.id, employee.name)}
+                                onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
                               >
                                 <FaCalendarPlus />
                               </span>
@@ -2080,6 +2082,7 @@ const EmployeeManagementPage: React.FC = () => {
         onAdd={handleAddLeavesSubmit}
         employeeId={selectedEmployeeForLeaves?.id || 0}
         employeeName={selectedEmployeeForLeaves?.name || ''}
+        employeeStatus={selectedEmployeeForLeaves?.status || 'active'}
         isLoading={addLeavesMutation.isLoading}
       />
     </AppLayout>

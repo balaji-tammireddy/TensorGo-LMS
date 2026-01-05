@@ -9,7 +9,7 @@ import { sendLeaveCarryForwardEmail } from '../utils/emailTemplates';
  */
 export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors: number }> => {
   logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] ========== FUNCTION CALLED ==========`);
-  
+
   const client = await pool.connect();
   let credited = 0;
   let errors = 0;
@@ -22,13 +22,13 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
     // Get all active employees with their leave balances
     logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Fetching all active employees`);
     const employeesResult = await client.query(`
-      SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+      SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.status,
              COALESCE(lb.casual_balance, 0) as current_casual,
              COALESCE(lb.sick_balance, 0) as current_sick,
              lb.id as balance_id
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
-      WHERE u.status = 'active'
+      WHERE u.status IN ('active', 'on_notice')
         AND u.role IN ('employee', 'manager', 'hr')
     `);
     logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Found ${employeesResult.rows.length} active employees`);
@@ -37,8 +37,15 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
       try {
         const currentCasual = parseFloat(employee.current_casual) || 0;
         const currentSick = parseFloat(employee.current_sick) || 0;
-        const newCasual = currentCasual + 1;
-        const newSick = currentSick + 0.5;
+
+        // Define credit amounts based on status
+        // Active employees: +1 casual, +0.5 sick
+        // On Notice employees: 0 casual, +0.5 sick
+        const casualCredit = employee.status === 'on_notice' ? 0 : 1;
+        const sickCredit = 0.5;
+
+        const newCasual = currentCasual + casualCredit;
+        const newSick = currentSick + sickCredit;
 
         // Check if total would exceed 99 limit
         if (newCasual > 99) {
@@ -54,23 +61,23 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
           // Update existing balance
           await client.query(
             `UPDATE leave_balances 
-             SET casual_balance = casual_balance + 1,
-                 sick_balance = sick_balance + 0.5,
+             SET casual_balance = casual_balance + $1,
+                 sick_balance = sick_balance + $2,
                  last_updated = CURRENT_TIMESTAMP
-             WHERE employee_id = $1`,
-            [employee.id]
+             WHERE employee_id = $3`,
+            [casualCredit, sickCredit, employee.id]
           );
         } else {
           // Create new balance record
           await client.query(
             `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance)
-             VALUES ($1, 1, 0.5, 10)`,
-            [employee.id]
+             VALUES ($1, $2, $3, 10)`,
+            [employee.id, casualCredit, sickCredit]
           );
         }
 
         credited++;
-        logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Credited monthly leaves to employee ${employee.emp_id} (${employee.name}): +1 casual, +0.5 sick`);
+        logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Credited monthly leaves to employee ${employee.emp_id} (${employee.name}) Status: ${employee.status}: +${casualCredit} casual, +${sickCredit} sick`);
       } catch (error: any) {
         errors++;
         logger.error(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Failed to credit leaves for employee ${employee.emp_id}:`, error);
@@ -81,7 +88,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
     await client.query('COMMIT');
     logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Transaction committed successfully`);
     logger.info(`[LEAVE_CREDIT] [CREDIT MONTHLY LEAVES] Monthly leave credit completed. Credited: ${credited}, Errors: ${errors}`);
-    
+
     return { credited, errors };
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -98,7 +105,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
  */
 export const creditAnniversaryLeaves = async (): Promise<{ credited: number; errors: number }> => {
   logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] ========== FUNCTION CALLED ==========`);
-  
+
   const client = await pool.connect();
   let credited = 0;
   let errors = 0;
@@ -119,7 +126,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
              lb.id as balance_id
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
-      WHERE u.status = 'active'
+      WHERE u.status IN ('active', 'on_notice')
         AND u.role IN ('employee', 'manager', 'hr')
     `);
     logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] Found ${employeesResult.rows.length} active employees`);
@@ -127,51 +134,51 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
     for (const employee of employeesResult.rows) {
       try {
         const joinDate = new Date(employee.date_of_joining);
-        
+
         // Calculate years of service
         let years = today.getFullYear() - joinDate.getFullYear();
         const monthDiff = today.getMonth() - joinDate.getMonth();
         const dayDiff = today.getDate() - joinDate.getDate();
-        
+
         // Adjust if anniversary hasn't occurred yet this year
         if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
           years--;
         }
-        
+
         // Check for anniversary credits (one-time bonuses)
         // 3-year anniversary: +3 casual leaves
         // 5-year anniversary: +5 casual leaves
-        
+
         let anniversaryCredit = 0;
         let anniversaryType = '';
         let anniversaryDate: Date | null = null;
-        
+
         // Check if today is their 3-year anniversary date
         if (years === 3) {
           const threeYearAnniversary = new Date(joinDate.getFullYear() + 3, joinDate.getMonth(), joinDate.getDate());
           const anniversaryDateStr = threeYearAnniversary.toISOString().split('T')[0];
           const todayStr = today.toISOString().split('T')[0];
-          
+
           if (todayStr === anniversaryDateStr) {
             anniversaryCredit = 3;
             anniversaryType = '3-year';
             anniversaryDate = threeYearAnniversary;
           }
         }
-        
+
         // Check if today is their 5-year anniversary date
         if (years === 5) {
           const fiveYearAnniversary = new Date(joinDate.getFullYear() + 5, joinDate.getMonth(), joinDate.getDate());
           const anniversaryDateStr = fiveYearAnniversary.toISOString().split('T')[0];
           const todayStr = today.toISOString().split('T')[0];
-          
+
           if (todayStr === anniversaryDateStr) {
             anniversaryCredit = 5;
             anniversaryType = '5-year';
             anniversaryDate = fiveYearAnniversary;
           }
         }
-        
+
         // Skip if not an anniversary date
         if (anniversaryCredit === 0) {
           continue;
@@ -190,7 +197,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
             const lastUpdated = new Date(balanceCheck.rows[0].last_updated);
             const lastUpdatedDateStr = lastUpdated.toISOString().split('T')[0];
             const anniversaryDateStr = anniversaryDate.toISOString().split('T')[0];
-            
+
             // Skip if already credited on the anniversary date
             if (lastUpdatedDateStr === anniversaryDateStr) {
               logger.debug(`Employee ${employee.emp_id} (${employee.name}) already received ${anniversaryType} anniversary credit on ${anniversaryDateStr}. Skipping.`);
@@ -242,7 +249,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
     } else {
       logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] No anniversary credits to process today`);
     }
-    
+
     return { credited, errors };
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -267,7 +274,7 @@ export const creditAnniversaryLeaves = async (): Promise<{ credited: number; err
  */
 export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: number; errors: number }> => {
   logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] ========== FUNCTION CALLED ==========`);
-  
+
   const client = await pool.connect();
   let adjusted = 0;
   let errors = 0;
@@ -287,7 +294,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
              lb.id as balance_id
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
-      WHERE u.status = 'active'
+      WHERE u.status IN ('active', 'on_notice')
         AND u.role IN ('employee', 'manager', 'hr')
     `);
     logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Found ${employeesResult.rows.length} active employees`);
@@ -297,34 +304,35 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
         const currentCasual = parseFloat(employee.current_casual) || 0;
         const currentSick = parseFloat(employee.current_sick) || 0;
         const currentLop = parseFloat(employee.current_lop) || 0;
-        
+
         // ============================================
         // STEP 1: CARRY FORWARD LEAVES
         // ============================================
         // Cap casual leaves at 8 for carry forward (delete excess)
         const carryForwardCasual = Math.min(currentCasual, 8);
-        
+
         // Reset sick leaves to 0 (all unused sick leaves are deleted)
         const afterCarryForwardSick = 0;
-        
+
         // Set LOP leaves to 10 at year-end (no carry forward, reset to yearly credit of 10)
         const afterCarryForwardLop = 10;
-        
+
         // ============================================
         // STEP 2: ADD JANUARY LEAVES
         // ============================================
-        // Add January monthly credits: +1 casual, +0.5 sick
-        const finalCasual = carryForwardCasual + 1;
+        // Step 2: Add January monthly credits: +1 casual (Active only), +0.5 sick
+        const casualCredit = employee.status === 'on_notice' ? 0 : 1;
+        const finalCasual = carryForwardCasual + casualCredit;
         const finalSick = afterCarryForwardSick + 0.5;
         const finalLop = afterCarryForwardLop; // LOP stays at 10
-        
+
         // Check if total would exceed 99 limit
         if (finalCasual > 99) {
           logger.warn(`Employee ${employee.emp_id} (${employee.name}) would exceed 99 casual leave limit after year-end. Current: ${currentCasual}, After carry forward: ${carryForwardCasual}, Final: ${finalCasual}. Skipping January credit.`);
           // Still update with carry forward only
           const finalCasualLimited = carryForwardCasual;
           const finalSickLimited = afterCarryForwardSick;
-          
+
           if (employee.balance_id) {
             await client.query(
               `UPDATE leave_balances 
@@ -342,7 +350,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
               [employee.id, finalCasualLimited, finalSickLimited, finalLop]
             );
           }
-          
+
           const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
           logger.info(
             `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
@@ -355,7 +363,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           // Still update with carry forward only
           const finalCasualLimited = carryForwardCasual;
           const finalSickLimited = afterCarryForwardSick;
-          
+
           if (employee.balance_id) {
             await client.query(
               `UPDATE leave_balances 
@@ -373,7 +381,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
               [employee.id, finalCasualLimited, finalSickLimited, finalLop]
             );
           }
-          
+
           const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
           logger.info(
             `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
@@ -403,17 +411,17 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
               [employee.id, finalCasual, finalSick, finalLop]
             );
           }
-          
+
           const casualDeleted = currentCasual > 8 ? currentCasual - 8 : 0;
           logger.info(
             `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
             `Step 1 - Carry forward: Casual ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
             `Sick ${currentSick} → 0 (all deleted), LOP ${currentLop} → 10. ` +
-            `Step 2 - January credit: +1 casual, +0.5 sick. ` +
+            `Step 2 - January credit: +${casualCredit} casual, +0.5 sick. ` +
             `Step 3 - Final total: Casual ${finalCasual}, Sick ${finalSick}, LOP ${finalLop}`
           );
         }
-        
+
         // Send carry forward email notification to ALL employees (even if no changes)
         // This ensures everyone receives notification about their carryforward status
         try {
@@ -422,7 +430,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           const currentDate = new Date();
           const previousYear = currentDate.getFullYear();
           const newYear = previousYear + 1;
-          
+
           // Prepare carry forward data
           const carriedForwardLeaves: { casual?: number; sick?: number; lop?: number } = {};
           if (carryForwardCasual > 0) {
@@ -430,7 +438,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           }
           // Sick leaves are not carried forward (reset to 0)
           // LOP is not carried forward (set to 10, not from previous year)
-          
+
           // Use final balances (after carry forward + January credits) for email
           await sendLeaveCarryForwardEmail(employee.email, {
             employeeName: employee.name,
@@ -444,13 +452,13 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
               lop: finalLop
             }
           });
-          
+
           logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Carry forward email sent successfully to ${employee.email} (${employee.name})`);
         } catch (emailError: any) {
           logger.error(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Failed to send carry forward email to ${employee.email}:`, emailError);
           // Don't fail the entire process if email fails
         }
-        
+
         adjusted++;
       } catch (error: any) {
         errors++;
@@ -464,7 +472,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
     if (adjusted > 0) {
       logger.info(`[LEAVE_CREDIT] [PROCESS YEAR END ADJUSTMENTS] Year-end leave adjustments completed (carry forward + January credits). Adjusted: ${adjusted}, Errors: ${errors}`);
     }
-    
+
     return { adjusted, errors };
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -482,15 +490,15 @@ export const isYearEnd = (): boolean => {
   logger.info(`[LEAVE_CREDIT] [IS YEAR END] ========== FUNCTION CALLED ==========`);
   const today = new Date();
   const month = today.getMonth() + 1; // 1-indexed (December = 12)
-  
+
   logger.info(`[LEAVE_CREDIT] [IS YEAR END] Today: ${today.toISOString().split('T')[0]}, Month: ${month}`);
-  
+
   // Check if it's December and today is the last working day
   if (month === 12 && isLastWorkingDayOfMonth()) {
     logger.info(`[LEAVE_CREDIT] [IS YEAR END] Year-end detected (December + last working day)`);
     return true;
   }
-  
+
   logger.info(`[LEAVE_CREDIT] [IS YEAR END] Not year-end`);
   return false;
 };
@@ -508,7 +516,7 @@ export const sendCarryForwardEmailsToAll = async (
 ): Promise<{ sent: number; errors: number }> => {
   logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Previous Year: ${previousYear || 'auto'}, New Year: ${newYear || 'auto'}`);
-  
+
   const client = await pool.connect();
   let sent = 0;
   let errors = 0;
@@ -528,7 +536,7 @@ export const sendCarryForwardEmailsToAll = async (
              COALESCE(lb.lop_balance, 0) as current_lop
       FROM users u
       LEFT JOIN leave_balances lb ON u.id = lb.employee_id
-      WHERE u.status = 'active'
+      WHERE u.status IN ('active', 'on_notice')
         AND u.role IN ('employee', 'manager', 'hr')
         AND u.email IS NOT NULL
         AND u.email != ''
@@ -540,10 +548,10 @@ export const sendCarryForwardEmailsToAll = async (
         const currentCasual = parseFloat(employee.current_casual) || 0;
         const currentSick = parseFloat(employee.current_sick) || 0;
         const currentLop = parseFloat(employee.current_lop) || 0;
-        
+
         // Cap casual leaves at 8 for carry forward (same logic as year-end)
         const carryForwardCasual = Math.min(currentCasual, 8);
-        
+
         // Prepare carry forward data
         const carriedForwardLeaves: { casual?: number; sick?: number; lop?: number } = {};
         if (carryForwardCasual > 0) {
@@ -551,7 +559,7 @@ export const sendCarryForwardEmailsToAll = async (
         }
         // Sick leaves are not carried forward (reset to 0)
         // LOP is not carried forward (set to 10, not from previous year)
-        
+
         await sendLeaveCarryForwardEmail(employee.email, {
           employeeName: employee.name,
           employeeEmpId: employee.emp_id,
@@ -564,7 +572,7 @@ export const sendCarryForwardEmailsToAll = async (
             lop: 10  // LOP reset to 10
           }
         });
-        
+
         logger.info(`[LEAVE_CREDIT] [SEND CARRY FORWARD EMAILS] Carry forward email sent successfully to ${employee.email} (${employee.name})`);
         sent++;
       } catch (emailError: any) {
@@ -596,23 +604,23 @@ export const sendCarryForwardEmailsToAll = async (
  */
 export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
   logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] ========== FUNCTION CALLED ==========`);
-  
+
   try {
     // Verify it's 8 PM before processing leave credits
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
-    
+
     logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
-    
+
     // Only allow processing between 8:00 PM and 8:59 PM
     if (currentHour !== 20) {
       logger.warn(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Leave credit check called at ${currentHour}:${currentMinute.toString().padStart(2, '0')}. Only runs at 8 PM. Skipping.`);
       return;
     }
-    
+
     logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] 8 PM verified (${currentHour}:${currentMinute.toString().padStart(2, '0')}). Proceeding with leave credit checks...`);
-    
+
     // Check for 3-year and 5-year anniversaries first (runs daily at 8 PM)
     logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Checking for anniversary credits`);
     await creditAnniversaryLeaves();
@@ -621,7 +629,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
     // This runs FIRST and includes: Step 1 - Carry forward, Step 2 - January credits, Step 3 - Update total
     if (isYearEnd()) {
       logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Last working day of December detected. Processing year-end adjustments (carry forward + January credits)...`);
-      
+
       // Check if adjustments were already processed today at 8 PM
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
@@ -631,7 +639,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
          INNER JOIN users u ON lb.employee_id = u.id
          WHERE DATE(lb.last_updated) = $1 
            AND EXTRACT(HOUR FROM lb.last_updated) >= 19
-           AND u.status = 'active'
+           AND u.status IN ('active', 'on_notice')
            AND u.role IN ('employee', 'manager', 'hr')
            AND lb.sick_balance >= 0.5`, // Check for January credit (sick should be 0.5 after year-end)
         [todayStr]
@@ -651,7 +659,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
       const today = new Date();
       const currentMonth = today.getMonth() + 1; // 1-indexed
       const currentYear = today.getFullYear();
-      
+
       // Calculate next month
       let nextMonth = currentMonth + 1;
       let nextYear = currentYear;
@@ -659,9 +667,9 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
         nextMonth = 1;
         nextYear = currentYear + 1;
       }
-      
+
       logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] Last working day of ${currentMonth}/${currentYear} detected. Crediting leaves for next month (${nextMonth}/${nextYear})...`);
-      
+
       // Check if leaves were already credited today at 8 PM by checking last_updated timestamp
       // This prevents duplicate credits even if the function is called multiple times
       // We check for updates after 7:30 PM today to ensure it was credited at 8 PM
@@ -673,7 +681,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
          INNER JOIN users u ON lb.employee_id = u.id
          WHERE DATE(lb.last_updated) = $1 
            AND EXTRACT(HOUR FROM lb.last_updated) >= 19
-           AND u.status = 'active'
+           AND u.status IN ('active', 'on_notice')
            AND u.role IN ('employee', 'manager', 'hr')
            AND lb.casual_balance >= 1 
            AND lb.sick_balance >= 0.5`,

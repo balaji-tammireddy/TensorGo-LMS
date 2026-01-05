@@ -21,6 +21,7 @@ interface AddLeavesModalProps {
   onAdd: (leaveType: 'casual' | 'sick' | 'lop', count: number, comment?: string) => void;
   employeeId: number;
   employeeName: string;
+  employeeStatus?: string;
   isLoading?: boolean;
 }
 
@@ -30,6 +31,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   onAdd,
   employeeId,
   employeeName,
+  employeeStatus,
   isLoading = false
 }) => {
   const [leaveType, setLeaveType] = useState<'casual' | 'sick' | 'lop'>('casual');
@@ -56,8 +58,10 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
       setCount('');
       setComment('');
       setValidationError('');
+    } else if (employeeStatus === 'on_notice' && leaveType === 'casual') {
+      setLeaveType('lop');
     }
-  }, [isOpen, employeeId]);
+  }, [isOpen, employeeId, employeeStatus, leaveType]);
 
   if (!isOpen) return null;
 
@@ -153,7 +157,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
+    <div className="modal-overlay">
       <div className="add-leaves-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Add Leaves</h2>
@@ -162,7 +166,23 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           </button>
         </div>
         <div className="modal-body">
-          <p className="employee-name">Employee: <strong>{employeeName}</strong></p>
+          <p className="employee-name">
+            Employee: <strong>{employeeName}</strong>
+            {employeeStatus === 'on_notice' && (
+              <span className="status-badge status-on-notice" style={{
+                backgroundColor: '#ff9800',
+                color: 'white',
+                fontSize: '0.75rem',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                marginLeft: '10px',
+                verticalAlign: 'middle',
+                display: 'inline-block'
+              }}>
+                On Notice
+              </span>
+            )}
+          </p>
           {balancesLoading ? (
             <div style={{ textAlign: 'center', padding: '20px' }}>Loading balances...</div>
           ) : (
@@ -185,7 +205,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                         borderRadius: '4px',
                         backgroundColor: 'transparent',
                         color: '#1f2a3d',
-                        height: 'auto'
+                        height: '42px'
                       }}
                     >
                       <span>
@@ -197,18 +217,31 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="leave-type-dropdown-content">
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('casual')}
-                    >
-                      Casual (Current: {balances?.casual || 0})
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('sick')}
-                    >
-                      Sick (Current: {balances?.sick || 0})
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    {employeeStatus !== 'on_notice' ? (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('casual')}
+                        >
+                          Casual (Current: {balances?.casual || 0})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('sick')}
+                        >
+                          Sick (Current: {balances?.sick || 0})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('sick')}
+                        >
+                          Sick (Current: {balances?.sick || 0})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem
                       onClick={() => handleLeaveTypeChange('lop')}
                     >
@@ -234,6 +267,18 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                   }}
                   disabled={isLoading || balancesLoading}
                   required
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    fontFamily: 'Poppins, sans-serif',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    backgroundColor: 'transparent',
+                    color: '#1f2a3d',
+                    height: '42px',
+                    boxSizing: 'border-box'
+                  }}
                 />
                 <small className="help-text">Enter number of leaves (e.g. 0.5, 1, 2, etc.)</small>
                 {validationError && (
