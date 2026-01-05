@@ -33,29 +33,6 @@ const ViewPoliciesPage: React.FC = () => {
         return <FaFileAlt />;
     };
 
-    const { data: policies, isLoading: loading } = useQuery(
-        ['policies'],
-        getPolicies,
-        {
-            staleTime: 24 * 60 * 60 * 1000, // 24 hours
-            cacheTime: 24 * 60 * 60 * 1000,
-            select: (data) => {
-                if (data && data.length > 0) {
-                    return data.map((p: any) => ({
-                        id: p.id,
-                        title: p.title,
-                        icon: getIconForTitle(p.title),
-                        link: p.public_url
-                    }));
-                }
-                return defaultPolicies;
-            },
-            onError: (error) => {
-                console.error('Error fetching policies:', error);
-            }
-        }
-    );
-
     const defaultPolicies: PolicyDisplay[] = [
         {
             id: 'asset',
@@ -95,6 +72,32 @@ const ViewPoliciesPage: React.FC = () => {
         }
     ];
 
+    const { data: policies, isLoading: loading } = useQuery(
+        ['policies'],
+        getPolicies,
+        {
+            staleTime: 24 * 60 * 60 * 1000, // 24 hours
+            cacheTime: 24 * 60 * 60 * 1000,
+            select: (data) => {
+                if (data && data.length > 0) {
+                    return data.map((p: any) => ({
+                        id: p.id,
+                        title: p.title,
+                        icon: getIconForTitle(p.title),
+                        link: p.public_url
+                    }));
+                }
+                return defaultPolicies;
+            },
+            onError: (error) => {
+                console.error('Error fetching policies:', error);
+            }
+        }
+    );
+
+    // Use fetched policies if available, otherwise use defaults if not loading
+    const displayPolicies = policies || (loading ? [] : defaultPolicies);
+
     const handleViewPolicy = (link: string, title: string) => {
         if (link === '#' || !link) {
             alert(`The document for "${title}" is currently being updated. Please check back later.`);
@@ -108,14 +111,13 @@ const ViewPoliciesPage: React.FC = () => {
             <div className="vp-container">
                 <div className="vp-header">
                     <h1 className="page-title">Company Policies</h1>
-
                 </div>
 
                 {loading ? (
                     <div className="vp-loading">Loading policies...</div>
                 ) : (
                     <div className="vp-grid">
-                        {policies?.map((policy: PolicyDisplay) => (
+                        {displayPolicies.map((policy: PolicyDisplay) => (
                             <div key={policy.id} className="vp-card">
                                 <div className="vp-icon-wrapper">
                                     {policy.icon}
@@ -132,7 +134,7 @@ const ViewPoliciesPage: React.FC = () => {
                     </div>
                 )}
 
-                {(!policies || policies.length === 0) && !loading && (
+                {(!displayPolicies || displayPolicies.length === 0) && !loading && (
                     <div className="vp-no-data">
                         <p>No policies available at the moment.</p>
                     </div>

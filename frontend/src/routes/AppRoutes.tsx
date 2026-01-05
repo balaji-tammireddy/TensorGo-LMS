@@ -18,6 +18,8 @@ const ViewPoliciesPage = lazy(() => import('../pages/ViewPoliciesPage'));
 const AccessDeniedPage = lazy(() => import('../pages/AccessDeniedPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
+import * as policyService from '../services/policyService';
+
 // Prefetch core data for authenticated users
 const DataPrefetcher: React.FC = () => {
   const { user } = useAuth();
@@ -33,6 +35,7 @@ const DataPrefetcher: React.FC = () => {
       queryClient.prefetchQuery(['holidays', currentYear], () => leaveService.getHolidays(currentYear));
       queryClient.prefetchQuery('leaveRules', leaveService.getLeaveRules);
       queryClient.prefetchQuery('myLeaveRequests', () => leaveService.getMyLeaveRequests(1, 50));
+      queryClient.prefetchQuery(['policies'], policyService.getPolicies);
 
       // If HR/Admin, prefetch pending requests and employee list
       if (user.role === 'hr' || user.role === 'super_admin') {
