@@ -333,15 +333,15 @@ export const applyLeave = async (
 
       if (days <= 2) {
         if (daysUntilStart < 3) {
-          throw new Error('Casual leaves of up to 2 days must be applied at least 3 days in advance.');
+          throw new Error('Casual leaves of 0.5 to 2.0 days must be applied at least 3 days in advance.');
         }
       } else if (days <= 5) {
         if (daysUntilStart < 7) {
-          throw new Error('Casual leaves of 3 to 5 days must be applied at least 1 week (7 days) in advance.');
+          throw new Error('Casual leaves of 3.0 to 5.0 days must be applied at least 7 days in advance.');
         }
       } else {
         if (daysUntilStart < 30) {
-          throw new Error('Casual leaves of more than 5 days must be applied at least 1 month (30 days) in advance.');
+          throw new Error('Casual leaves of More Than 5.0 days must be applied at least 1 Month in advance.');
         }
       }
     }
