@@ -5,7 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { DatePicker } from '../components/ui/date-picker';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaTrash } from 'react-icons/fa';
+import { FaTrash, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import './HolidayManagementPage.css';
@@ -23,6 +23,11 @@ const HolidayManagementPage: React.FC = () => {
 
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const handleSortToggle = () => {
+        setSortDirection((prev) => prev === 'asc' ? 'desc' : 'asc');
+    };
 
     // Fetch holidays
     const { data: holidaysData = [], isLoading: holidaysLoading } = useQuery(
@@ -52,9 +57,11 @@ const HolidayManagementPage: React.FC = () => {
         }).sort((a: any, b: any) => {
             const dateA = new Date(a.date + 'T00:00:00');
             const dateB = new Date(b.date + 'T00:00:00');
-            return dateA.getTime() - dateB.getTime();
+            return sortDirection === 'asc'
+                ? dateA.getTime() - dateB.getTime()
+                : dateB.getTime() - dateA.getTime();
         });
-    }, [holidaysData, selectedYear]);
+    }, [holidaysData, selectedYear, sortDirection]);
 
     // Create holiday mutation
     const createMutation = useMutation(
@@ -226,7 +233,12 @@ const HolidayManagementPage: React.FC = () => {
                                 <table className="hm-table">
                                     <thead>
                                         <tr>
-                                            <th>Date</th>
+                                            <th className="sortable-header" onClick={handleSortToggle}>
+                                                <div className="header-sort-wrapper">
+                                                    Date
+                                                    {sortDirection === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />}
+                                                </div>
+                                            </th>
                                             <th>Holiday Name</th>
                                             <th>Day</th>
                                             <th>Actions</th>

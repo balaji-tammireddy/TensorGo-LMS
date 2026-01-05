@@ -396,3 +396,35 @@
         background-position: -200% 0;
     }
 }
+
+/* Sortable Table Headers */
+.sortable-header {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.sortable-header:hover {
+    background-color: #edf2f7 !important;
+}
+
+.header-sort-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sort-icon {
+    font-size: 10px;
+    color: #a0aec0;
+    transition: all 0.2s;
+}
+
+.sort-icon.active {
+    color: #3182ce;
+}
+
+.sortable-header:hover .sort-icon:not(.active) {
+    color: #718096;
+}
