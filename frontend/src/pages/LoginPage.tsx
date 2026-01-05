@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { forgotPassword, verifyOTP, resetPassword } from '../services/authService';
-import { FaEye, FaEyeSlash, FaTimes } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaTimes, FaUserTimes } from 'react-icons/fa';
 import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
@@ -198,20 +198,30 @@ const LoginPage: React.FC = () => {
                 <img src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/logo.png" alt="TensorGo logo" />
               </div>
             </div>
-            <h1>HR Management System</h1>
-            <div className="error-message" style={{ marginTop: 16 }}>
-              You are no longer active employee of this organisation.
+
+            <div className="inactive-state-container">
+              <div className="inactive-icon-wrapper">
+                <FaUserTimes className="inactive-icon" />
+              </div>
+
+              <h1 className="inactive-title">Account Inactive</h1>
+
+              <p className="inactive-description">
+                You are no longer an active employee of this organization.
+                Please contact the HR department if you believe this is an error.
+              </p>
+
+              <button
+                type="button"
+                className="login-button inactive-login-button"
+                onClick={() => {
+                  setIsInactive(false);
+                  setPassword('');
+                }}
+              >
+                Sign In as Different User
+              </button>
             </div>
-            <button
-              type="button"
-              className="login-button inactive-login-button"
-              onClick={() => {
-                setIsInactive(false);
-                setPassword('');
-              }}
-            >
-              Sign In as Different User
-            </button>
           </>
         ) : (
           <>

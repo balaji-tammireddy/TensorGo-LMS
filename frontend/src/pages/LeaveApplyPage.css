@@ -1065,14 +1065,14 @@
 }
 
 .status-approved {
-  background-color: #4caf50;
-  /* Green */
+  background-color: #059669;
+  /* Emerald 600 */
   color: #fff;
 }
 
 .status-rejected {
-  background-color: #f44336;
-  /* Red */
+  background-color: #dc2626;
+  /* Red 600 */
   color: #fff;
   max-width: 200px;
   overflow: hidden;
