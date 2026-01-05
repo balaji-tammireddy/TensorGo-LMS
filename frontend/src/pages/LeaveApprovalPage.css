@@ -149,8 +149,14 @@
 
 .leave-approval-page .actions-cell {
   display: flex;
-  gap: 10px;
   justify-content: center;
+  align-items: center;
+}
+
+.action-icons-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .status-badge {
