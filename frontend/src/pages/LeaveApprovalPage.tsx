@@ -726,19 +726,6 @@ const LeaveApprovalPage: React.FC = () => {
                           <td>{request.empId}</td>
                           <td>
                             {request.empName}
-                            {request.empStatus === 'on_notice' && (
-                              <span className="status-badge status-on-notice" style={{
-                                backgroundColor: '#ff9800',
-                                color: 'white',
-                                fontSize: '0.7rem',
-                                padding: '2px 6px',
-                                borderRadius: '10px',
-                                marginLeft: '8px',
-                                display: 'inline-block'
-                              }}>
-                                On Notice
-                              </span>
-                            )}
                           </td>
                           <td>{formatDateSafe(request.appliedDate)}</td>
                           <td>{leaveDateRange}</td>
@@ -844,7 +831,9 @@ const LeaveApprovalPage: React.FC = () => {
                           >
                             <td>{idx + 1}</td>
                             <td>{request.empId}</td>
-                            <td>{request.empName}</td>
+                            <td>
+                              {request.empName}
+                            </td>
                             <td>{formatDateSafe(request.appliedDate)}</td>
                             <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
                             <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>

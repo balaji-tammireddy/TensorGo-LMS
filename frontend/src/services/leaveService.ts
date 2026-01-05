@@ -33,6 +33,7 @@ export interface LeaveRequest {
   rejectedDays?: number;
   pendingDays?: number;
   totalDays?: number;
+  empStatus?: string;
 }
 
 export interface PendingLeaveRequest {
@@ -45,6 +46,7 @@ export interface PendingLeaveRequest {
   noOfDays: number;
   leaveReason: string;
   currentStatus: string;
+  empStatus?: string;
   leaveDays: Array<{ date: string; type: string }>;
 }
 

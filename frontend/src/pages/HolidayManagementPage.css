@@ -1,6 +1,4 @@
 .holiday-management-page {
-    max-width: 1400px;
-    margin: 0 auto;
     padding: 20px;
 }
 
@@ -75,7 +73,8 @@
 }
 
 .hm-form-group .date-picker-input-field {
-    padding-right: 35px; /* Space for the calendar icon */
+    padding-right: 35px;
+    /* Space for the calendar icon */
 }
 
 .hm-form-group input:focus,

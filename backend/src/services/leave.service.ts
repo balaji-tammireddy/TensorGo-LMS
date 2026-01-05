@@ -750,6 +750,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
                 lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
                 lr.last_updated_by, lr.last_updated_by_role,
                 u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+                u.status AS emp_status,
                 last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
          FROM leave_requests lr
          JOIN users u ON u.id = lr.employee_id
@@ -765,6 +766,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
                 lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
                 lr.last_updated_by, lr.last_updated_by_role,
                 u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+                u.status AS emp_status,
                 last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
          FROM leave_requests lr
          JOIN users u ON lr.employee_id = u.id
@@ -846,6 +848,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     id: row.id,
     empId: row.emp_id,
     empName: row.emp_name,
+    empStatus: row.emp_status,
     appliedDate: formatDate(row.applied_date),
     noOfDays: parseFloat(row.no_of_days),
     currentStatus: row.current_status,
@@ -3482,6 +3485,7 @@ export const getApprovedLeaves = async (
         lr.id,
         u.emp_id,
         u.first_name || ' ' || COALESCE(u.last_name, '') AS emp_name,
+        u.status AS emp_status,
         lr.applied_date,
         lr.start_date,
         lr.end_date,
@@ -3512,7 +3516,7 @@ export const getApprovedLeaves = async (
      GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role,
-              last_updater.first_name, last_updater.last_name
+              last_updater.first_name, last_updater.last_name, u.status
      ORDER BY lr.applied_date DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
@@ -3628,6 +3632,7 @@ export const getApprovedLeaves = async (
       id: row.id,
       empId: row.emp_id,
       empName: row.emp_name,
+      empStatus: row.emp_status,
       appliedDate: formatDate(row.applied_date),
       leaveDate,
       startDate: formatDate(row.start_date),

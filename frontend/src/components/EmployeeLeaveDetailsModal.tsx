@@ -28,6 +28,7 @@ interface EmployeeLeaveDetailsModalProps {
     approverRole?: string | null;
     doctorNote?: string | null;
     leaveDays?: LeaveDay[];
+    empStatus?: string | null;
   } | null;
   onClose: () => void;
 }
@@ -83,7 +84,12 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
     <div className="leave-details-modal-overlay" onClick={onClose}>
       <div className="leave-details-modal" onClick={(e) => e.stopPropagation()}>
         <div className="leave-details-modal-header">
-          <h2>Leave Request Details</h2>
+          <h2>
+            Leave Request Details
+            {leaveRequest.empStatus === 'on_notice' && (
+              <span className="status-on-notice">On Notice</span>
+            )}
+          </h2>
           <button className="leave-details-modal-close" onClick={onClose}>
             <FaTimes />
           </button>
@@ -149,7 +155,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                     className="prescription-view-button"
                     onClick={async () => {
                       let imageUrl: string;
-                      
+
                       // Check if it's an OVHcloud key or base64
                       if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('medical-certificates/')) {
                         // Request signed URL from backend
@@ -168,7 +174,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                         // Fallback - try as base64
                         imageUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
                       }
-                      
+
                       const img = document.createElement('img');
                       img.src = imageUrl;
                       img.style.maxWidth = '90vw';
@@ -176,7 +182,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       img.style.objectFit = 'contain';
                       img.style.cursor = 'default';
                       img.onclick = (e) => e.stopPropagation();
-                      
+
                       const closeButton = document.createElement('button');
                       closeButton.innerHTML = '×';
                       closeButton.style.position = 'absolute';
@@ -202,18 +208,18 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       closeButton.onmouseleave = () => {
                         closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
                       };
-                      
+
                       const closeOverlay = () => {
                         if (document.body.contains(overlay)) {
                           document.body.removeChild(overlay);
                         }
                       };
-                      
+
                       closeButton.onclick = (e) => {
                         e.stopPropagation();
                         closeOverlay();
                       };
-                      
+
                       const overlay = document.createElement('div');
                       overlay.style.position = 'fixed';
                       overlay.style.top = '0';
@@ -227,7 +233,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       overlay.style.zIndex = '10000';
                       overlay.style.cursor = 'pointer';
                       overlay.onclick = closeOverlay;
-                      
+
                       overlay.appendChild(img);
                       overlay.appendChild(closeButton);
                       document.body.appendChild(overlay);
@@ -293,11 +299,10 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       return (
                         <div
                           key={idx}
-                          className={`leave-day-item ${
-                            isApproved ? 'day-approved' :
-                            isRejected ? 'day-rejected' :
-                            isPending ? 'day-pending' : ''
-                          }`}
+                          className={`leave-day-item ${isApproved ? 'day-approved' :
+                              isRejected ? 'day-rejected' :
+                                isPending ? 'day-pending' : ''
+                            }`}
                         >
                           <span className="day-date">{formatDateSafe(day.date)}</span>
                           <span className="day-type">{getDayTypeLabel(day.type)}</span>

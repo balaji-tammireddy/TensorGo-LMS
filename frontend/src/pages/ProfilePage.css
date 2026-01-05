@@ -1,6 +1,4 @@
 .profile-page {
-  max-width: 1200px;
-  margin: 0 auto;
   padding: 20px 24px 32px;
   background-color: #ffffff;
   border: 1px solid #e5e5e5;
@@ -245,6 +243,14 @@
   font-size: 14px;
   line-height: 1.5;
   height: 42px;
+  font-family: 'Poppins', sans-serif;
+  color: #1f2a3d;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vp-container {
+  padding: 30px;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   width: 100%;

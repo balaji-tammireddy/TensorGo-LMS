@@ -1435,7 +1435,8 @@ const LeaveApplyPage: React.FC = () => {
         approverName: request.approverName || null,
         approverRole: request.approverRole || null,
         doctorNote: request.doctorNote || null,
-        leaveDays: request.leaveDays || []
+        leaveDays: request.leaveDays || [],
+        empStatus: request.empStatus || null
       });
       setViewModalOpen(true);
     } else {
@@ -1631,27 +1632,12 @@ const LeaveApplyPage: React.FC = () => {
   return (
     <AppLayout>
       <div className="leave-apply-page">
-        <h1 className="page-title">
-          Welcome, {user?.name ? user.name.split(' ').map(part =>
+        <h2 className="page-title">
+          {user?.username ? user.username.split('.').map(part => 
             part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
           ).join(' ') : ''}
-          {user?.status === 'on_notice' && (
-            <span style={{
-              fontSize: '14px',
-              backgroundColor: '#ff9800',
-              color: 'white',
-              padding: '4px 12px',
-              borderRadius: '16px',
-              marginLeft: '12px',
-              verticalAlign: 'middle',
-              fontWeight: 500
-            }}>
-              On Notice
-            </span>
-          )}
-        </h1>
-
-        {/* Top Row: Three Equal Sections */}
+        </h2>
+      </div>   {/* Top Row: Three Equal Sections */}
         <div className="top-sections-row">
           {/* Leave Balances - Top Left */}
           <div className="leave-balances-section">
@@ -2669,7 +2655,7 @@ const LeaveApplyPage: React.FC = () => {
           setDeleteRequestId(null);
         }}
       />
-    </AppLayout>
+    </AppLayout >
   );
 };
 

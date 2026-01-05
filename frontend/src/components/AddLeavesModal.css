@@ -193,10 +193,21 @@
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
 }
 
-.modal-footer .submit-button:disabled,
 .modal-footer .cancel-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.status-on-notice {
+  background-color: #ff9800;
+  color: white;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 10px;
+  display: inline-block;
+  font-weight: 600;
+  vertical-align: middle;
 }
