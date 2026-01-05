@@ -262,7 +262,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending };
       },
-      onSuccess: async (response, requestId) => {
+      onSuccess: async (_response, requestId) => {
         // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
@@ -989,27 +989,26 @@ const LeaveApprovalPage: React.FC = () => {
                             <div className="actions-cell">
                               {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
                                 <div className="action-icons-container">
-                                  <span
-                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                  <button
+                                    className={`action-btn ${isUpdating ? 'disabled' : ''}`}
                                     title="View Details"
                                     onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
+                                    disabled={isUpdating}
                                   >
                                     <FaEye />
-                                  </span>
-                                  <span
-                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                  </button>
+                                  <button
+                                    className={`action-btn ${isUpdating ? 'disabled' : ''}`}
                                     title={isUpdating ? 'Loading...' : 'Edit'}
                                     onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
-                                    style={{
-                                      cursor: isUpdating ? 'not-allowed' : 'pointer'
-                                    }}
+                                    disabled={isUpdating}
                                   >
                                     {isUpdating && editingRequestId === request.id ? (
                                       <span className="loading-spinner-small"></span>
                                     ) : (
                                       <FaPencilAlt />
                                     )}
-                                  </span>
+                                  </button>
                                 </div>
                               )}
                             </div>

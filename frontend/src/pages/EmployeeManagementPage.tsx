@@ -980,46 +980,45 @@ const EmployeeManagementPage: React.FC = () => {
                       </td>
                       <td>
                         <div className="actions-wrapper">
-                          <span
-                            className="action-icon"
+                          <button
+                            className="action-btn"
                             title="View"
                             onClick={() => handleViewEmployee(employee.id)}
                           >
                             <FaEye />
-                          </span>
+                          </button>
                           {/* HR cannot edit super_admin users or their own details */}
                           {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
-                            <span
-                              className="action-icon"
+                            <button
+                              className="action-btn"
                               title="Edit"
                               onClick={() => handleEditEmployee(employee.id)}
                             >
                               <FaPencilAlt />
-                            </span>
+                            </button>
                           )}
                           {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
                           {/* Also hide for inactive/resigned/terminated employees */}
                           {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
                             (user?.role === 'super_admin' && employee.id !== user.id)) &&
                             (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned') && (
-                              <span
-                                className="action-icon"
+                              <button
+                                className="action-btn"
                                 title="Add Leaves"
                                 onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
                               >
                                 <FaCalendarPlus />
-                              </span>
+                              </button>
                             )}
                           {/* Super Admin can delete employees but not themselves */}
                           {user?.role === 'super_admin' && employee.id !== user.id && (
-                            <span
-                              className="action-icon"
+                            <button
+                              className="action-btn delete-btn"
                               title="Delete"
                               onClick={() => handleDelete(employee.id)}
-                              style={{ color: '#f44336' }}
                             >
                               <FaTrash />
-                            </span>
+                            </button>
                           )}
                         </div>
                       </td>

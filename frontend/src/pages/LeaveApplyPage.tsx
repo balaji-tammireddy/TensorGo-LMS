@@ -18,7 +18,7 @@ import { Button } from '../components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
-import { FaPencilAlt, FaTrash, FaEye, FaFilter, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaPencilAlt, FaTrash, FaEye, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import './LeaveApplyPage.css';
 
@@ -1053,7 +1053,6 @@ const LeaveApplyPage: React.FC = () => {
     if (formData.leaveType === 'casual' && formData.startDate) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const startDate = new Date(formData.startDate + 'T00:00:00'); // Use T00:00:00 to match backend logic usually
       // Note: Using T12:00:00 in other places to avoid timezone shift, but for diff calculation T00:00:00 is safer if today is also 00:00:00
       // Let's ensure consistency.
       const start = new Date(formData.startDate + 'T00:00:00');
@@ -2546,37 +2545,40 @@ const LeaveApplyPage: React.FC = () => {
                           </td>
                           <td>
                             <div className="action-icons-container">
-                              <span
-                                className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                              <button
+                                className={`action-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
                                 title="View Details"
                                 onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
+                                disabled={isUpdating || applyMutation.isLoading || deleteMutation.isLoading}
                               >
                                 <FaEye />
-                              </span>
+                              </button>
                               {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
                                 <>
-                                  <span
-                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                  <button
+                                    className={`action-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
                                     title={isUpdating ? 'Updating...' : 'Edit'}
                                     onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
+                                    disabled={isUpdating || applyMutation.isLoading || deleteMutation.isLoading}
                                   >
                                     {isUpdating && editingId === request.id ? (
                                       <span className="loading-spinner-small"></span>
                                     ) : (
                                       <FaPencilAlt />
                                     )}
-                                  </span>
-                                  <span
-                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                  </button>
+                                  <button
+                                    className={`action-btn delete-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
                                     title={isUpdating ? 'Updating...' : 'Delete'}
                                     onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
+                                    disabled={isUpdating || applyMutation.isLoading || deleteMutation.isLoading}
                                   >
                                     {isUpdating && deleteRequestId === request.id ? (
                                       <span className="loading-spinner-small"></span>
                                     ) : (
                                       <FaTrash />
                                     )}
-                                  </span>
+                                  </button>
                                 </>
                               )}
                             </div>
