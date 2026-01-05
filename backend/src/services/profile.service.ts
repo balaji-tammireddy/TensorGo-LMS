@@ -246,6 +246,18 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
   // Update reporting manager
   if (profileData.reportingManagerId !== undefined) {
+    if (profileData.reportingManagerId) {
+      const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [profileData.reportingManagerId]);
+      if (managerResult.rows.length > 0) {
+        const status = managerResult.rows[0].status;
+        if (status === 'on_notice') {
+          throw new Error('Employees in notice period cannot be reporting managers');
+        }
+        if (status !== 'active' && status !== 'on_leave') {
+          throw new Error('Selected reporting manager must be active or on leave');
+        }
+      }
+    }
     updates.push(`reporting_manager_id = $${paramCount}`);
     values.push(profileData.reportingManagerId || null);
     paramCount++;
@@ -326,23 +338,19 @@ export const deleteProfilePhoto = async (userId: number) => {
 };
 
 export const getReportingManagers = async (search?: string, employeeRole?: string, excludeEmployeeId?: number) => {
-  logger.info(`[PROFILE] [GET REPORTING MANAGERS] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
 
   // Reporting manager rules:
-  // - For employees: show all managers
-  // - For managers: show all hr's
-  // - For hrs: show all super admins
-  let targetRoles: string[];
-  if (employeeRole === 'manager') {
-    targetRoles = ['hr'];
-  } else if (employeeRole === 'hr') {
-    targetRoles = ['super_admin'];
-  } else if (employeeRole === 'super_admin') {
-    targetRoles = []; // Super admins don't typically have reporting managers
-  } else {
-    // Default to 'employee'
-    targetRoles = ['manager'];
+  // - Super Admin is always an option for every role
+  // - Interns and Employees also see Managers
+  // - Managers also see HRs
+  // - HRs and Super Admins see only Super Admins
+  let targetRoles: string[] = ['super_admin'];
+
+  if (employeeRole === 'intern' || employeeRole === 'employee') {
+    targetRoles.push('manager');
+  } else if (employeeRole === 'manager') {
+    targetRoles.push('hr');
   }
 
   if (targetRoles.length === 0) {
@@ -352,7 +360,7 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
     FROM users
-    WHERE role = ANY($1) AND status = 'active'
+    WHERE role = ANY($1) AND status IN ('active', 'on_leave')
   `;
   const params: any[] = [targetRoles];
   let paramIndex = 2;
