@@ -73,6 +73,19 @@ const LeaveApplyPage: React.FC = () => {
     ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // only allow tomorrow for future sick leave
     : undefined; // no max date for other leave types
 
+  // End date limit: 10 calendar days maximum from start date
+  const maxEndDateLimit = useMemo(() => {
+    if (!formData.startDate) return maxStartDate;
+
+    // Calculate 10 days from start date (start + 9 days = 10 days total)
+    const tenDaysFromStart = format(addDays(new Date(formData.startDate + 'T00:00:00'), 9), 'yyyy-MM-dd');
+
+    if (maxStartDate && tenDaysFromStart > maxStartDate) {
+      return maxStartDate;
+    }
+    return tenDaysFromStart;
+  }, [formData.startDate, maxStartDate]);
+
   // Set default leave type to LOP if user is on notice and current type is causal
   useEffect(() => {
     if (user?.status === 'on_notice' && formData.leaveType === 'casual') {
@@ -977,6 +990,19 @@ const LeaveApplyPage: React.FC = () => {
     if (overlapError) {
       showWarning(overlapError);
       return;
+    }
+
+    // 10-day maximum limit check
+    if (formData.startDate && formData.endDate && formData.leaveType !== 'permission') {
+      const start = new Date(formData.startDate + 'T00:00:00');
+      const end = new Date(formData.endDate + 'T00:00:00');
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both ends
+
+      if (diffDays > 10) {
+        showWarning(`Maximum leave duration is 10 days. You have selected ${diffDays} days.`);
+        return;
+      }
     }
 
     // Use memoized requestedDays
@@ -1918,7 +1944,7 @@ const LeaveApplyPage: React.FC = () => {
                           ? format(addDays(new Date(formData.startDate), 1), 'yyyy-MM-dd')
                           : (formData.startDate || minStartDate)
                       }
-                      max={maxStartDate}
+                      max={maxEndDateLimit}
                       placeholder="dd - mm - yyyy"
                       allowManualEntry={true}
                       isEmployeeVariant={true}
