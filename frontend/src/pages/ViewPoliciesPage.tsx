@@ -38,7 +38,7 @@ const ViewPoliciesPage: React.FC = () => {
             id: 'asset',
             title: 'Asset Management Policy',
             icon: <FaLaptop />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/asset-management-policy.pdf'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Asset Management Policy.pdf'
         },
         {
             id: 'communication',
@@ -62,13 +62,13 @@ const ViewPoliciesPage: React.FC = () => {
             id: 'quality',
             title: 'Quality Management Policy',
             icon: <FaCheckCircle />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/quality-management-policy.pdf'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Quality Management Policy.pdf'
         },
         {
             id: 'work-hour',
             title: 'Work Hour Policy',
             icon: <FaBuilding />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/work-hour-policy.pdf'
+            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Work Hour Policy.pdf'
         }
     ];
 
