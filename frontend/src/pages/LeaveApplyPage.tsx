@@ -46,8 +46,7 @@ const LeaveApplyPage: React.FC = () => {
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
-  const [filterStartDate, setFilterStartDate] = useState('');
-  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterDate, setFilterDate] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
     key: 'startDate',
     direction: 'asc'
@@ -569,20 +568,22 @@ const LeaveApplyPage: React.FC = () => {
 
     return [...myRequests.requests]
       .filter((request: any) => {
-        if (!filterStartDate && !filterEndDate) return true;
+        if (!filterDate) return true;
 
-        const reqStart = request.startDate ? new Date(request.startDate + 'T00:00:00') : null;
-        const reqEnd = request.endDate ? new Date(request.endDate + 'T00:00:00') : null;
+        const filterStr = filterDate;
 
-        const filterStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
-        const filterEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
+        // Check if filterDate matches applied date
+        const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
+        if (appliedStr === filterStr) return true;
 
-        // Filter logic: request must overlap with the filter range if both are set, 
-        // or match the specific filter if only one is set.
-        if (filterStart && reqStart && reqStart < filterStart) return false;
-        if (filterEnd && reqEnd && reqEnd > filterEnd) return false;
+        // Check if filterDate falls within start-end date range
+        if (request.startDate && request.endDate) {
+          const start = request.startDate;
+          const end = request.endDate;
+          if (filterStr >= start && filterStr <= end) return true;
+        }
 
-        return true;
+        return false;
       })
       .sort((a: any, b: any) => {
         if (!sortConfig.key || !sortConfig.direction) return 0;
@@ -596,7 +597,7 @@ const LeaveApplyPage: React.FC = () => {
           return valB - valA;
         }
       });
-  }, [myRequests?.requests, filterStartDate, filterEndDate, sortConfig]);
+  }, [myRequests?.requests, filterDate, sortConfig]);
 
   // Memoize expensive computation
   const requestedDays = useMemo(() => {
@@ -2350,58 +2351,24 @@ const LeaveApplyPage: React.FC = () => {
         <div className="recent-requests-section">
           <div className="requests-section-header">
             <h2>Recent Leave Requests</h2>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className={`table-filter-trigger ${filterStartDate || filterEndDate ? 'active' : ''}`}>
-                  <FaFilter />
-                  <span>Filter</span>
+            <div className="filter-date-controls">
+              {filterDate && (
+                <button
+                  className="filter-clear-button"
+                  onClick={() => setFilterDate('')}
+                  title="Clear filter"
+                >
+                  Reset
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="filter-dropdown-content"
-                align="end"
-                onInteractOutside={(e) => {
-                  const target = e.target as HTMLElement;
-                  if (target.closest('.date-picker-popover-portal')) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <div className="filter-bar-popover">
-                  <div className="filter-group-item">
-                    <label>FILTER START DATE</label>
-                    <DatePicker
-                      value={filterStartDate}
-                      onChange={(date) => setFilterStartDate(date)}
-                      placeholder="dd - mm - yyyy"
-                      allowManualEntry={true}
-                      isEmployeeVariant={true}
-                    />
-                  </div>
-                  <div className="filter-group-item">
-                    <label>FILTER END DATE</label>
-                    <DatePicker
-                      value={filterEndDate}
-                      onChange={(date) => setFilterEndDate(date)}
-                      placeholder="dd - mm - yyyy"
-                      allowManualEntry={true}
-                      isEmployeeVariant={true}
-                    />
-                  </div>
-                  {(filterStartDate || filterEndDate) && (
-                    <button
-                      className="filter-clear-link"
-                      onClick={() => {
-                        setFilterStartDate('');
-                        setFilterEndDate('');
-                      }}
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+              <DatePicker
+                value={filterDate}
+                onChange={(date) => setFilterDate(date)}
+                placeholder="Filter by date"
+                allowManualEntry={true}
+                isEmployeeVariant={true}
+              />
+            </div>
           </div>
           <div
             className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 3 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
@@ -2458,28 +2425,30 @@ const LeaveApplyPage: React.FC = () => {
                   <tr>
                     <td colSpan={10} style={{ padding: 0 }}>
                       <EmptyState
-                        title={filterStartDate || filterEndDate ? "No Results Found" : "No Leave History"}
-                        description={filterStartDate || filterEndDate ? "Try adjusting your filters to find what you're looking for." : "You haven't applied for any leaves yet."}
+                        title={filterDate ? "No Results Found" : "No Leave History"}
+                        description={filterDate ? "Try adjusting your filter to find what you're looking for." : "You haven't applied for any leaves yet."}
                       />
                     </td>
                   </tr>
                 ) : (
                   [...(myRequests.requests || [])]
                     .filter((request: any) => {
-                      if (!filterStartDate && !filterEndDate) return true;
+                      if (!filterDate) return true;
 
-                      const reqStart = request.startDate ? new Date(request.startDate + 'T00:00:00') : null;
-                      const reqEnd = request.endDate ? new Date(request.endDate + 'T00:00:00') : null;
+                      const filterStr = filterDate;
 
-                      const filterStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
-                      const filterEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
+                      // Check if filterDate matches applied date
+                      const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
+                      if (appliedStr === filterStr) return true;
 
-                      // Filter logic: request must overlap with the filter range if both are set, 
-                      // or match the specific filter if only one is set.
-                      if (filterStart && reqStart && reqStart < filterStart) return false;
-                      if (filterEnd && reqEnd && reqEnd > filterEnd) return false;
+                      // Check if filterDate falls within start-end date range
+                      if (request.startDate && request.endDate) {
+                        const start = request.startDate;
+                        const end = request.endDate;
+                        if (filterStr >= start && filterStr <= end) return true;
+                      }
 
-                      return true;
+                      return false;
                     })
                     .sort((a: any, b: any) => {
                       if (!sortConfig.key || !sortConfig.direction) return 0;
