@@ -685,8 +685,102 @@
 .recent-requests-section h2 {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 15px;
+  margin-bottom: 0;
   color: #333;
+}
+
+.requests-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.table-filter-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.table-filter-trigger:hover {
+  background: #f8fafc;
+  border-color: #cbd5e0;
+}
+
+.table-filter-trigger.active {
+  background: #ebf2ff;
+  border-color: #3c6ff2;
+  color: #3c6ff2;
+}
+
+.filter-dropdown-content {
+  min-width: 320px !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.filter-bar-popover {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.filter-group-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group-item label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.filter-group-item .date-picker-input-field {
+  width: 100% !important;
+  height: 40px !important;
+  background-color: #f8f9fc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+}
+
+.filter-clear-link {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: right;
+  padding: 4px;
+  margin-top: -5px;
+  transition: all 0.2s;
+}
+
+.filter-clear-link:hover {
+  text-decoration: underline;
+  opacity: 0.8;
 }
 
 /* Table container with scrollbar when more than 5 records */
@@ -795,6 +889,37 @@
 }
 
 /* Leave Reason Cell with Fixed Size and Scrollbar */
+.sortable-header {
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.sortable-header:hover {
+  background-color: #edf2f7 !important;
+}
+
+.header-sort-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sort-icon {
+  font-size: 10px;
+  color: #a0aec0;
+  transition: all 0.2s;
+}
+
+.sort-icon.active {
+  color: #3182ce;
+}
+
+.sortable-header:hover .sort-icon:not(.active) {
+  color: #718096;
+}
+
 .reason-cell {
   width: 100%;
   max-width: 250px;

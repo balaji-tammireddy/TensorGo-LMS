@@ -233,10 +233,14 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     return new Date();
   };
 
-  const toggleOpen = () => {
-    if (!disabled) {
-      setIsOpen(!isOpen);
+  const toggleOpen = (e: React.MouseEvent) => {
+    if (disabled) return;
+
+    // If manual entry is allowed and user clicks the input, only open, don't toggle
+    if (allowManualEntry && isOpen && (e.target as HTMLElement).tagName === 'INPUT') {
+      return;
     }
+    setIsOpen(!isOpen);
   };
 
   return (
@@ -276,8 +280,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             left: `${popoverCoords.left}px`,
             width: `${popoverCoords.width}px`,
             position: 'absolute',
-            zIndex: 9999
+            zIndex: 9999,
+            pointerEvents: 'auto'
           }}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <Calendar
             mode="single"

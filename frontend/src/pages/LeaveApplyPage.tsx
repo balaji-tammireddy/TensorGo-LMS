@@ -18,7 +18,7 @@ import { Button } from '../components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
-import { FaPencilAlt, FaTrash, FaEye } from 'react-icons/fa';
+import { FaPencilAlt, FaTrash, FaEye, FaFilter, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import './LeaveApplyPage.css';
 
@@ -46,6 +46,19 @@ const LeaveApplyPage: React.FC = () => {
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
+    key: 'startDate',
+    direction: 'asc'
+  });
+
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
   // For sick leave: allow past 3 days (including today) or ONLY tomorrow for future dates
   // For future dates, can ONLY apply for next day (tomorrow), not any other future dates
   const minStartDate = formData.leaveType === 'casual'
@@ -1519,8 +1532,9 @@ const LeaveApplyPage: React.FC = () => {
                   }}
                   min={minStartDate}
                   max={maxStartDate}
-                  placeholder="dd-mm-yyyy"
-                  displayFormat="dd-MM-yyyy"
+                  placeholder="dd - mm - yyyy"
+                  allowManualEntry={true}
+                  isEmployeeVariant={true}
                   disabledDates={(date) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
                     const isLop = formData.leaveType?.toLowerCase() === 'lop';
@@ -1630,8 +1644,9 @@ const LeaveApplyPage: React.FC = () => {
                           : (formData.startDate || minStartDate)
                       }
                       max={maxStartDate}
-                      placeholder="dd-mm-yyyy"
-                      displayFormat="dd-MM-yyyy"
+                      placeholder="dd - mm - yyyy"
+                      allowManualEntry={true}
+                      isEmployeeVariant={true}
                       disabled={
                         formData.startType === 'first_half' ||
                         (formData.startType === 'second_half' && formData.endType === 'second_half')
@@ -2059,7 +2074,61 @@ const LeaveApplyPage: React.FC = () => {
 
         {/* Recent Leave Requests Section */}
         <div className="recent-requests-section">
-          <h2>Recent Leave Requests</h2>
+          <div className="requests-section-header">
+            <h2>Recent Leave Requests</h2>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={`table-filter-trigger ${filterStartDate || filterEndDate ? 'active' : ''}`}>
+                  <FaFilter />
+                  <span>Filter</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="filter-dropdown-content"
+                align="end"
+                onInteractOutside={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.date-picker-popover-portal')) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <div className="filter-bar-popover">
+                  <div className="filter-group-item">
+                    <label>FILTER START DATE</label>
+                    <DatePicker
+                      value={filterStartDate}
+                      onChange={(date) => setFilterStartDate(date)}
+                      placeholder="dd - mm - yyyy"
+                      allowManualEntry={true}
+                      isEmployeeVariant={true}
+                    />
+                  </div>
+                  <div className="filter-group-item">
+                    <label>FILTER END DATE</label>
+                    <DatePicker
+                      value={filterEndDate}
+                      onChange={(date) => setFilterEndDate(date)}
+                      placeholder="dd - mm - yyyy"
+                      allowManualEntry={true}
+                      isEmployeeVariant={true}
+                    />
+                  </div>
+                  {(filterStartDate || filterEndDate) && (
+                    <button
+                      className="filter-clear-link"
+                      onClick={() => {
+                        setFilterStartDate('');
+                        setFilterEndDate('');
+                      }}
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div
             className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 3 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
             style={{
@@ -2073,8 +2142,26 @@ const LeaveApplyPage: React.FC = () => {
                   <th>S No</th>
                   <th>Appiled Date</th>
                   <th>Leave Reason</th>
-                  <th>Start date</th>
-                  <th>End Date</th>
+                  <th className="sortable-header" onClick={() => handleSort('startDate')}>
+                    <div className="header-sort-wrapper">
+                      Start date
+                      {sortConfig.key === 'startDate' ? (
+                        sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                      ) : (
+                        <FaSort className="sort-icon" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="sortable-header" onClick={() => handleSort('endDate')}>
+                    <div className="header-sort-wrapper">
+                      End Date
+                      {sortConfig.key === 'endDate' ? (
+                        sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                      ) : (
+                        <FaSort className="sort-icon" />
+                      )}
+                    </div>
+                  </th>
                   <th>No Of Days</th>
                   <th>Leave Type</th>
                   <th>Approved Dates</th>
@@ -2094,11 +2181,33 @@ const LeaveApplyPage: React.FC = () => {
                   </tr>
                 ) : (
                   [...(myRequests.requests || [])]
+                    .filter((request: any) => {
+                      if (!filterStartDate && !filterEndDate) return true;
+
+                      const reqStart = request.startDate ? new Date(request.startDate + 'T00:00:00') : null;
+                      const reqEnd = request.endDate ? new Date(request.endDate + 'T00:00:00') : null;
+
+                      const filterStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
+                      const filterEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
+
+                      // Filter logic: request must overlap with the filter range if both are set, 
+                      // or match the specific filter if only one is set.
+                      if (filterStart && reqStart && reqStart < filterStart) return false;
+                      if (filterEnd && reqEnd && reqEnd > filterEnd) return false;
+
+                      return true;
+                    })
                     .sort((a: any, b: any) => {
-                      // Sort by start date in ascending order (earliest/upcoming dates first)
-                      const dateA = a.startDate ? new Date(a.startDate + 'T12:00:00').getTime() : 0;
-                      const dateB = b.startDate ? new Date(b.startDate + 'T12:00:00').getTime() : 0;
-                      return dateA - dateB;
+                      if (!sortConfig.key || !sortConfig.direction) return 0;
+
+                      const valA = a[sortConfig.key] ? new Date(a[sortConfig.key] + 'T00:00:00').getTime() : 0;
+                      const valB = b[sortConfig.key] ? new Date(b[sortConfig.key] + 'T00:00:00').getTime() : 0;
+
+                      if (sortConfig.direction === 'asc') {
+                        return valA - valB;
+                      } else {
+                        return valB - valA;
+                      }
                     })
                     .map((request: any, idx: number) => {
                       const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
