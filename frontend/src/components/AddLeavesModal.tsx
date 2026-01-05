@@ -39,7 +39,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   const [comment, setComment] = useState<string>('');
   const [validationError, setValidationError] = useState<string>('');
   const { showWarning } = useToast();
-  const { user } = useAuth();
+  useAuth();
 
   // Fetch current leave balances
   const { data: balances, isLoading: balancesLoading } = useQuery(

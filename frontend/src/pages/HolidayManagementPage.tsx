@@ -5,7 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { DatePicker } from '../components/ui/date-picker';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaTrash, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaTrash, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import './HolidayManagementPage.css';
@@ -257,7 +257,7 @@ const HolidayManagementPage: React.FC = () => {
                                                     <td>{dayName}</td>
                                                     <td>
                                                         <button
-                                                            className="hm-delete-icon-button"
+                                                            className="action-btn delete-btn"
                                                             onClick={() => handleDelete(holiday.id, holiday.name)}
                                                             disabled={deleteMutation.isLoading}
                                                             title="Delete holiday"

@@ -949,6 +949,9 @@
   background-color: #edf2f7 !important;
 }
 
+/* Action button styles moved to bottom of file for better specificity */
+
+
 .header-sort-wrapper {
   display: flex;
   align-items: center;
@@ -1013,26 +1016,7 @@
   pointer-events: none;
 }
 
-.action-icons-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.action-icon {
-  cursor: pointer;
-  font-size: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  color: #3c6ff2;
-}
-
-.action-icon:hover:not(.disabled) {
-  opacity: 0.7;
-  transform: scale(1.1);
-}
+/* Standardized styles moved to line 952 */
 
 .loading-spinner-small {
   display: inline-block;
@@ -1474,4 +1458,46 @@
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s infinite;
   border-radius: 4px;
+}
+
+/* Final Enforced Action Button Styles */
+.leave-apply-page .action-icons-container {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.leave-apply-page .action-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: #3c6ff2 !important;
+  color: white !important;
+  transition: all 0.2s ease !important;
+}
+
+.leave-apply-page .action-btn:hover:not(:disabled):not(.disabled) {
+  background-color: #2c5dd8 !important;
+  transform: scale(1.05) !important;
+}
+
+.leave-apply-page .action-btn.delete-btn {
+  background-color: #f44336 !important;
+}
+
+.leave-apply-page .action-btn.delete-btn:hover:not(:disabled):not(.disabled) {
+  background-color: #d32f2f !important;
+}
+
+.leave-apply-page .action-btn.disabled,
+.leave-apply-page .action-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
 }
