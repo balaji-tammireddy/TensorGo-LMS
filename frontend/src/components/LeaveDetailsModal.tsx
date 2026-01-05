@@ -29,6 +29,7 @@ interface LeaveDetailsModalProps {
     id: number;
     empId: string;
     empName: string;
+    empStatus?: string;
     appliedDate: string;
     startDate: string;
     endDate: string;
@@ -709,6 +710,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
               Close
             </button>
             {leaveRequest.leaveType === 'lop' &&
+              leaveRequest.empStatus !== 'on_notice' &&
               (userRole === 'hr' || userRole === 'super_admin') &&
               onConvertLopToCasual && (
                 <button
