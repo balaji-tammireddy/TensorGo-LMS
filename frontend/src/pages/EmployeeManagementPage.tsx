@@ -320,7 +320,7 @@ const EmployeeManagementPage: React.FC = () => {
   );
 
   const handleOpenAddEmployee = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = format(new Date(), 'yyyy-MM-dd');
     setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
     setIsSameAddress(false);
     setIsEditMode(false);
@@ -647,7 +647,7 @@ const EmployeeManagementPage: React.FC = () => {
       const same =
         !!currentAddress && currentAddress === permanentAddress && currentAddress !== '';
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
 
       setNewEmployee({
         ...emptyEmployeeForm,
@@ -1291,7 +1291,7 @@ const EmployeeManagementPage: React.FC = () => {
                             }
                             disabled={isViewMode}
                             placeholder="DD-MM-YYYY"
-                            max={new Date().toISOString().split('T')[0]}
+                            max={format(new Date(), 'yyyy-MM-dd')}
                             allowManualEntry={true}
                             isEmployeeVariant={true}
                           />

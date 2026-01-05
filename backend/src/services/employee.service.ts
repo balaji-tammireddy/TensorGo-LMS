@@ -1,6 +1,7 @@
 import { pool } from '../database/db';
 import { hashPassword } from './auth.service';
 import { logger } from '../utils/logger';
+import { formatDateLocal } from '../utils/dateCalculator';
 
 export const getEmployees = async (
   page: number = 1,
@@ -83,7 +84,7 @@ export const getEmployees = async (
       empId: row.emp_id,
       name: row.name,
       position: row.position,
-      joiningDate: row.joining_date.toISOString().split('T')[0],
+      joiningDate: formatDateLocal(row.joining_date) || '',
       status: row.status,
       role: row.role,
       profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/')
@@ -156,6 +157,8 @@ export const getEmployeeById = async (employeeId: number) => {
 
   return {
     ...user,
+    date_of_birth: formatDateLocal(user.date_of_birth),
+    date_of_joining: formatDateLocal(user.date_of_joining),
     education: educationResult.rows
   };
 };
@@ -884,7 +887,7 @@ export const addLeavesToEmployee = async (
           previousBalance: previousBalance,
           newBalance: newBalance,
           allocatedBy: employee.approver_name || 'HR/Admin',
-          allocationDate: new Date().toISOString().split('T')[0],
+          allocationDate: formatDateLocal(new Date()) || '',
           comment: comment
         });
         logger.info(`✅ Leave allocation email sent to employee: ${employee.email}`);
@@ -1042,7 +1045,7 @@ export const convertLopToCasual = async (
           previousBalance: currentCasual,
           newBalance: newCasual,
           allocatedBy: employee.approver_name || 'HR/Admin',
-          allocationDate: new Date().toISOString().split('T')[0],
+          allocationDate: formatDateLocal(new Date()) || '',
           conversionNote: `${count} LOP leave(s) converted to casual leave(s). LOP balance: ${currentLop} → ${newLop}`
         });
         logger.info(`✅ LOP to casual conversion email sent to employee: ${employee.email}`);

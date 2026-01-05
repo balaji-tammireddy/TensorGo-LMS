@@ -1,6 +1,7 @@
 import { pool } from '../database/db';
 import { logger } from '../utils/logger';
 import { getSignedUrlFromOVH } from '../utils/storage';
+import { formatDateLocal } from '../utils/dateCalculator';
 
 export const getProfile = async (userId: number) => {
   logger.info(`[PROFILE] [GET PROFILE] ========== FUNCTION CALLED ==========`);
@@ -47,7 +48,7 @@ export const getProfile = async (userId: number) => {
       email: user.email,
       contactNumber: user.contact_number,
       altContact: user.alt_contact,
-      dateOfBirth: user.date_of_birth ? user.date_of_birth.toISOString().split('T')[0] : null,
+      dateOfBirth: formatDateLocal(user.date_of_birth),
       gender: user.gender,
       bloodGroup: user.blood_group,
       maritalStatus: user.marital_status,
@@ -58,7 +59,7 @@ export const getProfile = async (userId: number) => {
     employmentInfo: {
       designation: user.designation,
       department: user.department,
-      dateOfJoining: user.date_of_joining ? user.date_of_joining.toISOString().split('T')[0] : null
+      dateOfJoining: formatDateLocal(user.date_of_joining)
     },
     documents: {
       aadharNumber: user.aadhar_number,
