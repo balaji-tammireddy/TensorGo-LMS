@@ -492,8 +492,8 @@ export const applyLeave = async (
 
     // Check for 'On Notice' status restrictions
     if (userData.status === 'on_notice') {
-      if (leaveData.leaveType !== 'lop' && leaveData.leaveType !== 'permission') {
-        throw new Error('Employees on notice period can only apply for LOP or Permission.');
+      if (leaveData.leaveType !== 'lop' && leaveData.leaveType !== 'permission' && leaveData.leaveType !== 'sick') {
+        throw new Error('Employees on notice period can only apply for Sick, LOP or Permission.');
       }
     }
 
@@ -1707,7 +1707,7 @@ export const getPendingLeaveRequests = async (
   // Build query based on role
   // Removed DISTINCT as lr.id is primary key and joins are 1:1, improving query execution time
   let query = `
-    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
@@ -1825,6 +1825,7 @@ export const getPendingLeaveRequests = async (
         id: row.id,
         empId: row.emp_id,
         empName: row.emp_name,
+        empStatus: row.emp_status,
         appliedDate: formatDate(row.applied_date),
         leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
         leaveType: row.leave_type,

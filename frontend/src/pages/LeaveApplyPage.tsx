@@ -73,12 +73,12 @@ const LeaveApplyPage: React.FC = () => {
     ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // only allow tomorrow for future sick leave
     : undefined; // no max date for other leave types
 
-  // Set default leave type to LOP if user is on notice
+  // Set default leave type to LOP if user is on notice and current type is causal
   useEffect(() => {
     if (user?.status === 'on_notice' && formData.leaveType === 'casual') {
       setFormData(prev => ({ ...prev, leaveType: 'lop' }));
     }
-  }, [user, formData.leaveType]);
+  }, [user?.status, formData.leaveType]);
 
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
@@ -421,6 +421,21 @@ const LeaveApplyPage: React.FC = () => {
     }
   }, [formData.leaveType, formData.startDate, todayStr]);
 
+  // Ensure page is scrollable on mount and clean up on unmount
+  useEffect(() => {
+    // Save original overflow
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+
+    // Force scrollable (auto allows scroll if needed, whereas 'scroll' always shows bars)
+    // We use 'auto' to avoid double scrollbars if not needed.
+    document.body.style.overflow = 'auto';
+
+    return () => {
+      // Restore original overflow on unmount
+      document.body.style.overflow = originalStyle === 'hidden' ? '' : originalStyle;
+    };
+  }, []);
+
   // Update end time when start time changes (for permission) - auto-set to 2 hours after start
   useEffect(() => {
     if (formData.leaveType === 'permission' && formData.timeForPermission.start) {
@@ -546,6 +561,41 @@ const LeaveApplyPage: React.FC = () => {
     }
   );
 
+
+  // Memoize filtered and sorted requests
+  const filteredRequests = useMemo(() => {
+    if (!myRequests?.requests) return [];
+
+    return [...myRequests.requests]
+      .filter((request: any) => {
+        if (!filterStartDate && !filterEndDate) return true;
+
+        const reqStart = request.startDate ? new Date(request.startDate + 'T00:00:00') : null;
+        const reqEnd = request.endDate ? new Date(request.endDate + 'T00:00:00') : null;
+
+        const filterStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
+        const filterEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
+
+        // Filter logic: request must overlap with the filter range if both are set, 
+        // or match the specific filter if only one is set.
+        if (filterStart && reqStart && reqStart < filterStart) return false;
+        if (filterEnd && reqEnd && reqEnd > filterEnd) return false;
+
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        if (!sortConfig.key || !sortConfig.direction) return 0;
+
+        const valA = a[sortConfig.key] ? new Date(a[sortConfig.key] + 'T00:00:00').getTime() : 0;
+        const valB = b[sortConfig.key] ? new Date(b[sortConfig.key] + 'T00:00:00').getTime() : 0;
+
+        if (sortConfig.direction === 'asc') {
+          return valA - valB;
+        } else {
+          return valB - valA;
+        }
+      });
+  }, [myRequests?.requests, filterStartDate, filterEndDate, sortConfig]);
 
   // Memoize expensive computation
   const requestedDays = useMemo(() => {
@@ -1710,7 +1760,7 @@ const LeaveApplyPage: React.FC = () => {
             <div className="form-row-6">
               <div className="form-group">
                 <label>Leave Type</label>
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
@@ -1733,7 +1783,7 @@ const LeaveApplyPage: React.FC = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="leave-type-dropdown-content">
-                    {user?.status !== 'on_notice' && (
+                    {user?.status !== 'on_notice' ? (
                       <>
                         <DropdownMenuItem
                           onClick={() => handleLeaveTypeChange('casual')}
@@ -1741,6 +1791,15 @@ const LeaveApplyPage: React.FC = () => {
                           Casual
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('sick')}
+                        >
+                          Sick
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : (
+                      <>
                         <DropdownMenuItem
                           onClick={() => handleLeaveTypeChange('sick')}
                         >
@@ -1817,7 +1876,7 @@ const LeaveApplyPage: React.FC = () => {
               {formData.leaveType !== 'permission' && (
                 <div className="form-group">
                   <label>Start Type</label>
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
@@ -1932,7 +1991,7 @@ const LeaveApplyPage: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>End Type</label>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="outline"
@@ -2043,7 +2102,7 @@ const LeaveApplyPage: React.FC = () => {
                   <div className="time-inputs">
                     <div className="time-input-wrapper">
                       <div className="custom-time-picker">
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
@@ -2087,7 +2146,7 @@ const LeaveApplyPage: React.FC = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                         <span className="time-separator">:</span>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
@@ -2169,7 +2228,7 @@ const LeaveApplyPage: React.FC = () => {
                     <span style={{ margin: '0 5px', color: '#666', fontSize: '12px' }}>to</span>
                     <div className="time-input-wrapper">
                       <div className="custom-time-picker">
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
@@ -2213,7 +2272,7 @@ const LeaveApplyPage: React.FC = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                         <span className="time-separator">:</span>
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
@@ -2343,33 +2402,58 @@ const LeaveApplyPage: React.FC = () => {
         <div className="recent-requests-section">
           <div className="requests-section-header">
             <h2>Recent Leave Requests</h2>
-            <div className="header-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {filterDate && (
-                <button
-                  className="clear-button"
-                  onClick={() => setFilterDate('')}
-                  style={{
-                    whiteSpace: 'nowrap',
-                    margin: 0,
-                    height: '40px',
-                    minWidth: '90px',
-                    padding: '0 15px',
-                    fontSize: '13px'
-                  }}
-                >
-                  Clear
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={`table-filter-trigger ${filterStartDate || filterEndDate ? 'active' : ''}`}>
+                  <FaFilter />
+                  <span>Filter</span>
                 </button>
-              )}
-              <div style={{ width: '200px' }}>
-                <DatePicker
-                  value={filterDate}
-                  onChange={(date) => setFilterDate(date)}
-                  placeholder="Filter Date"
-                  allowManualEntry={true}
-                  isEmployeeVariant={true}
-                />
-              </div>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="filter-dropdown-content"
+                align="end"
+                onInteractOutside={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.date-picker-popover-portal')) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <div className="filter-bar-popover">
+                  <div className="filter-group-item">
+                    <label>FILTER START DATE</label>
+                    <DatePicker
+                      value={filterStartDate}
+                      onChange={(date) => setFilterStartDate(date)}
+                      placeholder="dd - mm - yyyy"
+                      allowManualEntry={true}
+                      isEmployeeVariant={true}
+                    />
+                  </div>
+                  <div className="filter-group-item">
+                    <label>FILTER END DATE</label>
+                    <DatePicker
+                      value={filterEndDate}
+                      onChange={(date) => setFilterEndDate(date)}
+                      placeholder="dd - mm - yyyy"
+                      allowManualEntry={true}
+                      isEmployeeVariant={true}
+                    />
+                  </div>
+                  {(filterStartDate || filterEndDate) && (
+                    <button
+                      className="filter-clear-link"
+                      onClick={() => {
+                        setFilterStartDate('');
+                        setFilterEndDate('');
+                      }}
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <div
             className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 3 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
@@ -2412,57 +2496,87 @@ const LeaveApplyPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {!myRequests?.requests || myRequests.requests.length === 0 ? (
+                {(requestsLoading && !myRequests) ? (
                   <tr>
-                    <td colSpan={10} style={{ padding: 0 }}>
-                      <EmptyState
-                        title="No Leave History"
-                        description="You haven't applied for any leaves yet."
-                      />
+                    <td colSpan={10}>
+                      <div className="skeleton-table">
+                        <div className="skeleton-table-row"></div>
+                        <div className="skeleton-table-row"></div>
+                        <div className="skeleton-table-row"></div>
+                      </div>
                     </td>
                   </tr>
                 ) : filteredRequests.length === 0 ? (
                   <tr>
                     <td colSpan={10} style={{ padding: 0 }}>
                       <EmptyState
-                        title="No Results Found"
-                        description="No leave requests found for the selected date."
+                        title={filterStartDate || filterEndDate ? "No Results Found" : "No Leave History"}
+                        description={filterStartDate || filterEndDate ? "Try adjusting your filters to find what you're looking for." : "You haven't applied for any leaves yet."}
                       />
                     </td>
                   </tr>
                 ) : (
-                  filteredRequests.map((request: any, idx: number) => {
-                    const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
-                      (deleteMutation.isLoading && deleteRequestId === request.id) ||
-                      editingRequestId === request.id;
-                    return (
-                      <tr
-                        key={request.id}
-                        className={isUpdating ? 'updating-row' : ''}
-                      >
-                        <td>{idx + 1}</td>
-                        <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}</td>
-                        <td>
-                          <div className="reason-cell">
-                            {request.leaveReason}
-                          </div>
-                        </td>
-                        <td>
-                          {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
-                          {request.startDate && request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
-                        </td>
-                        <td>
-                          {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
-                          {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
-                        </td>
-                        <td>{request.noOfDays}</td>
-                        <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
-                        <td>
-                          {(() => {
-                            const approvedDates = (request.leaveDays || [])
-                              .filter((d: any) => d.status === 'approved')
-                              .map((d: any) => new Date(d.date + 'T12:00:00'))
-                              .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+                  [...(myRequests.requests || [])]
+                    .filter((request: any) => {
+                      if (!filterStartDate && !filterEndDate) return true;
+
+                      const reqStart = request.startDate ? new Date(request.startDate + 'T00:00:00') : null;
+                      const reqEnd = request.endDate ? new Date(request.endDate + 'T00:00:00') : null;
+
+                      const filterStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
+                      const filterEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
+
+                      // Filter logic: request must overlap with the filter range if both are set, 
+                      // or match the specific filter if only one is set.
+                      if (filterStart && reqStart && reqStart < filterStart) return false;
+                      if (filterEnd && reqEnd && reqEnd > filterEnd) return false;
+
+                      return true;
+                    })
+                    .sort((a: any, b: any) => {
+                      if (!sortConfig.key || !sortConfig.direction) return 0;
+
+                      const valA = a[sortConfig.key] ? new Date(a[sortConfig.key] + 'T00:00:00').getTime() : 0;
+                      const valB = b[sortConfig.key] ? new Date(b[sortConfig.key] + 'T00:00:00').getTime() : 0;
+
+                      if (sortConfig.direction === 'asc') {
+                        return valA - valB;
+                      } else {
+                        return valB - valA;
+                      }
+                    })
+                    .map((request: any, idx: number) => {
+                      const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
+                        (deleteMutation.isLoading && deleteRequestId === request.id) ||
+                        editingRequestId === request.id;
+                      return (
+                        <tr
+                          key={request.id}
+                          className={isUpdating ? 'updating-row' : ''}
+                        >
+                          <td>{idx + 1}</td>
+                          <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}</td>
+                          <td>
+                            <div className="reason-cell">
+                              {request.leaveReason}
+                            </div>
+                          </td>
+                          <td>
+                            {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                            {request.startDate && request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
+                          </td>
+                          <td>
+                            {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                            {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
+                          </td>
+                          <td>{request.noOfDays}</td>
+                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
+                          <td>
+                            {(() => {
+                              const approvedDates = (request.leaveDays || [])
+                                .filter((d: any) => d.status === 'approved')
+                                .map((d: any) => new Date(d.date + 'T12:00:00'))
+                                .sort((a: Date, b: Date) => a.getTime() - b.getTime());
 
                             if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
                               return '-';

@@ -328,7 +328,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
 
   return (
     <>
-      <div className="leave-details-modal-overlay" onClick={onClose}>
+      <div className="leave-details-modal-overlay">
         <div className="leave-details-modal" onClick={(e) => e.stopPropagation()}>
           <div className="leave-details-modal-header">
             <h2>Leave Request Details</h2>
