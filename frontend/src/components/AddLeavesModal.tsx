@@ -208,16 +208,12 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                     >
                       Sick (Current: {balances?.sick || 0})
                     </DropdownMenuItem>
-                    {user?.role === 'super_admin' && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('lop')}
-                        >
-                          LOP (Current: {balances?.lop || 0})
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => handleLeaveTypeChange('lop')}
+                    >
+                      LOP (Current: {balances?.lop || 0})
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
