@@ -31,14 +31,14 @@ export const authenticateToken = async (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    
+
     // Verify user still exists and is active
     const result = await pool.query(
       'SELECT id, emp_id, email, role, first_name, last_name, status FROM users WHERE id = $1',
       [decoded.userId]
     );
 
-    if (result.rows.length === 0 || result.rows[0].status !== 'active') {
+    if (result.rows.length === 0 || (result.rows[0].status !== 'active' && result.rows[0].status !== 'on_notice')) {
       return res.status(401).json({
         error: {
           code: 'UNAUTHORIZED',

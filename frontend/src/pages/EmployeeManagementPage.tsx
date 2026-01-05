@@ -127,7 +127,7 @@ const emptyEmployeeForm = {
   panNumber: '',
   currentAddress: '',
   permanentAddress: '',
-  status: 'active' as 'active' | 'on_leave' | 'resigned' | 'terminated',
+  status: 'active' as 'active' | 'on_leave' | 'resigned' | 'terminated' | 'on_notice',
   education: baseEducationLevels.map((level) => ({
     level,
     groupStream: '',
@@ -729,7 +729,14 @@ const EmployeeManagementPage: React.FC = () => {
 
 
   const getStatusColor = (status: string) => {
-    return status === 'active' ? '#4caf50' : '#f44336';
+    switch (status) {
+      case 'active': return '#4caf50';
+      case 'on_notice': return '#ff9800'; // Orange for On Notice
+      case 'on_leave': return '#2196f3';
+      case 'resigned': return '#f44336';
+      case 'terminated': return '#f44336'; // Red for Inactive/Terminated
+      default: return '#f44336'; // Red for any other Inactive status
+    }
   };
 
   if (employeesLoading && !employeesData) {
@@ -837,10 +844,18 @@ const EmployeeManagementPage: React.FC = () => {
                     borderRadius: '2px',
                     backgroundColor: '#ffffff',
                     color: '#1f2a3d',
-                    height: 'auto'
+                    height: 'auto',
+                    minWidth: '140px',
+                    justifyContent: 'space-between',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <span>{statusFilter === '' ? 'All Status' : statusFilter === 'active' ? 'Active' : 'Inactive'}</span>
+                  <span>
+                    {statusFilter === '' ? 'All Status' :
+                      statusFilter === 'active' ? 'Active' :
+                        statusFilter === 'on_notice' ? 'On Notice' :
+                          'Inactive'}
+                  </span>
                   <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                 </Button>
               </DropdownMenuTrigger>
@@ -855,6 +870,12 @@ const EmployeeManagementPage: React.FC = () => {
                   onClick={() => setStatusFilter('active')}
                 >
                   Active
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setStatusFilter('on_notice')}
+                >
+                  On Notice
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -920,7 +941,9 @@ const EmployeeManagementPage: React.FC = () => {
                             color: '#ffffff'
                           }}
                         >
-                          {employee.status === 'active' ? 'Active' : 'Inactive'}
+                          {employee.status === 'active' ? 'Active' :
+                            employee.status === 'on_notice' ? 'On Notice' :
+                              'Inactive'}
                         </span>
                       </td>
                       <td>
@@ -1598,7 +1621,11 @@ const EmployeeManagementPage: React.FC = () => {
                                     lineHeight: '1.5'
                                   }}
                                 >
-                                  <span>{newEmployee.status === 'active' ? 'Active' : 'Inactive'}</span>
+                                  <span>
+                                    {newEmployee.status === 'active' ? 'Active' :
+                                      newEmployee.status === 'on_notice' ? 'On Notice' :
+                                        'Inactive'}
+                                  </span>
                                   <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -1610,6 +1637,15 @@ const EmployeeManagementPage: React.FC = () => {
                                   })}
                                 >
                                   Active
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setNewEmployee({
+                                    ...newEmployee,
+                                    status: 'on_notice'
+                                  })}
+                                >
+                                  On Notice
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem

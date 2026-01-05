@@ -31,8 +31,8 @@ export const getEmployees = async (
 
   if (status) {
     if (status === 'inactive') {
-      // Treat "inactive" as any non-active status
-      query += ` AND status <> 'active'`;
+      // Treat "inactive" as any non-active AND non-on-notice status
+      query += ` AND status NOT IN ('active', 'on_notice')`;
     } else {
       query += ` AND status = $${params.length + 1}`;
       params.push(status);
@@ -62,7 +62,7 @@ export const getEmployees = async (
 
   if (status) {
     if (status === 'inactive') {
-      countQuery += ` AND status <> 'active'`;
+      countQuery += ` AND status NOT IN ('active', 'on_notice')`;
     } else {
       countQuery += ` AND status = $${countParams.length + 1}`;
       countParams.push(status);

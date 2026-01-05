@@ -72,6 +72,13 @@ const LeaveApplyPage: React.FC = () => {
     ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // only allow tomorrow for future sick leave
     : undefined; // no max date for other leave types
 
+  // Set default leave type to LOP if user is on notice
+  useEffect(() => {
+    if (user?.status === 'on_notice' && formData.leaveType === 'casual') {
+      setFormData(prev => ({ ...prev, leaveType: 'lop' }));
+    }
+  }, [user, formData.leaveType]);
+
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
   };
@@ -1333,9 +1340,23 @@ const LeaveApplyPage: React.FC = () => {
     <AppLayout>
       <div className="leave-apply-page">
         <h1 className="page-title">
-          Welcome, {user?.name ? user.name.split(' ').map((part, i, arr) =>
-            (i === arr.length - 1 && arr.length > 1) ? part.charAt(0).toUpperCase() + part.slice(1) : part
+          Welcome, {user?.name ? user.name.split(' ').map(part =>
+            part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
           ).join(' ') : ''}
+          {user?.status === 'on_notice' && (
+            <span style={{
+              fontSize: '14px',
+              backgroundColor: '#ff9800',
+              color: 'white',
+              padding: '4px 12px',
+              borderRadius: '16px',
+              marginLeft: '12px',
+              verticalAlign: 'middle',
+              fontWeight: 500
+            }}>
+              On Notice
+            </span>
+          )}
         </h1>
 
         {/* Top Row: Three Equal Sections */}
@@ -1470,18 +1491,22 @@ const LeaveApplyPage: React.FC = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="leave-type-dropdown-content">
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('casual')}
-                    >
-                      Casual
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('sick')}
-                    >
-                      Sick
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    {user?.status !== 'on_notice' && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('casual')}
+                        >
+                          Casual
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleLeaveTypeChange('sick')}
+                        >
+                          Sick
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem
                       onClick={() => handleLeaveTypeChange('lop')}
                     >
