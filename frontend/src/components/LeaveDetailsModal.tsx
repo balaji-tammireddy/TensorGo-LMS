@@ -77,6 +77,20 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const [showConvertConfirmDialog, setShowConvertConfirmDialog] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
 
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {

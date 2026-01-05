@@ -20,7 +20,7 @@ import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus } from 'react-icons/fa';
+import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import './EmployeeManagementPage.css';
 
@@ -161,6 +161,14 @@ const EmployeeManagementPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
   const [managerSearch, setManagerSearch] = useState('');
   const [appliedManagerSearch, setAppliedManagerSearch] = useState<string | undefined>(undefined);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'empId', direction: 'asc' });
+
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const { data: managersData } = useQuery(
     ['reporting-managers', newEmployee.role, editingEmployeeId, appliedManagerSearch],
@@ -249,12 +257,18 @@ const EmployeeManagementPage: React.FC = () => {
   const sortedEmployees = React.useMemo(() => {
     if (!employeesData?.employees) return [];
     return [...employeesData.employees].sort((a, b) => {
-      // Sort by Employee ID (numeric order)
-      const aId = parseInt(a.empId) || 0;
-      const bId = parseInt(b.empId) || 0;
-      return aId - bId; // ascending order (001, 002, 003, etc.)
+      if (sortConfig.key === 'empId') {
+        const aId = parseInt(a.empId) || 0;
+        const bId = parseInt(b.empId) || 0;
+        return sortConfig.direction === 'asc' ? aId - bId : bId - aId;
+      } else if (sortConfig.key === 'joiningDate') {
+        const aDate = new Date(a.joiningDate + 'T00:00:00').getTime();
+        const bDate = new Date(b.joiningDate + 'T00:00:00').getTime();
+        return sortConfig.direction === 'asc' ? aDate - bDate : bDate - aDate;
+      }
+      return 0;
     });
-  }, [employeesData]);
+  }, [employeesData, sortConfig]);
 
   const createMutation = useMutation(employeeService.createEmployee, {
     onSuccess: () => {
@@ -907,10 +921,28 @@ const EmployeeManagementPage: React.FC = () => {
               <thead>
                 <tr>
                   <th>SNo</th>
-                  <th>Emp ID</th>
+                  <th className="sortable-header" onClick={() => handleSort('empId')}>
+                    <div className="header-sort-wrapper">
+                      Emp ID
+                      {sortConfig.key === 'empId' ? (
+                        sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                      ) : (
+                        <FaSort className="sort-icon" />
+                      )}
+                    </div>
+                  </th>
                   <th>Emp Name</th>
                   <th>Position</th>
-                  <th>Joining Date</th>
+                  <th className="sortable-header" onClick={() => handleSort('joiningDate')}>
+                    <div className="header-sort-wrapper">
+                      Joining Date
+                      {sortConfig.key === 'joiningDate' ? (
+                        sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                      ) : (
+                        <FaSort className="sort-icon" />
+                      )}
+                    </div>
+                  </th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>

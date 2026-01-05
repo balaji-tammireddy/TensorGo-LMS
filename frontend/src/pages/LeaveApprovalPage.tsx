@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import LeaveDetailsModal from '../components/LeaveDetailsModal';
 import ErrorDisplay from '../components/common/ErrorDisplay';
+import { DatePicker } from '../components/ui/date-picker';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +17,7 @@ import { Button } from '../components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaPencilAlt, FaEye } from 'react-icons/fa';
+import { FaPencilAlt, FaEye, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import './LeaveApprovalPage.css';
 
@@ -33,6 +34,30 @@ const LeaveApprovalPage: React.FC = () => {
   const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
   const [isRefetchingRequest, setIsRefetchingRequest] = useState(false);
+  const [recentFilterDate, setRecentFilterDate] = useState('');
+  const [recentSortConfig, setRecentSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
+    key: 'appliedDate',
+    direction: 'desc'
+  });
+
+  const handleRecentSort = (key: string) => {
+    setRecentSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  const [pendingSortConfig, setPendingSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+    key: 'appliedDate',
+    direction: 'desc'
+  });
+
+  const handlePendingSort = (key: string) => {
+    setPendingSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
 
   // Debounce search input
   useEffect(() => {
@@ -514,7 +539,7 @@ const LeaveApprovalPage: React.FC = () => {
   // Group requests by ID and show one row per request (not expanded by days)
   const groupedPendingRequests = useMemo(() => {
     const pendingRequests = pendingData?.requests || [];
-    return pendingRequests.map((request: any) => {
+    const mapped = pendingRequests.map((request: any) => {
       const pendingDays = request.leaveDays?.filter((day: any) => (day.status || 'pending') === 'pending') || [];
       const approvedDays = request.leaveDays?.filter((day: any) => day.status === 'approved') || [];
       const rejectedDays = request.leaveDays?.filter((day: any) => day.status === 'rejected') || [];
@@ -550,7 +575,25 @@ const LeaveApprovalPage: React.FC = () => {
         rejectedDaysCount: rejectedDays.length
       };
     }).filter((request: any) => request.pendingDaysCount > 0); // Only show requests with pending days
-  }, [pendingData]);
+
+    // Sort based on pendingSortConfig
+    return mapped.sort((a: any, b: any) => {
+      if (!pendingSortConfig.key) return 0;
+
+      let valA: number, valB: number;
+      if (pendingSortConfig.key === 'appliedDate') {
+        valA = a.appliedDate ? new Date(a.appliedDate + 'T00:00:00').getTime() : 0;
+        valB = b.appliedDate ? new Date(b.appliedDate + 'T00:00:00').getTime() : 0;
+      } else if (pendingSortConfig.key === 'startDate') {
+        valA = a.startDate ? new Date(a.startDate + 'T00:00:00').getTime() : 0;
+        valB = b.startDate ? new Date(b.startDate + 'T00:00:00').getTime() : 0;
+      } else {
+        return 0;
+      }
+
+      return pendingSortConfig.direction === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [pendingData, pendingSortConfig]);
 
   // Initial loading state (only for first-time page load)
   if ((pendingLoading && !pendingData) || (approvedLoading && !approvedData)) {
@@ -682,8 +725,26 @@ const LeaveApprovalPage: React.FC = () => {
                     <th>S NO</th>
                     <th>EMP ID</th>
                     <th>EMP NAME</th>
-                    <th>APPLIED DATE</th>
-                    <th>LEAVE DATE</th>
+                    <th className="sortable-header" onClick={() => handlePendingSort('appliedDate')}>
+                      <div className="header-sort-wrapper">
+                        APPLIED DATE
+                        {pendingSortConfig.key === 'appliedDate' ? (
+                          pendingSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                        ) : (
+                          <FaSort className="sort-icon" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="sortable-header" onClick={() => handlePendingSort('startDate')}>
+                      <div className="header-sort-wrapper">
+                        LEAVE DATE
+                        {pendingSortConfig.key === 'startDate' ? (
+                          pendingSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                        ) : (
+                          <FaSort className="sort-icon" />
+                        )}
+                      </div>
+                    </th>
                     <th>LEAVE TYPE</th>
                     <th>NO OF DAYS</th>
                     <th>LEAVE REASON</th>
@@ -771,7 +832,27 @@ const LeaveApprovalPage: React.FC = () => {
           </div>
 
           <div className="approved-requests-section">
-            <h2>Recent Leave Requests</h2>
+            <div className="requests-section-header">
+              <h2>Recent Leave Requests</h2>
+              <div className="filter-date-controls">
+                {recentFilterDate && (
+                  <button
+                    className="filter-clear-button"
+                    onClick={() => setRecentFilterDate('')}
+                    title="Clear filter"
+                  >
+                    Reset
+                  </button>
+                )}
+                <DatePicker
+                  value={recentFilterDate}
+                  onChange={(date) => setRecentFilterDate(date)}
+                  placeholder="Filter by date"
+                  allowManualEntry={true}
+                  isEmployeeVariant={true}
+                />
+              </div>
+            </div>
             <div
               className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || approvedLoading ? 'updating' : ''}`}
               style={{
@@ -785,8 +866,26 @@ const LeaveApprovalPage: React.FC = () => {
                     <th>S NO</th>
                     <th>EMP ID</th>
                     <th>EMP NAME</th>
-                    <th>APPLIED DATE</th>
-                    <th>LEAVE DATE</th>
+                    <th className="sortable-header" onClick={() => handleRecentSort('appliedDate')}>
+                      <div className="header-sort-wrapper">
+                        APPLIED DATE
+                        {recentSortConfig.key === 'appliedDate' ? (
+                          recentSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                        ) : (
+                          <FaSort className="sort-icon" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="sortable-header" onClick={() => handleRecentSort('startDate')}>
+                      <div className="header-sort-wrapper">
+                        LEAVE DATE
+                        {recentSortConfig.key === 'startDate' ? (
+                          recentSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                        ) : (
+                          <FaSort className="sort-icon" />
+                        )}
+                      </div>
+                    </th>
                     <th>LEAVE TYPE</th>
                     <th>NO OF DAYS</th>
                     <th>STATUS</th>
@@ -803,87 +902,122 @@ const LeaveApprovalPage: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : !approvedData?.requests || approvedData.requests.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} style={{ padding: 0 }}>
-                        <EmptyState
-                          title="No Recent Activity"
-                          description="No recently approved or rejected leave requests found."
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    approvedData.requests
+                  ) : (() => {
+                    // Filter and sort approved requests
+                    const filteredSortedRequests = (approvedData?.requests || [])
                       .filter((request: any) => {
                         // Filter out any requests that still have pending days
-                        // This is a safety check in case backend filtering isn't perfect
                         const hasPendingDays = request.leaveDays?.some((day: any) =>
                           (day.status || 'pending') === 'pending'
                         );
-                        return !hasPendingDays && request.leaveStatus !== 'pending';
+                        if (hasPendingDays || request.leaveStatus === 'pending') return false;
+
+                        // Apply date filter if set
+                        if (!recentFilterDate) return true;
+
+                        const filterStr = recentFilterDate;
+
+                        // Check if filterDate matches applied date
+                        const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
+                        if (appliedStr === filterStr) return true;
+
+                        // Check if filterDate falls within start-end date range
+                        if (request.startDate && request.endDate) {
+                          const start = request.startDate;
+                          const end = request.endDate;
+                          if (filterStr >= start && filterStr <= end) return true;
+                        }
+
+                        return false;
                       })
-                      .map((request: any, idx: number) => {
-                        const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
-                        return (
-                          <tr
-                            key={request.id}
-                            className={isUpdating ? 'updating-row' : ''}
-                          >
-                            <td>{idx + 1}</td>
-                            <td>{request.empId}</td>
-                            <td>
-                              {request.empName}
-                            </td>
-                            <td>{formatDateSafe(request.appliedDate)}</td>
-                            <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
-                            <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
-                            <td>{request.noOfDays}</td>
-                            <td>
-                              {request.leaveStatus === 'pending' ? (
-                                <span className="status-badge status-pending">Pending</span>
-                              ) : request.leaveStatus === 'approved' ? (
-                                <span className="status-badge status-approved">Approved</span>
-                              ) : request.leaveStatus === 'rejected' ? (
-                                <span className="status-badge status-rejected">Rejected</span>
-                              ) : request.leaveStatus === 'partially_approved' ? (
-                                <span className="status-badge status-partial">Partially Approved</span>
-                              ) : (
-                                <span className="status-badge">{request.leaveStatus}</span>
+                      .sort((a: any, b: any) => {
+                        if (!recentSortConfig.key || !recentSortConfig.direction) return 0;
+
+                        const valA = a[recentSortConfig.key] ? new Date(a[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
+                        const valB = b[recentSortConfig.key] ? new Date(b[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
+
+                        if (recentSortConfig.direction === 'asc') {
+                          return valA - valB;
+                        } else {
+                          return valB - valA;
+                        }
+                      });
+
+                    if (filteredSortedRequests.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} style={{ padding: 0 }}>
+                            <EmptyState
+                              title={recentFilterDate ? "No Results Found" : "No Recent Activity"}
+                              description={recentFilterDate ? "Try adjusting your filter to find what you're looking for." : "No recently approved or rejected leave requests found."}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredSortedRequests.map((request: any, idx: number) => {
+                      const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
+                      return (
+                        <tr
+                          key={request.id}
+                          className={isUpdating ? 'updating-row' : ''}
+                        >
+                          <td>{idx + 1}</td>
+                          <td>{request.empId}</td>
+                          <td>
+                            {request.empName}
+                          </td>
+                          <td>{formatDateSafe(request.appliedDate)}</td>
+                          <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
+                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
+                          <td>{request.noOfDays}</td>
+                          <td>
+                            {request.leaveStatus === 'pending' ? (
+                              <span className="status-badge status-pending">Pending</span>
+                            ) : request.leaveStatus === 'approved' ? (
+                              <span className="status-badge status-approved">Approved</span>
+                            ) : request.leaveStatus === 'rejected' ? (
+                              <span className="status-badge status-rejected">Rejected</span>
+                            ) : request.leaveStatus === 'partially_approved' ? (
+                              <span className="status-badge status-partial">Partially Approved</span>
+                            ) : (
+                              <span className="status-badge">{request.leaveStatus}</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="actions-cell">
+                              {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
+                                <div className="action-icons-container">
+                                  <span
+                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                    title="View Details"
+                                    onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
+                                  >
+                                    <FaEye />
+                                  </span>
+                                  <span
+                                    className={`action-icon ${isUpdating ? 'disabled' : ''}`}
+                                    title={isUpdating ? 'Loading...' : 'Edit'}
+                                    onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
+                                    style={{
+                                      cursor: isUpdating ? 'not-allowed' : 'pointer'
+                                    }}
+                                  >
+                                    {isUpdating && editingRequestId === request.id ? (
+                                      <span className="loading-spinner-small"></span>
+                                    ) : (
+                                      <FaPencilAlt />
+                                    )}
+                                  </span>
+                                </div>
                               )}
-                            </td>
-                            <td>
-                              <div className="actions-cell">
-                                {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
-                                  <div className="action-icons-container">
-                                    <span
-                                      className={`action-icon ${isUpdating ? 'disabled' : ''}`}
-                                      title="View Details"
-                                      onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
-                                    >
-                                      <FaEye />
-                                    </span>
-                                    <span
-                                      className={`action-icon ${isUpdating ? 'disabled' : ''}`}
-                                      title={isUpdating ? 'Loading...' : 'Edit'}
-                                      onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
-                                      style={{
-                                        cursor: isUpdating ? 'not-allowed' : 'pointer'
-                                      }}
-                                    >
-                                      {isUpdating && editingRequestId === request.id ? (
-                                        <span className="loading-spinner-small"></span>
-                                      ) : (
-                                        <FaPencilAlt />
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                  )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
