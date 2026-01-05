@@ -85,9 +85,12 @@
   color: #333;
 }
 
-/* Table container with scrollbar when more than 3 records */
+/* Table container with fixed height and scrolling */
 .requests-table-container {
   width: 100%;
+  min-height: 400px;
+  max-height: 400px;
+  overflow-y: auto;
   overflow-x: hidden;
   transition: opacity 0.3s ease, pointer-events 0.3s ease;
 }
@@ -110,12 +113,7 @@
   vertical-align: middle;
 }
 
-.requests-table-container.scrollable {
-  max-height: calc(60px * 3 + 48px);
-  /* 3 rows * 60px row height + header height */
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+
 
 .requests-table-container::-webkit-scrollbar {
   width: 8px;
