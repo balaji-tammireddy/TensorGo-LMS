@@ -14,6 +14,13 @@
   vertical-align: middle;
 }
 
+.page-title .status-on-notice {
+  font-size: 0.9rem;
+  padding: 4px 12px;
+  border-radius: 16px;
+  vertical-align: baseline;
+}
+
 
 
 

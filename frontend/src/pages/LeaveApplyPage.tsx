@@ -46,7 +46,8 @@ const LeaveApplyPage: React.FC = () => {
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
-  const [filterDate, setFilterDate] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
     key: 'startDate',
     direction: 'asc'
@@ -742,47 +743,7 @@ const LeaveApplyPage: React.FC = () => {
     return null;
   }, [formData.startDate, formData.endDate, formData.startType, formData.endType, myRequests?.requests, editingId]);
 
-  const filteredRequests = useMemo(() => {
-    if (!myRequests?.requests) return [];
 
-    let result = [...(myRequests.requests || [])];
-
-    // Filter by Date
-    if (filterDate) {
-      const filterStr = filterDate;
-      result = result.filter((request: any) => {
-        // 1. Check Applied Date
-        const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
-        if (appliedStr === filterStr) return true;
-
-        // 2. Check overlap with Start/End Date range
-        if (request.startDate && request.endDate) {
-          const start = request.startDate;
-          const end = request.endDate;
-          // Check if filterDate is between start and end (inclusive)
-          if (filterStr >= start && filterStr <= end) return true;
-        }
-
-        return false;
-      });
-    }
-
-    // Sort
-    result.sort((a: any, b: any) => {
-      if (!sortConfig.key || !sortConfig.direction) return 0;
-
-      const valA = a[sortConfig.key] ? new Date(a[sortConfig.key] + 'T00:00:00').getTime() : 0;
-      const valB = b[sortConfig.key] ? new Date(b[sortConfig.key] + 'T00:00:00').getTime() : 0;
-
-      if (sortConfig.direction === 'asc') {
-        return valA - valB;
-      } else {
-        return valB - valA;
-      }
-    });
-
-    return result;
-  }, [myRequests, filterDate, sortConfig]);
 
   const applyMutation = useMutation(
     (data: { id?: number; data: any }) =>
@@ -1633,11 +1594,12 @@ const LeaveApplyPage: React.FC = () => {
     <AppLayout>
       <div className="leave-apply-page">
         <h2 className="page-title">
-          {user?.username ? user.username.split('.').map(part => 
-            part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-          ).join(' ') : ''}
+          Welcome, {user?.name || ''}
+          {user?.status === 'on_notice' && (
+            <span className="status-on-notice" style={{ marginLeft: '10px' }}>On Notice</span>
+          )}
         </h2>
-      </div>   {/* Top Row: Three Equal Sections */}
+        {/* Top Row: Three Equal Sections */}
         <div className="top-sections-row">
           {/* Leave Balances - Top Left */}
           <div className="leave-balances-section">
@@ -2564,69 +2526,69 @@ const LeaveApplyPage: React.FC = () => {
                                 .map((d: any) => new Date(d.date + 'T12:00:00'))
                                 .sort((a: Date, b: Date) => a.getTime() - b.getTime());
 
-                            if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
-                              return '-';
-                            }
-                            if (!approvedDates.length) return '-';
-                            if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
-                            return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
-                          })()}
-                        </td>
-                        <td>
-                          {request.currentStatus === 'pending' ? (
-                            <span className="status-badge status-applied">Applied</span>
-                          ) : request.currentStatus === 'approved' ? (
-                            <span className="status-badge status-approved">Approved</span>
-                          ) : request.currentStatus === 'rejected' ? (
-                            <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
-                              Rejected
-                            </span>
-                          ) : request.currentStatus === 'partially_approved' ? (
-                            <span className="status-badge status-partial">Partially Approved</span>
-                          ) : (
-                            <span className="status-badge">{request.currentStatus}</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="action-icons-container">
-                            <span
-                              className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                              title="View Details"
-                              onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
-                            >
-                              <FaEye />
-                            </span>
-                            {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
-                              <>
-                                <span
-                                  className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                                  title={isUpdating ? 'Updating...' : 'Edit'}
-                                  onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
-                                >
-                                  {isUpdating && editingId === request.id ? (
-                                    <span className="loading-spinner-small"></span>
-                                  ) : (
-                                    <FaPencilAlt />
-                                  )}
-                                </span>
-                                <span
-                                  className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                                  title={isUpdating ? 'Updating...' : 'Delete'}
-                                  onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
-                                >
-                                  {isUpdating && deleteRequestId === request.id ? (
-                                    <span className="loading-spinner-small"></span>
-                                  ) : (
-                                    <FaTrash />
-                                  )}
-                                </span>
-                              </>
+                              if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
+                                return '-';
+                              }
+                              if (!approvedDates.length) return '-';
+                              if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
+                              return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
+                            })()}
+                          </td>
+                          <td>
+                            {request.currentStatus === 'pending' ? (
+                              <span className="status-badge status-applied">Applied</span>
+                            ) : request.currentStatus === 'approved' ? (
+                              <span className="status-badge status-approved">Approved</span>
+                            ) : request.currentStatus === 'rejected' ? (
+                              <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
+                                Rejected
+                              </span>
+                            ) : request.currentStatus === 'partially_approved' ? (
+                              <span className="status-badge status-partial">Partially Approved</span>
+                            ) : (
+                              <span className="status-badge">{request.currentStatus}</span>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+                          </td>
+                          <td>
+                            <div className="action-icons-container">
+                              <span
+                                className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                title="View Details"
+                                onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
+                              >
+                                <FaEye />
+                              </span>
+                              {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
+                                <>
+                                  <span
+                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                    title={isUpdating ? 'Updating...' : 'Edit'}
+                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
+                                  >
+                                    {isUpdating && editingId === request.id ? (
+                                      <span className="loading-spinner-small"></span>
+                                    ) : (
+                                      <FaPencilAlt />
+                                    )}
+                                  </span>
+                                  <span
+                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                    title={isUpdating ? 'Updating...' : 'Delete'}
+                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
+                                  >
+                                    {isUpdating && deleteRequestId === request.id ? (
+                                      <span className="loading-spinner-small"></span>
+                                    ) : (
+                                      <FaTrash />
+                                    )}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                 )}
               </tbody>
             </table>
