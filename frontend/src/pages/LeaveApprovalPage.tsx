@@ -138,7 +138,7 @@ const LeaveApprovalPage: React.FC = () => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
-        showSuccess('Leave approved!');
+        showSuccess('Leave Approved Successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
@@ -197,7 +197,7 @@ const LeaveApprovalPage: React.FC = () => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
-        showSuccess('Leave rejected!');
+        showSuccess('Leave Rejected Successfully!');
         setIsModalOpen(false);
         setSelectedRequest(null);
       },
@@ -267,7 +267,7 @@ const LeaveApprovalPage: React.FC = () => {
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         queryClient.invalidateQueries(['leaveBalances']);
-        showSuccess('Converted LOP to Casual successfully!');
+        showSuccess('Converted LOP to Casual Successfully!');
 
         // Update selected request if modal is open - fetch full updated request to get new leave day IDs
         if (selectedRequest && selectedRequest.id === requestId) {

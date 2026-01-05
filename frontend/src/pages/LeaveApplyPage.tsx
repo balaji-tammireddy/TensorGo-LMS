@@ -299,7 +299,7 @@ const LeaveApplyPage: React.FC = () => {
 
     // Validate duration doesn't exceed 2 hours
     if (diffHours > 2) {
-      showWarning('Permission limited to 2 hours max.');
+      showWarning('Permission limited to maximum of 2 hours only.');
       // Reset to 2 hours after start, rounded to 15 minutes, within office hours
       const calculatedEndTime = new Date(startTime);
       calculatedEndTime.setHours(calculatedEndTime.getHours() + 2);
@@ -856,7 +856,7 @@ const LeaveApplyPage: React.FC = () => {
         queryClient.invalidateQueries('leaveBalances');
         queryClient.invalidateQueries('myLeaveRequests');
 
-        showSuccess(variables.id ? 'Leave updated!' : 'Leave applied!');
+        showSuccess(variables.id ? 'Leave Updated Successfully!' : 'Leave Applied Successfully!');
         setFormData({
           leaveType: 'casual',
           startDate: '',
@@ -931,7 +931,7 @@ const LeaveApplyPage: React.FC = () => {
       // Invalidate in background for fresh data
       queryClient.invalidateQueries('leaveBalances');
       queryClient.invalidateQueries('myLeaveRequests');
-      showSuccess('Leave deleted successfully!');
+      showSuccess('Leave Deleted successfully!');
       // Reset form after a delete (especially if we were editing)
       setFormData({
         leaveType: 'casual',
