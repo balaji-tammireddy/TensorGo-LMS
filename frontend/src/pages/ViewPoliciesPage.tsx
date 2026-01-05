@@ -76,8 +76,8 @@ const ViewPoliciesPage: React.FC = () => {
         ['policies'],
         getPolicies,
         {
-            staleTime: 24 * 60 * 60 * 1000, // 24 hours
-            cacheTime: 24 * 60 * 60 * 1000,
+            staleTime: 5 * 60 * 1000, // 5 minutes
+            cacheTime: 5 * 60 * 1000,
             select: (data) => {
                 if (data && data.length > 0) {
                     return data.map((p: any) => ({

@@ -46,8 +46,7 @@ const LeaveApplyPage: React.FC = () => {
     reason: '',
     timeForPermission: { start: '', end: '' }
   });
-  const [filterStartDate, setFilterStartDate] = useState('');
-  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterDate, setFilterDate] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
     key: 'startDate',
     direction: 'asc'
@@ -65,7 +64,9 @@ const LeaveApplyPage: React.FC = () => {
     ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days for casual
     : formData.leaveType === 'sick'
       ? format(addDays(new Date(), -3), 'yyyy-MM-dd') // allow past 3 days for sick leave
-      : todayStr; // LOP and permission can be applied for today
+      : formData.leaveType === 'permission'
+        ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // Permission can only be applied from tomorrow
+        : todayStr; // LOP can be applied for today
 
   // For sick leave: max date is tomorrow (only allow tomorrow for future dates)
   const maxStartDate = formData.leaveType === 'sick'
@@ -691,6 +692,48 @@ const LeaveApplyPage: React.FC = () => {
     return null;
   }, [formData.startDate, formData.endDate, formData.startType, formData.endType, myRequests?.requests, editingId]);
 
+  const filteredRequests = useMemo(() => {
+    if (!myRequests?.requests) return [];
+
+    let result = [...(myRequests.requests || [])];
+
+    // Filter by Date
+    if (filterDate) {
+      const filterStr = filterDate;
+      result = result.filter((request: any) => {
+        // 1. Check Applied Date
+        const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
+        if (appliedStr === filterStr) return true;
+
+        // 2. Check overlap with Start/End Date range
+        if (request.startDate && request.endDate) {
+          const start = request.startDate;
+          const end = request.endDate;
+          // Check if filterDate is between start and end (inclusive)
+          if (filterStr >= start && filterStr <= end) return true;
+        }
+
+        return false;
+      });
+    }
+
+    // Sort
+    result.sort((a: any, b: any) => {
+      if (!sortConfig.key || !sortConfig.direction) return 0;
+
+      const valA = a[sortConfig.key] ? new Date(a[sortConfig.key] + 'T00:00:00').getTime() : 0;
+      const valB = b[sortConfig.key] ? new Date(b[sortConfig.key] + 'T00:00:00').getTime() : 0;
+
+      if (sortConfig.direction === 'asc') {
+        return valA - valB;
+      } else {
+        return valB - valA;
+      }
+    });
+
+    return result;
+  }, [myRequests, filterDate, sortConfig]);
+
   const applyMutation = useMutation(
     (data: { id?: number; data: any }) =>
       data.id
@@ -966,6 +1009,37 @@ const LeaveApplyPage: React.FC = () => {
       }
     }
 
+
+
+    // Validation: Casual Leave Prior Notice
+    if (formData.leaveType === 'casual' && formData.startDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startDate = new Date(formData.startDate + 'T00:00:00'); // Use T00:00:00 to match backend logic usually
+      // Note: Using T12:00:00 in other places to avoid timezone shift, but for diff calculation T00:00:00 is safer if today is also 00:00:00
+      // Let's ensure consistency.
+      const start = new Date(formData.startDate + 'T00:00:00');
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysUntilStart = Math.ceil((start.getTime() - today.getTime()) / msPerDay);
+
+      if (requestedDays <= 2) {
+        if (daysUntilStart < 3) {
+          showWarning('Casual leaves of up to 2 days must be applied at least 3 days in advance.');
+          return;
+        }
+      } else if (requestedDays <= 5) {
+        if (daysUntilStart < 7) {
+          showWarning('Casual leaves of 3 to 5 days must be applied at least 1 week (7 days) in advance.');
+          return;
+        }
+      } else {
+        if (daysUntilStart < 30) {
+          showWarning('Casual leaves of more than 5 days must be applied at least 1 month (30 days) in advance.');
+          return;
+        }
+      }
+    }
+
     // Client-side balance guard
     if (balances) {
       // Find the original request if we're editing, to account for "refunded" days
@@ -984,6 +1058,90 @@ const LeaveApplyPage: React.FC = () => {
         if (requestedDays > effectiveBalance) {
           showWarning(`Insufficient casual leave balance. Available: ${effectiveBalance}, Required: ${requestedDays}`);
           return;
+        }
+
+        // Check Casual Monthly Limit (Max 10 days per month)
+        // Only run this check if we have request history
+        if (myRequests?.requests) {
+          try {
+            const start = new Date(`${formData.startDate}T00:00:00`);
+            const end = new Date(`${formData.endDate}T00:00:00`);
+            const currentRequestDays = eachDayOfInterval({ start, end });
+
+            // Map months to count of new days
+            const newMonthCounts = new Map<string, number>();
+
+            // Calculate days for current request
+            const startHalf = formData.startType !== 'full';
+            const endHalf = formData.endType !== 'full';
+
+            // Filter out weekends and holidays for Casual leaves
+            const holidaySet = new Set(holidays.map(h => h.date));
+
+            currentRequestDays.forEach((day, idx) => {
+              const dateStr = format(day, 'yyyy-MM-dd');
+              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+              const isHoliday = holidaySet.has(dateStr);
+
+              if (isWeekend || isHoliday) return;
+
+              const monthKey = format(day, 'yyyy-MM');
+              const isFirst = idx === 0;
+              const isLate = idx === currentRequestDays.length - 1;
+              let val = 1;
+              if (isFirst && isLate) val = (startHalf || endHalf) ? 0.5 : 1;
+              else if (isFirst && startHalf) val = 0.5;
+              else if (isLate && endHalf) val = 0.5;
+
+              newMonthCounts.set(monthKey, (newMonthCounts.get(monthKey) || 0) + val);
+            });
+
+            // Check each month involved
+            for (const [monthKey, newCount] of newMonthCounts.entries()) {
+              // Sum existing approved/pending Casual days for this month
+              let existingCount = 0;
+              myRequests.requests.forEach((req: any) => {
+                // Skip if rejected or if it's the one currently being edited
+                if (req.currentStatus === 'rejected' || req.id === editingId) return;
+                if (req.leaveType !== 'casual') return;
+
+                // We need to count days falling in this month
+                // Use leaveDays if available for accuracy, otherwise rough estimation or skip
+                if (req.leaveDays && Array.isArray(req.leaveDays)) {
+                  req.leaveDays.forEach((ld: any) => {
+                    if (ld.status === 'rejected') return;
+                    const ldDate = new Date(ld.date);
+                    if (format(ldDate, 'yyyy-MM') === monthKey) {
+                      existingCount += (ld.type === 'half' ? 0.5 : 1);
+                    }
+                  });
+                } else {
+                  // Fallback roughly
+                  const rStart = new Date(req.startDate);
+                  const rEnd = new Date(req.endDate);
+                  const rDays = eachDayOfInterval({ start: rStart, end: rEnd });
+                  rDays.forEach(d => {
+                    if (format(d, 'yyyy-MM') === monthKey && d.getDay() !== 0 && d.getDay() !== 6 && !holidaySet.has(format(d, 'yyyy-MM-dd'))) {
+                      const isFirst = format(d, 'yyyy-MM-dd') === req.startDate;
+                      const isLast = format(d, 'yyyy-MM-dd') === req.endDate;
+                      let val = 1;
+                      if (isFirst && req.startType !== 'full') val = 0.5;
+                      if (isLast && req.endType !== 'full') val = 0.5;
+                      existingCount += val;
+                    }
+                  });
+                }
+              });
+
+              if (existingCount + newCount > 10) {
+                showWarning(`Casual leave limit exceeded for ${monthKey}. Max 10 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
+                return;
+              }
+            }
+
+          } catch (e) {
+            console.error('Error checking Casual limit:', e);
+          }
         }
       }
       if (formData.leaveType === 'sick') {
@@ -1010,6 +1168,84 @@ const LeaveApplyPage: React.FC = () => {
         if (requestedDays > effectiveBalance) {
           showWarning(`Insufficient LOP balance. Available: ${effectiveBalance}, Required: ${requestedDays}`);
           return;
+        }
+
+        // Check LOP Monthly Limit (Max 5 days per month)
+        // Only run this check if we have request history
+        if (myRequests?.requests) {
+          try {
+            const start = new Date(`${formData.startDate}T00:00:00`);
+            const end = new Date(`${formData.endDate}T00:00:00`);
+            const currentRequestDays = eachDayOfInterval({ start, end });
+
+            // Map months to count of new days
+            const newMonthCounts = new Map<string, number>();
+
+            // Calculate days for current request
+            const startHalf = formData.startType !== 'full';
+            const endHalf = formData.endType !== 'full';
+
+            currentRequestDays.forEach((day, idx) => {
+              const monthKey = format(day, 'yyyy-MM');
+              const isFirst = idx === 0;
+              const isLate = idx === currentRequestDays.length - 1;
+              let val = 1;
+              if (isFirst && isLate) val = (startHalf || endHalf) ? 0.5 : 1;
+              else if (isFirst && startHalf) val = 0.5;
+              else if (isLate && endHalf) val = 0.5;
+
+              newMonthCounts.set(monthKey, (newMonthCounts.get(monthKey) || 0) + val);
+            });
+
+            // Check each month involved
+            for (const [monthKey, newCount] of newMonthCounts.entries()) {
+              // Sum existing approved/pending LOP days for this month
+              let existingCount = 0;
+              myRequests.requests.forEach((req: any) => {
+                // Skip if rejected or if it's the one currently being edited
+                if (req.currentStatus === 'rejected' || req.id === editingId) return;
+                if (req.leaveType !== 'lop') return;
+
+                // We need to count days falling in this month
+                // Use leaveDays if available for accuracy, otherwise rough estimation or skip
+                if (req.leaveDays && Array.isArray(req.leaveDays)) {
+                  req.leaveDays.forEach((ld: any) => {
+                    if (ld.status === 'rejected') return;
+                    const ldDate = new Date(ld.date);
+                    if (format(ldDate, 'yyyy-MM') === monthKey) {
+                      existingCount += (ld.type === 'half' ? 0.5 : 1);
+                    }
+                  });
+                } else {
+                  // Fallback if leaveDays detailed array is missing (though myRequests usually has it)
+                  // If start/end spans this month, roughly count
+                  const rStart = new Date(req.startDate);
+                  const rEnd = new Date(req.endDate);
+                  const rDays = eachDayOfInterval({ start: rStart, end: rEnd });
+                  rDays.forEach(d => {
+                    if (format(d, 'yyyy-MM') === monthKey) {
+                      const isFirst = format(d, 'yyyy-MM-dd') === req.startDate;
+                      const isLast = format(d, 'yyyy-MM-dd') === req.endDate;
+                      let val = 1;
+                      if (isFirst && req.startType !== 'full') val = 0.5;
+                      if (isLast && req.endType !== 'full') val = 0.5;
+                      // Note: this fallback is imperfect but good enough for client side warnings
+                      existingCount += val;
+                    }
+                  });
+                }
+              });
+
+              if (existingCount + newCount > 5) {
+                showWarning(`LOP limit exceeded for ${monthKey}. Max 5 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
+                return;
+              }
+            }
+
+          } catch (e) {
+            console.error('Error checking LOP limit:', e);
+            // Proceed to backend check if client check fails
+          }
         }
       }
     }
@@ -1174,8 +1410,14 @@ const LeaveApplyPage: React.FC = () => {
       const futureDateStr = format(futureDate, 'yyyy-MM-dd');
       defaultStartStr = futureDateStr;
       defaultEndStr = futureDateStr;
+    } else if (newType === 'permission') {
+      // Permission defaults to tomorrow
+      const futureDate = addDays(today, 1);
+      const futureDateStr = format(futureDate, 'yyyy-MM-dd');
+      defaultStartStr = futureDateStr;
+      defaultEndStr = futureDateStr;
     } else {
-      // Sick, LOP, Permission defaults to today
+      // Sick, LOP defaults to today
       const todayStr = format(today, 'yyyy-MM-dd');
       defaultStartStr = todayStr;
       defaultEndStr = todayStr;
@@ -2101,58 +2343,33 @@ const LeaveApplyPage: React.FC = () => {
         <div className="recent-requests-section">
           <div className="requests-section-header">
             <h2>Recent Leave Requests</h2>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className={`table-filter-trigger ${filterStartDate || filterEndDate ? 'active' : ''}`}>
-                  <FaFilter />
-                  <span>Filter</span>
+            <div className="header-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {filterDate && (
+                <button
+                  className="clear-button"
+                  onClick={() => setFilterDate('')}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    margin: 0,
+                    height: '40px',
+                    minWidth: '90px',
+                    padding: '0 15px',
+                    fontSize: '13px'
+                  }}
+                >
+                  Clear
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="filter-dropdown-content"
-                align="end"
-                onInteractOutside={(e) => {
-                  const target = e.target as HTMLElement;
-                  if (target.closest('.date-picker-popover-portal')) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <div className="filter-bar-popover">
-                  <div className="filter-group-item">
-                    <label>FILTER START DATE</label>
-                    <DatePicker
-                      value={filterStartDate}
-                      onChange={(date) => setFilterStartDate(date)}
-                      placeholder="dd - mm - yyyy"
-                      allowManualEntry={true}
-                      isEmployeeVariant={true}
-                    />
-                  </div>
-                  <div className="filter-group-item">
-                    <label>FILTER END DATE</label>
-                    <DatePicker
-                      value={filterEndDate}
-                      onChange={(date) => setFilterEndDate(date)}
-                      placeholder="dd - mm - yyyy"
-                      allowManualEntry={true}
-                      isEmployeeVariant={true}
-                    />
-                  </div>
-                  {(filterStartDate || filterEndDate) && (
-                    <button
-                      className="filter-clear-link"
-                      onClick={() => {
-                        setFilterStartDate('');
-                        setFilterEndDate('');
-                      }}
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+              <div style={{ width: '200px' }}>
+                <DatePicker
+                  value={filterDate}
+                  onChange={(date) => setFilterDate(date)}
+                  placeholder="Filter Date"
+                  allowManualEntry={true}
+                  isEmployeeVariant={true}
+                />
+              </div>
+            </div>
           </div>
           <div
             className={`requests-table-container ${myRequests?.requests && myRequests.requests.length > 3 ? 'scrollable' : ''} ${applyMutation.isLoading || deleteMutation.isLoading ? 'updating' : ''}`}
@@ -2204,132 +2421,112 @@ const LeaveApplyPage: React.FC = () => {
                       />
                     </td>
                   </tr>
+                ) : filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} style={{ padding: 0 }}>
+                      <EmptyState
+                        title="No Results Found"
+                        description="No leave requests found for the selected date."
+                      />
+                    </td>
+                  </tr>
                 ) : (
-                  [...(myRequests.requests || [])]
-                    .filter((request: any) => {
-                      if (!filterStartDate && !filterEndDate) return true;
+                  filteredRequests.map((request: any, idx: number) => {
+                    const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
+                      (deleteMutation.isLoading && deleteRequestId === request.id) ||
+                      editingRequestId === request.id;
+                    return (
+                      <tr
+                        key={request.id}
+                        className={isUpdating ? 'updating-row' : ''}
+                      >
+                        <td>{idx + 1}</td>
+                        <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}</td>
+                        <td>
+                          <div className="reason-cell">
+                            {request.leaveReason}
+                          </div>
+                        </td>
+                        <td>
+                          {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                          {request.startDate && request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
+                        </td>
+                        <td>
+                          {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                          {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
+                        </td>
+                        <td>{request.noOfDays}</td>
+                        <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
+                        <td>
+                          {(() => {
+                            const approvedDates = (request.leaveDays || [])
+                              .filter((d: any) => d.status === 'approved')
+                              .map((d: any) => new Date(d.date + 'T12:00:00'))
+                              .sort((a: Date, b: Date) => a.getTime() - b.getTime());
 
-                      const reqStart = request.startDate ? new Date(request.startDate + 'T00:00:00') : null;
-                      const reqEnd = request.endDate ? new Date(request.endDate + 'T00:00:00') : null;
-
-                      const filterStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
-                      const filterEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
-
-                      // Filter logic: request must overlap with the filter range if both are set, 
-                      // or match the specific filter if only one is set.
-                      if (filterStart && reqStart && reqStart < filterStart) return false;
-                      if (filterEnd && reqEnd && reqEnd > filterEnd) return false;
-
-                      return true;
-                    })
-                    .sort((a: any, b: any) => {
-                      if (!sortConfig.key || !sortConfig.direction) return 0;
-
-                      const valA = a[sortConfig.key] ? new Date(a[sortConfig.key] + 'T00:00:00').getTime() : 0;
-                      const valB = b[sortConfig.key] ? new Date(b[sortConfig.key] + 'T00:00:00').getTime() : 0;
-
-                      if (sortConfig.direction === 'asc') {
-                        return valA - valB;
-                      } else {
-                        return valB - valA;
-                      }
-                    })
-                    .map((request: any, idx: number) => {
-                      const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
-                        (deleteMutation.isLoading && deleteRequestId === request.id) ||
-                        editingRequestId === request.id;
-                      return (
-                        <tr
-                          key={request.id}
-                          className={isUpdating ? 'updating-row' : ''}
-                        >
-                          <td>{idx + 1}</td>
-                          <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}</td>
-                          <td>
-                            <div className="reason-cell">
-                              {request.leaveReason}
-                            </div>
-                          </td>
-                          <td>
-                            {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
-                            {request.startDate && request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
-                          </td>
-                          <td>
-                            {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
-                            {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
-                          </td>
-                          <td>{request.noOfDays}</td>
-                          <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
-                          <td>
-                            {(() => {
-                              const approvedDates = (request.leaveDays || [])
-                                .filter((d: any) => d.status === 'approved')
-                                .map((d: any) => new Date(d.date + 'T12:00:00'))
-                                .sort((a: Date, b: Date) => a.getTime() - b.getTime());
-
-                              if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
-                                return '-';
-                              }
-                              if (!approvedDates.length) return '-';
-                              if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
-                              return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
-                            })()}
-                          </td>
-                          <td>
-                            {request.currentStatus === 'pending' ? (
-                              <span className="status-badge status-applied">Applied</span>
-                            ) : request.currentStatus === 'approved' ? (
-                              <span className="status-badge status-approved">Approved</span>
-                            ) : request.currentStatus === 'rejected' ? (
-                              <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
-                                Rejected
-                              </span>
-                            ) : request.currentStatus === 'partially_approved' ? (
-                              <span className="status-badge status-partial">Partially Approved</span>
-                            ) : (
-                              <span className="status-badge">{request.currentStatus}</span>
+                            if (!(request.currentStatus === 'approved' || request.currentStatus === 'partially_approved')) {
+                              return '-';
+                            }
+                            if (!approvedDates.length) return '-';
+                            if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
+                            return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
+                          })()}
+                        </td>
+                        <td>
+                          {request.currentStatus === 'pending' ? (
+                            <span className="status-badge status-applied">Applied</span>
+                          ) : request.currentStatus === 'approved' ? (
+                            <span className="status-badge status-approved">Approved</span>
+                          ) : request.currentStatus === 'rejected' ? (
+                            <span className="status-badge status-rejected" title={request.rejectionReason || 'Rejected'}>
+                              Rejected
+                            </span>
+                          ) : request.currentStatus === 'partially_approved' ? (
+                            <span className="status-badge status-partial">Partially Approved</span>
+                          ) : (
+                            <span className="status-badge">{request.currentStatus}</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="action-icons-container">
+                            <span
+                              className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                              title="View Details"
+                              onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
+                            >
+                              <FaEye />
+                            </span>
+                            {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
+                              <>
+                                <span
+                                  className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                  title={isUpdating ? 'Updating...' : 'Edit'}
+                                  onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
+                                >
+                                  {isUpdating && editingId === request.id ? (
+                                    <span className="loading-spinner-small"></span>
+                                  ) : (
+                                    <FaPencilAlt />
+                                  )}
+                                </span>
+                                <span
+                                  className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                  title={isUpdating ? 'Updating...' : 'Delete'}
+                                  onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
+                                >
+                                  {isUpdating && deleteRequestId === request.id ? (
+                                    <span className="loading-spinner-small"></span>
+                                  ) : (
+                                    <FaTrash />
+                                  )}
+                                </span>
+                              </>
                             )}
-                          </td>
-                          <td>
-                            <div className="action-icons-container">
-                              <span
-                                className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                                title="View Details"
-                                onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
-                              >
-                                <FaEye />
-                              </span>
-                              {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
-                                <>
-                                  <span
-                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                                    title={isUpdating ? 'Updating...' : 'Edit'}
-                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
-                                  >
-                                    {isUpdating && editingId === request.id ? (
-                                      <span className="loading-spinner-small"></span>
-                                    ) : (
-                                      <FaPencilAlt />
-                                    )}
-                                  </span>
-                                  <span
-                                    className={`action-icon ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                                    title={isUpdating ? 'Updating...' : 'Delete'}
-                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
-                                  >
-                                    {isUpdating && deleteRequestId === request.id ? (
-                                      <span className="loading-spinner-small"></span>
-                                    ) : (
-                                      <FaTrash />
-                                    )}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

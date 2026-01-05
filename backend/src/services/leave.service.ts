@@ -257,13 +257,7 @@ export const applyLeave = async (
       }
     }
 
-    if (leaveData.leaveType === 'casual') {
-      const msPerDay = 1000 * 60 * 60 * 24;
-      const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
-      if (daysUntilStart < 3) {
-        throw new Error('Casual leaves must be applied at least 3 days in advance.');
-      }
-    }
+
 
     if (endDate < startDate) {
       throw new Error('End date must be greater than or equal to start date');
@@ -332,6 +326,26 @@ export const applyLeave = async (
       leaveData.leaveType
     );
 
+    // Validation: Prior Notice for Casual Leaves
+    if (leaveData.leaveType === 'casual') {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+
+      if (days <= 2) {
+        if (daysUntilStart < 3) {
+          throw new Error('Casual leaves of up to 2 days must be applied at least 3 days in advance.');
+        }
+      } else if (days <= 5) {
+        if (daysUntilStart < 7) {
+          throw new Error('Casual leaves of 3 to 5 days must be applied at least 1 week (7 days) in advance.');
+        }
+      } else {
+        if (daysUntilStart < 30) {
+          throw new Error('Casual leaves of more than 5 days must be applied at least 1 month (30 days) in advance.');
+        }
+      }
+    }
+
     if (existingLeavesCheck.rows.length > 0) {
       for (const requestedDay of leaveDays) {
         const requestedDateStr = `${requestedDay.date.getFullYear()}-${String(requestedDay.date.getMonth() + 1).padStart(2, '0')}-${String(requestedDay.date.getDate()).padStart(2, '0')}`;
@@ -355,6 +369,83 @@ export const applyLeave = async (
           if (existingType === 'full' || requestedDay.type === 'full' || existingType === requestedDay.type) {
             throw new Error(`Leave already exists for ${requestedDateStr} (${statusText}).`);
           }
+        }
+      }
+    }
+
+    // Validation: LOP leaves cannot exceed 5 days per month
+    if (leaveData.leaveType === 'lop') {
+      const monthCounts = new Map<string, number>();
+
+      // Group requested days by month
+      for (const day of leaveDays) {
+        const monthKey = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}`;
+        const dayValue = day.type === 'half' ? 0.5 : 1;
+        monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + dayValue);
+      }
+
+      // Check against database for each month involved
+      for (const [monthKey, newCount] of monthCounts.entries()) {
+        const [year, month] = monthKey.split('-');
+
+        // Count existing LOP days for this month (excluding rejected ones)
+        // We look for any leave_days of type 'lop' in this month
+        const existingLopResult = await pool.query(
+          `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+           FROM leave_days ld
+           JOIN leave_requests lr ON ld.leave_request_id = lr.id
+           WHERE ld.employee_id = $1 
+             AND ld.leave_type = 'lop'
+             AND EXTRACT(YEAR FROM ld.leave_date) = $2
+             AND EXTRACT(MONTH FROM ld.leave_date) = $3
+             AND ld.day_status != 'rejected'
+             AND lr.current_status != 'rejected'`,
+          [userId, parseInt(year), parseInt(month)]
+        );
+
+        const existingCount = parseFloat(existingLopResult.rows[0].total_days) || 0;
+        const totalLopDays = existingCount + newCount;
+
+        if (totalLopDays > 5) {
+          throw new Error(`LOP request exceeds monthly limit of 5 days. You have already used/requested ${existingCount} LOP days in ${monthKey}, and this request adds ${newCount} days.`);
+        }
+      }
+    }
+
+    // Validation: Casual leaves cannot exceed 10 days per month
+    if (leaveData.leaveType === 'casual') {
+      const monthCounts = new Map<string, number>();
+
+      // Group requested days by month
+      for (const day of leaveDays) {
+        const monthKey = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}`;
+        const dayValue = day.type === 'half' ? 0.5 : 1;
+        monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + dayValue);
+      }
+
+      // Check against database for each month involved
+      for (const [monthKey, newCount] of monthCounts.entries()) {
+        const [year, month] = monthKey.split('-');
+
+        // Count existing Casual days for this month (excluding rejected ones)
+        const existingCasualResult = await pool.query(
+          `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+           FROM leave_days ld
+           JOIN leave_requests lr ON ld.leave_request_id = lr.id
+           WHERE ld.employee_id = $1 
+             AND ld.leave_type = 'casual'
+             AND EXTRACT(YEAR FROM ld.leave_date) = $2
+             AND EXTRACT(MONTH FROM ld.leave_date) = $3
+             AND ld.day_status != 'rejected'
+             AND lr.current_status != 'rejected'`,
+          [userId, parseInt(year), parseInt(month)]
+        );
+
+        const existingCount = parseFloat(existingCasualResult.rows[0].total_days) || 0;
+        const totalCasualDays = existingCount + newCount;
+
+        if (totalCasualDays > 10) {
+          throw new Error(`Casual leave request exceeds monthly limit of 10 days. You have already used/requested ${existingCount} casual days in ${monthKey}, and this request adds ${newCount} days.`);
         }
       }
     }
