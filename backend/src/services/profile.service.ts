@@ -373,6 +373,13 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   }
 
   if (search) {
+    // Check for special characters and emojis (allow only alphanumeric and spaces)
+    const isValid = /^[a-zA-Z0-9\s]*$/.test(search);
+    if (!isValid) {
+      logger.warn(`[PROFILE] [GET REPORTING MANAGERS] Invalid search term detected: ${search}`);
+      throw new Error('Search term contains invalid characters. Emojis and special characters are not allowed.');
+    }
+
     query += ` AND (first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex} OR emp_id ILIKE $${paramIndex})`;
     params.push(`%${search}%`);
   }

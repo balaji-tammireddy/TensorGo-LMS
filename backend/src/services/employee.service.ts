@@ -26,6 +26,13 @@ export const getEmployees = async (
   const params: any[] = [];
 
   if (search) {
+    // Check for special characters and emojis (allow only alphanumeric and spaces)
+    const isValid = /^[a-zA-Z0-9\s]*$/.test(search);
+    if (!isValid) {
+      logger.warn(`[EMPLOYEE] [GET EMPLOYEES] Invalid search term detected: ${search}`);
+      throw new Error('Search term contains invalid characters. Emojis and special characters are not allowed.');
+    }
+
     // Search by employee ID or name (first or last name)
     query += ` AND (emp_id ILIKE $${params.length + 1} OR first_name ILIKE $${params.length + 1} OR last_name ILIKE $${params.length + 1})`;
     params.push(`%${search}%`);

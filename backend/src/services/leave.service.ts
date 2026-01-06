@@ -1622,7 +1622,8 @@ export const convertLeaveRequestLopToCasual = async (
       previousLopBalance: currentLop,
       newLopBalance: newLopBalance,
       previousCasualBalance: currentCasual,
-      newCasualBalance: newCasualBalance
+      newCasualBalance: newCasualBalance,
+      conversionDate: new Date().toISOString()
     };
 
     // Send email notifications based on converter role - ONE EMAIL with TO/CC
@@ -1873,6 +1874,13 @@ export const getPendingLeaveRequests = async (
   }
 
   if (search) {
+    // Check for special characters and emojis (allow only alphanumeric and spaces)
+    const isValid = /^[a-zA-Z0-9\s]*$/.test(search);
+    if (!isValid) {
+      logger.warn(`[LEAVE] [GET PENDING] Invalid search term detected: ${search}`);
+      throw new Error('Search term contains invalid characters. Emojis and special characters are not allowed.');
+    }
+
     // ILIKE with leading wildcards can be slow, but the new indexes on names will help with non-leading searches
     query += ` AND (u.emp_id ILIKE $${params.length + 1} OR u.first_name ILIKE $${params.length + 1} OR u.last_name ILIKE $${params.length + 1})`;
     params.push(`%${search}%`);
@@ -3560,6 +3568,7 @@ export const rejectLeaveDays = async (
 export const updateLeaveStatus = async (
   leaveRequestId: number,
   approverId: number,
+  approverRole: string,
   newStatus: string,
   selectedDayIds?: number[],
   rejectReason?: string,
