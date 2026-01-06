@@ -934,7 +934,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
             </td>
           </tr>
                 <tr>
-                  <td style="padding: 0; background-color: #dc2626;">
+                  <td style="padding: 0; background-color: #16a34a;">
                     <div style="padding: 12px 40px; text-align: center;">
                       <p style="margin: 0; color: #ffffff; font-size: 13px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">Password Changed</p>
                     </div>
@@ -947,9 +947,9 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
           <!-- Content Section -->
           <tr>
             <td style="padding: 40px;">
-              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px 20px; margin: 0 0 28px 0; border-radius: 4px;">
-                <p style="margin: 0; color: #991b1b; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; line-height: 1.5;">
-                  Security Alert: Your password has been successfully changed.
+              <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px 20px; margin: 0 0 28px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #15803d; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; line-height: 1.5;">
+                  Success: Your password has been successfully changed.
                 </p>
               </div>
               <!-- Greeting -->
