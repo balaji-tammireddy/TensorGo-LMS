@@ -817,7 +817,7 @@ const EmployeeManagementPage: React.FC = () => {
               type="text"
               placeholder="Search by Name or Emp ID..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => setSearchInput(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const value = e.currentTarget.value.trim();

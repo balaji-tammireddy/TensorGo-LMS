@@ -813,35 +813,109 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const detailsTable = generateDetailsTable([
-    { label: 'Date & Time:', value: changeDateDisplay, isBold: true },
-    ...(data.ipAddress ? [{ label: 'IP Address:', value: data.ipAddress }] : [])
-  ]);
-
-  const content = `
-    <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
-      <p style="margin: 0; color: #991b1b; font-weight: bold; font-size: 14px;">
-        Security Alert: Your password has been successfully changed.
-      </p>
-    </div>
-    <p>Dear ${data.userName},</p>
-    <p>This is a security notification to inform you that your password was successfully changed.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Change Details</h3>
-    ${detailsTable}
-    <div style="margin-top: 30px; padding: 15px; background-color: #fffbeb; border: 1px solid #fbbf24; border-radius: 4px;">
-      <p style="margin: 0; color: #92400e; font-size: 14px;">
-        <strong>Important:</strong> If you did not make this change, please contact your administrator immediately and change your password again.
-      </p>
-    </div>
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Changed - Security Notification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 30px 0; background-color: #f5f7fa;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); overflow: hidden;">
+          <!-- Header with Corporate Branding -->
+          <tr>
+            <td style="padding: 0;">
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.3px;">Security Notification</h1>
+            </td>
+          </tr>
+                <tr>
+                  <td style="padding: 0; background-color: #dc2626;">
+                    <div style="padding: 12px 40px; text-align: center;">
+                      <p style="margin: 0; color: #ffffff; font-size: 13px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">Password Changed</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Content Section -->
+          <tr>
+            <td style="padding: 40px;">
+              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px 20px; margin: 0 0 28px 0; border-radius: 4px;">
+                <p style="margin: 0; color: #991b1b; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600; line-height: 1.5;">
+                  Security Alert: Your password has been successfully changed.
+                </p>
+              </div>
+              <!-- Greeting -->
+              <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
+                Dear ${data.userName},
+              </p>
+              
+              <!-- Introduction -->
+              <p style="margin: 0 0 28px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
+                This is a security notification to inform you that your password was successfully changed.
+              </p>
+              
+              <!-- Change Details Card -->
+              <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #3b82f6; padding: 28px; margin: 28px 0; border-radius: 6px;">
+                <h3 style="margin: 0 0 20px 0; color: #1e3a8a; font-size: 17px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.2px;">Change Details</h3>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 12px 0; color: #6b7280; font-size: 14px; font-family: 'Poppins', sans-serif; width: 38%; font-weight: 500; vertical-align: top;">Date & Time:</td>
+                    <td style="padding: 12px 0; color: #111827; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600;">${changeDateDisplay}</td>
+                  </tr>
+                  ${data.ipAddress ? `
+                  <tr>
+                    <td style="padding: 12px 0; color: #6b7280; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top;">IP Address:</td>
+                    <td style="padding: 12px 0; color: #111827; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600;">${data.ipAddress}</td>
+                  </tr>
+                  ` : ''}
+                </table>
+              </div>
+              
+              <!-- Security Notice -->
+              <div style="background-color: #fffbeb; border: 1px solid #fbbf24; padding: 16px 20px; margin: 28px 0; border-radius: 6px;">
+                <p style="margin: 0; color: #92400e; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-weight: 500;">
+                  <strong>Important:</strong> If you did not make this change, please contact your administrator immediately and change your password again.
+                </p>
+              </div>
+              
+              <!-- Closing -->
+              <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
+                Best regards,<br>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
+                This is an automated security notification from TensorGo Leave Management System. Please do not reply to this email.
+              </p>
+              <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 11px; font-family: 'Poppins', sans-serif; line-height: 1.5;">
+                Reference ID: ${uniqueId}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
   `;
-
-  return generateEmailWrapper(
-    'Security Notification',
-    content,
-    uniqueId,
-    'Your password has been successfully changed'
-  );
 };
 
 const generatePasswordChangeSecurityEmailText = (data: PasswordChangeSecurityEmailData): string => {
@@ -855,7 +929,7 @@ Dear ${data.userName},
 This is a security notification to inform you that your password was successfully changed.
 
 Change Details:
-- Date & Time: ${changeDateDisplay}
+- Date: ${changeDateDisplay}
 ${data.ipAddress ? `- IP Address: ${data.ipAddress}\n` : ''}
 
 ⚠️ Important: If you did not make this change, please contact your administrator immediately and change your password again.

@@ -706,6 +706,7 @@ const LeaveApplyPage: React.FC = () => {
       // Check each requested day against existing leave requests
       for (const day of requestedDaysArray) {
         const dayStr = format(day, 'yyyy-MM-dd');
+        const displayDateStr = format(day, 'dd-MM-yyyy');
         const dayOfWeek = day.getDay();
         const isSunday = dayOfWeek === 0;
         const isSaturday = dayOfWeek === 6;
@@ -735,7 +736,7 @@ const LeaveApplyPage: React.FC = () => {
                 if (existingDay.type === 'full') {
                   const statusText = existingDay.status === 'approved' ? 'approved' :
                     existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                  return `Leave already exists for ${dayStr} (${statusText} - full day). Cannot apply leave on this date.`;
+                  return `Leave already exists for ${displayDateStr} (${statusText} - full day). Cannot apply leave on this date.`;
                 }
                 // If existing leave is half day
                 if (existingDay.type === 'half') {
@@ -743,12 +744,12 @@ const LeaveApplyPage: React.FC = () => {
                   if (!isHalfDay) {
                     const statusText = existingDay.status === 'approved' ? 'approved' :
                       existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                    return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
+                    return `Leave already exists for ${displayDateStr} (${statusText} - half day). Cannot apply full day leave on this date.`;
                   }
                   // If both are half days, block to prevent conflicts
                   const statusText = existingDay.status === 'approved' ? 'approved' :
                     existingDay.status === 'partially_approved' ? 'partially approved' : 'pending';
-                  return `Leave already exists for ${dayStr} (${statusText} - half day). Cannot apply leave on this date.`;
+                  return `Leave already exists for ${displayDateStr} (${statusText} - half day). Cannot apply leave on this date.`;
                 }
               }
             }
@@ -758,7 +759,9 @@ const LeaveApplyPage: React.FC = () => {
             if (request.currentStatus === 'approved' || request.currentStatus === 'pending' || request.currentStatus === 'partially_approved') {
               const statusText = request.currentStatus === 'approved' ? 'approved' :
                 request.currentStatus === 'partially_approved' ? 'partially approved' : 'pending';
-              return `Leave already applied from ${request.startDate} to ${request.endDate} (${statusText}). Dates overlap with your request.`;
+              const startDateDisplay = format(new Date(request.startDate), 'dd-MM-yyyy');
+              const endDateDisplay = format(new Date(request.endDate), 'dd-MM-yyyy');
+              return `Leave already applied from ${startDateDisplay} to ${endDateDisplay} (${statusText}). Dates overlap with your request.`;
             }
           }
         }
@@ -1835,10 +1838,8 @@ const LeaveApplyPage: React.FC = () => {
                     const blockedHoliday = !isLop && !!holiday;
 
                     if (blockedWeekend) {
-                      const isIntern = user?.role === 'intern';
-                      const message = isIntern
-                        ? 'Cannot select Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.'
-                        : 'Cannot select Saturday or Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.';
+
+                      const message = 'Please select only working days as start date.';
                       showWarning(message);
                       return;
                     }
@@ -1862,7 +1863,7 @@ const LeaveApplyPage: React.FC = () => {
                   min={minStartDate}
                   max={maxStartDate}
                   placeholder="dd - mm - yyyy"
-                  allowManualEntry={true}
+                  allowManualEntry={false}
                   isEmployeeVariant={true}
                   disabledDates={(date) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
@@ -1956,10 +1957,8 @@ const LeaveApplyPage: React.FC = () => {
                         const blockedHoliday = !isLop && !!holiday;
 
                         if (blockedWeekend) {
-                          const isIntern = user?.role === 'intern';
-                          const message = isIntern
-                            ? 'Cannot select Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.'
-                            : 'Cannot select Saturday or Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.';
+
+                          const message = 'Please select only working days as end date.';
                           showWarning(message);
                           return;
                         }
@@ -1978,7 +1977,7 @@ const LeaveApplyPage: React.FC = () => {
                       }
                       max={maxEndDateLimit}
                       placeholder="dd - mm - yyyy"
-                      allowManualEntry={true}
+                      allowManualEntry={false}
                       isEmployeeVariant={true}
                       disabled={
                         formData.startType === 'first_half' ||
