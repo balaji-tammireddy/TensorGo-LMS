@@ -77,3 +77,13 @@ export const deleteLeaveSchema = z.object({
   })
 });
 
+
+export const rejectLeaveDaysSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid leave request ID')
+  }),
+  body: z.object({
+    dayIds: z.array(z.number()).min(1, 'At least one day must be selected'),
+    comment: z.string().min(1, 'Comment is required for rejection')
+  })
+});

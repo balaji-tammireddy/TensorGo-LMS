@@ -165,6 +165,11 @@ export const rejectLeaveDay = async (leaveId: number, dayId: number, comment: st
   return response.data;
 };
 
+export const rejectLeaveDays = async (leaveId: number, dayIds: number[], comment: string) => {
+  const response = await api.post(`/leave/${leaveId}/days/reject`, { dayIds, comment });
+  return response.data;
+};
+
 export const getApprovedLeaves = async (page: number = 1, limit: number = 10) => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   const response = await api.get(`/leave/approved?${params}`);

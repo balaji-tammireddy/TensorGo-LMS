@@ -175,10 +175,11 @@ const LeaveApprovalPage: React.FC = () => {
 
   const rejectMutation = useMutation(
     ({ id, dayIds, comment }: { id: number; dayIds?: number[]; comment: string }) => {
+      // Use batch rejection if dayIds are provided
       if (dayIds && dayIds.length > 0) {
-        // Reject multiple days - use batch endpoint if available, otherwise parallel
-        return Promise.all(dayIds.map(dayId => leaveService.rejectLeaveDay(id, dayId, comment)));
+        return leaveService.rejectLeaveDays(id, dayIds, comment);
       } else {
+        // Fallback for full leave rejection (legacy or if not using day selection)
         return leaveService.rejectLeave(id, comment);
       }
     },
