@@ -130,7 +130,6 @@ const LoginPage: React.FC = () => {
     try {
       await verifyOTP({ email: forgotPasswordEmail.trim(), otp: otp.trim() });
       showSuccess('OTP verified successfully');
-      showSuccess('OTP verified successfully');
       setForgotPasswordStep('password');
     } catch (err: any) {
       const errorData = err.response?.data?.error;
