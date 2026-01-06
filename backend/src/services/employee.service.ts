@@ -404,7 +404,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their role
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -634,6 +634,69 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   await pool.query(query, values);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Database update completed successfully`);
+
+  // Check if status changed to on_notice, resigned, terminated, or inactive
+  const RESTRICTED_STATUSES = ['on_notice', 'resigned', 'terminated', 'inactive'];
+  const oldStatus = employeeCheck.rows[0].status;
+  const newStatus = employeeData.status;
+
+  if (newStatus && RESTRICTED_STATUSES.includes(newStatus) && oldStatus !== newStatus) {
+    logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager status changed from ${oldStatus} to ${newStatus}. Checking for subordinates to reassign.`);
+
+    // Find all subordinates
+    const subordinatesResult = await pool.query(
+      'SELECT id, email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE reporting_manager_id = $1',
+      [employeeId]
+    );
+
+    if (subordinatesResult.rows.length > 0) {
+      logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Found ${subordinatesResult.rows.length} subordinates. Finding Super Admin for reassignment.`);
+      // Find Super Admin
+      const superAdminResult = await pool.query(
+        'SELECT id, emp_id, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE role = \'super_admin\' ORDER BY id ASC LIMIT 1'
+      );
+
+      if (superAdminResult.rows.length > 0) {
+        const superAdmin = superAdminResult.rows[0];
+        const managerName = superAdmin.name;
+        const managerId = superAdmin.id;
+        const managerEmpId = superAdmin.emp_id;
+
+        // Update subordinates
+        await pool.query(
+          'UPDATE users SET reporting_manager_id = $1, reporting_manager_name = $2 WHERE reporting_manager_id = $3',
+          [managerId, managerName, employeeId]
+        );
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassigned ${subordinatesResult.rows.length} subordinates to ${managerName} (${managerEmpId})`);
+
+        // Send emails
+        try {
+          const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
+          const previousManagerName = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
+
+          for (const sub of subordinatesResult.rows) {
+            try {
+              await sendReportingManagerChangeEmail(sub.email, {
+                employeeName: sub.name,
+                previousManagerName,
+                newManagerName: managerName,
+                newManagerEmpId: managerEmpId
+              });
+              logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassignment email sent to subordinate: ${sub.email}`);
+            } catch (emailError) {
+              logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending reassignment email to ${sub.email}:`, emailError);
+            }
+          }
+        } catch (importError) {
+          logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error importing email templates for reassignment:`, importError);
+        }
+      } else {
+        logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] No Super Admin found to reassign subordinates to.`);
+      }
+    } else {
+      logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] No subordinates found for the updated employee.`);
+    }
+  }
 
   // If joining date was updated, recalculate leave balances
   if (employeeData.dateOfJoining && requesterRole === 'super_admin') {

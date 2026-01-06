@@ -2223,3 +2223,125 @@ export const sendHolidayListReminderEmail = async (
     text: generateHolidayListReminderEmailText(data),
   });
 };
+
+// ============================================================================
+// REPORTING MANAGER CHANGE EMAIL
+// ============================================================================
+
+export interface ReportingManagerChangeEmailData {
+  employeeName: string;
+  previousManagerName: string;
+  newManagerName: string;
+  newManagerEmpId: string;
+}
+
+const generateReportingManagerChangeEmailHtml = (data: ReportingManagerChangeEmailData): string => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reporting Manager Updated</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f7fa;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 30px 0; background-color: #f5f7fa;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.3px;">Reporting Manager Updated</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 16px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
+                Dear ${data.employeeName},
+              </p>
+              <p style="margin: 0 0 28px 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
+                This is to inform you that your reporting manager has been updated. This change occurred because your previous manager, <strong>${data.previousManagerName}</strong>, is no longer available as a reporting manager (e.g., transition to notice period or inactive status).
+              </p>
+              <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #3b82f6; padding: 28px; margin: 28px 0; border-radius: 6px;">
+                <h3 style="margin: 0 0 20px 0; color: #1e3a8a; font-size: 17px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.2px;">New Reporting Manager</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 12px 0; color: #6b7280; font-size: 14px; font-family: 'Poppins', sans-serif; width: 38%; font-weight: 500; vertical-align: top;">Name:</td>
+                    <td style="padding: 12px 0; color: #111827; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600;">${data.newManagerName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 0; color: #6b7280; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 500; vertical-align: top;">Employee ID:</td>
+                    <td style="padding: 12px 0; color: #111827; font-size: 14px; font-family: 'Poppins', sans-serif; font-weight: 600;">${data.newManagerEmpId}</td>
+                  </tr>
+                </table>
+              </div>
+              <p style="margin: 28px 0 0 0; color: #374151; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
+                From now on, please direct all your leave requests and professional communications to <strong>${data.newManagerName}</strong>.
+              </p>
+              <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
+                Best regards,<br>
+                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 12px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
+                This is an automated notification from TensorGo Leave Management System.
+              </p>
+              <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 11px; font-family: 'Poppins', sans-serif; line-height: 1.5;">
+                Reference ID: ${uniqueId}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+};
+
+const generateReportingManagerChangeEmailText = (data: ReportingManagerChangeEmailData): string => {
+  return `
+Reporting Manager Updated
+
+Dear ${data.employeeName},
+
+This is to inform you that your reporting manager has been updated. This change occurred because your previous manager, ${data.previousManagerName}, is no longer available as a reporting manager.
+
+New Reporting Manager:
+- Name: ${data.newManagerName}
+- Employee ID: ${data.newManagerEmpId}
+
+From now on, please direct all your leave requests and professional communications to your new manager.
+
+Best regards,
+TensorGo
+
+---
+This is an automated notification from TensorGo Leave Management System.
+`;
+};
+
+export const sendReportingManagerChangeEmail = async (
+  recipientEmail: string,
+  data: ReportingManagerChangeEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  return await sendEmail({
+    to: recipientEmail,
+    subject: `Your Reporting Manager has been updated [Ref: ${uniqueId}]`,
+    html: generateReportingManagerChangeEmailHtml(data),
+    text: generateReportingManagerChangeEmailText(data),
+  });
+};
