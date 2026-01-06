@@ -223,16 +223,54 @@ export const applyLeave = async (
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
 
+    // Fetch user role and reporting manager info
+    const userResult = await pool.query(
+      `SELECT u.role as employee_role, u.status,
+              COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
+              u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+              u.emp_id as employee_emp_id, 
+              COALESCE(rm.email, sa.sa_email) as manager_email, 
+              COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as manager_name,
+              COALESCE(rm.role, 'super_admin') as manager_role, 
+              rm.reporting_manager_id as hr_id, 
+              hr.email as hr_email,
+              hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name, 
+              hr.role as hr_role
+      FROM users u
+      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
+      LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
+      LEFT JOIN LATERAL (
+        SELECT id as sa_id, email as sa_email, first_name || ' ' || COALESCE(last_name, '') as sa_full_name
+        FROM users 
+        WHERE role = 'super_admin'
+        ORDER BY id ASC
+        LIMIT 1
+      ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
+      WHERE u.id = $1`,
+      [userId]
+    );
+
+    const userData = userResult.rows[0];
+    const userRole = userData.employee_role;
+
     // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
     // EXCEPTION: LOP leaves can start/end on weekends
+    // EXCEPTION: For interns, Saturday is a working day
     if (leaveData.leaveType !== 'lop') {
       const startDayOfWeek = startDate.getDay();
       const endDayOfWeek = endDate.getDay();
-      if (startDayOfWeek === 0 || startDayOfWeek === 6) {
-        throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+
+      const isWeekendCheck = (day: number) => {
+        return day === 0 || (day === 6 && userRole !== 'intern');
+      };
+
+      if (isWeekendCheck(startDayOfWeek)) {
+        const dayName = startDayOfWeek === 0 ? 'Sunday' : 'Saturday';
+        throw new Error(`Cannot select ${dayName} as start date. Please select a working day.`);
       }
-      if (endDayOfWeek === 0 || endDayOfWeek === 6) {
-        throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+      if (isWeekendCheck(endDayOfWeek)) {
+        const dayName = endDayOfWeek === 0 ? 'Sunday' : 'Saturday';
+        throw new Error(`Cannot select ${dayName} as end date. Please select a working day.`);
       }
     }
 
@@ -323,7 +361,8 @@ export const applyLeave = async (
       endDate,
       normalizedStartType as 'full' | 'half',
       normalizedEndType as 'full' | 'half',
-      leaveData.leaveType
+      leaveData.leaveType,
+      userRole
     );
 
     // Validation: Prior Notice for Casual Leaves
@@ -462,33 +501,13 @@ export const applyLeave = async (
       }
     }
 
+    // We already fetched userData above, skipping re-fetch
+    /*
     const userResult = await pool.query(
-      `SELECT u.role as employee_role, u.status,
-              COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
-              u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-              u.emp_id as employee_emp_id, 
-              COALESCE(rm.email, sa.sa_email) as manager_email, 
-              COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as manager_name,
-              COALESCE(rm.role, 'super_admin') as manager_role, 
-              rm.reporting_manager_id as hr_id, 
-              hr.email as hr_email,
-              hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name, 
-              hr.role as hr_role
-      FROM users u
-      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
-      LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
-      LEFT JOIN LATERAL (
-        SELECT id as sa_id, email as sa_email, first_name || ' ' || COALESCE(last_name, '') as sa_full_name
-        FROM users 
-        WHERE role = 'super_admin'
-        ORDER BY id ASC
-        LIMIT 1
-      ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
-      WHERE u.id = $1`,
-      [userId]
+      ...
     );
-
     const userData = userResult.rows[0];
+    */
 
     // Check for 'On Notice' status restrictions
     if (userData.status === 'on_notice') {
@@ -750,7 +769,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
                 lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
                 lr.last_updated_by, lr.last_updated_by_role,
                 u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-                u.status AS emp_status,
+                u.status AS emp_status, u.role AS emp_role,
                 last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
          FROM leave_requests lr
          JOIN users u ON u.id = lr.employee_id
@@ -766,7 +785,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
                 lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
                 lr.last_updated_by, lr.last_updated_by_role,
                 u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-                u.status AS emp_status,
+                u.status AS emp_status, u.role AS emp_role,
                 last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
          FROM leave_requests lr
          JOIN users u ON lr.employee_id = u.id
@@ -782,6 +801,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
             lr.last_updated_by, lr.last_updated_by_role,
             u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+            u.status AS emp_status, u.role AS emp_role,
             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
      FROM leave_requests lr
      JOIN users u ON u.id = lr.employee_id
@@ -893,7 +913,7 @@ export const updateLeaveRequest = async (
   logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}, Leave Type: ${leaveData.leaveType}, Start: ${leaveData.startDate}, End: ${leaveData.endDate}`);
   // Verify the request and authorization
   const checkResult = await pool.query(
-    'SELECT current_status, employee_id, leave_type, no_of_days FROM leave_requests WHERE id = $1',
+    'SELECT lr.current_status, lr.employee_id, lr.leave_type, lr.no_of_days, u.role as employee_role FROM leave_requests lr JOIN users u ON lr.employee_id = u.id WHERE lr.id = $1',
     [requestId]
   );
 
@@ -943,14 +963,22 @@ export const updateLeaveRequest = async (
 
   // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
   // EXCEPTION: LOP leaves can start/end on weekends
+  const employeeRole = checkResult.rows[0].employee_role;
   if (leaveData.leaveType !== 'lop') {
     const startDayOfWeek = startDate.getDay();
     const endDayOfWeek = endDate.getDay();
-    if (startDayOfWeek === 0 || startDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as start date. Please select a weekday.');
+
+    const isWeekendCheck = (day: number) => {
+      return day === 0 || (day === 6 && employeeRole !== 'intern');
+    };
+
+    if (isWeekendCheck(startDayOfWeek)) {
+      const dayName = startDayOfWeek === 0 ? 'Sunday' : 'Saturday';
+      throw new Error(`Cannot select ${dayName} as start date. Please select a working day.`);
     }
-    if (endDayOfWeek === 0 || endDayOfWeek === 6) {
-      throw new Error('Cannot select Saturday or Sunday as end date. Please select a weekday.');
+    if (isWeekendCheck(endDayOfWeek)) {
+      const dayName = endDayOfWeek === 0 ? 'Sunday' : 'Saturday';
+      throw new Error(`Cannot select ${dayName} as end date. Please select a working day.`);
     }
   }
 
@@ -1088,7 +1116,8 @@ export const updateLeaveRequest = async (
       endDate,
       normalizedStartType as 'full' | 'half',
       normalizedEndType as 'full' | 'half',
-      leaveData.leaveType
+      leaveData.leaveType,
+      employeeRole
     );
 
     for (const requestedDay of requestedLeaveDays) {
@@ -1144,7 +1173,8 @@ export const updateLeaveRequest = async (
     endDate,
     normalizedStartType as 'full' | 'half',
     normalizedEndType as 'full' | 'half',
-    leaveData.leaveType
+    leaveData.leaveType,
+    employeeRole
   );
 
   // Require timings for permission
@@ -1326,6 +1356,7 @@ export const convertLeaveRequestLopToCasual = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.email as employee_email,
       u.emp_id as employee_emp_id,
+      u.role as employee_role,
       u.reporting_manager_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as converter_name,
       manager.email as manager_email,
@@ -1378,7 +1409,8 @@ export const convertLeaveRequestLopToCasual = async (
     new Date(leave.end_date),
     leave.start_type,
     leave.end_type,
-    'casual'
+    'casual',
+    leave.employee_role
   );
 
   const originalLopDays = parseFloat(leave.no_of_days) || 0;
@@ -1710,7 +1742,7 @@ export const getPendingLeaveRequests = async (
   // Build query based on role
   // Removed DISTINCT as lr.id is primary key and joins are 1:1, improving query execution time
   let query = `
-    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status,
+    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status, u.role as emp_role,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
@@ -1805,6 +1837,7 @@ export const getPendingLeaveRequests = async (
   const requestsWithDays = filteredRows.map((row) => {
     try {
       const days = daysMap.get(row.id) || [];
+      const empRole = row.emp_role; // Add empRole to the mapped object
 
       // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
       const rejectionReason = (row.current_status === 'rejected')
@@ -1829,6 +1862,7 @@ export const getPendingLeaveRequests = async (
         empId: row.emp_id,
         empName: row.emp_name,
         empStatus: row.emp_status,
+        empRole: row.emp_role,
         appliedDate: formatDate(row.applied_date),
         leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
         leaveType: row.leave_type,
@@ -3486,6 +3520,7 @@ export const getApprovedLeaves = async (
         u.emp_id,
         u.first_name || ' ' || COALESCE(u.last_name, '') AS emp_name,
         u.status AS emp_status,
+        u.role AS emp_role,
         lr.applied_date,
         lr.start_date,
         lr.end_date,
@@ -3516,7 +3551,7 @@ export const getApprovedLeaves = async (
      GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role,
-              last_updater.first_name, last_updater.last_name, u.status
+              last_updater.first_name, last_updater.last_name, u.status, u.role
      ORDER BY lr.applied_date DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]

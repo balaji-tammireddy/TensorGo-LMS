@@ -97,12 +97,17 @@ const LeaveApplyPage: React.FC = () => {
     return value.replace(/[^a-zA-Z\s]/g, '');
   };
 
-  // Check if a date is a weekend (Saturday = 6, Sunday = 0)
+  // Check if a date is a weekend (Sunday = 0, Saturday = 6)
+  // For interns, Saturday is a working day, so only Sunday is considered a weekend.
   const isWeekend = (dateStr: string): boolean => {
     if (!dateStr) return false;
     const date = new Date(dateStr + 'T00:00:00');
     const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+    const isSunday = dayOfWeek === 0;
+    const isSaturday = dayOfWeek === 6;
+    const isIntern = user?.role === 'intern';
+
+    return isSunday || (isSaturday && !isIntern);
   };
 
   const formatHalfLabel = (val?: string) => {
@@ -634,14 +639,18 @@ const LeaveApplyPage: React.FC = () => {
 
       daysArr.forEach((d, idx) => {
         const dateStr = format(d, 'yyyy-MM-dd');
-        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const dayOfWeek = d.getDay();
+        const isSunday = dayOfWeek === 0;
+        const isSaturday = dayOfWeek === 6;
+        const isIntern = user?.role === 'intern';
+        const isActuallyWeekend = isSunday || (isSaturday && !isIntern);
         const isHoliday = holidaySet.has(dateStr);
 
         // If NOT LOP, skip weekends and holidays.
         // If LOP, we count everything (weekends and holidays included).
         const isLop = formData.leaveType?.toLowerCase() === 'lop';
         if (!isLop) {
-          if (isWeekend || isHoliday) return;
+          if (isActuallyWeekend || isHoliday) return;
         }
 
         const isFirst = idx === 0;
@@ -697,8 +706,13 @@ const LeaveApplyPage: React.FC = () => {
       // Check each requested day against existing leave requests
       for (const day of requestedDaysArray) {
         const dayStr = format(day, 'yyyy-MM-dd');
-        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-        if (isWeekend) continue; // Skip weekends
+        const dayOfWeek = day.getDay();
+        const isSunday = dayOfWeek === 0;
+        const isSaturday = dayOfWeek === 6;
+        const isIntern = user?.role === 'intern';
+        const isActuallyWeekend = isSunday || (isSaturday && !isIntern);
+
+        if (isActuallyWeekend) continue; // Skip weekends
 
         const isFirst = dayStr === formData.startDate;
         const isLast = dayStr === formData.endDate;
@@ -1117,10 +1131,14 @@ const LeaveApplyPage: React.FC = () => {
 
             currentRequestDays.forEach((day, idx) => {
               const dateStr = format(day, 'yyyy-MM-dd');
-              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+              const dayOfWeek = day.getDay();
+              const isSunday = dayOfWeek === 0;
+              const isSaturday = dayOfWeek === 6;
+              const isIntern = user?.role === 'intern';
+              const isActuallyWeekend = isSunday || (isSaturday && !isIntern);
               const isHoliday = holidaySet.has(dateStr);
 
-              if (isWeekend || isHoliday) return;
+              if (isActuallyWeekend || isHoliday) return;
 
               const monthKey = format(day, 'yyyy-MM');
               const isFirst = idx === 0;
@@ -1158,9 +1176,16 @@ const LeaveApplyPage: React.FC = () => {
                   const rEnd = new Date(req.endDate);
                   const rDays = eachDayOfInterval({ start: rStart, end: rEnd });
                   rDays.forEach(d => {
-                    if (format(d, 'yyyy-MM') === monthKey && d.getDay() !== 0 && d.getDay() !== 6 && !holidaySet.has(format(d, 'yyyy-MM-dd'))) {
-                      const isFirst = format(d, 'yyyy-MM-dd') === req.startDate;
-                      const isLast = format(d, 'yyyy-MM-dd') === req.endDate;
+                    const dayOfWeek = d.getDay();
+                    const isSunday = dayOfWeek === 0;
+                    const isSaturday = dayOfWeek === 6;
+                    const isIntern = user?.role === 'intern';
+                    const isActuallyWeekend = isSunday || (isSaturday && !isIntern);
+                    const dateStr = format(d, 'yyyy-MM-dd');
+
+                    if (format(d, 'yyyy-MM') === monthKey && !isActuallyWeekend && !holidaySet.has(dateStr)) {
+                      const isFirst = dateStr === req.startDate;
+                      const isLast = dateStr === req.endDate;
                       let val = 1;
                       if (isFirst && req.startType !== 'full') val = 0.5;
                       if (isLast && req.endType !== 'full') val = 0.5;
@@ -1810,7 +1835,11 @@ const LeaveApplyPage: React.FC = () => {
                     const blockedHoliday = !isLop && !!holiday;
 
                     if (blockedWeekend) {
-                      showWarning('Cannot select Saturday or Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.');
+                      const isIntern = user?.role === 'intern';
+                      const message = isIntern
+                        ? 'Cannot select Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.'
+                        : 'Cannot select Saturday or Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.';
+                      showWarning(message);
                       return;
                     }
 
@@ -1927,7 +1956,11 @@ const LeaveApplyPage: React.FC = () => {
                         const blockedHoliday = !isLop && !!holiday;
 
                         if (blockedWeekend) {
-                          showWarning('Cannot select Saturday or Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.');
+                          const isIntern = user?.role === 'intern';
+                          const message = isIntern
+                            ? 'Cannot select Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.'
+                            : 'Cannot select Saturday or Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.';
+                          showWarning(message);
                           return;
                         }
 

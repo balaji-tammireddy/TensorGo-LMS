@@ -43,6 +43,7 @@ interface LeaveDetailsModalProps {
     rejectionReason?: string | null;
     approverName?: string | null;
     approverRole?: string | null;
+    empRole?: string;
     leaveDays?: LeaveDay[];
   } | null;
   onClose: () => void;
@@ -324,7 +325,10 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       const dayOfWeek = dayDateObj.getDay(); // 0 = Sunday, 6 = Saturday
 
       // Check if it's a weekend
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isSunday = dayOfWeek === 0;
+      const isSaturday = dayOfWeek === 6;
+      const isIntern = leaveRequest.empRole === 'intern';
+      const isWeekend = isSunday || (isSaturday && !isIntern);
 
       // Check if it's a holiday - normalize holiday date string too
       const isHoliday = holidays.some(h => {

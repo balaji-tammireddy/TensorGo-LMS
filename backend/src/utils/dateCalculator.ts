@@ -15,7 +15,8 @@ export async function calculateLeaveDays(
   endDate: Date,
   startType: 'full' | 'half',
   endType: 'full' | 'half',
-  leaveType: string = 'casual'
+  leaveType: string = 'casual',
+  userRole?: string
 ): Promise<{ days: number; leaveDays: LeaveDay[] }> {
   try {
     const leaveDays: LeaveDay[] = [];
@@ -67,7 +68,12 @@ export async function calculateLeaveDays(
       const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
 
       // Skip weekends (Saturday and Sunday) - UNLESS it's LOP
-      if (leaveType !== 'lop' && (dayOfWeek === 0 || dayOfWeek === 6)) {
+      // For interns, Saturday is a working day, so only Sunday is skipped.
+      const isSunday = dayOfWeek === 0;
+      const isSaturday = dayOfWeek === 6;
+      const isWeekend = isSunday || (isSaturday && userRole !== 'intern');
+
+      if (leaveType !== 'lop' && isWeekend) {
         currentDate.setDate(currentDate.getDate() + 1);
         continue;
       }
