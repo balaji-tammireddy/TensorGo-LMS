@@ -377,7 +377,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 <div className="leave-detail-value">
                   {leaveRequest.empName}
                   {leaveRequest.empStatus === 'on_notice' && (
-                    <span className="status-badge status-on-notice">On Notice</span>
+                    <span className="status-badge status-on-notice compact">On Notice</span>
                   )}
                 </div>
               </div>

@@ -177,12 +177,20 @@ export const getLeaveRules = async () => {
     );
     logger.info(`[LEAVE] [GET LEAVE RULES] Found ${result.rows.length} active leave rules`);
 
-    return result.rows.map(row => ({
-      leaveRequired: row.leave_required_max
-        ? `${Number(row.leave_required_min)} to ${Number(row.leave_required_max)} days`
-        : `More Than ${Number(row.leave_required_min)} days`,
-      priorInformation: row.prior_information_days === 30 ? '1 Month' : row.prior_information_days === 14 ? '2 weeks' : `${Number(row.prior_information_days)} ${row.prior_information_days === 1 ? 'day' : 'days'}`
-    }));
+    return result.rows.map(row => {
+      const min = parseFloat(row.leave_required_min);
+      const max = row.leave_required_max ? parseFloat(row.leave_required_max) : null;
+      const prior = parseFloat(row.prior_information_days);
+      
+      logger.info(`[LEAVE] [GET LEAVE RULES] Formatting rule: min=${row.leave_required_min}->${min}, max=${row.leave_required_max}->${max}`);
+      
+      return {
+        leaveRequired: max !== null
+          ? `${min} - ${max} days`
+          : `More Than ${min} days`,
+        priorInformation: row.prior_information_days === 30 ? '1 Month' : row.prior_information_days === 14 ? '2 weeks' : `${prior} ${prior === 1 ? 'day' : 'days'}`
+      };
+    });
   } catch (error: any) {
     logger.error(`[LEAVE] [GET LEAVE RULES] Error fetching leave rules:`, error);
     throw new Error(`Failed to fetch leave rules: ${error.message || error.toString()}`);

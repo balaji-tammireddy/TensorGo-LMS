@@ -183,7 +183,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           <p className="employee-name">
             Employee: <strong>{employeeName}</strong>
             {employeeStatus === 'on_notice' && (
-              <span className="status-badge status-on-notice">On Notice</span>
+              <span className="status-badge status-on-notice compact">On Notice</span>
             )}
           </p>
           {balancesLoading ? (

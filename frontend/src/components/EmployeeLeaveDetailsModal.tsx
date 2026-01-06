@@ -101,7 +101,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
           <h2>
             Leave Request Details
             {leaveRequest.empStatus === 'on_notice' && (
-              <span className="status-badge status-on-notice">On Notice</span>
+              <span className="status-badge status-on-notice compact">On Notice</span>
             )}
           </h2>
           <button className="leave-details-modal-close" onClick={onClose}>
