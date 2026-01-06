@@ -2,6 +2,8 @@ import { pool } from '../database/db';
 import { hashPassword } from './auth.service';
 import { logger } from '../utils/logger';
 import { formatDateLocal } from '../utils/dateCalculator';
+import * as emailTemplates from '../utils/emailTemplates';
+import { calculateAllLeaveCredits } from '../utils/leaveCredit';
 
 export const getEmployees = async (
   page: number = 1,
@@ -376,11 +378,10 @@ export const createEmployee = async (employeeData: any) => {
   // Send welcome email with credentials
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
-    const { sendNewEmployeeCredentialsEmail } = await import('../utils/emailTemplates');
     const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const temporaryPassword = employeeData.password || 'tensorgo@2023';
 
-    await sendNewEmployeeCredentialsEmail(employeeData.email, {
+    await emailTemplates.sendNewEmployeeCredentialsEmail(employeeData.email, {
       employeeName: `${employeeData.firstName} ${employeeData.middleName || ''} ${employeeData.lastName || ''}`.trim(),
       employeeEmpId: empId,
       email: employeeData.email,
@@ -430,6 +431,24 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     // If already super_admin and trying to set reporting manager, clear it
     employeeData.reportingManagerId = null;
     employeeData.reportingManagerName = null;
+  }
+
+  // Prevent role change if there are subordinates reporting to this user
+  const dbRole = String(employeeCheck.rows[0].role || '').trim().toLowerCase();
+  const requestedRole = employeeData.role ? String(employeeData.role).trim().toLowerCase() : null;
+  const isRoleTransition = requestedRole !== null && requestedRole !== dbRole;
+
+  if (isRoleTransition) {
+    // Check for subordinates
+    const subordinatesResult = await pool.query(
+      'SELECT id, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE reporting_manager_id = $1 LIMIT 5',
+      [employeeId]
+    );
+
+    if (subordinatesResult.rows.length > 0) {
+      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Role change BLOCKED for user ${employeeId} due to existing subordinates.`);
+      throw new Error('Notification: Please first remove the users reporting to that user');
+    }
   }
 
   // Validate reporting manager status if it's being updated
@@ -685,7 +704,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const newJoiningDate = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
 
   if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin') {
-    const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
 
     // Update leave balances with recalculated credits
@@ -772,10 +790,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       ]);
 
       if (employeeResult.rows.length > 0 && employeeResult.rows[0].email) {
-        const { sendEmployeeDetailsUpdateEmail } = await import('../utils/emailTemplates');
         const requesterName = requesterResult.rows.length > 0 ? requesterResult.rows[0].name : (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
-        await sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
+        await emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
           employeeEmpId: employeeResult.rows[0].emp_id || '',
           updatedFields: employeeData,
@@ -969,7 +986,6 @@ export const addLeavesToEmployee = async (
 
     // Send email notification to employee
     try {
-      const { sendLeaveAllocationEmail } = await import('../utils/emailTemplates');
       const employeeResult = await pool.query(
         `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name, u.emp_id,
                 approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
@@ -986,7 +1002,7 @@ export const addLeavesToEmployee = async (
           : 0;
         const newBalance = previousBalance + count;
 
-        await sendLeaveAllocationEmail(employee.email, {
+        await emailTemplates.sendLeaveAllocationEmail(employee.email, {
           employeeName: employee.employee_name || 'Employee',
           employeeEmpId: employee.emp_id || '',
           leaveType: leaveType,

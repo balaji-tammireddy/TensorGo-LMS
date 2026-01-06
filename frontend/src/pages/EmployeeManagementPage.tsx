@@ -674,38 +674,38 @@ const EmployeeManagementPage: React.FC = () => {
 
       const today = format(new Date(), 'yyyy-MM-dd');
 
+      const employeeDetail = data.employee || data;
+
       setNewEmployee({
         ...emptyEmployeeForm,
-        empId: data.emp_id || '',
-        role: data.role || '',
-        email: data.email || '',
-        firstName: data.first_name || '',
-        middleName: data.middle_name || '',
-        lastName: data.last_name || '',
-        contactNumber: data.contact_number || data.contactNumber || data.personalInfo?.contactNumber || data.personalInfo?.contact_number || '',
-        altContact: data.alt_contact || data.altContact || data.personalInfo?.altContact || data.personalInfo?.alt_contact || data.alternate_contact || data.alternateContactNumber || '',
-        dateOfBirth: data.date_of_birth ? (typeof data.date_of_birth === 'string' ? data.date_of_birth.split('T')[0] : data.date_of_birth.toISOString().split('T')[0]) : (data.dateOfBirth ? (typeof data.dateOfBirth === 'string' ? data.dateOfBirth.split('T')[0] : data.dateOfBirth.toISOString().split('T')[0]) : (data.personalInfo?.dateOfBirth ? (typeof data.personalInfo.dateOfBirth === 'string' ? data.personalInfo.dateOfBirth.split('T')[0] : data.personalInfo.dateOfBirth.toISOString().split('T')[0]) : '')),
-        gender: data.gender || data.personalInfo?.gender || '',
-        bloodGroup: data.blood_group || data.personalInfo?.bloodGroup || '',
-        maritalStatus: data.marital_status || data.personalInfo?.maritalStatus || '',
-        emergencyContactName: data.emergency_contact_name || data.emergencyContactName || data.personalInfo?.emergencyContactName || '',
-        emergencyContactNo: data.emergency_contact_no || data.emergencyContactNo || data.personalInfo?.emergencyContactNo || data.emergency_contact_number || data.emergencyContactNumber || '',
-        emergencyContactRelation: data.emergency_contact_relation || data.emergencyContactRelation || data.personalInfo?.emergencyContactRelation || '',
-        designation: data.designation || '',
-        department: data.department || '',
-        dateOfJoining: data.date_of_joining
-          ? data.date_of_joining.split('T')[0]
+        empId: employeeDetail.emp_id || '',
+        role: employeeDetail.role || '',
+        email: employeeDetail.email || '',
+        firstName: employeeDetail.first_name || '',
+        middleName: employeeDetail.middle_name || '',
+        lastName: employeeDetail.last_name || '',
+        contactNumber: employeeDetail.contact_number || employeeDetail.contactNumber || '',
+        altContact: employeeDetail.alt_contact || employeeDetail.altContact || '',
+        dateOfBirth: employeeDetail.date_of_birth ? (typeof employeeDetail.date_of_birth === 'string' ? employeeDetail.date_of_birth.split('T')[0] : employeeDetail.date_of_birth.toISOString().split('T')[0]) : '',
+        gender: employeeDetail.gender || '',
+        bloodGroup: employeeDetail.blood_group || '',
+        maritalStatus: employeeDetail.marital_status || '',
+        emergencyContactName: employeeDetail.emergency_contact_name || '',
+        emergencyContactNo: employeeDetail.emergency_contact_no || '',
+        emergencyContactRelation: employeeDetail.emergency_contact_relation || '',
+        designation: employeeDetail.designation || '',
+        department: employeeDetail.department || '',
+        dateOfJoining: employeeDetail.date_of_joining
+          ? employeeDetail.date_of_joining.split('T')[0]
           : today,
-        aadharNumber: data.aadhar_number || '',
-        panNumber: data.pan_number || '',
+        aadharNumber: employeeDetail.aadhar_number || '',
+        panNumber: employeeDetail.pan_number || '',
         currentAddress: same ? permanentAddress : currentAddress,
         permanentAddress,
-        status: data.status || 'active',
+        status: employeeDetail.status || 'active',
         education,
-        // Prefer explicitly stored reporting_manager_name; fall back to joined full name
-        // Super admin should not have a reporting manager
-        reportingManagerName: data.reporting_manager_name || data.reporting_manager_full_name || '',
-        reportingManagerId: data.reporting_manager_id || null
+        reportingManagerName: employeeDetail.reporting_manager_full_name || employeeDetail.reporting_manager_name || '',
+        reportingManagerId: employeeDetail.reporting_manager_id || null
       });
 
       setIsSameAddress(same);
