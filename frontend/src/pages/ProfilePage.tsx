@@ -1277,7 +1277,7 @@ const ProfilePage: React.FC = () => {
           </div>
 
           <div className="profile-section">
-            <h2>Qualification</h2>
+            <h2>Education Information</h2>
             <table className="education-table">
               <thead>
                 <tr>

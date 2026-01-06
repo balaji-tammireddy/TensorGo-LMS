@@ -1791,7 +1791,7 @@ const EmployeeManagementPage: React.FC = () => {
                     </div>
 
                     <div className="employee-modal-section">
-                      <h3>Qualification</h3>
+                      <h3>Education Information</h3>
                       <table className="education-table">
                         <thead>
                           <tr>

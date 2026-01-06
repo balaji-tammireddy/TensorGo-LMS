@@ -55,13 +55,9 @@ export function calculateInitialLeaveCredits(joinDate: string | Date): { casual:
   const date = typeof joinDate === 'string' ? new Date(joinDate) : joinDate;
   const dayOfMonth = date.getDate();
 
-  if (dayOfMonth <= 15) {
-    // Joined on or before 15th: 1 casual + 0.5 sick
-    return { casual: 1, sick: 0.5 };
-  } else {
-    // Joined after 15th: 0.5 sick only
-    return { casual: 0, sick: 0.5 };
-  }
+  // As per requirement, disable auto-add on joining. 
+  // All employees start with 0 casual and 0 sick leaves.
+  return { casual: 0, sick: 0 };
 }
 
 /**

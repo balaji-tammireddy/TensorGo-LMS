@@ -404,7 +404,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their role
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_joining FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -699,7 +699,10 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   // If joining date was updated, recalculate leave balances
-  if (employeeData.dateOfJoining && requesterRole === 'super_admin') {
+  const oldJoiningDate = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
+  const newJoiningDate = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
+
+  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin') {
     const { calculateAllLeaveCredits } = await import('../utils/leaveCredit');
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
 

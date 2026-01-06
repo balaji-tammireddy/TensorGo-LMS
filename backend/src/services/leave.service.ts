@@ -566,35 +566,71 @@ export const applyLeave = async (
     }
 
     // Fire and forget email
+    // Fire and forget email - STRICT HIERARCHY
     (async () => {
       try {
-        if (userData.manager_email && userData.reporting_manager_id) {
-          const emailData = {
-            employeeName: userData.employee_name,
-            employeeEmpId: userData.employee_emp_id,
-            managerName: userData.manager_name || 'Manager',
-            leaveType: leaveData.leaveType,
-            startDate: checkStartDateStr,
-            startType: leaveData.startType,
-            endDate: checkEndDateStr,
-            endType: leaveData.endType,
-            noOfDays: days,
-            reason: leaveData.reason,
-            timeForPermissionStart: leaveData.timeForPermission?.start || null,
-            timeForPermissionEnd: leaveData.timeForPermission?.end || null,
-            doctorNote: leaveData.doctorNote || null,
-            appliedDate: new Date().toISOString().split('T')[0]
-          };
+        // Fetch valid hierarchy chain (L1, L2, L3)
+        // This works for all roles because:
+        // - Employee: L1=Manager, L2=HR, L3=SA
+        // - Manager:  L1=HR,      L2=SA, L3=null
+        // - HR:       L1=SA,      L2=null
+        const hierarchyResult = await pool.query(`
+          SELECT 
+            l1.email as l1_email, l1.first_name as l1_name,
+            l2.email as l2_email, l2.first_name as l2_name,
+            l3.email as l3_email, l3.first_name as l3_name
+          FROM users u
+          LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
+          LEFT JOIN users l2 ON l1.reporting_manager_id = l2.id
+          LEFT JOIN users l3 ON l2.reporting_manager_id = l3.id
+          WHERE u.id = $1
+        `, [userId]);
 
-          const isUrgent = startDate.getTime() === today.getTime();
-          const ccEmails = userData.hr_email && userData.manager_email !== userData.hr_email ? [userData.hr_email] : [];
+        const chain = hierarchyResult.rows[0];
+        const isUrgent = startDate.getTime() === today.getTime();
+        const appliedDate = new Date().toISOString().split('T')[0];
 
+        const baseEmailData = {
+          employeeName: userData.employee_name,
+          employeeEmpId: userData.employee_emp_id,
+          leaveType: leaveData.leaveType,
+          startDate: checkStartDateStr,
+          startType: leaveData.startType,
+          endDate: checkEndDateStr,
+          endType: leaveData.endType,
+          noOfDays: days,
+          reason: leaveData.reason,
+          timeForPermissionStart: leaveData.timeForPermission?.start || null,
+          timeForPermissionEnd: leaveData.timeForPermission?.end || null,
+          doctorNote: leaveData.doctorNote || null,
+          appliedDate
+        };
+
+        // Determine recipients
+        const toEmail = chain.l1_email;
+        const toName = chain.l1_name || 'Reporting Manager';
+
+        // CC list: Upstream managers (L2, L3)
+        const ccSet = new Set<string>();
+        if (chain.l2_email) ccSet.add(chain.l2_email);
+        if (chain.l3_email) ccSet.add(chain.l3_email);
+
+        // Remove 'To' email from CC if somehow duplicated (unlikely with this query but safe)
+        if (toEmail) ccSet.delete(toEmail);
+
+        const ccEmails = Array.from(ccSet);
+
+        if (toEmail) {
+          const emailData = { ...baseEmailData, managerName: toName };
           if (isUrgent) {
-            await sendUrgentLeaveApplicationEmail(userData.manager_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+            await sendUrgentLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
           } else {
-            await sendLeaveApplicationEmail(userData.manager_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+            await sendLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
           }
+        } else {
+          logger.warn(`No reporting manager (L1) found for user ${userId}. Email not sent.`);
         }
+
       } catch (e) {
         logger.error('Async email error in applyLeave:', e);
       }
@@ -767,47 +803,38 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     throw new Error('Invalid leave request ID');
   }
 
-  // HR and Super Admin can view any leave
-  // Managers can view leaves of their direct reports
-  // Others can only view their own
-  const canViewAny = userRole === 'super_admin' || userRole === 'hr';
+  // STRICT HIERARCHY CHECK (L1/L2/L3)
+  let query = '';
+  let params: any[] = [];
 
-  let query: string;
-  let params: any[];
-
-  if (canViewAny) {
-    query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
-                lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
-                lr.no_of_days, lr.applied_date,
-                lr.current_status, lr.employee_id, lr.doctor_note,
-                lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-                lr.last_updated_by, lr.last_updated_by_role,
-                u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-                u.status AS emp_status, u.role AS emp_role,
-                last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
-         FROM leave_requests lr
-         JOIN users u ON u.id = lr.employee_id
-         LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
-         WHERE lr.id = $1`;
-    params = [requestId];
-  } else if (userRole === 'manager') {
-    // Managers can view leaves of their direct reports
-    query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
-                lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
-                lr.no_of_days, lr.applied_date,
-                lr.current_status, lr.employee_id, lr.doctor_note,
-                lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-                lr.last_updated_by, lr.last_updated_by_role,
-                u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-                u.status AS emp_status, u.role AS emp_role,
-                last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
-         FROM leave_requests lr
-         JOIN users u ON lr.employee_id = u.id
-         LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
-         WHERE lr.id = $1 AND (lr.employee_id = $2 OR u.reporting_manager_id = $2)`;
+  if (userRole === 'super_admin' || userRole === 'hr' || userRole === 'manager') {
+    query = `
+      SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
+             lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
+             lr.no_of_days, lr.applied_date,
+             lr.current_status, lr.employee_id, lr.doctor_note,
+             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
+             lr.last_updated_by, lr.last_updated_by_role,
+             u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
+             u.status AS emp_status, u.role AS emp_role,
+             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+      FROM leave_requests lr
+      JOIN users u ON u.id = lr.employee_id
+      LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
+      LEFT JOIN users l2 ON l1.reporting_manager_id = l2.id
+      LEFT JOIN users l3 ON l2.reporting_manager_id = l3.id
+      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+      WHERE lr.id = $1 
+      AND lr.employee_id != $2
+      AND (
+           u.reporting_manager_id = $2    -- I am Direct Manager (L1)
+        OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2/HR)
+        OR l2.reporting_manager_id = $2   -- I am HR's Manager (L3/Super Admin)
+      )
+    `;
     params = [requestId, userId];
   } else {
-    // Others can only view their own leaves
+    // Regular employees can only view their own
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
             lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
             lr.no_of_days, lr.applied_date,
@@ -832,7 +859,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     throw new Error('Leave request not found or you do not have permission to access it');
   }
 
-  const row = result.rows[0];
+  const row: any = result.rows[0];
 
   // Note: We allow viewing all requests regardless of status
   // The edit/delete restrictions are handled in the update/delete functions
@@ -939,6 +966,7 @@ export const updateLeaveRequest = async (
   const currentStatus = checkResult.rows[0].current_status;
   const oldLeaveType = checkResult.rows[0].leave_type;
   const oldDays = parseFloat(checkResult.rows[0].no_of_days);
+  const employeeRole = checkResult.rows[0].employee_role;
 
   // HR and Super Admin can edit any leave (approved, rejected, etc.)
   // Regular users can only edit pending leaves
@@ -948,8 +976,46 @@ export const updateLeaveRequest = async (
     throw new Error('Only pending leave requests can be edited');
   }
 
-  // Authorization: Super Admin and HR can edit any leave, others can only edit their own
+  // STRICT HIERARCHY VALIDATION for Edit
   if (userRole !== 'super_admin' && userRole !== 'hr' && !belongsToUser) {
+    // Only SA, HR, and Employee (own) can edit usually. 
+    // But strictly, anyone in the chain should be able to edit pending leaves if they have permissions.
+    // However, legacy logic suggests mostly employee/admin. 
+    // Let's stick to the plan: "Apply the same L1/L2/L3 visibility check to restrict viewing/editing".
+
+    // Actually, for UPDATE, usually only the employee updates their request or an admin/manager fixes it.
+    // If userRole is manager/hr/super_admin, we check if they are in the chain.
+  }
+
+  // Permissions Check
+  if (userRole === 'super_admin') {
+    // SA can edit ANY request (except own, but canEdit check handles pending)
+  } else if (userRole === 'hr' && !belongsToUser) {
+    // HR: L1/L2 + Role Filter
+    const permissionCheck = await pool.query(
+      `SELECT 1 
+       FROM users u
+       LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
+       WHERE u.id = $1 
+       AND (
+         u.reporting_manager_id = $2    -- I am Direct Manager (L1)
+         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2)
+       ) 
+       AND LOWER(u.role) IN ('intern', 'employee', 'manager')`,
+      [checkResult.rows[0].employee_id, userId]
+    );
+    if (permissionCheck.rows.length === 0) {
+      throw new Error('You do not have permission to edit this leave request');
+    }
+  } else if (userRole === 'manager' && !belongsToUser) {
+    const permissionCheck = await pool.query(
+      `SELECT 1 FROM users WHERE id = $1 AND reporting_manager_id = $2`,
+      [checkResult.rows[0].employee_id, userId]
+    );
+    if (permissionCheck.rows.length === 0) {
+      throw new Error('You do not have permission to edit this leave request');
+    }
+  } else if (!belongsToUser) {
     throw new Error('You do not have permission to edit this leave request');
   }
 
@@ -977,7 +1043,6 @@ export const updateLeaveRequest = async (
 
   // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
   // EXCEPTION: LOP leaves can start/end on weekends
-  const employeeRole = checkResult.rows[0].employee_role;
   if (leaveData.leaveType !== 'lop') {
     const startDayOfWeek = startDate.getDay();
     const endDayOfWeek = endDate.getDay();
@@ -1753,6 +1818,10 @@ export const getPendingLeaveRequests = async (
 
   const offset = (page - 1) * limit;
 
+  // Normalize role to lowercase for consistent checking
+  const normalizedRole = approverRole?.toLowerCase().trim();
+  logger.info(`[LEAVE] [GET PENDING] Normalized Role: '${normalizedRole}' (Original: '${approverRole}')`);
+
   // Build query based on role
   // Removed DISTINCT as lr.id is primary key and joins are 1:1, improving query execution time
   let query = `
@@ -1770,21 +1839,31 @@ export const getPendingLeaveRequests = async (
     LEFT JOIN users manager ON manager.id = lr.manager_approved_by
     LEFT JOIN users hr ON hr.id = lr.hr_approved_by
     LEFT JOIN users super_admin ON super_admin.id = lr.super_admin_approved_by
+    LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
     WHERE 1=1
   `;
 
   const params: any[] = [];
 
-  // Role-based filtering
-  if (approverRole === 'manager') {
-    // CRITICAL: Managers can ONLY see leave requests from employees where they are the reporting manager
-    query += ' AND u.reporting_manager_id = $1';
+  // SUPER ADMIN: Global Visibility (All leaves except own)
+  if (normalizedRole === 'super_admin') {
+    query += ` AND lr.employee_id != $1`;
     params.push(approverId);
-  } else if (approverRole === 'hr' || approverRole === 'super_admin') {
-    // HR and Super Admin can see ALL employee leave requests EXCEPT their own (no self-approval)
-    query += ' AND lr.employee_id != $1';
+  }
+  // HR: Strict Hierarchy (L1/L2) + Role Exclusion (No HRs/SAs)
+  else if (normalizedRole === 'hr') {
+    query += ` AND lr.employee_id != $1 AND (
+       u.reporting_manager_id = $1    -- I am Direct Manager (L1)
+       OR l1.reporting_manager_id = $1   -- I am Manager's Manager (L2)
+     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
+    params.push(approverId);
+  }
+  // MANAGER: Strict Hierarchy (L1 only)
+  else if (normalizedRole === 'manager') {
+    query += ` AND u.reporting_manager_id = $1 AND lr.employee_id != $1`;
     params.push(approverId);
   } else {
+    // Should not happen for approvers, but safety net
     return { requests: [], pagination: { page, limit, total: 0 } };
   }
 
@@ -1815,11 +1894,18 @@ export const getPendingLeaveRequests = async (
 
   const result = await pool.query(query, params);
 
+  // Log the effective query for debugging (safely)
+  logger.info(`[LEAVE] [GET PENDING] Query executed for ${normalizedRole}. Params count: ${params.length}. Rows found: ${result.rows.length}`);
+  if (result.rows.length > 0) {
+    // Log first row names to check visibility
+    logger.info(`[LEAVE] [GET PENDING] First row visible: ${result.rows[0].emp_name} (${result.rows[0].emp_role})`);
+  }
+
   // Additional safeguard: Filter out any requests that don't belong to manager's direct reports
   // Also filter out approver's own requests to prevent self-approval
   // This ensures data integrity even if query construction has issues
   // Use Number() to handle type coercion (PostgreSQL may return strings)
-  const filteredRows = approverRole === 'manager'
+  const filteredRows = normalizedRole === 'manager'
     ? result.rows.filter(row => Number(row.reporting_manager_id) === Number(approverId))
     : result.rows.filter(row => {
       // For HR and Super Admin, exclude their own requests (no self-approval)
@@ -1909,6 +1995,7 @@ export const getPendingLeaveRequests = async (
     SELECT COUNT(DISTINCT lr.id)
     FROM leave_requests lr
     JOIN users u ON lr.employee_id = u.id
+    LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
     WHERE 1=1
       AND (
         lr.current_status IN ('pending','partially_approved')
@@ -1921,13 +2008,22 @@ export const getPendingLeaveRequests = async (
   `;
   const countParams: any[] = [];
 
-  if (approverRole === 'manager') {
-    // CRITICAL: Managers can ONLY see leave requests from employees where they are the reporting manager
-    countQuery += ' AND u.reporting_manager_id = $1';
+  // SUPER ADMIN: Global Visibility
+  if (normalizedRole === 'super_admin') {
+    countQuery += ` AND lr.employee_id != $1`;
     countParams.push(approverId);
-  } else if (approverRole === 'hr' || approverRole === 'super_admin') {
-    // HR and Super Admin can see ALL employee leave requests EXCEPT their own (no self-approval)
-    countQuery += ' AND lr.employee_id != $1';
+  }
+  // HR: Strict Hierarchy + Role Exclusion
+  else if (normalizedRole === 'hr') {
+    countQuery += ` AND lr.employee_id != $1 AND (
+       u.reporting_manager_id = $1    -- I am Direct Manager (L1)
+       OR l1.reporting_manager_id = $1   -- I am Manager's Manager (L2)
+     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
+    countParams.push(approverId);
+  }
+  // MANAGER: Direct Reports
+  else if (normalizedRole === 'manager') {
+    countQuery += ` AND u.reporting_manager_id = $1 AND lr.employee_id != $1`;
     countParams.push(approverId);
   }
 
@@ -1996,28 +2092,43 @@ export const approveLeave = async (
     throw new Error('Leave request is already approved');
   }
 
-  // Check authorization
+  // Check authorization - STRICT HIERARCHY
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
 
-  if (approverRole === 'manager') {
-    // Managers can approve only their direct reports
+  // Prevent self-approval
+  if (employeeId === approverIdNum) {
+    throw new Error('Cannot approve your own leave request');
+  }
+
+  // Check authorization
+  // Super Admin: Global
+  if (approverRole === 'super_admin') {
+    // Allowed
+  }
+  // HR: Strict L1/L2 + Role Filter
+  else if (approverRole === 'hr') {
+    const permissionCheck = await pool.query(
+      `SELECT 1 
+       FROM users u
+       LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
+       WHERE u.id = $1 
+       AND (
+         u.reporting_manager_id = $2    -- I am Direct Manager (L1)
+         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2)
+       ) 
+       AND LOWER(u.role) IN ('intern', 'employee', 'manager')`,
+      [leave.employee_id, approverId]
+    );
+    if (permissionCheck.rows.length === 0) {
+      throw new Error('Not authorized to approve this leave');
+    }
+  }
+  // Manager: L1
+  else if (approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
-    }
-  } else if (approverRole === 'hr') {
-    // HR can approve employee and manager leaves, but NOT their own (no self-approval)
-    if (employeeId === approverIdNum) {
-      throw new Error('Cannot approve your own leave request');
-    }
-    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager' && leave.employee_role !== 'intern') {
-      throw new Error('Not authorized to approve this leave');
-    }
-  } else if (approverRole === 'super_admin') {
-    // Super Admin can approve all leaves, but NOT their own (no self-approval)
-    if (employeeId === approverIdNum) {
-      throw new Error('Cannot approve your own leave request');
     }
   } else {
     throw new Error('Not authorized to approve leaves');
@@ -2238,32 +2349,43 @@ export const rejectLeave = async (
     [leaveRequestId]
   );
 
-  // Check authorization (same as approve)
+  // Check authorization (same as approve) - STRICT HIERARCHY
   // CRITICAL: Prevent self-rejection for HR and super_admin
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
   const employeeId = Number(leave.employee_id);
   const approverIdNum = Number(approverId);
 
-  if (approverRole === 'manager') {
+  if (employeeId === approverIdNum) {
+    throw new Error('Cannot reject your own leave request');
+  }
+
+  // Check authorization
+  // Super Admin: Global
+  if (approverRole === 'super_admin') {
+    // Allowed
+  }
+  // HR: Strict L1/L2 + Role Filter
+  else if (approverRole === 'hr') {
+    const permissionCheck = await pool.query(
+      `SELECT 1 
+       FROM users u
+       LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
+       WHERE u.id = $1 
+       AND (
+         u.reporting_manager_id = $2    -- I am Direct Manager (L1)
+         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2)
+       ) 
+       AND LOWER(u.role) IN ('intern', 'employee', 'manager')`,
+      [leave.employee_id, approverId]
+    );
+    if (permissionCheck.rows.length === 0) {
+      throw new Error('Not authorized to reject this leave');
+    }
+  }
+  // Manager: L1
+  else if (approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to reject this leave');
-    }
-  } else if (approverRole === 'hr') {
-    // HR cannot reject their own leave requests
-    if (employeeId === approverIdNum) {
-      throw new Error('Cannot reject your own leave request');
-    }
-    const managerResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [leave.reporting_manager_id]
-    );
-    if (managerResult.rows[0]?.role !== 'hr' && leave.employee_role !== 'manager') {
-      throw new Error('Not authorized to reject this leave');
-    }
-  } else if (approverRole === 'super_admin') {
-    // Super Admin cannot reject their own leave requests
-    if (employeeId === approverIdNum) {
-      throw new Error('Cannot reject your own leave request');
     }
   } else {
     throw new Error('Not authorized to reject leaves');
