@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { format } from 'date-fns';
 import * as leaveService from '../services/leaveService';
@@ -38,6 +38,20 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
   leaveRequest,
   onClose
 }) => {
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen || !leaveRequest) return null;
 
   const getLeaveTypeLabel = (type: string) => {

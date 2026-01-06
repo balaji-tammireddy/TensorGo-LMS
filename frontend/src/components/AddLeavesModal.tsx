@@ -63,6 +63,20 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     }
   }, [isOpen, employeeId, employeeStatus, leaveType]);
 
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
