@@ -101,17 +101,7 @@
   opacity: 0.8;
 }
 
-.status-on-notice {
-  background-color: #ff9800;
-  color: white;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 12px;
-  margin-left: 8px;
-  display: inline-block;
-  font-weight: 600;
-  vertical-align: middle;
-}
+
 
 
 
@@ -172,29 +162,34 @@
 }
 
 .status-pending {
-  background-color: #ffab00;
+  background: linear-gradient(135deg, #ffab00 0%, #ffc400 100%);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 171, 0, 0.2);
 }
 
 .status-applied {
-  background-color: #3c6ff2;
+  background: linear-gradient(135deg, #3c6ff2 0%, #5a87f5 100%);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(60, 111, 242, 0.2);
 }
 
 .status-approved {
-  background-color: #00c853;
+  background: linear-gradient(135deg, #00c853 0%, #00e676 100%);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.2);
 }
 
 .status-rejected {
-  background-color: #ff5252;
+  background: linear-gradient(135deg, #ff5252 0%, #ff8080 100%);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.2);
 }
 
 .status-partial {
-  background: linear-gradient(90deg, #ff8c00 0%, #ffab00 100%);
+  background: linear-gradient(135deg, #ff8c00 0%, #ffab00 100%);
   color: #fff;
   border: none;
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.2);
 }
 
 .edit-btn {
@@ -503,6 +498,7 @@
 .sortable-header:hover .sort-icon:not(.active) {
   color: #718096;
 }
+
 /* Recent Search Box Styles */
 .recent-search-box {
   position: relative;

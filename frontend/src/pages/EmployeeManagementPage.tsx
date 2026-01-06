@@ -741,14 +741,14 @@ const EmployeeManagementPage: React.FC = () => {
 
 
 
-  const getStatusColor = (status: string) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
-      case 'active': return '#4caf50';
-      case 'on_notice': return '#ff9800'; // Orange for On Notice
-      case 'on_leave': return '#2196f3';
-      case 'resigned': return '#f44336';
-      case 'terminated': return '#f44336'; // Red for Inactive/Terminated
-      default: return '#f44336'; // Red for any other Inactive status
+      case 'active': return 'status-active';
+      case 'on_notice': return 'status-on-notice';
+      case 'on_leave': return 'status-on-leave';
+      case 'resigned': return 'status-resigned';
+      case 'terminated': return 'status-terminated';
+      default: return 'status-inactive';
     }
   };
 
@@ -965,13 +965,7 @@ const EmployeeManagementPage: React.FC = () => {
                       <td>{employee.position}</td>
                       <td>{format(new Date(employee.joiningDate), 'dd/MM/yyyy')}</td>
                       <td>
-                        <span
-                          className="status-badge"
-                          style={{
-                            backgroundColor: getStatusColor(employee.status),
-                            color: '#ffffff'
-                          }}
-                        >
+                        <span className={`status-badge ${getStatusClass(employee.status)}`}>
                           {employee.status === 'active' ? 'Active' :
                             employee.status === 'on_notice' ? 'On Notice' :
                               'Inactive'}

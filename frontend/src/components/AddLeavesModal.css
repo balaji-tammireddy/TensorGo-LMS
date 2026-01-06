@@ -202,14 +202,3 @@
   box-shadow: none;
 }
 
-.status-on-notice {
-  background-color: #ff9800;
-  color: white;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 12px;
-  margin-left: 10px;
-  display: inline-block;
-  font-weight: 600;
-  vertical-align: middle;
-}

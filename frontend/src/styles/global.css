@@ -148,30 +148,60 @@ tr:hover {
 }
 
 .status-pending {
-  background: #ffab00;
+  background: linear-gradient(135deg, #ffab00 0%, #ffc400 100%);
   border: none;
+  box-shadow: 0 4px 12px rgba(255, 171, 0, 0.2);
 }
 
 .status-applied {
-  background: #3c6ff2;
+  background: linear-gradient(135deg, #3c6ff2 0%, #5a87f5 100%);
   border: none;
+  box-shadow: 0 4px 12px rgba(60, 111, 242, 0.2);
 }
 
 .status-approved {
-  background: #00c853;
+  background: linear-gradient(135deg, #00c853 0%, #00e676 100%);
   border: none;
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.2);
 }
 
 .status-rejected {
-  background: #ff5252;
+  background: linear-gradient(135deg, #ff5252 0%, #ff8080 100%);
   border: none;
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.2);
 }
 
 .status-partial,
 .status-partially-approved {
-  background: linear-gradient(90deg, #ff8c00 0%, #ffab00 100%);
+  background: linear-gradient(135deg, #ff8c00 0%, #ffab00 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.2);
+}
+
+.status-active {
+  background: linear-gradient(135deg, #4caf50 0%, #81c784 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+}
+
+.status-on-notice {
+  background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
   border: none;
   box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+}
+
+.status-on-leave {
+  background: linear-gradient(135deg, #2196f3 0%, #64b5f6 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+}
+
+.status-inactive,
+.status-resigned,
+.status-terminated {
+  background: linear-gradient(135deg, #f44336 0%, #ff8080 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.2);
 }
 
 .status-badge:hover {
