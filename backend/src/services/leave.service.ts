@@ -102,11 +102,17 @@ export const createHoliday = async (holidayDate: string, holidayName: string) =>
   logger.info(`[LEAVE] [CREATE HOLIDAY] ========== FUNCTION CALLED ==========`);
 
   try {
+    const trimmedName = holidayName.trim();
+    // Validate holiday name: only letters and spaces allowed
+    if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
+      throw new Error('Holiday name cannot contain numbers or special characters');
+    }
+
     const result = await pool.query(
       `INSERT INTO holidays (holiday_date, holiday_name, is_active)
        VALUES ($1, $2, true)
        RETURNING id, holiday_date, holiday_name, is_active, created_at`,
-      [holidayDate, holidayName.trim()]
+      [holidayDate, trimmedName]
     );
 
     logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${result.rows[0].id}`);

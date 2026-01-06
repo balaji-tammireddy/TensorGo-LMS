@@ -1277,7 +1277,7 @@ const ProfilePage: React.FC = () => {
           </div>
 
           <div className="profile-section">
-            <h2>Education Information</h2>
+            <h2>Qualification</h2>
             <table className="education-table">
               <thead>
                 <tr>
@@ -1396,17 +1396,19 @@ const ProfilePage: React.FC = () => {
             </table>
           </div>
 
-          <div className="profile-section">
-            <h2>Reporting Hierarchy</h2>
-            <div className="form-group">
-              <label>Reporting Manager</label>
-              <input
-                type="text"
-                value={profile?.reportingManager?.name || ''}
-                disabled
-              />
+          {user?.role !== 'super_admin' && (
+            <div className="profile-section">
+              <h2>Reporting Hierarchy</h2>
+              <div className="form-group">
+                <label>Reporting Manager</label>
+                <input
+                  type="text"
+                  value={profile?.reportingManager?.name || ''}
+                  disabled
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </AppLayout>
       <ConfirmationDialog

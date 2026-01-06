@@ -724,7 +724,7 @@ const LeaveApprovalPage: React.FC = () => {
               <table className="requests-table">
                 <thead>
                   <tr>
-                    <th>S NO</th>
+                    <th>S No</th>
                     <th>EMP ID</th>
                     <th>EMP NAME</th>
                     <th className="sortable-header" onClick={() => handlePendingSort('appliedDate')}>
@@ -865,7 +865,7 @@ const LeaveApprovalPage: React.FC = () => {
               <table className="requests-table">
                 <thead>
                   <tr>
-                    <th>S NO</th>
+                    <th>S No</th>
                     <th>EMP ID</th>
                     <th>EMP NAME</th>
                     <th className="sortable-header" onClick={() => handleRecentSort('appliedDate')}>

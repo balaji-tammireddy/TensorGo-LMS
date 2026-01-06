@@ -299,18 +299,27 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   };
 
   const getStatusLabel = () => {
-    if (approvedDays.length === 0 && rejectedDays.length === 0) {
+    // If there are any pending days, it's either Pending or Partially Approved
+    if (pendingDays.length > 0) {
+      if (approvedDays.length > 0) {
+        return 'Partially Approved';
+      }
       return 'Pending';
     }
-    if (approvedDays.length > 0 && pendingDays.length > 0) {
+
+    // No pending days - check for mix of approved and rejected
+    if (approvedDays.length > 0 && rejectedDays.length > 0) {
       return 'Partially Approved';
     }
-    if (approvedDays.length > 0 && pendingDays.length === 0) {
+
+    if (approvedDays.length > 0) {
       return 'Approved';
     }
-    if (rejectedDays.length > 0 && pendingDays.length === 0) {
+
+    if (rejectedDays.length > 0) {
       return 'Rejected';
     }
+
     return leaveRequest.currentStatus;
   };
 

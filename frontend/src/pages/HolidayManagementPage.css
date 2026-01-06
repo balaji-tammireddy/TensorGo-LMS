@@ -440,3 +440,9 @@
 .sortable-header:hover .sort-icon:not(.active) {
     color: #718096;
 }
+
+.required-indicator {
+    color: #e53935;
+    margin-left: 2px;
+    font-weight: bold;
+}

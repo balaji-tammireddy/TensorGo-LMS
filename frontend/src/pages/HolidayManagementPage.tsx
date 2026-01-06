@@ -144,7 +144,7 @@ const HolidayManagementPage: React.FC = () => {
                     <form onSubmit={handleSubmit} className="hm-form">
                         <div className="hm-form-row">
                             <div className="hm-form-group hm-form-group-date">
-                                <label>Holiday Date *</label>
+                                <label>Holiday Date <span className="required-indicator">*</span></label>
                                 <DatePicker
                                     value={formData.holidayDate}
                                     onChange={handleDateChange}
@@ -162,11 +162,15 @@ const HolidayManagementPage: React.FC = () => {
                                 />
                             </div>
                             <div className="hm-form-group hm-form-group-name">
-                                <label>Holiday Name *</label>
+                                <label>Holiday Name <span className="required-indicator">*</span></label>
                                 <input
                                     type="text"
                                     value={formData.holidayName}
-                                    onChange={(e) => setFormData({ ...formData, holidayName: e.target.value })} maxLength={100}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                                        setFormData({ ...formData, holidayName: value });
+                                    }}
+                                    maxLength={100}
                                 />
                             </div>
                             <div className="hm-form-actions">

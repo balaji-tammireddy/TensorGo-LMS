@@ -2439,7 +2439,7 @@ const LeaveApplyPage: React.FC = () => {
               <thead>
                 <tr>
                   <th>S No</th>
-                  <th>Appiled Date</th>
+                  <th>Applied Date</th>
                   <th>Leave Reason</th>
                   <th className="sortable-header" onClick={() => handleSort('startDate')}>
                     <div className="header-sort-wrapper">
