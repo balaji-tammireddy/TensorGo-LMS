@@ -980,8 +980,8 @@ const EmployeeManagementPage: React.FC = () => {
                           >
                             <FaEye />
                           </button>
-                          {/* HR cannot edit super_admin users or their own details */}
-                          {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
+                          {/* HR cannot edit super_admin or other HR users or their own details */}
+                          {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.role === 'hr')) && (
                             <button
                               className="action-btn edit-btn"
                               title="Edit"
@@ -990,9 +990,9 @@ const EmployeeManagementPage: React.FC = () => {
                               <FaPencilAlt />
                             </button>
                           )}
-                          {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin, and Super Admin cannot add to themselves */}
+                          {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin or other HR, and Super Admin cannot add to themselves */}
                           {/* Also hide for inactive/resigned/terminated employees */}
-                          {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.id !== user.id) ||
+                          {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
                             (user?.role === 'super_admin' && employee.id !== user.id)) &&
                             (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned') && (
                               <button

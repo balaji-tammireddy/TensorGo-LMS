@@ -446,10 +446,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Prevent HR from editing super_admin users (except role updates)
-  if (requesterRole === 'hr' && employeeRole === 'super_admin' && !isOnlyRoleUpdate) {
-    // If role is being updated along with other fields, remove role from the update
-    // HR can only update role for super_admin, not other fields
+  // Prevent HR from editing super_admin or other HR users (except role updates)
+  if (requesterRole === 'hr' && (employeeRole === 'super_admin' || employeeRole === 'hr') && !isOnlyRoleUpdate) {
     if (isRoleBeingUpdated) {
       // Remove all fields except role
       Object.keys(employeeData).forEach(key => {
@@ -459,24 +457,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
       });
     } else {
-      throw new Error('HR cannot edit super admin users');
-    }
-  }
-
-  // Prevent HR from editing their own details (except role updates)
-  if (requesterRole === 'hr' && requesterId && requesterId === employeeId && !isOnlyRoleUpdate) {
-    // If role is being updated along with other fields, remove role from the update
-    // HR can only update role for themselves, not other fields
-    if (isRoleBeingUpdated) {
-      // Remove all fields except role
-      Object.keys(employeeData).forEach(key => {
-        const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-        if (dbKey !== 'role') {
-          delete employeeData[key];
-        }
-      });
-    } else {
-      throw new Error('HR cannot edit their own details');
+      const targetName = employeeRole === 'super_admin' ? 'super admin' : (requesterId === employeeId ? 'their own' : 'other HR');
+      throw new Error(`HR cannot edit ${targetName} details`);
     }
   }
 
@@ -776,18 +758,28 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   // Send email notification if HR or Super Admin updated employee details
   if ((requesterRole === 'hr' || requesterRole === 'super_admin') && !isOnlyRoleUpdate) {
     try {
-      // Get employee details for email
-      const employeeResult = await pool.query(
-        `SELECT email, first_name || ' ' || COALESCE(last_name, '') as employee_name, emp_id 
-         FROM users WHERE id = $1`,
-        [employeeId]
-      );
+      // Get employee details and requester details for email
+      const [employeeResult, requesterResult] = await Promise.all([
+        pool.query(
+          `SELECT email, first_name || ' ' || COALESCE(last_name, '') as employee_name, emp_id 
+           FROM users WHERE id = $1`,
+          [employeeId]
+        ),
+        pool.query(
+          `SELECT first_name || ' ' || COALESCE(last_name, '') as name FROM users WHERE id = $1`,
+          [requesterId]
+        )
+      ]);
 
       if (employeeResult.rows.length > 0 && employeeResult.rows[0].email) {
         const { sendEmployeeDetailsUpdateEmail } = await import('../utils/emailTemplates');
+        const requesterName = requesterResult.rows.length > 0 ? requesterResult.rows[0].name : (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
+
         await sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
-          employeeEmpId: employeeResult.rows[0].emp_id || ''
+          employeeEmpId: employeeResult.rows[0].emp_id || '',
+          updatedFields: employeeData,
+          updatedBy: requesterName
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
       }
@@ -885,6 +877,27 @@ export const addLeavesToEmployee = async (
   // Validate count
   if (count <= 0) {
     throw new Error('Leave count must be greater than 0');
+  }
+
+  // Check roles for permission
+  const [requesterResult, targetResult] = await Promise.all([
+    pool.query('SELECT role FROM users WHERE id = $1', [updatedBy]),
+    pool.query('SELECT role FROM users WHERE id = $1', [employeeId])
+  ]);
+
+  if (requesterResult.rows.length === 0) {
+    throw new Error('Requester not found');
+  }
+  if (targetResult.rows.length === 0) {
+    throw new Error('Employee not found');
+  }
+
+  const requesterRole = requesterResult.rows[0].role;
+  const targetRole = targetResult.rows[0].role;
+
+  // HR cannot add leaves for themselves, other HRs, or Super Admins
+  if (requesterRole === 'hr' && (targetRole === 'hr' || targetRole === 'super_admin')) {
+    throw new Error('HR cannot add leaves for themselves, other HR users, or Super Admins');
   }
 
   // Check if employee exists
