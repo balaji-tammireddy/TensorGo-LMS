@@ -3,7 +3,7 @@ import * as leaveController from '../controllers/leave.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { authorizeRole } from '../middleware/authorize.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
-import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, updateLeaveSchema, deleteLeaveSchema, approveLeaveDaySchema, rejectLeaveDaySchema } from '../validations/leave.schema';
+import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, updateLeaveSchema, deleteLeaveSchema, approveLeaveDaySchema, rejectLeaveDaySchema, rejectLeaveDaysSchema } from '../validations/leave.schema';
 
 const router = Router();
 
@@ -59,6 +59,14 @@ router.post('/:id/day/:dayId/reject', authorizeRole('manager', 'hr', 'super_admi
   console.log(`[ROUTE] Request params:`, req.params);
   next();
 }, leaveController.rejectLeaveDay);
+// Batch Rejection Route
+router.post('/:id/days/reject', authorizeRole('manager', 'hr', 'super_admin'), validateRequest(rejectLeaveDaysSchema), (req, res, next) => {
+  console.log(`[ROUTE] POST /leave/${req.params.id}/days/reject - User: ${(req as any).user?.id}, Role: ${(req as any).user?.role}`);
+  console.log(`[ROUTE] Request body:`, req.body);
+  console.log(`[ROUTE] Request params:`, req.params);
+  next();
+}, leaveController.rejectLeaveDays);
+
 router.post('/:id/update-status', authorizeRole('hr', 'super_admin'), leaveController.updateLeaveStatus);
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 

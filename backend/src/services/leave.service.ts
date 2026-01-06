@@ -1457,6 +1457,11 @@ export const convertLeaveRequestLopToCasual = async (
 
   const leave = leaveResult.rows[0];
 
+  // Restrict conversion to pending requests only
+  if (leave.current_status !== 'pending') {
+    throw new Error('Cannot convert leave type: Request is already approved or rejected');
+  }
+
   logger.info(`[CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
   logger.info(`[CONVERT LOP TO CASUAL] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}`);
   logger.info(`[CONVERT LOP TO CASUAL] Leave data:`, {
@@ -3298,7 +3303,7 @@ export const rejectLeaveDay = async (
   });
 
   // ========== SEND EMAIL NOTIFICATIONS ==========
-  logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LEAVE DAY REJECTION ==========`);
+  logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR DAY REJECTION ==========`);
   logger.info(`[EMAIL] Request ID: ${leaveRequestId}, Day ID: ${dayId}, Approver ID: ${approverId}, Approver Role: ${approverRole}`);
 
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
@@ -3333,11 +3338,11 @@ export const rejectLeaveDay = async (
         recipientName: leave.employee_name || 'Employee',
         recipientRole: 'employee' as const,
         leaveType: leave.leave_type,
-        startDate: leave.start_date,
+        startDate: leave.start_date, // Should ideally be day.leave_date but using request dates for context
         startType: leave.start_type,
         endDate: leave.end_date,
         endType: leave.end_type,
-        noOfDays: parseFloat(leave.no_of_days),
+        noOfDays: 1, // Single day rejected
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
         approverRole: approverRole,
@@ -3350,18 +3355,211 @@ export const rejectLeaveDay = async (
       logger.error(`[EMAIL] ❌ Error sending day rejection email:`, err);
     }
   }
-
-  logger.info(`[EMAIL] ========== EMAIL NOTIFICATION COMPLETED FOR LEAVE DAY REJECTION ==========`);
+  logger.info(`[EMAIL] ========== EMAIL NOTIFICATION COMPLETED FOR DAY REJECTION ==========`);
   logger.info(`[REJECT LEAVE DAY] ========== FUNCTION COMPLETING ==========`);
 
   return { message: 'Leave day rejected successfully' };
+};
+
+export const rejectLeaveDays = async (
+  leaveRequestId: number,
+  dayIds: number[],
+  approverId: number,
+  approverRole: string,
+  comment: string
+) => {
+  logger.info(`[REJECT LEAVE DAYS] ========== FUNCTION CALLED ==========`);
+  logger.info(`[REJECT LEAVE DAYS] Request ID: ${leaveRequestId}, Day IDs: ${dayIds.join(', ')}, Approver ID: ${approverId}, Role: ${approverRole}`);
+
+  // Get leave request details
+  const leaveResult = await pool.query(
+    `SELECT 
+      lr.*, 
+      u.reporting_manager_id, 
+      u.role as employee_role,
+      u.email as employee_email,
+      u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+      u.emp_id as employee_emp_id,
+      approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      manager.email as manager_email,
+      manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+      hr.email as hr_email,
+      hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
+     FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN users approver ON approver.id = $2
+     LEFT JOIN users manager ON u.reporting_manager_id = manager.id
+     LEFT JOIN users hr ON manager.reporting_manager_id = hr.id
+     WHERE lr.id = $1`,
+    [leaveRequestId, approverId]
+  );
+
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Leave request not found');
+  }
+
+  const leave = leaveResult.rows[0];
+  const employeeId = Number(leave.employee_id);
+  const approverIdNum = Number(approverId);
+
+  // Authorization Checks
+  if (approverRole === 'manager') {
+    if (Number(leave.reporting_manager_id) !== approverIdNum) {
+      throw new Error('Not authorized to reject this leave');
+    }
+  } else if (approverRole === 'hr') {
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot reject your own leave request');
+    }
+    if (leave.employee_role !== 'employee' && leave.employee_role !== 'manager' && leave.employee_role !== 'intern') {
+      throw new Error('Not authorized to reject this leave');
+    }
+  } else if (approverRole === 'super_admin') {
+    if (employeeId === approverIdNum) {
+      throw new Error('Cannot reject your own leave request');
+    }
+  } else {
+    throw new Error('Not authorized to reject leaves');
+  }
+
+  // Verify all days belong to the request
+  const daysCheck = await pool.query(
+    'SELECT id, day_type, day_status FROM leave_days WHERE id = ANY($1) AND leave_request_id = $2',
+    [dayIds, leaveRequestId]
+  );
+
+  if (daysCheck.rows.length !== dayIds.length) {
+    throw new Error('One or more invalid day IDs provided');
+  }
+
+  // Filter only days that are NOT already rejected
+  const daysToReject = daysCheck.rows.filter(d => d.day_status !== 'rejected');
+
+  if (daysToReject.length === 0) {
+    logger.info('[REJECT LEAVE DAYS] All selected days are already rejected. No changes needed.');
+    return { message: 'Selected days are already rejected' };
+  }
+
+  const dayIdsToReject = daysToReject.map(d => d.id);
+
+  // Batch Update Status
+  await pool.query(
+    `UPDATE leave_days
+     SET day_status = 'rejected'
+     WHERE id = ANY($1)`,
+    [dayIdsToReject]
+  );
+
+  // Calculate Refund
+  let totalRefund = 0;
+  if (leave.leave_type !== 'permission') {
+    totalRefund = daysToReject.reduce((acc, d) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
+
+    if (totalRefund > 0) {
+      const balanceColumn =
+        leave.leave_type === 'casual'
+          ? 'casual_balance'
+          : leave.leave_type === 'sick'
+            ? 'sick_balance'
+            : 'lop_balance';
+
+      if (leave.leave_type === 'lop') {
+        const currentBalanceResult = await pool.query(
+          'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+          [leave.employee_id]
+        );
+        const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+        let newLopBalance = currentLop + totalRefund;
+
+        if (newLopBalance > 10) {
+          const cappedRefund = 10 - currentLop;
+          if (cappedRefund > 0) {
+            await pool.query(
+              `UPDATE leave_balances SET lop_balance = 10 WHERE employee_id = $1`,
+              [leave.employee_id]
+            );
+            logger.warn(
+              `[REJECT LEAVE DAYS] LOP balance capped at 10. Refunded ${cappedRefund} instead of ${totalRefund}.`
+            );
+          }
+        } else {
+          await pool.query(
+            `UPDATE leave_balances SET lop_balance = lop_balance + $1 WHERE employee_id = $2`,
+            [totalRefund, leave.employee_id]
+          );
+        }
+      } else {
+        await pool.query(
+          `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+          [totalRefund, leave.employee_id]
+        );
+      }
+    }
+  }
+
+  // Update Request Header
+  const updateQuery = `
+    UPDATE leave_requests 
+    SET ${approverRole === 'manager' ? 'manager_approval_status' : approverRole === 'hr' ? 'hr_approval_status' : 'super_admin_approval_status'} = 'rejected',
+        ${approverRole === 'manager' ? 'manager_approval_date' : approverRole === 'hr' ? 'hr_approval_date' : 'super_admin_approval_date'} = CURRENT_TIMESTAMP,
+        ${approverRole === 'manager' ? 'manager_approval_comment' : approverRole === 'hr' ? 'hr_approval_comment' : 'super_admin_approval_comment'} = $1,
+        ${approverRole === 'manager' ? 'manager_approved_by' : approverRole === 'hr' ? 'hr_approved_by' : 'super_admin_approved_by'} = $2,
+        last_updated_by = $2,
+        last_updated_by_role = $3
+    WHERE id = $4
+  `;
+  await pool.query(updateQuery, [comment, approverId, approverRole, leaveRequestId]);
+
+  // Recalculate Status
+  try {
+    await recalcLeaveRequestStatus(leaveRequestId);
+  } catch (recalcError) {
+    logger.error(`[REJECT LEAVE DAYS] Error recalculating status:`, recalcError);
+  }
+
+  // Send ONE Email
+  logger.info(`[EMAIL] ========== SENDING BATCH REJECTION EMAIL ==========`);
+  if (leave.employee_email) {
+    try {
+      const ccEmails: string[] = [];
+      if (approverRole === 'hr' && leave.manager_email && leave.manager_email !== leave.employee_email) {
+        ccEmails.push(leave.manager_email);
+      } else if (approverRole === 'super_admin') {
+        if (leave.manager_email && leave.manager_email !== leave.employee_email) ccEmails.push(leave.manager_email);
+        if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) ccEmails.push(leave.hr_email);
+      }
+
+      await sendLeaveStatusEmail(leave.employee_email, {
+        employeeName: leave.employee_name || 'Employee',
+        employeeEmpId: leave.employee_emp_id || '',
+        recipientName: leave.employee_name || 'Employee',
+        recipientRole: 'employee' as const,
+        leaveType: leave.leave_type,
+        startDate: leave.start_date,
+        startType: leave.start_type,
+        endDate: leave.end_date,
+        endType: leave.end_type,
+        noOfDays: totalRefund, // Days rejected in this batch
+        reason: leave.reason,
+        approverName: leave.approver_name || 'Approver',
+        approverRole: approverRole,
+        comment: comment,
+        status: 'rejected' as const
+      }, ccEmails.length > 0 ? ccEmails : undefined);
+
+      logger.info(`[EMAIL] ✅ Batch rejection email sent to ${leave.employee_email}`);
+    } catch (err) {
+      logger.error(`[EMAIL] ❌ Error sending batch rejection email:`, err);
+    }
+  }
+
+  return { message: 'Leave days rejected successfully' };
 };
 
 // Update leave status for HR/Super Admin (bypasses normal authorization)
 export const updateLeaveStatus = async (
   leaveRequestId: number,
   approverId: number,
-  approverRole: string,
   newStatus: string,
   selectedDayIds?: number[],
   rejectReason?: string,

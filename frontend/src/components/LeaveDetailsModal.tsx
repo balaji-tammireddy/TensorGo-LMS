@@ -737,6 +737,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
               Close
             </button>
             {leaveRequest.leaveType === 'lop' &&
+              leaveRequest.currentStatus === 'pending' &&
               leaveRequest.empStatus !== 'on_notice' &&
               leaveRequest.empStatus !== 'On Notice' && // Add case-insensitive check just in case
               (userRole === 'hr' || userRole === 'super_admin') &&

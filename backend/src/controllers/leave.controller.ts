@@ -456,6 +456,54 @@ export const rejectLeaveDay = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const rejectLeaveDays = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [LEAVE] [REJECT LEAVE DAYS] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [LEAVE] [REJECT LEAVE DAYS] Leave ID: ${req.params.id}, Day IDs: ${req.body.dayIds?.join(', ') || 'none'}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Comment: ${req.body.comment || 'none'}`);
+
+  try {
+    const leaveRequestId = parseInt(req.params.id);
+    const { dayIds, comment } = req.body;
+
+    if (!dayIds || !Array.isArray(dayIds) || dayIds.length === 0) {
+      logger.warn(`[CONTROLLER] [LEAVE] [REJECT LEAVE DAYS] dayIds array is required`);
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'dayIds array is required'
+        }
+      });
+    }
+
+    if (!comment) {
+      logger.warn(`[CONTROLLER] [LEAVE] [REJECT LEAVE DAYS] Comment is required for rejection`);
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Comment is required for rejection'
+        }
+      });
+    }
+
+    const result = await leaveService.rejectLeaveDays(
+      leaveRequestId,
+      dayIds,
+      req.user!.id,
+      req.user!.role,
+      comment
+    );
+    logger.info(`[CONTROLLER] [LEAVE] [REJECT LEAVE DAYS] Leave days rejected successfully - Leave Request ID: ${leaveRequestId}, Day IDs: ${dayIds.join(', ')}`);
+    res.json(result);
+  } catch (error: any) {
+    logger.error(`[CONTROLLER] [LEAVE] [REJECT LEAVE DAYS] Error:`, error);
+    res.status(400).json({
+      error: {
+        code: 'REJECTION_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
 export const getApprovedLeaves = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [LEAVE] [GET APPROVED LEAVES] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [LEAVE] [GET APPROVED LEAVES] User ID: ${req.user!.id}, Role: ${req.user!.role}, Page: ${req.query.page || 1}, Limit: ${req.query.limit || 10}`);
