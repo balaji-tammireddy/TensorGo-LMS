@@ -464,7 +464,7 @@ export const getApprovedLeaves = async (req: AuthRequest, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
-    const result = await leaveService.getApprovedLeaves(page, limit, req.user!.role);
+    const result = await leaveService.getApprovedLeaves(req.user!.id, req.user!.role, page, limit);
     logger.info(`[CONTROLLER] [LEAVE] [GET APPROVED LEAVES] Retrieved ${result.requests?.length || 0} approved leaves, Total: ${result.pagination?.total || 0}`);
     res.json(result);
   } catch (error: any) {

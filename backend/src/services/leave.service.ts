@@ -3640,17 +3640,19 @@ export const updateLeaveStatus = async (
 };
 
 export const getApprovedLeaves = async (
+  approverId: number,
+  approverRole: string,
   page: number = 1,
-  limit: number = 10,
-  userRole?: string
+  limit: number = 10
 ) => {
+  const normalizedRole = approverRole?.toLowerCase().trim();
   logger.info(`[LEAVE] [GET APPROVED LEAVES] ========== FUNCTION CALLED ==========`);
-  logger.info(`[LEAVE] [GET APPROVED LEAVES] Page: ${page}, Limit: ${limit}, User Role: ${userRole || 'none'}`);
+  logger.info(`[LEAVE] [GET APPROVED LEAVES] Approver ID: ${approverId}, Role: ${normalizedRole}, Page: ${page}, Limit: ${limit}`);
 
   const offset = (page - 1) * limit;
+  const params: any[] = [];
 
-  const result = await pool.query(
-    `SELECT
+  let query = `SELECT
         lr.id,
         u.emp_id,
         u.first_name || ' ' || COALESCE(u.last_name, '') AS emp_name,
@@ -3677,31 +3679,78 @@ export const getApprovedLeaves = async (
      JOIN users u ON lr.employee_id = u.id
      LEFT JOIN leave_days ld ON ld.leave_request_id = lr.id
      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+     LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
      WHERE lr.current_status != 'pending'
         AND NOT EXISTS (
           SELECT 1 FROM leave_days ld2
           WHERE ld2.leave_request_id = lr.id 
             AND COALESCE(ld2.day_status, 'pending') = 'pending'
         )
-     GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
+  `;
+
+  // SUPER ADMIN: Global (except own)
+  if (normalizedRole === 'super_admin') {
+    query += ` AND lr.employee_id != $${params.length + 1}`;
+    params.push(approverId);
+  }
+  // HR: Strict Hierarchy (L1/L2) + Role Exclusion
+  else if (normalizedRole === 'hr') {
+    query += ` AND lr.employee_id != $${params.length + 1} AND (
+       u.reporting_manager_id = $${params.length + 1}
+       OR l1.reporting_manager_id = $${params.length + 1}
+     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
+    params.push(approverId);
+  }
+  // MANAGER: Direct Reports
+  else if (normalizedRole === 'manager') {
+    query += ` AND u.reporting_manager_id = $${params.length + 1} AND lr.employee_id != $${params.length + 1}`;
+    params.push(approverId);
+  }
+
+  query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role,
               last_updater.first_name, last_updater.last_name, u.status, u.role
      ORDER BY lr.applied_date DESC
-     LIMIT $1 OFFSET $2`,
-    [limit, offset]
-  );
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 
-  const countResult = await pool.query(
-    `SELECT COUNT(DISTINCT lr.id)
+  params.push(limit, offset);
+
+  const result = await pool.query(query, params);
+
+  let countQuery = `SELECT COUNT(DISTINCT lr.id)
      FROM leave_requests lr
+     JOIN users u ON lr.employee_id = u.id
+     LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
      WHERE lr.current_status != 'pending'
         AND NOT EXISTS (
           SELECT 1 FROM leave_days ld2
           WHERE ld2.leave_request_id = lr.id 
             AND COALESCE(ld2.day_status, 'pending') = 'pending'
-        )`
-  );
+        )`;
+
+  const countParams: any[] = [];
+
+  // SUPER ADMIN: Global (except own)
+  if (normalizedRole === 'super_admin') {
+    countQuery += ` AND lr.employee_id != $${countParams.length + 1}`;
+    countParams.push(approverId);
+  }
+  // HR: Strict Hierarchy (L1/L2) + Role Exclusion
+  else if (normalizedRole === 'hr') {
+    countQuery += ` AND lr.employee_id != $${countParams.length + 1} AND (
+       u.reporting_manager_id = $${countParams.length + 1}
+       OR l1.reporting_manager_id = $${countParams.length + 1}
+     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
+    countParams.push(approverId);
+  }
+  // MANAGER: Direct Reports
+  else if (normalizedRole === 'manager') {
+    countQuery += ` AND u.reporting_manager_id = $${countParams.length + 1} AND lr.employee_id != $${countParams.length + 1}`;
+    countParams.push(approverId);
+  }
+
+  const countResult = await pool.query(countQuery, countParams);
 
   // Batch fetch leave days for all request IDs to avoid N+1 query problem
   const requestIds = result.rows.map(r => r.id);
@@ -3777,7 +3826,7 @@ export const getApprovedLeaves = async (
 
     // Manager can only view, HR and Super Admin can view and edit
     // No one can delete approved/rejected leaves
-    const canEdit = userRole === 'hr' || userRole === 'super_admin';
+    const canEdit = normalizedRole === 'hr' || normalizedRole === 'super_admin';
     const canDelete = false; // Approved/rejected leaves cannot be deleted
 
     // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
