@@ -328,6 +328,7 @@ const LeaveApprovalPage: React.FC = () => {
           rejectionReason: fullRequest.rejectionReason || request.rejectionReason || null,
           approverName: fullRequest.approverName || request.approverName || null,
           approverRole: fullRequest.approverRole || request.approverRole || null,
+          empStatus: fullRequest.empStatus || request.empStatus || null,
           leaveDays: fullRequest.leaveDays || []
         });
         setIsEditMode(false);
@@ -385,6 +386,7 @@ const LeaveApprovalPage: React.FC = () => {
         rejectionReason: fullRequest.rejectionReason || request.rejectionReason || null,
         approverName: fullRequest.approverName || request.approverName || null,
         approverRole: fullRequest.approverRole || request.approverRole || null,
+        empStatus: fullRequest.empStatus || request.empStatus || null,
         leaveDays: fullRequest.leaveDays || []
       });
       // Only set edit mode for HR and Super Admin
