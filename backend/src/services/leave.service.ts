@@ -181,12 +181,12 @@ export const getLeaveRules = async () => {
       const min = parseFloat(row.leave_required_min);
       const max = row.leave_required_max ? parseFloat(row.leave_required_max) : null;
       const prior = parseFloat(row.prior_information_days);
-      
+
       logger.info(`[LEAVE] [GET LEAVE RULES] Formatting rule: min=${row.leave_required_min}->${min}, max=${row.leave_required_max}->${max}`);
-      
+
       return {
         leaveRequired: max !== null
-          ? `${min} - ${max} days`
+          ? `${min} to ${max} days`
           : `More Than ${min} days`,
         priorInformation: row.prior_information_days === 30 ? '1 Month' : row.prior_information_days === 14 ? '2 weeks' : `${prior} ${prior === 1 ? 'day' : 'days'}`
       };
@@ -2371,9 +2371,8 @@ export const rejectLeave = async (
   // Recalculate status
   try {
     await recalcLeaveRequestStatus(leaveRequestId);
-    logger.info(`[EMAIL DEBUG] Status recalculated successfully for leave request ${leaveRequestId}`);
   } catch (recalcError: any) {
-    logger.error(`[EMAIL DEBUG] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
+    logger.error(`[EMAIL] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
     // Continue with email sending even if recalc fails
   }
 

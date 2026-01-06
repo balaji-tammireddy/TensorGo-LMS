@@ -65,8 +65,9 @@ export const getRules = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [LEAVE] [GET RULES] ========== REQUEST RECEIVED ==========`);
 
   try {
+    logger.info(`[CONTROLLER] [LEAVE] [GET RULES] leaveService.getLeaveRules type: ${typeof leaveService.getLeaveRules}`);
     const rules = await leaveService.getLeaveRules();
-    logger.info(`[CONTROLLER] [LEAVE] [GET RULES] Rules retrieved successfully`);
+    logger.info(`[CONTROLLER] [LEAVE] [GET RULES] Rules retrieved successfully. Count: ${rules?.length}`);
     res.json({ rules });
   } catch (error: any) {
     logger.error(`[CONTROLLER] [LEAVE] [GET RULES] Error:`, error);
