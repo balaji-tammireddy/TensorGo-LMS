@@ -17,6 +17,7 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      fixedWeeks={true}
       className={cn("rdp-calendar", className)}
       classNames={{
         months: "rdp-months",
