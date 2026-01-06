@@ -1026,7 +1026,7 @@ Dear ${data.userName},
 This is a security notification to inform you that your password was successfully changed.
 
 Change Details:
-- Date & Time: ${changeDateDisplay}
+- Date: ${changeDateDisplay}
 ${data.ipAddress ? `- IP Address: ${data.ipAddress}\n` : ''}
 
 ⚠️ Important: If you did not make this change, please contact your administrator immediately and change your password again.
