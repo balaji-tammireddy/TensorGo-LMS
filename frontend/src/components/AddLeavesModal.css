@@ -140,6 +140,7 @@
 .modal-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
   padding: 20px 24px;
   border-top: 1px solid #e5e5e5;
@@ -184,7 +185,8 @@
   background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
   color: white;
   border-color: #2951c8;
-  box-shadow: 0 6px 14px rgba(60, 111, 242, 0.22);
+  box-shadow: 0 4px 10px rgba(60, 111, 242, 0.22);
+  transform: translateY(-5px);
 }
 
 .modal-footer .submit-button:hover:not(:disabled) {
