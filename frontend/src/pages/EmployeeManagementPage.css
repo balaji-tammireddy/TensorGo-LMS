@@ -136,8 +136,8 @@
 
 .employees-table th:nth-child(4),
 .employees-table td:nth-child(4) {
-  width: 180px;
-  /* Position */
+  width: 130px;
+  /* Role */
 }
 
 .employees-table th:nth-child(5),

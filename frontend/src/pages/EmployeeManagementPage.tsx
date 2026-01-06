@@ -96,6 +96,17 @@ const sanitizeLettersOnly = (value: string) => {
 
 const baseEducationLevels = ['PG', 'UG', '12th'];
 
+const getRoleLabel = (role: string) => {
+  switch (role) {
+    case 'super_admin': return 'Super Admin';
+    case 'hr': return 'HR';
+    case 'manager': return 'Manager';
+    case 'employee': return 'Employee';
+    case 'intern': return 'Intern';
+    default: return role?.replace(/_/g, ' ') || '-';
+  }
+};
+
 // Helper function to format education level display
 const formatEducationLevel = (level: string): React.ReactNode => {
   if (level === '12th') {
@@ -931,7 +942,7 @@ const EmployeeManagementPage: React.FC = () => {
                     </div>
                   </th>
                   <th>Emp Name</th>
-                  <th>Position</th>
+                  <th>Role</th>
                   <th className="sortable-header" onClick={() => handleSort('joiningDate')}>
                     <div className="header-sort-wrapper">
                       Joining Date
@@ -962,7 +973,9 @@ const EmployeeManagementPage: React.FC = () => {
                       <td>{idx + 1}</td>
                       <td>{employee.empId}</td>
                       <td>{employee.name}</td>
-                      <td>{employee.position}</td>
+                      <td>
+                        {getRoleLabel(employee.role)}
+                      </td>
                       <td>{format(new Date(employee.joiningDate), 'dd/MM/yyyy')}</td>
                       <td>
                         <span className={`status-badge ${getStatusClass(employee.status)}`}>
