@@ -447,7 +447,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
     if (subordinatesResult.rows.length > 0) {
       logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Role change BLOCKED for user ${employeeId} due to existing subordinates.`);
-      throw new Error('Notification: Please first remove the users reporting to that user');
+      throw new Error('Please remove the users reporting to that user and try again.');
     }
   }
 
