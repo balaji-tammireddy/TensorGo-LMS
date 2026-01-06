@@ -131,7 +131,8 @@ export const getEmployeeById = async (employeeId: number) => {
   const result = await pool.query(
     `SELECT u.*, 
             COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
-            COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name
+            COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
+            COALESCE(sc.subordinate_count, 0) as subordinate_count
      FROM users u
      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
      LEFT JOIN LATERAL (
@@ -141,6 +142,11 @@ export const getEmployeeById = async (employeeId: number) => {
        ORDER BY id ASC
        LIMIT 1
      ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::integer as subordinate_count 
+       FROM users sub 
+       WHERE sub.reporting_manager_id = u.id
+     ) sc ON true
      WHERE u.id = $1`,
     [employeeId]
   );
@@ -446,8 +452,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     );
 
     if (subordinatesResult.rows.length > 0) {
+      const name = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
       logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Role change BLOCKED for user ${employeeId} due to existing subordinates.`);
-      throw new Error('Please remove the users reporting to that user and try again.');
+      throw new Error(`Please remove the users reporting to ${name} and try again.`);
     }
   }
 

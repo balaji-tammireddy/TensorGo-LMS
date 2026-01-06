@@ -147,7 +147,8 @@ const emptyEmployeeForm = {
     scorePercentage: ''
   })),
   reportingManagerName: '',
-  reportingManagerId: null as number | null
+  reportingManagerId: null as number | null,
+  subordinateCount: 0
 };
 
 const EmployeeManagementPage: React.FC = () => {
@@ -705,7 +706,8 @@ const EmployeeManagementPage: React.FC = () => {
         status: employeeDetail.status || 'active',
         education,
         reportingManagerName: employeeDetail.reporting_manager_full_name || employeeDetail.reporting_manager_name || '',
-        reportingManagerId: employeeDetail.reporting_manager_id || null
+        reportingManagerId: employeeDetail.reporting_manager_id || null,
+        subordinateCount: employeeDetail.subordinate_count ? parseInt(String(employeeDetail.subordinate_count), 10) : 0
       });
 
       setIsSameAddress(same);
@@ -1188,7 +1190,25 @@ const EmployeeManagementPage: React.FC = () => {
                               ).map((role, index, array) => (
                                 <React.Fragment key={role}>
                                   <DropdownMenuItem
-                                    onClick={() => {
+                                    onSelect={(e) => {
+                                      e.preventDefault();
+
+                                      const subCount = newEmployee.subordinateCount ? parseInt(String(newEmployee.subordinateCount), 10) : 0;
+
+                                      // Log for debugging
+                                      console.log('Role Selection:', {
+                                        editMode: isEditMode,
+                                        subCount,
+                                        currentRole: newEmployee.role,
+                                        targetRole: role
+                                      });
+
+                                      if (isEditMode && subCount > 0 && newEmployee.role !== role) {
+                                        const name = `${newEmployee.firstName} ${newEmployee.lastName || ''}`.trim();
+                                        showWarning(`Cannot change role: ${name} has ${subCount} users reporting to them.`);
+                                        return;
+                                      }
+
                                       const newRole = role;
                                       setNewEmployee({
                                         ...newEmployee,
