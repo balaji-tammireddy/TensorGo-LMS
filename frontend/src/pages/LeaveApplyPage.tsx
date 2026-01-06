@@ -1647,7 +1647,7 @@ const LeaveApplyPage: React.FC = () => {
         <h2 className="page-title">
           Welcome, {user?.name || ''}
           {user?.status === 'on_notice' && (
-            <span className="status-on-notice" style={{ marginLeft: '10px' }}>On Notice</span>
+            <span className="status-badge status-on-notice">On Notice</span>
           )}
         </h2>
         {/* Top Row: Three Equal Sections */}
@@ -2579,7 +2579,7 @@ const LeaveApplyPage: React.FC = () => {
                           <td>
                             <div className="action-icons-container">
                               <button
-                                className={`action-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                className={`action-btn edit-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
                                 title="View Details"
                                 onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleView(request.id)}
                                 disabled={isUpdating || applyMutation.isLoading || deleteMutation.isLoading}
@@ -2589,7 +2589,7 @@ const LeaveApplyPage: React.FC = () => {
                               {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
                                 <>
                                   <button
-                                    className={`action-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
+                                    className={`action-btn edit-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
                                     title={isUpdating ? 'Updating...' : 'Edit'}
                                     onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
                                     disabled={isUpdating || applyMutation.isLoading || deleteMutation.isLoading}

@@ -87,7 +87,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
           <h2>
             Leave Request Details
             {leaveRequest.empStatus === 'on_notice' && (
-              <span className="status-on-notice">On Notice</span>
+              <span className="status-badge status-on-notice">On Notice</span>
             )}
           </h2>
           <button className="leave-details-modal-close" onClick={onClose}>
@@ -300,8 +300,8 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                         <div
                           key={idx}
                           className={`leave-day-item ${isApproved ? 'day-approved' :
-                              isRejected ? 'day-rejected' :
-                                isPending ? 'day-pending' : ''
+                            isRejected ? 'day-rejected' :
+                              isPending ? 'day-pending' : ''
                             }`}
                         >
                           <span className="day-date">{formatDateSafe(day.date)}</span>

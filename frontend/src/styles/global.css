@@ -204,6 +204,53 @@ tr:hover {
   box-shadow: 0 4px 12px rgba(244, 67, 54, 0.2);
 }
 
+/* Standardized Action Buttons with Gloss Effect */
+.action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: white !important;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.action-btn.view-btn,
+.action-btn.edit-btn {
+  background: linear-gradient(135deg, #3c6ff2 0%, #5a87f5 100%);
+  box-shadow: 0 4px 12px rgba(60, 111, 242, 0.25);
+}
+
+.action-btn.delete-btn {
+  background: linear-gradient(135deg, #ff5252 0%, #ff8080 100%);
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.25);
+}
+
+.action-btn.add-leaves-btn {
+  background: linear-gradient(135deg, #00c853 0%, #00e676 100%);
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.25);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .status-badge:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);

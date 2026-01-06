@@ -974,7 +974,7 @@ const EmployeeManagementPage: React.FC = () => {
                       <td>
                         <div className="actions-wrapper">
                           <button
-                            className="action-btn"
+                            className="action-btn view-btn"
                             title="View"
                             onClick={() => handleViewEmployee(employee.id)}
                           >
@@ -983,7 +983,7 @@ const EmployeeManagementPage: React.FC = () => {
                           {/* HR cannot edit super_admin users or their own details */}
                           {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.id === user.id)) && (
                             <button
-                              className="action-btn"
+                              className="action-btn edit-btn"
                               title="Edit"
                               onClick={() => handleEditEmployee(employee.id)}
                             >
@@ -996,7 +996,7 @@ const EmployeeManagementPage: React.FC = () => {
                             (user?.role === 'super_admin' && employee.id !== user.id)) &&
                             (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned') && (
                               <button
-                                className="action-btn"
+                                className="action-btn add-leaves-btn"
                                 title="Add Leaves"
                                 onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
                               >

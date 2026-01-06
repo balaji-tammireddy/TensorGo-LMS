@@ -822,7 +822,7 @@ const LeaveApprovalPage: React.FC = () => {
                           <td>
                             <div className="actions-cell">
                               <button
-                                className={`edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
+                                className={`action-btn edit-btn ${isUpdating || approveMutation.isLoading || rejectMutation.isLoading ? 'disabled' : ''}`}
                                 onClick={() => !isUpdating && !approveMutation.isLoading && !rejectMutation.isLoading && handleEditClick(request)}
                                 title={isUpdating ? 'Updating...' : 'View Details & Approve/Reject'}
                                 disabled={isUpdating || approveMutation.isLoading || rejectMutation.isLoading}
@@ -1033,7 +1033,7 @@ const LeaveApprovalPage: React.FC = () => {
                               {(user?.role === 'hr' || user?.role === 'super_admin' || user?.role === 'manager') && (
                                 <div className="action-icons-container">
                                   <button
-                                    className={`action-btn ${isUpdating ? 'disabled' : ''}`}
+                                    className={`action-btn view-btn ${isUpdating ? 'disabled' : ''}`}
                                     title="View Details"
                                     onClick={() => !isUpdating && handleViewApprovedLeave(request.id)}
                                     disabled={isUpdating}
@@ -1041,7 +1041,7 @@ const LeaveApprovalPage: React.FC = () => {
                                     <FaEye />
                                   </button>
                                   <button
-                                    className={`action-btn ${isUpdating ? 'disabled' : ''}`}
+                                    className={`action-btn edit-btn ${isUpdating ? 'disabled' : ''}`}
                                     title={isUpdating ? 'Loading...' : 'Edit'}
                                     onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
                                     disabled={isUpdating}
