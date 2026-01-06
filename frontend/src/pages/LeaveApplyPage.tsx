@@ -1835,10 +1835,8 @@ const LeaveApplyPage: React.FC = () => {
                     const blockedHoliday = !isLop && !!holiday;
 
                     if (blockedWeekend) {
-                      const isIntern = user?.role === 'intern';
-                      const message = isIntern
-                        ? 'Cannot select Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.'
-                        : 'Cannot select Saturday or Sunday as start date. If this is for LOP, please select "LOP" as the Leave Type first.';
+
+                      const message = 'Please select only working days as start date.';
                       showWarning(message);
                       return;
                     }
@@ -1862,7 +1860,7 @@ const LeaveApplyPage: React.FC = () => {
                   min={minStartDate}
                   max={maxStartDate}
                   placeholder="dd - mm - yyyy"
-                  allowManualEntry={true}
+                  allowManualEntry={false}
                   isEmployeeVariant={true}
                   disabledDates={(date) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
@@ -1956,10 +1954,8 @@ const LeaveApplyPage: React.FC = () => {
                         const blockedHoliday = !isLop && !!holiday;
 
                         if (blockedWeekend) {
-                          const isIntern = user?.role === 'intern';
-                          const message = isIntern
-                            ? 'Cannot select Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.'
-                            : 'Cannot select Saturday or Sunday as end date. If this is for LOP, please select "LOP" as the Leave Type first.';
+
+                          const message = 'Please select only working days as end date.';
                           showWarning(message);
                           return;
                         }
@@ -1978,7 +1974,7 @@ const LeaveApplyPage: React.FC = () => {
                       }
                       max={maxEndDateLimit}
                       placeholder="dd - mm - yyyy"
-                      allowManualEntry={true}
+                      allowManualEntry={false}
                       isEmployeeVariant={true}
                       disabled={
                         formData.startType === 'first_half' ||
