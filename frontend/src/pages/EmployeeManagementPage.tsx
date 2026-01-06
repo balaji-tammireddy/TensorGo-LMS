@@ -815,7 +815,7 @@ const EmployeeManagementPage: React.FC = () => {
           <div className="search-box">
             <input
               type="text"
-              placeholder="Search by Name or Emp ID"
+              placeholder="Search by Name or Emp ID..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => {

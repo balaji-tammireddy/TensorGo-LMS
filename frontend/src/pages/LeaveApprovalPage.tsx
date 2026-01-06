@@ -863,7 +863,7 @@ const LeaveApprovalPage: React.FC = () => {
                 <div className="recent-search-box">
                   <input
                     type="text"
-                    placeholder="Search by EMP name or ID..."
+                    placeholder="Search by Name or Emp ID..."
                     value={recentSearchInput}
                     onChange={(e) => setRecentSearchInput(e.target.value)}
                   />

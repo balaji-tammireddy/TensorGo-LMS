@@ -179,9 +179,9 @@ export const getLeaveRules = async () => {
 
     return result.rows.map(row => ({
       leaveRequired: row.leave_required_max
-        ? `${row.leave_required_min} to ${row.leave_required_max} days`
-        : `More Than ${row.leave_required_min} days`,
-      priorInformation: row.prior_information_days === 30 ? '1 Month' : row.prior_information_days === 14 ? '2 weeks' : `${row.prior_information_days} ${row.prior_information_days === 1 ? 'day' : 'days'}`
+        ? `${Number(row.leave_required_min)} to ${Number(row.leave_required_max)} days`
+        : `More Than ${Number(row.leave_required_min)} days`,
+      priorInformation: row.prior_information_days === 30 ? '1 Month' : row.prior_information_days === 14 ? '2 weeks' : `${Number(row.prior_information_days)} ${row.prior_information_days === 1 ? 'day' : 'days'}`
     }));
   } catch (error: any) {
     logger.error(`[LEAVE] [GET LEAVE RULES] Error fetching leave rules:`, error);
