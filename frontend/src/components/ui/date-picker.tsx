@@ -172,7 +172,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     if (isEmployeeVariant) {
       const isDeleting = (e.nativeEvent as any).inputType === 'deleteContentBackward';
       if (!isDeleting) {
-        const digits = val.replace(/\D/g, '');
+        val = val.replace(/\D/g, ''); // Sanitize immediately
+        const digits = val;
         if (digits.length > 0) {
           if (digits.length <= 2) {
             val = digits;
@@ -183,6 +184,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           }
         }
       }
+    } else {
+      // For non-employee variant (standard date), allow digits and dashes only
+      // standard format is typically yyyy-mm-dd, so digits and dashes are all we need.
+      // However, to be safe and allow user typing, we'll strip anything that isn't a digit or dash.
+      val = val.replace(/[^0-9-]/g, '');
     }
 
     setInputValue(val);

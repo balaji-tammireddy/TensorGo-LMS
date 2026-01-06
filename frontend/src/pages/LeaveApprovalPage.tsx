@@ -675,7 +675,7 @@ const LeaveApprovalPage: React.FC = () => {
                 type="text"
                 placeholder="Search by Name or Emp ID..."
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                onChange={(e) => setSearchInput(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))}
                 onKeyDown={handleSearchKeyDown}
               />
               {searchInput && (
@@ -865,7 +865,7 @@ const LeaveApprovalPage: React.FC = () => {
                     type="text"
                     placeholder="Search by Name or Emp ID..."
                     value={recentSearchInput}
-                    onChange={(e) => setRecentSearchInput(e.target.value)}
+                    onChange={(e) => setRecentSearchInput(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))}
                   />
                   {recentSearchInput && (
                     <button
@@ -1040,18 +1040,36 @@ const LeaveApprovalPage: React.FC = () => {
                                   >
                                     <FaEye />
                                   </button>
-                                  <button
-                                    className={`action-btn edit-btn ${isUpdating ? 'disabled' : ''}`}
-                                    title={isUpdating ? 'Loading...' : 'Edit'}
-                                    onClick={() => !isUpdating && handleEditApprovedLeave(request.id)}
-                                    disabled={isUpdating}
-                                  >
-                                    {isUpdating && editingRequestId === request.id ? (
-                                      <span className="loading-spinner-small"></span>
-                                    ) : (
-                                      <FaPencilAlt />
-                                    )}
-                                  </button>
+                                  {(() => {
+                                    const lastUpdatedBy = request.lastUpdatedByRole;
+                                    const userRole = user?.role;
+                                    let isEditDisabled = false;
+                                    let editTitle = isUpdating ? 'Loading...' : 'Edit';
+
+                                    if (lastUpdatedBy === 'super_admin' && userRole !== 'super_admin') {
+                                      isEditDisabled = true;
+                                      editTitle = 'Edited by Super Admin';
+                                    } else if (lastUpdatedBy === 'hr' && userRole === 'manager') {
+                                      isEditDisabled = true;
+                                      editTitle = 'Edited by HR';
+                                    }
+
+                                    return (
+                                      <button
+                                        className={`action-btn edit-btn ${isUpdating || isEditDisabled ? 'disabled' : ''}`}
+                                        title={editTitle}
+                                        onClick={() => !isUpdating && !isEditDisabled && handleEditApprovedLeave(request.id)}
+                                        disabled={isUpdating || isEditDisabled}
+                                        style={isEditDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                      >
+                                        {isUpdating && editingRequestId === request.id ? (
+                                          <span className="loading-spinner-small"></span>
+                                        ) : (
+                                          <FaPencilAlt />
+                                        )}
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
