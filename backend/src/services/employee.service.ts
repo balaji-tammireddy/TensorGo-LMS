@@ -255,6 +255,20 @@ export const createEmployee = async (employeeData: any) => {
   const reportingManagerId = role === 'super_admin' ? null : (employeeData.reportingManagerId || null);
   const reportingManagerName = role === 'super_admin' ? null : (employeeData.reportingManagerName || null);
 
+  // Validate reporting manager status
+  if (reportingManagerId) {
+    const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [reportingManagerId]);
+    if (managerResult.rows.length > 0) {
+      const status = managerResult.rows[0].status;
+      if (status === 'on_notice') {
+        throw new Error('Employees in notice period cannot be reporting managers');
+      }
+      if (status !== 'active' && status !== 'on_leave') {
+        throw new Error('Selected reporting manager must be active or on leave');
+      }
+    }
+  }
+
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Inserting employee into database`);
   const result = await pool.query(
     `INSERT INTO users (
@@ -416,6 +430,20 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     // If already super_admin and trying to set reporting manager, clear it
     employeeData.reportingManagerId = null;
     employeeData.reportingManagerName = null;
+  }
+
+  // Validate reporting manager status if it's being updated
+  if (employeeData.reportingManagerId) {
+    const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
+    if (managerResult.rows.length > 0) {
+      const status = managerResult.rows[0].status;
+      if (status === 'on_notice') {
+        throw new Error('Employees in notice period cannot be reporting managers');
+      }
+      if (status !== 'active' && status !== 'on_leave') {
+        throw new Error('Selected reporting manager must be active or on leave');
+      }
+    }
   }
 
   // Prevent HR from editing super_admin users (except role updates)

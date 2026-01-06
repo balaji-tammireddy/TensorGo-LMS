@@ -436,8 +436,8 @@ const EmployeeManagementPage: React.FC = () => {
     checkField('department', 'Department');
     checkField('dateOfJoining', 'Date of Joining');
 
-    // Super admin should not have a reporting manager
-    if (!newEmployee.reportingManagerId && newEmployee.role !== 'super_admin') {
+    // Reporting manager is required for all roles
+    if (!newEmployee.reportingManagerId) {
       missingFields.push('Reporting Manager');
       fieldErrors['reportingManagerId'] = true;
     }
@@ -693,9 +693,8 @@ const EmployeeManagementPage: React.FC = () => {
         education,
         // Prefer explicitly stored reporting_manager_name; fall back to joined full name
         // Super admin should not have a reporting manager
-        reportingManagerName:
-          data.role === 'super_admin' ? '' : (data.reporting_manager_name || data.reporting_manager_full_name || ''),
-        reportingManagerId: data.role === 'super_admin' ? null : (data.reporting_manager_id || null)
+        reportingManagerName: data.reporting_manager_name || data.reporting_manager_full_name || '',
+        reportingManagerId: data.reporting_manager_id || null
       });
 
       setIsSameAddress(same);
@@ -1922,137 +1921,133 @@ const EmployeeManagementPage: React.FC = () => {
                       </table>
                     </div>
 
-                    {newEmployee.role !== 'super_admin' && (
-                      <div className="employee-modal-section">
-                        <h3>Reporting Hierarchy</h3>
-                        <div className={`employee-modal-field full-width ${formErrors.reportingManagerId ? 'has-error' : ''}`}>
-                          <label>
-                            Reporting Manager<span className="required-indicator">*</span>
-                          </label>
-                          {!newEmployee.role ? (
-                            <Button
-                              variant="outline"
-                              className="leave-type-dropdown-trigger"
-                              disabled
-                              style={{
-                                width: '100%',
-                                justifyContent: 'space-between',
-                                padding: '6px 8px',
-                                fontSize: '12px',
-                                fontFamily: 'Poppins, sans-serif',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                backgroundColor: 'transparent',
-                                color: '#1f2a3d',
-                                height: 'auto'
-                              }}
+                    <div className="employee-modal-section">
+                      <h3>Reporting Hierarchy</h3>
+                      <div className={`employee-modal-field full-width ${formErrors.reportingManagerId ? 'has-error' : ''}`}>
+                        <label>
+                          Reporting Manager<span className="required-indicator">*</span>
+                        </label>
+                        {!newEmployee.role ? (
+                          <Button
+                            variant="outline"
+                            className="leave-type-dropdown-trigger"
+                            disabled
+                            style={{
+                              width: '100%',
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              fontSize: '12px',
+                              fontFamily: 'Poppins, sans-serif',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              backgroundColor: 'transparent',
+                              color: '#1f2a3d',
+                              height: 'auto'
+                            }}
+                          >
+                            <span>Please select role first</span>
+                            <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                          </Button>
+                        ) : (
+                          <DropdownMenu onOpenChange={(open) => !open && setManagerSearch('')}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="leave-type-dropdown-trigger"
+                                disabled={isViewMode}
+                                style={{
+                                  width: '100%',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 12px',
+                                  fontSize: '14px',
+                                  fontFamily: 'Poppins, sans-serif',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'transparent',
+                                  color: '#1f2a3d',
+                                  height: 'auto',
+                                  minHeight: '42px',
+                                  lineHeight: '1.5'
+                                }}
+                              >
+                                <span>
+                                  {newEmployee.reportingManagerName
+                                    ? `${newEmployee.reportingManagerName} (${managersData?.find((m: any) => m.id === newEmployee.reportingManagerId)?.empId || ''})`
+                                    : 'Select Reporting Manager'}
+                                </span>
+                                <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              side="top"
+                              align="start"
+                              className="leave-type-dropdown-content"
+                              style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '250px' }}
                             >
-                              <span>Please select role first</span>
-                              <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
-                            </Button>
-                          ) : (
-                            <DropdownMenu onOpenChange={(open) => !open && setManagerSearch('')}>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className="leave-type-dropdown-trigger"
-                                  disabled={isViewMode}
+                              <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search by name or ID..."
+                                  value={managerSearch}
+                                  onChange={(e) => setManagerSearch(e.target.value)}
+                                  autoFocus
                                   style={{
                                     width: '100%',
-                                    justifyContent: 'space-between',
-                                    padding: '10px 12px',
-                                    fontSize: '14px',
-                                    fontFamily: 'Poppins, sans-serif',
+                                    padding: '8px 12px',
+                                    fontSize: '13px',
                                     border: '1px solid #ddd',
                                     borderRadius: '4px',
-                                    backgroundColor: 'transparent',
-                                    color: '#1f2a3d',
-                                    height: 'auto',
-                                    minHeight: '42px',
-                                    lineHeight: '1.5'
+                                    fontFamily: 'Poppins, sans-serif'
                                   }}
-                                >
-                                  <span>
-                                    {newEmployee.reportingManagerName
-                                      ? `${newEmployee.reportingManagerName} (${managersData?.find((m: any) => m.id === newEmployee.reportingManagerId)?.empId || ''})`
-                                      : 'Select Reporting Manager'}
-                                  </span>
-                                  <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                side="top"
-                                align="start"
-                                className="leave-type-dropdown-content"
-                                style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '250px' }}
-                              >
-                                <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
-                                  <input
-                                    type="text"
-                                    placeholder="Search by name or ID..."
-                                    value={managerSearch}
-                                    onChange={(e) => setManagerSearch(e.target.value)}
-                                    autoFocus
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px 12px',
-                                      fontSize: '13px',
-                                      border: '1px solid #ddd',
-                                      borderRadius: '4px',
-                                      fontFamily: 'Poppins, sans-serif'
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              {managersData?.length === 0 ? (
+                                <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666' }}>
+                                  No managers found
                                 </div>
-                                {managersData?.length === 0 ? (
-                                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666' }}>
-                                    No managers found
-                                  </div>
-                                ) : (
-                                  managersData?.map((manager: any, index: number) => (
-                                    <React.Fragment key={manager.id}>
-                                      <DropdownMenuItem
-                                        onClick={() => {
-                                          setNewEmployee({
-                                            ...newEmployee,
-                                            reportingManagerId: manager.id,
-                                            reportingManagerName: manager.name
-                                          });
-                                          setManagerSearch(''); // Reset search on select
-                                        }}
-                                      >
-                                        {manager.name} ({manager.empId})
-                                      </DropdownMenuItem>
-                                      {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
-                                    </React.Fragment>
-                                  ))
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
+                              ) : (
+                                managersData?.map((manager: any, index: number) => (
+                                  <React.Fragment key={manager.id}>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setNewEmployee({
+                                          ...newEmployee,
+                                          reportingManagerId: manager.id,
+                                          reportingManagerName: manager.name
+                                        });
+                                        setManagerSearch(''); // Reset search on select
+                                      }}
+                                    >
+                                      {manager.name} ({manager.empId})
+                                    </DropdownMenuItem>
+                                    {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
+                                  </React.Fragment>
+                                ))
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </>
                 )}
               </div>
 
               <div className="employee-modal-footer">
                 {isViewMode ? (
-                  newEmployee.role !== 'super_admin' && (
-                    <button
-                      type="button"
-                      className="modal-save-button"
-                      onClick={() => {
-                        if (!showLeaveHistory) {
-                          refetchLeaveHistory();
-                        }
-                        setShowLeaveHistory(!showLeaveHistory);
-                      }}
-                    >
-                      {showLeaveHistory ? 'Back to Details' : 'Leave History'}
-                    </button>
-                  )
+                  <button
+                    type="button"
+                    className="modal-save-button"
+                    onClick={() => {
+                      if (!showLeaveHistory) {
+                        refetchLeaveHistory();
+                      }
+                      setShowLeaveHistory(!showLeaveHistory);
+                    }}
+                  >
+                    {showLeaveHistory ? 'Back to Details' : 'Leave History'}
+                  </button>
                 ) : (
                   <>
                     <button
