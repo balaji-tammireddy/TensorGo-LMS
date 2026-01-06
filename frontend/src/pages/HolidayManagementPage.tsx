@@ -150,13 +150,7 @@ const HolidayManagementPage: React.FC = () => {
                                     onChange={handleDateChange}
                                     placeholder="DD - MM - YYYY"
                                     min={new Date().toISOString().split('T')[0]}
-                                    disabledDates={(date) => {
-                                        // Check if date is in existing holidays
-                                        return holidaysData.some((holiday: any) => {
-                                            const holidayDate = new Date(holiday.date);
-                                            return holidayDate.toDateString() === date.toDateString();
-                                        });
-                                    }}
+                                    min={new Date().toISOString().split('T')[0]}
                                     allowManualEntry={true}
                                     isEmployeeVariant={true}
                                 />
