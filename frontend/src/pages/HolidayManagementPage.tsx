@@ -20,6 +20,7 @@ const HolidayManagementPage: React.FC = () => {
     });
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [selectedHoliday, setSelectedHoliday] = useState<{ id: number; name: string } | null>(null);
+    const [resetKey, setResetKey] = useState(0);
 
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -116,6 +117,7 @@ const HolidayManagementPage: React.FC = () => {
 
     const handleReset = () => {
         setFormData({ holidayDate: '', holidayName: '' });
+        setResetKey(prev => prev + 1);
     };
 
     const handleDelete = (holidayId: number, holidayName: string) => {
@@ -146,6 +148,7 @@ const HolidayManagementPage: React.FC = () => {
                             <div className="hm-form-group hm-form-group-date">
                                 <label>Holiday Date <span className="required-indicator">*</span></label>
                                 <DatePicker
+                                    key={resetKey}
                                     value={formData.holidayDate}
                                     onChange={handleDateChange}
                                     placeholder="DD - MM - YYYY"
