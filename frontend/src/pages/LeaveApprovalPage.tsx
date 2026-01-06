@@ -35,6 +35,8 @@ const LeaveApprovalPage: React.FC = () => {
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
   const [isRefetchingRequest, setIsRefetchingRequest] = useState(false);
   const [recentFilterDate, setRecentFilterDate] = useState('');
+  const [recentSearchInput, setRecentSearchInput] = useState('');
+  const [recentSearch, setRecentSearch] = useState('');
   const [recentSortConfig, setRecentSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
     key: 'appliedDate',
     direction: 'desc'
@@ -67,6 +69,15 @@ const LeaveApprovalPage: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Debounce recent search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setRecentSearch(recentSearchInput);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [recentSearchInput]);
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
@@ -837,22 +848,44 @@ const LeaveApprovalPage: React.FC = () => {
             <div className="requests-section-header">
               <h2>Recent Leave Requests</h2>
               <div className="filter-date-controls">
-                {recentFilterDate && (
+                {(recentFilterDate || recentSearchInput) && (
                   <button
                     className="filter-clear-button"
-                    onClick={() => setRecentFilterDate('')}
-                    title="Clear filter"
+                    onClick={() => {
+                      setRecentFilterDate('');
+                      setRecentSearchInput('');
+                    }}
+                    title="Reset all filters"
                   >
                     Reset
                   </button>
                 )}
-                <DatePicker
-                  value={recentFilterDate}
-                  onChange={(date) => setRecentFilterDate(date)}
-                  placeholder="Filter by date"
-                  allowManualEntry={true}
-                  isEmployeeVariant={true}
-                />
+                <div className="recent-search-box">
+                  <input
+                    type="text"
+                    placeholder="Search by EMP name or ID..."
+                    value={recentSearchInput}
+                    onChange={(e) => setRecentSearchInput(e.target.value)}
+                  />
+                  {recentSearchInput && (
+                    <button
+                      className="search-clear-small"
+                      onClick={() => setRecentSearchInput('')}
+                      title="Clear search"
+                    >
+                      &times;
+                    </button>
+                  )}
+                </div>
+                <div className="recent-filter-controls">
+                  <DatePicker
+                    value={recentFilterDate}
+                    onChange={(date) => setRecentFilterDate(date)}
+                    placeholder="Filter by date"
+                    allowManualEntry={true}
+                    isEmployeeVariant={true}
+                  />
+                </div>
               </div>
             </div>
             <div
@@ -913,6 +946,14 @@ const LeaveApprovalPage: React.FC = () => {
                           (day.status || 'pending') === 'pending'
                         );
                         if (hasPendingDays || request.leaveStatus === 'pending') return false;
+
+                        // Apply search filter if set (EMP Name or ID)
+                        if (recentSearch) {
+                          const searchTerm = recentSearch.toLowerCase();
+                          const matchesName = request.empName?.toLowerCase().includes(searchTerm);
+                          const matchesId = request.empId?.toString().toLowerCase().includes(searchTerm);
+                          if (!matchesName && !matchesId) return false;
+                        }
 
                         // Apply date filter if set
                         if (!recentFilterDate) return true;

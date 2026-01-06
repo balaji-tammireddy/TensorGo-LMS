@@ -407,7 +407,7 @@ const ProfilePage: React.FC = () => {
     setFormErrors(fieldErrors);
 
     if (missingFields.length > 0) {
-      showWarning(`Missing fields: ${missingFields.join(', ')}`);
+      showWarning('Please Fill All Mandatory Details');
       return;
     }
 
