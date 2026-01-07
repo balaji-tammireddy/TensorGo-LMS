@@ -451,6 +451,19 @@ const EmployeeManagementPage: React.FC = () => {
     checkField('department', 'Department');
     checkField('dateOfJoining', 'Date of Joining');
 
+    // Date of Joining must not be in the future
+    if (newEmployee.dateOfJoining) {
+      const doj = new Date(newEmployee.dateOfJoining);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (doj > today) {
+        showWarning('Date of Joining cannot be in the future');
+        fieldErrors['dateOfJoining'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
+
     // Reporting manager is required for all roles except super_admin
     if (newEmployee.role !== 'super_admin' && !newEmployee.reportingManagerId) {
       missingFields.push('Reporting Manager');
@@ -548,6 +561,23 @@ const EmployeeManagementPage: React.FC = () => {
         showWarning(yearValidationError);
         setFormErrors(fieldErrors);
         return;
+      }
+
+      // Range validation: Minimum 15 years gap between Date of Birth and Graduation Year
+      if (newEmployee.dateOfBirth) {
+        const birthYear = new Date(newEmployee.dateOfBirth).getFullYear();
+        for (let i = 0; i < newEmployee.education.length; i++) {
+          const edu = newEmployee.education[i];
+          if (edu.year && !isEmpty(edu.year)) {
+            const gradYear = parseInt(edu.year, 10);
+            if (!isNaN(gradYear) && gradYear - birthYear < 15) {
+              showWarning(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
+              fieldErrors[`edu_${i}_year`] = true;
+              setFormErrors(fieldErrors);
+              return;
+            }
+          }
+        }
       }
 
       // Chronological validation: 12th < UG < PG

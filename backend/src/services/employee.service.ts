@@ -213,6 +213,16 @@ export const createEmployee = async (employeeData: any) => {
     }
   }
 
+  // Date of Joining must not be in the future
+  if (employeeData.dateOfJoining) {
+    const doj = new Date(employeeData.dateOfJoining);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Allow joining on current day
+    if (doj > today) {
+      throw new Error('Date of Joining cannot be in the future');
+    }
+  }
+
   // Reporting manager required if role != 'super_admin'
   if (employeeData.role !== 'super_admin' && !employeeData.reportingManagerId) {
     throw new Error('Reporting Manager is required');
@@ -270,6 +280,9 @@ export const createEmployee = async (employeeData: any) => {
     throw new Error('UG and 12th education details are mandatory');
   }
 
+  const birthDate = new Date(employeeData.dateOfBirth);
+  const birthYear = birthDate.getFullYear();
+
   const educationYears: Record<string, number> = {};
   for (const edu of employeeData.education) {
     const isMandatory = ['UG', '12th'].includes(edu.level);
@@ -279,7 +292,14 @@ export const createEmployee = async (employeeData: any) => {
       if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
         throw new Error(`Please fill complete details for ${edu.level} education`);
       }
-      educationYears[edu.level] = parseInt(edu.year, 10);
+      const gradYear = parseInt(edu.year, 10);
+
+      // Minimum 15 years gap between DOB and any graduation year
+      if (gradYear - birthYear < 15) {
+        throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
+      }
+
+      educationYears[edu.level] = gradYear;
     }
   }
 
@@ -611,29 +631,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Education validation if updated
-  if (employeeData.education && Array.isArray(employeeData.education)) {
-    const educationYears: Record<string, number> = {};
-
-    for (const edu of employeeData.education) {
-      const isMandatory = ['UG', '12th'].includes(edu.level);
-      const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
-
-      if (isMandatory || hasAnyField) {
-        if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
-          throw new Error(`Please fill complete details for ${edu.level} education`);
-        }
-        educationYears[edu.level] = parseInt(edu.year, 10);
-      }
-    }
-
-    if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
-      throw new Error('12th Graduation Year must be before UG Graduation Year');
-    }
-    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] >= educationYears['PG']) {
-      throw new Error('UG Graduation Year must be before PG Graduation Year');
+  // Date of Joining must not be in the future if updated
+  if (employeeData.dateOfJoining) {
+    const doj = new Date(employeeData.dateOfJoining);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Allow joining on current day
+    if (doj > today) {
+      throw new Error('Date of Joining cannot be in the future');
     }
   }
+
 
   // Enum validations
   const allowedStatuses = ['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive'];
@@ -658,10 +665,44 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_joining, reporting_manager_id, reporting_manager_name FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
+  }
+
+  // Education validation if updated
+  if (employeeData.education && Array.isArray(employeeData.education)) {
+    const dobValue = employeeData.dateOfBirth || employeeCheck.rows[0].date_of_birth;
+    const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
+
+    const educationYears: Record<string, number> = {};
+
+    for (const edu of employeeData.education) {
+      const isMandatory = ['UG', '12th'].includes(edu.level);
+      const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
+
+      if (isMandatory || hasAnyField) {
+        if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+          throw new Error(`Please fill complete details for ${edu.level} education`);
+        }
+        const gradYear = parseInt(edu.year, 10);
+
+        // Minimum 15 years gap between DOB and any graduation year
+        if (birthYear && gradYear - birthYear < 15) {
+          throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
+        }
+
+        educationYears[edu.level] = gradYear;
+      }
+    }
+
+    if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
+      throw new Error('12th Graduation Year must be before UG Graduation Year');
+    }
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] >= educationYears['PG']) {
+      throw new Error('UG Graduation Year must be before PG Graduation Year');
+    }
   }
 
   const employeeRole = employeeCheck.rows[0].role;
