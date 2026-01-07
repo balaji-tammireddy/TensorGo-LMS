@@ -108,6 +108,15 @@ export const createHoliday = async (holidayDate: string, holidayName: string) =>
       throw new Error('Holiday name cannot contain numbers or special characters');
     }
 
+    // Prevent past dates
+    const selectedDate = new Date(holidayDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      throw new Error('Holiday Cannot be Added in Past Dates');
+    }
+
     const result = await pool.query(
       `INSERT INTO holidays (holiday_date, holiday_name, is_active)
        VALUES ($1, $2, true)

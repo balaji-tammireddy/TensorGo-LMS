@@ -104,8 +104,22 @@ const HolidayManagementPage: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.holidayDate || !formData.holidayName.trim()) {
-            showError('All fields required');
+        if (!formData.holidayName.trim()) {
+            showError('Holiday Name is required');
+            return;
+        }
+
+        if (!formData.holidayDate) {
+            showError('Holiday Date is required');
+            return;
+        }
+
+        const selectedDate = new Date(formData.holidayDate + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (selectedDate < today) {
+            showError('Holiday Cannot be Added in Past Dates');
             return;
         }
 

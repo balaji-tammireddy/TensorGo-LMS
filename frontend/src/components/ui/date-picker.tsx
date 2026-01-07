@@ -216,7 +216,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       return;
     }
 
-    if (parsedDate && !isDateDisabled(parsedDate)) {
+    if (parsedDate) {
       setSelectedDate(parsedDate);
       onChange(format(parsedDate, 'yyyy-MM-dd'));
     }
@@ -232,7 +232,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         } else if (/^\d{8}$/.test(cleanVal)) {
           finalDate = parse(cleanVal, 'ddMMyyyy', new Date());
         }
-        if (finalDate && isValid(finalDate) && !isDateDisabled(finalDate)) {
+        if (finalDate && isValid(finalDate)) {
           const dateStr = format(finalDate, 'yyyy-MM-dd');
           setSelectedDate(finalDate);
           setInputValue(format(finalDate, 'dd - MM - yyyy'));
