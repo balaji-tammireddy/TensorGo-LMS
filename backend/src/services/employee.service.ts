@@ -306,6 +306,22 @@ export const createEmployee = async (employeeData: any) => {
       if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
         throw new Error(`Please fill complete details for ${edu.level} education`);
       }
+
+      // Validate for special characters and emojis
+      const nameRegex = /^[a-zA-Z0-9\s.,&()-]+$/;
+      if (!nameRegex.test(edu.groupStream)) {
+        throw new Error(`Group/Stream for ${edu.level} contains invalid characters or emojis`);
+      }
+      if (!nameRegex.test(edu.collegeUniversity)) {
+        throw new Error(`College/University for ${edu.level} contains invalid characters or emojis`);
+      }
+      if (!/^[0-9]{4}$/.test(edu.year)) {
+        throw new Error(`Graduation Year for ${edu.level} must be a valid 4-digit year`);
+      }
+      if (!/^[0-9.]+%?$/.test(edu.scorePercentage)) {
+        throw new Error(`Score/Percentage for ${edu.level} must be a valid number or percentage`);
+      }
+
       const gradYear = parseInt(edu.year, 10);
 
       // Minimum 15 years gap between DOB and any graduation year
@@ -758,6 +774,22 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
           throw new Error(`Please fill complete details for ${edu.level} education`);
         }
+
+        // Validate for special characters and emojis
+        const nameRegex = /^[a-zA-Z0-9\s.,&()-]+$/;
+        if (!nameRegex.test(edu.groupStream)) {
+          throw new Error(`Group/Stream for ${edu.level} contains invalid characters or emojis`);
+        }
+        if (!nameRegex.test(edu.collegeUniversity)) {
+          throw new Error(`College/University for ${edu.level} contains invalid characters or emojis`);
+        }
+        if (!/^[0-9]{4}$/.test(edu.year)) {
+          throw new Error(`Graduation Year for ${edu.level} must be a valid 4-digit year`);
+        }
+        if (!/^[0-9.]+%?$/.test(edu.scorePercentage)) {
+          throw new Error(`Score/Percentage for ${edu.level} must be a valid number or percentage`);
+        }
+
         const gradYear = parseInt(edu.year, 10);
 
         // Minimum 15 years gap between DOB and any graduation year
