@@ -690,7 +690,7 @@ const LeaveApprovalPage: React.FC = () => {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="leave-type-dropdown-trigger leave-filter-dropdown"
+                    className="leave-filter-dropdown"
                   >
                     <span>{filter === '' ? 'All Types' : filter === 'casual' ? 'Casual' : filter === 'sick' ? 'Sick' : 'LOP'}</span>
                     <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />

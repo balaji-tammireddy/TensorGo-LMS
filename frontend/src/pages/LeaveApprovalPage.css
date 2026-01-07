@@ -36,10 +36,12 @@
   font-size: 14px !important;
   color: #1f2a3d !important;
   padding: 0 12px !important;
-  width: 150px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  width: 160px !important;
+  min-width: 160px !important;
+  max-width: 160px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
 }
 
 .leave-filter-dropdown:hover {
