@@ -830,10 +830,25 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     allowedFields.push('role');
   }
 
-  // Only super_admin can update email and date_of_joining
+  // Only super_admin can update email, date_of_joining and emp_id
   if (requesterRole === 'super_admin') {
     allowedFields.push('email');
     allowedFields.push('date_of_joining');
+    allowedFields.push('emp_id');
+  }
+
+  // Check if emp_id is being updated and validate uniqueness
+  if (employeeData.empId && requesterRole === 'super_admin') {
+    const empId = employeeData.empId.trim().toUpperCase();
+    const empIdCheck = await pool.query(
+      'SELECT id FROM users WHERE emp_id = $1 AND id != $2',
+      [empId, employeeId]
+    );
+    if (empIdCheck.rows.length > 0) {
+      throw new Error('Employee ID already exists');
+    }
+    // Normalize it in the data
+    employeeData.empId = empId;
   }
 
   // Check if email is being updated and validate uniqueness
@@ -899,7 +914,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     permanentAddress: 'permanent_address',
     status: 'status',
     reportingManagerId: 'reporting_manager_id',
-    reportingManagerName: 'reporting_manager_name'
+    reportingManagerName: 'reporting_manager_name',
+    empId: 'emp_id'
   };
 
   const processedKeys = new Set();
@@ -917,8 +933,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       continue;
     }
 
-    // Employee ID cannot be changed once set
-    if (dbKey === 'emp_id') {
+    // Employee ID cannot be changed once set, unless requester is super_admin
+    if (dbKey === 'emp_id' && requesterRole !== 'super_admin') {
       continue;
     }
 

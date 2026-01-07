@@ -1177,7 +1177,7 @@ const EmployeeManagementPage: React.FC = () => {
                               });
                             }}
                             maxLength={6}
-                            disabled={isEditMode || isViewMode}
+                            disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
                           />
                         </div>
                         <div className={`employee-modal-field employee-role-field ${formErrors.role ? 'has-error' : ''}`}>
