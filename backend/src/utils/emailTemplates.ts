@@ -141,7 +141,7 @@ const generateEmailWrapper = (title: string, content: string, footerRefId: strin
           <!-- Footer -->
           <tr>
             <td bgcolor="#f8fafc" align="left" style="padding: 30px 40px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-family: Arial, sans-serif;">
-              <p style="margin: 0;">This is an automated notification from TensorGo Leave Management System. Please do not reply to this email.</p>
+              <p style="margin: 0;">This is an automated notification from TensorGo Intranet. Please do not reply to this email.</p>
               <p style="margin: 10px 0 0 0;">Reference ID: ${footerRefId}</p>
             </td>
           </tr>
@@ -188,7 +188,7 @@ const generatePasswordResetEmailHtml = (data: PasswordResetEmailData): string =>
 
   const content = `
     <p>Dear ${data.userName},</p>
-    <p>You have requested to reset your password for your <strong>TensorGo Leave Management System</strong> account.</p>
+    <p>You have requested to reset your password for your <strong>TensorGo Intranet</strong> account.</p>
     
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; padding: 25px; margin: 30px 0; border-radius: 6px; text-align: center;">
       <p style="margin: 0 0 10px 0; color: #64748b; font-size: 14px; font-weight: 500;">Your OTP Code:</p>
@@ -196,8 +196,8 @@ const generatePasswordResetEmailHtml = (data: PasswordResetEmailData): string =>
     </div>
     
     <p style="margin-top: 30px;">This OTP is valid for <strong>10 minutes</strong>. Please enter this code to reset your password.</p>
-    <p>If you did not request a password reset, please ignore this email or contact support if you have concerns.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>If you did not request a password reset, please ignore this email.</p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -217,7 +217,7 @@ Password Reset Request
 
 Dear ${data.userName},
 
-You have requested to reset your password for your TensorGo Leave Management System account.
+You have requested to reset your password for your TensorGo Intranet account.
 
 Your OTP Code: ${data.otp}
 
@@ -225,8 +225,8 @@ This OTP is valid for 10 minutes. Please enter this code to reset your password.
 
 If you did not request a password reset, please ignore this email.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
   `;
 };
 
@@ -241,7 +241,7 @@ export const sendPasswordResetEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const emailSubject = `Password Reset OTP - TensorGo-LMS [Ref: ${uniqueId}]`;
+  const emailSubject = `Password Reset OTP - TensorGo Intranet [Ref: ${uniqueId}]`;
   const emailHtml = generatePasswordResetEmailHtml(data);
   const emailText = generatePasswordResetEmailText(data);
 
@@ -300,7 +300,7 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
     <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Leave Application Details</h3>
     ${detailsTable}
     <p style="margin-top: 30px;">Please review and take appropriate action on this leave application at your earliest convenience.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -353,11 +353,11 @@ Leave Details:
 
 Please review and take appropriate action on the leave application.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated email from TensorGo Leave Management System.
+This is an automated email from TensorGo Intranet.
 Please do not reply to this email.
   `;
 
@@ -474,7 +474,7 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
         <strong>${data.status === 'approved' ? 'Approved' : data.status === 'partially_approved' ? 'Partially Approved' : 'Rejected'} by:</strong> ${data.approverName} (${approverRoleDisplay})
       </p>
     </div>
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -531,11 +531,11 @@ Reason: ${data.reason}
   text += `Status: ${statusDisplay}
 ${data.status === 'approved' || data.status === 'partially_approved' ? 'Approved' : 'Rejected'} by: ${data.approverName} (${approverRoleDisplay})
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated email from TensorGo Leave Management System.
+This is an automated email from TensorGo Intranet.
 Please do not reply to this email.
   `;
 
@@ -608,7 +608,7 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
 
   const content = `
     <p>Dear ${data.employeeName},</p>
-    <p>Welcome to <strong>TensorGo Leave Management System!</strong> Your account has been created successfully. Please find your login credentials below.</p>
+    <p>Welcome to <strong>TensorGo Intranet!</strong> Your account has been created successfully. Please find your login credentials below.</p>
     <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Your Login Credentials</h3>
     ${detailsTable}
     <div style="margin: 40px 0; text-align: center;">
@@ -628,11 +628,11 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
         <strong>Security Notice:</strong> Please change your password after your first login for security purposes.
       </p>
     </div>
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
-    'Welcome to TensorGo LMS',
+    'Welcome to TensorGo Intranet',
     content,
     uniqueId,
     'Your account has been created successfully'
@@ -641,11 +641,11 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
 
 const generateNewEmployeeCredentialsEmailText = (data: NewEmployeeCredentialsEmailData): string => {
   return `
-Welcome to TensorGo LMS
+Welcome to TensorGo Intranet
 
 Dear ${data.employeeName},
 
-Welcome to TensorGo Leave Management System! Your account has been created successfully.
+Welcome to TensorGo Intranet! Your account has been created successfully.
 
 Your Login Credentials:
 - Employee ID: ${data.employeeEmpId}
@@ -657,11 +657,11 @@ Login URL: ${data.loginUrl}
 
 Important: Please change your password after your first login for security purposes.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated email from TensorGo Leave Management System.
+This is an automated email from TensorGo Intranet.
 Please do not reply to this email.
   `;
 };
@@ -674,7 +674,7 @@ export const sendNewEmployeeCredentialsEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const emailSubject = `Welcome to TensorGo LMS - Your Login Credentials [Ref: ${uniqueId}]`;
+  const emailSubject = `Welcome to TensorGo Intranet - Your Login Credentials [Ref: ${uniqueId}]`;
   const emailHtml = generateNewEmployeeCredentialsEmailHtml(data);
   const emailText = generateNewEmployeeCredentialsEmailText(data);
 
@@ -720,7 +720,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
     { label: 'Previous Balance:', value: `${data.previousBalance} ${data.previousBalance === 1 ? 'day' : 'days'}` },
     {
       label: 'New Balance:',
-      value: `<span style="color: #059669; font-weight: bold;">${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}</span>`,
+      value: `<span style="color: #111827; font-weight: bold;">${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}</span>`,
       isHtml: true,
       isBold: true
     },
@@ -739,7 +739,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
         <p style="margin: 0; color: #166534; font-size: 14px;"><strong>Conversion Note:</strong> ${data.conversionNote}</p>
       </div>
     ` : ''}
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -770,11 +770,11 @@ Allocation Details:
 - Allocation Date: ${allocationDateDisplay}
 ${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated email from TensorGo Leave Management System.
+This is an automated email from TensorGo Intranet.
 Please do not reply to this email.
   `;
 };
@@ -837,15 +837,8 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
             <td style="padding: 0;">
               <table role="presentation" style="width: 100%; border-collapse: collapse;">
                 <tr>
-                  <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.3px;">Security Notification</h1>
-            </td>
-          </tr>
-                <tr>
-                  <td style="padding: 0; background-color: #dc2626;">
-                    <div style="padding: 12px 40px; text-align: center;">
-                      <p style="margin: 0; color: #ffffff; font-size: 13px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">Password Changed</p>
-                    </div>
+                  <td style="padding: 32px 40px; background-color: #1e3a8a; text-align: left;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.5px;">Password Changed</h1>
                   </td>
                 </tr>
               </table>
@@ -891,14 +884,13 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
               <!-- Security Notice -->
               <div style="background-color: #fffbeb; border: 1px solid #fbbf24; padding: 16px 20px; margin: 28px 0; border-radius: 6px;">
                 <p style="margin: 0; color: #92400e; font-size: 14px; font-family: 'Poppins', sans-serif; line-height: 1.6; font-weight: 500;">
-                  <strong>Important:</strong> If you did not make this change, please contact your administrator immediately and change your password again.
+                  <strong>Important:</strong> If you did not make this change, please contact your HR immediately and change your password again.
                 </p>
               </div>
               
               <!-- Closing -->
               <p style="margin: 32px 0 0 0; color: #1f2937; font-size: 15px; font-family: 'Poppins', sans-serif; line-height: 1.7;">
-                Best regards,<br>
-                <strong style="font-weight: 600; color: #1e3a8a;">TensorGo</strong>
+                Best Regards,<br/><strong>TensorGo Intranet</strong>
               </p>
             </td>
           </tr>
@@ -907,7 +899,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
           <tr>
             <td style="padding: 24px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #6b7280; font-size: 12px; font-family: 'Poppins', sans-serif; line-height: 1.6;">
-                This is an automated security notification from TensorGo Leave Management System. Please do not reply to this email.
+                This is an automated security notification from TensorGo Intranet. Please do not reply to this email.
               </p>
               <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 11px; font-family: 'Poppins', sans-serif; line-height: 1.5;">
                 Reference ID: ${uniqueId}
@@ -937,13 +929,13 @@ Change Details:
 - Date: ${changeDateDisplay}
 ${data.ipAddress ? `- IP Address: ${data.ipAddress}\n` : ''}
 
-⚠️ Important: If you did not make this change, please contact your administrator immediately and change your password again.
+⚠️ Important: If you did not make this change, please contact your HR immediately and change your password again.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated security email from TensorGo Leave Management System.
+This is an automated security email from TensorGo Intranet.
 Please do not reply to this email.
   `;
 };
@@ -1030,7 +1022,7 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
     </div>
     
     <p style="margin-top: 30px;">Please log in to the portal to take action on these requests.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1060,11 +1052,11 @@ ${index + 1}. ${leave.employeeName} (${leave.employeeEmpId})
 
 Please review and take appropriate action on these leave requests at your earliest convenience.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated daily reminder from TensorGo Leave Management System.
+This is an automated daily reminder from TensorGo Intranet.
 Please do not reply to this email.
   `;
 };
@@ -1110,7 +1102,7 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
     <div style="text-align: center; padding: 20px 0;">
       <h2 style="color: #1e3a8a; font-size: 28px; margin-bottom: 20px;">🎉 Happy Birthday, ${data.employeeName}! 🎂</h2>
       <p style="font-size: 18px; line-height: 1.6; color: #374151;">
-        On behalf of the entire team at <strong>TensorGo</strong>, we wish you a very happy birthday and a wonderful year ahead!
+        On behalf of the entire team at <strong>TensorGo Intranet</strong>, we wish you a very happy birthday and a wonderful year ahead!
       </p>
       <div style="margin: 40px 0; font-size: 50px;">🎁 ✨ 🎈</div>
       <p style="font-size: 16px; color: #6b7280; font-style: italic;">
@@ -1118,7 +1110,7 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
       </p>
     </div>
     <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 30px; text-align: center;">
-      <p style="margin: 0; font-size: 16px;">Best wishes,<br/><strong>Team TensorGo</strong></p>
+      <p style="margin: 0; font-size: 16px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
     </div>
   `;
 
@@ -1144,11 +1136,11 @@ May the year ahead bring you continued success, good health, and personal fulfil
 
 We wish you a pleasant and memorable birthday.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated birthday wish from TensorGo Leave Management System.
+This is an automated birthday wish from TensorGo Intranet.
 Please do not reply to this email.
   `;
 };
@@ -1229,7 +1221,7 @@ const generateLeaveCarryForwardEmailHtml = (data: LeaveCarryForwardEmailData): s
     <div style="margin-top: 30px; padding: 15px; background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
       <p style="margin: 0; color: #1e40af; font-size: 14px;"><strong>Note:</strong> Carry-forward is subject to the company's leave policy limits.</p>
     </div>
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1266,11 +1258,11 @@ Carry Forward Details:
   * Sick Leave: ${data.newYearBalances.sick} ${data.newYearBalances.sick === 1 ? 'day' : 'days'}
   * LOP: ${data.newYearBalances.lop} ${data.newYearBalances.lop === 1 ? 'day' : 'days'}
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated email from TensorGo Leave Management System.
+This is an automated email from TensorGo Intranet.
 Please do not reply to this email.
   `;
 };
@@ -1342,7 +1334,7 @@ const generateUrgentLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData
     <p>An urgent leave application has been submitted by <strong>${data.employeeName}</strong> (Employee ID: <strong>${data.employeeEmpId}</strong>). Please review the details below and take appropriate action at your earliest convenience.</p>
     <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Leave Application Details</h3>
     ${detailsTable}
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1397,15 +1389,15 @@ LEAVE APPLICATION DETAILS:
 ${data.leaveType === 'permission' && data.timeForPermissionStart && data.timeForPermissionEnd ? `- Time: ${formatTime(data.timeForPermissionStart)} - ${formatTime(data.timeForPermissionEnd)}\n` : ''}- Reason: ${data.reason}
 ${data.doctorNote && data.leaveType !== 'sick' ? `- Medical Certificate: ${data.doctorNote}\n` : ''}- Application Date: ${appliedDateDisplay}
 
-ACTION REQUIRED: This urgent leave application requires your prompt review and decision. Please log into the Leave Management System to approve or reject this request.
+ACTION REQUIRED: This urgent leave application requires your prompt review and decision. Please log into the TensorGo Intranet to approve or reject this request.
 
 Thank you for your attention to this matter.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
 
 ---
-This is an automated notification from TensorGo Leave Management System.
+This is an automated notification from TensorGo Intranet.
 Please do not reply to this email.
 Reference ID: ${uniqueId}
   `;
@@ -1437,14 +1429,14 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
 
   const content = `
     <p>Dear ${data.employeeName},</p>
-    <p>This is to inform you that your profile details have been updated in the <strong>TensorGo Leave Management System</strong> by <strong>${data.updatedBy}</strong>.</p>
+    <p>This is to inform you that your profile details have been updated in the <strong>TensorGo Intranet</strong> by <strong>${data.updatedBy}</strong>.</p>
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; margin: 30px 0; border-radius: 6px;">
       <p style="margin: 0; color: #475569; line-height: 1.6;">
         For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
       </p>
     </div>
-    <p style="margin-top: 30px;">If you did not authorize this change or have any questions, please contact the HR department immediately.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1464,14 +1456,13 @@ Profile Update Notification
 
 Dear ${data.employeeName},
 
-This is to inform you that your profile details have been updated in the TensorGo Leave Management System by ${data.updatedBy}.
+This is to inform you that your profile details have been updated in the TensorGo Intranet by ${data.updatedBy}.
 
 For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
 
-If you did not authorize this change or have any questions, please contact the HR department immediately.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
   `;
 };
 
@@ -1550,7 +1541,7 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
     ${detailsTable}
     
     <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #059669; padding: 24px; margin: 28px 0; border-radius: 6px;">
-      <h3 style="margin: 0 0 16px 0; color: #059669; font-size: 17px; font-weight: 600;">Balance Changes</h3>
+      <h3 style="margin: 0 0 16px 0; color: #111827; font-size: 17px; font-weight: 600;">Balance Changes</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 10px 0; color: #6b7280; font-size: 14px; width: 38%;">LOP Balance:</td>
@@ -1569,7 +1560,7 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
       </table>
     </div>
     
-    <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1607,8 +1598,8 @@ Balance Changes:
 - LOP Balance: ${data.previousLopBalance} → ${data.newLopBalance} (Refunded ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})
 - Casual Balance: ${data.previousCasualBalance} → ${data.newCasualBalance} (Deducted ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'})
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
   `;
 };
 
@@ -1658,7 +1649,7 @@ const generateHolidayListReminderEmailHtml = (data: HolidayListReminderEmailData
     <p>Dear ${data.recipientName},</p>
     <p>This is an automated reminder to update the holiday list for the upcoming year <strong>${data.nextYear}</strong>.</p>
     <p>Please ensure the holiday calendar is updated before the start of the new year to avoid any disruptions in leave planning.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1681,8 +1672,8 @@ Dear ${data.recipientName},
 This is an automated reminder to update the holiday list for the upcoming year ${data.nextYear}.
 Please ensure the holiday calendar is updated before the start of the new year.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
   `;
 };
 
@@ -1728,20 +1719,19 @@ const generateReportingManagerChangeEmailHtml = (data: ReportingManagerChangeEma
 
   const detailsTable = generateDetailsTable([
     { label: 'New Manager Name:', value: data.newManagerName, isBold: true },
-    { label: 'New Manager ID:', value: data.newManagerEmpId, isBold: true },
-    { label: 'Previous Manager:', value: data.previousManagerName }
+    { label: 'New Manager ID:', value: data.newManagerEmpId, isBold: true }
   ]);
 
   const content = `
     <p>Dear ${data.employeeName},</p>
-    <p>This is to inform you that your reporting manager has been updated in the <strong>TensorGo Leave Management System</strong>.</p>
-    <p>This change occurred because your previous manager, <strong>${data.previousManagerName}</strong>, is no longer available as a reporting manager.</p>
+    <p>This is to inform you that your reporting manager has been updated in the <strong>TensorGo Intranet</strong>.</p>
+
     
     <h3 style="margin: 30px 0 10px 0; font-size: 18px;">New Reporting Manager Details</h3>
     ${detailsTable}
     
     <p style="margin-top: 30px;">From now on, please direct all your leave requests and professional communications to <strong>${data.newManagerName}</strong>.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
@@ -1761,7 +1751,7 @@ Reporting Manager Updated
 
 Dear ${data.employeeName},
 
-This is to inform you that your reporting manager has been updated. This change occurred because your previous manager, ${data.previousManagerName}, is no longer available as a reporting manager.
+This is to inform you that your reporting manager has been updated.
 
 New Reporting Manager:
 - Name: ${data.newManagerName}
@@ -1769,8 +1759,8 @@ New Reporting Manager:
 
 From now on, please direct all your leave requests and professional communications to your new manager.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
   `;
 };
 
@@ -1810,13 +1800,13 @@ export const sendRoleChangeEmail = async (recipientEmail: string, data: RoleChan
 
   const content = `
     <p>Dear ${data.employeeName},</p>
-    <p>This is to inform you that your role in the <strong>TensorGo Leave Management System</strong> has been updated.</p>
+    <p>This is to inform you that your role in the <strong>TensorGo Intranet</strong> has been updated.</p>
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 6px;">
       <p style="margin: 0; font-size: 16px; color: #1e3a8a;"><strong>New Role:</strong> ${data.newRole.toUpperCase()}</p>
       <p style="margin: 10px 0 0 0; font-size: 14px; color: #64748b;">Updated by: ${data.updatedBy}</p>
     </div>
     <p>If you have any questions regarding this change, please contact your reporting manager or the HR department.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return await sendEmail({
@@ -1832,8 +1822,8 @@ This is to inform you that your role has been updated to ${data.newRole.toUpperC
 
 If you have any questions, please contact HR.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
     `
   });
 };
@@ -1855,13 +1845,13 @@ export const sendStatusChangeEmail = async (recipientEmail: string, data: Status
 
   const content = `
     <p>Dear ${data.employeeName},</p>
-    <p>This is to inform you that your employment status in the <strong>TensorGo Leave Management System</strong> has been updated.</p>
+    <p>This is to inform you that your employment status in the <strong>TensorGo Intranet</strong> has been updated.</p>
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 6px;">
       <p style="margin: 0; font-size: 16px; color: #1e3a8a;"><strong>New Status:</strong> ${data.newStatus.toUpperCase()}</p>
       <p style="margin: 10px 0 0 0; font-size: 14px; color: #64748b;">Updated by: ${data.updatedBy}</p>
     </div>
     <p>If you have any questions regarding this change, please contact the HR department.</p>
-    <p>Best regards,<br/><strong>TensorGo</strong></p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return await sendEmail({
@@ -1877,8 +1867,8 @@ This is to inform you that your employment status has been updated to ${data.new
 
 If you have any questions, please contact HR.
 
-Best regards,
-TensorGo
+Best Regards,
+TensorGo Intranet
     `
   });
 };

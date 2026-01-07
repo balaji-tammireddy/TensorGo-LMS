@@ -1054,7 +1054,10 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   if (isManagerChanged) {
     try {
       const empResult = await pool.query(
-        'SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name, reporting_manager_name FROM users WHERE id = $1',
+        `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.reporting_manager_name, m.emp_id as manager_emp_id 
+         FROM users u 
+         LEFT JOIN users m ON u.reporting_manager_id = m.id 
+         WHERE u.id = $1`,
         [employeeId]
       );
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
@@ -1063,7 +1066,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
           employeeName: empResult.rows[0].name,
           previousManagerName: employeeCheck.rows[0].reporting_manager_name || 'N/A',
           newManagerName: empResult.rows[0].reporting_manager_name || 'New Manager',
-          newManagerEmpId: '' // We don't have it easily here without another join, but it's optional in template
+          newManagerEmpId: empResult.rows[0].manager_emp_id || ''
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
@@ -1187,7 +1190,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   // Send email notification if HR or Super Admin updated employee details
-  if ((requesterRole === 'hr' || requesterRole === 'super_admin') && !isOnlyRoleUpdate) {
+  if ((requesterRole === 'hr' || requesterRole === 'super_admin') && !isOnlyRoleUpdate && !isManagerChanged) {
     try {
       // Get employee details and requester details for email
       const [employeeResult, requesterResult] = await Promise.all([

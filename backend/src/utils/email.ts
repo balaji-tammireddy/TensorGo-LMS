@@ -18,7 +18,7 @@ const getEmailConfig = () => {
       pass: process.env.SMTP_PASSWORD, // Gmail App Password
     },
     from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-    fromName: process.env.EMAIL_FROM_NAME || 'TensorGo LMS',
+    fromName: process.env.EMAIL_FROM_NAME || 'TensorGo Intranet',
   };
 };
 

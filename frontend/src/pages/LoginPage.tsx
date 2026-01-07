@@ -229,7 +229,7 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
             <form onSubmit={handleSubmit} className="login-form">
-              <h1>HR Management System</h1>
+              <h1>INTRANET</h1>
               <div className="form-group">
                 <label>Email</label>
                 <input
