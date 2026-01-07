@@ -185,10 +185,10 @@ const LeaveApplyPage: React.FC = () => {
 
     // Clamp to office hours (10:00-18:00 for start time)
     if (roundedStartTime < '10:00') {
-      showWarning('Start time set to 10:00 AM (Office Hours).');
+      showWarning('Start time set to 10:00 (Office Hours).');
       roundedStartTime = '10:00';
     } else if (roundedStartTime > '18:00') {
-      showWarning('Start time set to 6:00 PM (Office Hours).');
+      showWarning('Start time set to 18:00 (Office Hours).');
       roundedStartTime = '18:00';
     }
 
@@ -273,10 +273,10 @@ const LeaveApplyPage: React.FC = () => {
     // Clamp to office hours (10:00-19:00)
     if (roundedEndTime < '10:00') {
       roundedEndTime = '10:00';
-      showWarning('End time must be within office hours (10:00 AM - 7:00 PM).');
+      showWarning('End time must be within office hours (10:00 - 19:00).');
     } else if (roundedEndTime > '19:00') {
       roundedEndTime = '19:00';
-      showWarning('End time must be within office hours (10:00 AM - 7:00 PM).');
+      showWarning('End time must be within office hours (10:00 - 19:00).');
     }
 
     const [startHours, startMinutes] = formData.timeForPermission.start.split(':').map(Number);

@@ -45,7 +45,7 @@ const Sidebar: React.FC = memo(() => {
 
     // Leave Apply available to everyone except super_admin
     if (user.role !== 'super_admin') {
-      routes.push({ path: '/leave-apply', icon: <FaFileAlt />, label: 'Leave Apply' });
+      routes.push({ path: '/leave-apply', icon: <FaFileAlt />, label: 'Leave Application' });
     }
 
     // Manager, HR, Super Admin can access Leave Approval
