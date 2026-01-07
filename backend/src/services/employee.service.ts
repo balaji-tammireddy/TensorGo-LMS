@@ -179,9 +179,15 @@ export const getEmployeeById = async (employeeId: number) => {
   };
 };
 
-export const createEmployee = async (employeeData: any) => {
+export const createEmployee = async (employeeData: any, requesterRole?: string, requesterId?: number) => {
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
-  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}`);
+  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}, Requester: ${requesterRole || 'none'}`);
+
+  // Only super_admin can create another super_admin
+  if (employeeData.role === 'super_admin' && requesterRole !== 'super_admin') {
+    logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to create super_admin`);
+    throw new Error('Only Super Admin can create Super Admin users');
+  }
 
   // Mandatory fields check
   const mandatoryFields = [
@@ -370,14 +376,14 @@ export const createEmployee = async (employeeData: any) => {
   const empId = employeeData.empId.trim().toUpperCase();
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Normalized Employee ID: ${empId}`);
 
-  // Validate employee ID length (max 6 characters)
-  if (empId.length > 6) {
-    throw new Error('Employee ID must be maximum 6 characters');
+  // Validate employee ID length (max 20 characters)
+  if (empId.length > 20) {
+    throw new Error('Employee ID must be maximum 20 characters');
   }
 
-  // Validate employee ID format (alphanumeric only)
-  if (!/^[A-Z0-9]+$/.test(empId)) {
-    throw new Error('Employee ID must contain only letters and numbers');
+  // Validate employee ID format (alphanumeric and hyphens only)
+  if (!/^[A-Z0-9-]+$/.test(empId)) {
+    throw new Error('Employee ID must contain only letters, numbers, and hyphens');
   }
 
   // Check if emp_id or email already exists
@@ -939,6 +945,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     allowedFields.push('email');
     allowedFields.push('date_of_joining');
     allowedFields.push('emp_id');
+  } else {
+    // If not super_admin, strictly forbid these fields if they are being updated
+    if (employeeData.email) throw new Error('Only Super Admin can update Official Email');
+    if (employeeData.dateOfJoining) throw new Error('Only Super Admin can update Date of Joining');
+    if (employeeData.empId) throw new Error('Only Super Admin can update Employee ID');
   }
 
   // Check if emp_id is being updated and validate uniqueness
@@ -1040,6 +1051,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     // Employee ID cannot be changed once set, unless requester is super_admin
     if (dbKey === 'emp_id' && requesterRole !== 'super_admin') {
       continue;
+    }
+
+    // Only super_admin can set/change someone to super_admin role
+    if (dbKey === 'role' && value === 'super_admin' && requesterRole !== 'super_admin') {
+      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to set super_admin role`);
+      throw new Error('Only Super Admin can assign the Super Admin role');
     }
 
     updates.push(`${dbKey} = $${paramCount}`);

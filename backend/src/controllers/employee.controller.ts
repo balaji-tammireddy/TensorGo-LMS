@@ -74,7 +74,7 @@ export const createEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] User ID: ${req.user!.id}, Role: ${req.user!.role}, Employee ID: ${req.body.empId}, Email: ${req.body.email}`);
 
   try {
-    const result = await employeeService.createEmployee(req.body);
+    const result = await employeeService.createEmployee(req.body, req.user?.role, req.user?.id);
     logger.info(`[CONTROLLER] [EMPLOYEE] [CREATE EMPLOYEE] Employee created successfully - Employee ID: ${result.employeeId}`);
     res.status(201).json(result);
   } catch (error: any) {

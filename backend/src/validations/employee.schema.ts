@@ -162,7 +162,12 @@ export const updateProfileSchema = z.object({
             maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional().nullable(),
             emergencyContactName: nameSchema.optional().nullable(),
             emergencyContactNo: phoneSchema.optional().nullable(),
-            emergencyContactRelation: nameSchema.optional().nullable()
+            emergencyContactRelation: nameSchema.optional().nullable(),
+            empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format').optional().nullable(),
+            email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
+                (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
+                { message: 'Only organization mail should be used' }
+            ).optional().nullable()
         }).optional().nullable(),
         employmentInfo: z.object({
             designation: nameSchema.optional().nullable(),

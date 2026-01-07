@@ -94,17 +94,29 @@ export const getProfile = async (userId: number) => {
   };
 };
 
-export const updateProfile = async (userId: number, profileData: any) => {
+export const updateProfile = async (userId: number, profileData: any, requesterRole: string) => {
   logger.info(`[PROFILE] [UPDATE PROFILE] ========== FUNCTION CALLED ==========`);
-  logger.info(`[PROFILE] [UPDATE PROFILE] User ID: ${userId}`);
+  logger.info(`[PROFILE] [UPDATE PROFILE] User ID: ${userId}, Role: ${requesterRole}`);
   logger.info(`[PROFILE] [UPDATE PROFILE] Sections to update: ${Object.keys(profileData).join(', ')}`);
+  if (profileData.personalInfo) {
+    logger.info(`[PROFILE] [UPDATE PROFILE] PersonalInfo keys: ${Object.keys(profileData.personalInfo).join(', ')}`);
+    logger.info(`[PROFILE] [UPDATE PROFILE] Payload empId: ${profileData.personalInfo.empId}, Email: ${profileData.personalInfo.email}`);
+  }
+
+  const userRole = String(requesterRole || ''); // Ensure string
+  logger.info(`[PROFILE] [UPDATE PROFILE] Validating with User Role: '${userRole}'`);
+
+  // Fetch current user data for validation and role-based restrictions
+  const currentValues = await pool.query('SELECT role, status, date_of_birth, date_of_joining, emp_id, email, designation, department FROM users WHERE id = $1', [userId]);
+  if (currentValues.rows.length === 0) {
+    throw new Error('User not found');
+  }
+  // We can trust requesterRole from the token, but we still need DB values for field comparison
+  const currentDob = currentValues.rows[0].date_of_birth;
+  const currentDoj = currentValues.rows[0].date_of_joining;
 
   // Validate date of birth and gap with joining date
   if (profileData.personalInfo?.dateOfBirth || profileData.employmentInfo?.dateOfJoining) {
-    const currentValues = await pool.query('SELECT date_of_birth, date_of_joining FROM users WHERE id = $1', [userId]);
-    const currentDob = currentValues.rows[0].date_of_birth;
-    const currentDoj = currentValues.rows[0].date_of_joining;
-
     const dobStr = profileData.personalInfo?.dateOfBirth || currentDob;
     const dojStr = profileData.employmentInfo?.dateOfJoining || currentDoj;
 
@@ -168,6 +180,16 @@ export const updateProfile = async (userId: number, profileData: any) => {
     reportingManagerId: 'reporting_manager_id'
   };
 
+  const allowedPersonalFields = [
+    'first_name', 'middle_name', 'last_name', 'contact_number', 'alt_contact',
+    'date_of_birth', 'gender', 'blood_group', 'marital_status',
+    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation'
+  ];
+
+  const allowedEmploymentFields = [
+    'designation', 'department', 'date_of_joining'
+  ];
+
   // Update personal info
   if (profileData.personalInfo) {
     const { contactNumber, altContact, emergencyContactNo } = profileData.personalInfo;
@@ -183,10 +205,35 @@ export const updateProfile = async (userId: number, profileData: any) => {
 
     const requiredPersonalInfo = ['firstName', 'lastName', 'email', 'contactNumber', 'dateOfBirth', 'gender', 'bloodGroup', 'maritalStatus'];
     for (const [key, value] of Object.entries(profileData.personalInfo)) {
-      const dbKey = fieldMap[key] || key;
+      const dbKey = fieldMap[key];
 
-      // Prevent updating immutable fields
-      if (key === 'empId' || key === 'email') {
+      // Check if trying to update restricted fields
+      if (key === 'empId') {
+        // Only super_admin might theoretically be allowed
+        if (userRole !== 'super_admin') {
+          const storedEmpId = currentValues.rows[0].emp_id;
+          const incoming = String(value || '').trim();
+          const stored = String(storedEmpId || '').trim();
+
+          logger.info(`[PROFILE] [UPDATE PROFILE] Checking empId update. Role: ${userRole}. Incoming: '${incoming}', Stored: '${stored}'`);
+
+          if (incoming && incoming !== stored) {
+            logger.warn(`[PROFILE] [UPDATE PROFILE] Blocked unauthorized empId update by ${userRole}`);
+            throw new Error('Employee ID cannot be updated by employee');
+          }
+        }
+        continue;
+      }
+      if (key === 'email') {
+        if (userRole !== 'super_admin') {
+          if (value && value !== currentValues.rows[0].email) {
+            throw new Error('Official Email cannot be updated by employee');
+          }
+        }
+        continue;
+      }
+
+      if (!dbKey || !allowedPersonalFields.includes(dbKey)) {
         continue;
       }
 
@@ -206,11 +253,39 @@ export const updateProfile = async (userId: number, profileData: any) => {
     }
   }
 
-  // Update employment info (only for HR/Super Admin)
+  // Update employment info
   if (profileData.employmentInfo) {
     const requiredEmploymentInfo = ['designation', 'department', 'dateOfJoining'];
     for (const [key, value] of Object.entries(profileData.employmentInfo)) {
-      const dbKey = fieldMap[key] || key;
+      const dbKey = fieldMap[key];
+      if (!dbKey || !allowedEmploymentFields.includes(dbKey)) {
+        continue;
+      }
+
+      // Fields disabled in ProfilePage.tsx
+      // dateOfJoining is always disabled in profile update
+      if (key === 'dateOfJoining') {
+        const currentDojStr = currentDoj ? formatDateLocal(currentDoj) : null;
+        if (value && value !== currentDojStr) {
+          throw new Error('Date of Joining cannot be updated');
+        }
+        continue;
+      }
+
+      // designation and department are disabled for non-super_admin users in self-update
+      if (key === 'designation') {
+        if (userRole !== 'super_admin' && value && value !== currentValues.rows[0].designation) {
+          throw new Error('Designation cannot be updated by employee');
+        }
+        if (userRole !== 'super_admin') continue;
+      }
+      if (key === 'department') {
+        if (userRole !== 'super_admin' && value && value !== currentValues.rows[0].department) {
+          throw new Error('Department cannot be updated by employee');
+        }
+        if (userRole !== 'super_admin') continue;
+      }
+
       if (value !== undefined) {
         const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
 
@@ -275,8 +350,9 @@ export const updateProfile = async (userId: number, profileData: any) => {
     }
   }
 
-  // Update reporting manager
-  if (profileData.reportingManagerId !== undefined) {
+  // Update reporting manager (Disabled in ProfilePage.tsx)
+  // Only Super Admin or HR should be able to update reporting manager (via /employees/:id API, not here)
+  if (profileData.reportingManagerId !== undefined && (userRole === 'super_admin' || userRole === 'hr')) {
     if (profileData.reportingManagerId) {
       const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [profileData.reportingManagerId]);
       if (managerResult.rows.length > 0) {
@@ -404,8 +480,8 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   }
 
   if (search) {
-    // Check for special characters and emojis (allow only alphanumeric and spaces)
-    const isValid = /^[a-zA-Z0-9\s]*$/.test(search);
+    // Check for special characters and emojis (allow only alphanumeric, spaces, and hyphens)
+    const isValid = /^[a-zA-Z0-9\s-]*$/.test(search);
     if (!isValid) {
       logger.warn(`[PROFILE] [GET REPORTING MANAGERS] Invalid search term detected: ${search}`);
       throw new Error('Search term contains invalid characters. Emojis and special characters are not allowed.');
