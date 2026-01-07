@@ -31,3 +31,6 @@ backend/uploads/
 # TypeScript
 *.tsbuildinfo
 
+# Build Config
+frontend/vite.config.ts
+
