@@ -75,7 +75,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
   const formatDateSafe = (dateStr: string) => {
     try {
       const date = new Date(dateStr + 'T12:00:00');
-      return format(date, 'dd/MM/yyyy');
+      return format(date, 'dd-MM-yyyy');
     } catch {
       return dateStr;
     }

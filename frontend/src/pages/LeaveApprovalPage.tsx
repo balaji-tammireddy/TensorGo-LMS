@@ -521,14 +521,14 @@ const LeaveApprovalPage: React.FC = () => {
     if (!value) return '';
     try {
       if (value instanceof Date) {
-        return format(value, 'dd/MM/yyyy');
+        return format(value, 'dd-MM-yyyy');
       }
       const str = value.toString();
       if (!str || str.toLowerCase() === 'invalid date') return '';
       const hasTime = str.includes('T');
       const d = new Date(hasTime ? str : `${str}T12:00:00`);
       if (isNaN(d.getTime())) return '';
-      return format(d, 'dd/MM/yyyy');
+      return format(d, 'dd-MM-yyyy');
     } catch {
       return '';
     }

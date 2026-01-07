@@ -451,6 +451,25 @@ const EmployeeManagementPage: React.FC = () => {
     checkField('department', 'Department');
     checkField('dateOfJoining', 'Date of Joining');
 
+    // Validate gap between Date of Birth and Date of Joining (min 18 years)
+    if (newEmployee.dateOfBirth && newEmployee.dateOfJoining) {
+      const dob = new Date(newEmployee.dateOfBirth);
+      const doj = new Date(newEmployee.dateOfJoining);
+
+      let workAge = doj.getFullYear() - dob.getFullYear();
+      const monthDiff = doj.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
+        workAge--;
+      }
+
+      if (workAge < 18) {
+        showWarning('Joining Date must be at least 18 years after Date of Birth');
+        fieldErrors['dateOfJoining'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
+
     // Date of Joining must not be in the future
     if (newEmployee.dateOfJoining) {
       const doj = new Date(newEmployee.dateOfJoining);

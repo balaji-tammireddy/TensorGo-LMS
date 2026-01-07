@@ -43,7 +43,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const [popoverCoords, setPopoverCoords] = useState({ top: 0, left: 0, width: 0 });
   const [position, setPosition] = useState<'bottom' | 'top'>('bottom');
 
-  const effectivePlaceholder = placeholder || (isEmployeeVariant ? 'dd - mm - yyyy' : 'Select date');
+  const effectivePlaceholder = placeholder || (isEmployeeVariant ? 'dd-mm-yyyy' : 'Select date');
 
   const updatePopoverPosition = useCallback(() => {
     if (!containerRef.current) return;
@@ -106,7 +106,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     if (value) {
       const date = new Date(value + 'T00:00:00');
       setSelectedDate(date);
-      const defaultFormat = isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd';
+      const defaultFormat = isEmployeeVariant ? 'dd-MM-yyyy' : 'yyyy-MM-dd';
       // Update input value formatting to use displayFormat if provided, otherwise fallback to existing logic.
       setInputValue(format(date, displayFormat || defaultFormat));
     } else {
@@ -155,7 +155,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const handleSelect = (date: Date | undefined) => {
     if (date) {
       const dateStrYMD = format(date, 'yyyy-MM-dd');
-      const defaultFormat = isEmployeeVariant ? 'dd - MM - yyyy' : 'yyyy-MM-dd';
+      const defaultFormat = isEmployeeVariant ? 'dd-MM-yyyy' : 'yyyy-MM-dd';
       const dateStrDisplay = format(date, displayFormat || defaultFormat);
       setSelectedDate(date);
       setInputValue(dateStrDisplay);
@@ -178,9 +178,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           if (digits.length <= 2) {
             val = digits;
           } else if (digits.length <= 4) {
-            val = `${digits.slice(0, 2)} - ${digits.slice(2)}`;
+            val = `${digits.slice(0, 2)}-${digits.slice(2)}`;
           } else {
-            val = `${digits.slice(0, 2)} - ${digits.slice(2, 4)} - ${digits.slice(4, 8)}`;
+            val = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}`;
           }
         }
       }
@@ -235,7 +235,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         if (finalDate && isValid(finalDate)) {
           const dateStr = format(finalDate, 'yyyy-MM-dd');
           setSelectedDate(finalDate);
-          setInputValue(format(finalDate, 'dd - MM - yyyy'));
+          setInputValue(format(finalDate, 'dd-MM-yyyy'));
           onChange(dateStr);
           setIsOpen(false);
         }

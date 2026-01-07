@@ -221,6 +221,20 @@ export const createEmployee = async (employeeData: any) => {
     if (doj > today) {
       throw new Error('Date of Joining cannot be in the future');
     }
+
+    // Validate gap between Date of Birth and Date of Joining (min 18 years)
+    if (employeeData.dateOfBirth) {
+      const dob = new Date(employeeData.dateOfBirth);
+      let workAge = doj.getFullYear() - dob.getFullYear();
+      const monthDiff = doj.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
+        workAge--;
+      }
+
+      if (workAge < 18) {
+        throw new Error('Joining Date must be at least 18 years after Date of Birth');
+      }
+    }
   }
 
   // Reporting manager required if role != 'super_admin'
@@ -639,6 +653,47 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     today.setHours(23, 59, 59, 999); // Allow joining on current day
     if (doj > today) {
       throw new Error('Date of Joining cannot be in the future');
+    }
+
+    // Validate gap between Date of Birth and Date of Joining (min 18 years)
+    // If DOB is also being updated, use new DOB, otherwise fetch current DOB
+    let dob: Date | null = null;
+    if (employeeData.dateOfBirth) {
+      dob = new Date(employeeData.dateOfBirth);
+    } else {
+      const currentEmployee = await pool.query('SELECT date_of_birth FROM users WHERE id = $1', [employeeId]);
+      if (currentEmployee.rows.length > 0 && currentEmployee.rows[0].date_of_birth) {
+        dob = new Date(currentEmployee.rows[0].date_of_birth);
+      }
+    }
+
+    if (dob) {
+      let workAge = doj.getFullYear() - dob.getFullYear();
+      const monthDiff = doj.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
+        workAge--;
+      }
+
+      if (workAge < 18) {
+        throw new Error('Joining Date must be at least 18 years after Date of Birth');
+      }
+    }
+  } else if (employeeData.dateOfBirth) {
+    // If only DOB is updated, check against existing DOJ
+    const currentEmployee = await pool.query('SELECT date_of_joining FROM users WHERE id = $1', [employeeId]);
+    if (currentEmployee.rows.length > 0 && currentEmployee.rows[0].date_of_joining) {
+      const doj = new Date(currentEmployee.rows[0].date_of_joining);
+      const dob = new Date(employeeData.dateOfBirth);
+
+      let workAge = doj.getFullYear() - dob.getFullYear();
+      const monthDiff = doj.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
+        workAge--;
+      }
+
+      if (workAge < 18) {
+        throw new Error('Joining Date must be at least 18 years after Date of Birth');
+      }
     }
   }
 
@@ -1210,6 +1265,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         await emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
+          employeeEmpId: employeeResult.rows[0].emp_id || '',
           updatedBy: requesterName
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
