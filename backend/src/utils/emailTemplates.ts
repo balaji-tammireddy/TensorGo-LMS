@@ -56,17 +56,23 @@ const formatDateForDisplay = (dateStr: string): string => {
  */
 const formatDateTimeForDisplay = (dateStr: string): string => {
   const date = new Date(dateStr);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
 
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  // Convert UTC date to IST (UTC + 5:30)
+  // getTimezoneOffset returns the difference in minutes between UTC and Local time.
+  // We want to force IST (+330 minutes from UTC)
+  const istDate = new Date(date.getTime() + (330 * 60 * 1000));
+
+  const day = String(istDate.getUTCDate()).padStart(2, '0');
+  const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+  const year = istDate.getUTCFullYear();
+
+  let hours = istDate.getUTCHours();
+  const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   hours = hours ? hours : 12; // the hour '0' should be '12'
 
-  return `${day}-${month}-${year} (${hours}:${minutes} ${ampm})`;
+  return `${day}-${month}-${year} at ${hours}:${minutes} ${ampm} IST`;
 };
 
 /**

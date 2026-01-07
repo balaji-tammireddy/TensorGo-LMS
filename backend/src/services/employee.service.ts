@@ -575,7 +575,7 @@ export const createEmployee = async (employeeData: any) => {
   // Send welcome email with credentials
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
-    const loginUrl = 'http://51.15.227.10/login';
+    const loginUrl = 'http://51.15.227.10:3000/login';
     const temporaryPassword = employeeData.password || 'tensorgo@2023';
 
     await emailTemplates.sendNewEmployeeCredentialsEmail(employeeData.email, {
