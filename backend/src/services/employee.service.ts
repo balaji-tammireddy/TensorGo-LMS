@@ -153,6 +153,7 @@ export const getEmployeeById = async (employeeId: number) => {
        SELECT COUNT(*)::integer as subordinate_count 
        FROM users sub 
        WHERE sub.reporting_manager_id = u.id
+       AND sub.status IN ('active', 'on_leave', 'on_notice')
      ) sc ON true
      WHERE u.id = $1`,
     [employeeId]
@@ -181,6 +182,134 @@ export const getEmployeeById = async (employeeId: number) => {
 export const createEmployee = async (employeeData: any) => {
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}`);
+
+  // Mandatory fields check
+  const mandatoryFields = [
+    { key: 'role', label: 'Role' },
+    { key: 'firstName', label: 'First Name' },
+    { key: 'lastName', label: 'Last Name' },
+    { key: 'email', label: 'Official Email' },
+    { key: 'contactNumber', label: 'Contact Number' },
+    { key: 'altContact', label: 'Alternate Contact Number' },
+    { key: 'dateOfBirth', label: 'Date of Birth' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'bloodGroup', label: 'Blood Group' },
+    { key: 'maritalStatus', label: 'Marital Status' },
+    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
+    { key: 'emergencyContactNo', label: 'Emergency Contact Number' },
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department' },
+    { key: 'dateOfJoining', label: 'Date of Joining' },
+    { key: 'aadharNumber', label: 'Aadhar Number' },
+    { key: 'panNumber', label: 'PAN Number' },
+    { key: 'currentAddress', label: 'Current Address' },
+    { key: 'permanentAddress', label: 'Permanent Address' }
+  ];
+
+  for (const field of mandatoryFields) {
+    if (employeeData[field.key] === undefined || employeeData[field.key] === null || (typeof employeeData[field.key] === 'string' && employeeData[field.key].trim() === '')) {
+      throw new Error(`${field.label} is required`);
+    }
+  }
+
+  // Reporting manager required if role != 'super_admin'
+  if (employeeData.role !== 'super_admin' && !employeeData.reportingManagerId) {
+    throw new Error('Reporting Manager is required');
+  }
+
+  // Validate phone numbers length and format
+  const phoneFields = [
+    { key: 'contactNumber', label: 'Contact Number' },
+    { key: 'altContact', label: 'Alternate Contact Number' },
+    { key: 'emergencyContactNo', label: 'Emergency Contact Number' }
+  ];
+
+  for (const field of phoneFields) {
+    const val = String(employeeData[field.key] || '').trim();
+    if (val.length !== 10 || !/^\d+$/.test(val)) {
+      throw new Error(`${field.label} must be exactly 10 digits`);
+    }
+  }
+
+  // Validate text-only fields (no special characters, numbers or emojis)
+  const textFields = [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'middleName', label: 'Middle Name' },
+    { key: 'lastName', label: 'Last Name' },
+    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department' }
+  ];
+
+  for (const field of textFields) {
+    const val = employeeData[field.key];
+    if (val && typeof val === 'string' && val.trim() !== '') {
+      if (!/^[a-zA-Z\s]+$/.test(val)) {
+        throw new Error(`${field.label} should only contain letters and spaces`);
+      }
+    }
+  }
+
+  // Validate Aadhar number length and format
+  if (employeeData.aadharNumber) {
+    const aadhar = String(employeeData.aadharNumber).trim();
+    if (aadhar.length !== 12 || !/^\d+$/.test(aadhar)) {
+      throw new Error('Aadhar must be exactly 12 digits');
+    }
+  }
+
+  // Education validation
+  if (!employeeData.education || !Array.isArray(employeeData.education)) {
+    throw new Error('Education details are required');
+  }
+
+  const eduLevels = employeeData.education.map((e: any) => e.level);
+  if (!eduLevels.includes('UG') || !eduLevels.includes('12th')) {
+    throw new Error('UG and 12th education details are mandatory');
+  }
+
+  const educationYears: Record<string, number> = {};
+  for (const edu of employeeData.education) {
+    const isMandatory = ['UG', '12th'].includes(edu.level);
+    const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
+
+    if (isMandatory || hasAnyField) {
+      if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+        throw new Error(`Please fill complete details for ${edu.level} education`);
+      }
+      educationYears[edu.level] = parseInt(edu.year, 10);
+    }
+  }
+
+  if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
+    throw new Error('12th Graduation Year must be before UG Graduation Year');
+  }
+  if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] >= educationYears['PG']) {
+    throw new Error('UG Graduation Year must be before PG Graduation Year');
+  }
+
+  // Enum validations
+  const allowedStatuses = ['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive'];
+  if (employeeData.status && !allowedStatuses.includes(employeeData.status)) {
+    throw new Error('Invalid status');
+  }
+
+  const allowedGenders = ['Male', 'Female', 'Other'];
+  if (employeeData.gender && !allowedGenders.includes(employeeData.gender)) {
+    throw new Error('Invalid gender. Must be Male, Female, or Other');
+  }
+
+  const allowedBloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  if (employeeData.bloodGroup && !allowedBloodGroups.includes(employeeData.bloodGroup)) {
+    throw new Error('Invalid blood group');
+  }
+
+  const allowedMaritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'];
+  if (employeeData.maritalStatus && !allowedMaritalStatuses.includes(employeeData.maritalStatus)) {
+    throw new Error('Invalid marital status');
+  }
 
   // Employee ID must be provided by HR/Super Admin
   if (!employeeData.empId || !employeeData.empId.trim()) {
@@ -270,18 +399,39 @@ export const createEmployee = async (employeeData: any) => {
   const reportingManagerId = role === 'super_admin' ? null : (employeeData.reportingManagerId || null);
   const reportingManagerName = role === 'super_admin' ? null : (employeeData.reportingManagerName || null);
 
-  // Validate reporting manager status
+  // Validate reporting manager status and hierarchy
   if (reportingManagerId) {
-    const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [reportingManagerId]);
+    const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [reportingManagerId]);
     if (managerResult.rows.length > 0) {
-      const status = managerResult.rows[0].status;
-      if (status === 'on_notice') {
+      const { status: managerStatus, role: managerRole } = managerResult.rows[0];
+
+      // Status check
+      if (managerStatus === 'on_notice') {
         throw new Error('Employees in notice period cannot be reporting managers');
       }
-      if (status !== 'active' && status !== 'on_leave') {
+      if (managerStatus !== 'active' && managerStatus !== 'on_leave') {
         throw new Error('Selected reporting manager must be active or on leave');
       }
+
+      // Hierarchy check
+      if (managerRole !== 'super_admin') {
+        if (role === 'intern' || role === 'employee') {
+          if (managerRole !== 'manager') {
+            throw new Error(`For ${role === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
+          }
+        } else if (role === 'manager') {
+          if (managerRole !== 'hr') {
+            throw new Error('For Managers, only HR or Super Admins can be reporting managers');
+          }
+        } else if (role === 'hr') {
+          throw new Error('For HR, only Super Admins can be reporting managers');
+        }
+      }
+    } else {
+      throw new Error('Selected reporting manager does not exist');
     }
+  } else if (role !== 'super_admin') {
+    throw new Error('Reporting Manager is required');
   }
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Inserting employee into database`);
@@ -416,16 +566,108 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${employeeId}, Requester Role: ${requesterRole || 'none'}, Requester ID: ${requesterId || 'none'}`);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Fields to update: ${Object.keys(employeeData).join(', ')}`);
 
-  // Check if employee exists and get their role
+  // Basic format validations before DB calls
+  // Validate phone numbers if updated
+  const phoneFields = [
+    { key: 'contactNumber', label: 'Contact Number' },
+    { key: 'altContact', label: 'Alternate Contact Number' },
+    { key: 'emergencyContactNo', label: 'Emergency Contact Number' }
+  ];
+
+  for (const field of phoneFields) {
+    if (employeeData[field.key]) {
+      const val = String(employeeData[field.key]).trim();
+      if (val.length !== 10 || !/^\d+$/.test(val)) {
+        throw new Error(`${field.label} must be exactly 10 digits`);
+      }
+    }
+  }
+
+  // Validate text-only fields if updated
+  const textFields = [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'middleName', label: 'Middle Name' },
+    { key: 'lastName', label: 'Last Name' },
+    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department' }
+  ];
+
+  for (const field of textFields) {
+    const val = employeeData[field.key];
+    if (val && typeof val === 'string' && val.trim() !== '') {
+      if (!/^[a-zA-Z\s]+$/.test(val)) {
+        throw new Error(`${field.label} should only contain letters and spaces`);
+      }
+    }
+  }
+
+  // Validate Aadhar if updated
+  if (employeeData.aadharNumber) {
+    const aadhar = String(employeeData.aadharNumber).trim();
+    if (aadhar.length !== 12 || !/^\d+$/.test(aadhar)) {
+      throw new Error('Aadhar must be exactly 12 digits');
+    }
+  }
+
+  // Education validation if updated
+  if (employeeData.education && Array.isArray(employeeData.education)) {
+    const educationYears: Record<string, number> = {};
+
+    for (const edu of employeeData.education) {
+      const isMandatory = ['UG', '12th'].includes(edu.level);
+      const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
+
+      if (isMandatory || hasAnyField) {
+        if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+          throw new Error(`Please fill complete details for ${edu.level} education`);
+        }
+        educationYears[edu.level] = parseInt(edu.year, 10);
+      }
+    }
+
+    if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
+      throw new Error('12th Graduation Year must be before UG Graduation Year');
+    }
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] >= educationYears['PG']) {
+      throw new Error('UG Graduation Year must be before PG Graduation Year');
+    }
+  }
+
+  // Enum validations
+  const allowedStatuses = ['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive'];
+  if (employeeData.status && !allowedStatuses.includes(employeeData.status)) {
+    throw new Error('Invalid status');
+  }
+
+  const allowedGenders = ['Male', 'Female', 'Other'];
+  if (employeeData.gender && !allowedGenders.includes(employeeData.gender)) {
+    throw new Error('Invalid gender. Must be Male, Female, or Other');
+  }
+
+  const allowedBloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  if (employeeData.bloodGroup && !allowedBloodGroups.includes(employeeData.bloodGroup)) {
+    throw new Error('Invalid blood group');
+  }
+
+  const allowedMaritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'];
+  if (employeeData.maritalStatus && !allowedMaritalStatuses.includes(employeeData.maritalStatus)) {
+    throw new Error('Invalid marital status');
+  }
+
+  // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_joining FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_joining, reporting_manager_id, reporting_manager_name FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
   }
-  logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee found - Role: ${employeeCheck.rows[0].role}`);
 
   const employeeRole = employeeCheck.rows[0].role;
+  const dbStatus = employeeCheck.rows[0].status;
+  const dbReportingManagerId = employeeCheck.rows[0].reporting_manager_id;
+  const dbReportingManagerName = employeeCheck.rows[0].reporting_manager_name;
 
   // Check what fields are being updated
   const fieldsBeingUpdated = Object.keys(employeeData).map(key =>
@@ -434,47 +676,68 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const isOnlyRoleUpdate = fieldsBeingUpdated.length === 1 && fieldsBeingUpdated[0] === 'role';
   const isRoleBeingUpdated = fieldsBeingUpdated.includes('role');
 
+  // Reporting manager required if role is being set and is not 'super_admin'
+  if (employeeData.role && employeeData.role !== 'super_admin' && !employeeData.reportingManagerId && !employeeData.reportingManagerName) {
+    if (!dbReportingManagerId && !dbReportingManagerName) {
+      throw new Error('Reporting Manager is required');
+    }
+  }
+
   // Super admin should not have a reporting manager
-  // If role is being changed to super_admin, clear reporting manager
-  // If role is already super_admin, prevent setting reporting manager
   if (isRoleBeingUpdated && employeeData.role === 'super_admin') {
     employeeData.reportingManagerId = null;
     employeeData.reportingManagerName = null;
   } else if (employeeRole === 'super_admin' && (employeeData.reportingManagerId !== undefined || employeeData.reportingManagerName !== undefined)) {
-    // If already super_admin and trying to set reporting manager, clear it
     employeeData.reportingManagerId = null;
     employeeData.reportingManagerName = null;
   }
 
   // Prevent role change if there are subordinates reporting to this user
-  const dbRole = String(employeeCheck.rows[0].role || '').trim().toLowerCase();
+  const dbRole = String(employeeRole || '').trim().toLowerCase();
   const requestedRole = employeeData.role ? String(employeeData.role).trim().toLowerCase() : null;
   const isRoleTransition = requestedRole !== null && requestedRole !== dbRole;
 
   if (isRoleTransition) {
-    // Check for subordinates
-    const subordinatesResult = await pool.query(
-      'SELECT id, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE reporting_manager_id = $1 LIMIT 5',
+    const activeSubordinates = await pool.query(
+      'SELECT id FROM users WHERE reporting_manager_id = $1 AND status IN (\'active\', \'on_leave\', \'on_notice\') LIMIT 1',
       [employeeId]
     );
 
-    if (subordinatesResult.rows.length > 0) {
+    if (activeSubordinates.rows.length > 0) {
       const name = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
-      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Role change BLOCKED for user ${employeeId} due to existing subordinates.`);
+      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Role change BLOCKED for user ${employeeId} due to existing active subordinates.`);
       throw new Error(`Please remove the users reporting to ${name} and try again.`);
     }
   }
 
-  // Validate reporting manager status if it's being updated
+  // Validate reporting manager status and hierarchy if it's being updated
   if (employeeData.reportingManagerId) {
-    const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
+    const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
     if (managerResult.rows.length > 0) {
-      const status = managerResult.rows[0].status;
-      if (status === 'on_notice') {
+      const { status: managerStatus, role: managerRole } = managerResult.rows[0];
+      const targetRole = employeeData.role || employeeRole;
+
+      // Status check
+      if (managerStatus === 'on_notice') {
         throw new Error('Employees in notice period cannot be reporting managers');
       }
-      if (status !== 'active' && status !== 'on_leave') {
+      if (managerStatus !== 'active' && managerStatus !== 'on_leave') {
         throw new Error('Selected reporting manager must be active or on leave');
+      }
+
+      // Hierarchy check
+      if (managerRole !== 'super_admin') {
+        if (targetRole === 'intern' || targetRole === 'employee') {
+          if (managerRole !== 'manager') {
+            throw new Error(`For ${targetRole === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
+          }
+        } else if (targetRole === 'manager') {
+          if (managerRole !== 'hr') {
+            throw new Error('For Managers, only HR or Super Admins can be reporting managers');
+          }
+        } else if (targetRole === 'hr') {
+          throw new Error('For HR, only Super Admins can be reporting managers');
+        }
       }
     }
   }
@@ -482,7 +745,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   // Prevent HR from editing super_admin or other HR users (except role updates)
   if (requesterRole === 'hr' && (employeeRole === 'super_admin' || employeeRole === 'hr') && !isOnlyRoleUpdate) {
     if (isRoleBeingUpdated) {
-      // Remove all fields except role
       Object.keys(employeeData).forEach(key => {
         const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
         if (dbKey !== 'role') {

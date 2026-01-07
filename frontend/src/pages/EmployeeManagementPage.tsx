@@ -234,9 +234,9 @@ const EmployeeManagementPage: React.FC = () => {
   useEffect(() => {
     const term = searchInput.trim();
     const timer = setTimeout(() => {
-      if (term.length >= 3) {
+      if (term.length > 0) {
         setAppliedSearch(term);
-      } else if (term.length === 0) {
+      } else {
         setAppliedSearch(undefined);
       }
     }, 500); // 500ms debounce
@@ -834,11 +834,11 @@ const EmployeeManagementPage: React.FC = () => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const value = e.currentTarget.value.trim();
-                  if (value.length < 3) {
-                    showWarning('Type 3+ chars to search');
-                    return;
+                  if (value.length > 0) {
+                    setAppliedSearch(value);
+                  } else {
+                    setAppliedSearch(undefined);
                   }
-                  setAppliedSearch(value);
                 }
               }}
             />
@@ -1195,17 +1195,9 @@ const EmployeeManagementPage: React.FC = () => {
 
                                       const subCount = newEmployee.subordinateCount ? parseInt(String(newEmployee.subordinateCount), 10) : 0;
 
-                                      // Log for debugging
-                                      console.log('Role Selection:', {
-                                        editMode: isEditMode,
-                                        subCount,
-                                        currentRole: newEmployee.role,
-                                        targetRole: role
-                                      });
-
                                       if (isEditMode && subCount > 0 && newEmployee.role !== role) {
                                         const name = `${newEmployee.firstName} ${newEmployee.lastName || ''}`.trim();
-                                        showWarning(`Cannot change role: ${name} has ${subCount} users reporting to them.`);
+                                        showWarning(`Please remove the users reporting to ${name} and try again.`);
                                         return;
                                       }
 

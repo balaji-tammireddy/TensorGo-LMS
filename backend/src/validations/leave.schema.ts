@@ -87,3 +87,10 @@ export const rejectLeaveDaysSchema = z.object({
     comment: z.string().min(1, 'Comment is required for rejection')
   })
 });
+
+export const holidaySchema = z.object({
+  body: z.object({
+    holidayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+    holidayName: z.string().min(1, 'Holiday name is required')
+  })
+});

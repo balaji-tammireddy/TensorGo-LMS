@@ -3,7 +3,7 @@ import * as leaveController from '../controllers/leave.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { authorizeRole } from '../middleware/authorize.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
-import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, updateLeaveSchema, deleteLeaveSchema, approveLeaveDaySchema, rejectLeaveDaySchema, rejectLeaveDaysSchema } from '../validations/leave.schema';
+import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, updateLeaveSchema, deleteLeaveSchema, approveLeaveDaySchema, rejectLeaveDaySchema, rejectLeaveDaysSchema, holidaySchema } from '../validations/leave.schema';
 
 const router = Router();
 
@@ -71,8 +71,7 @@ router.post('/:id/update-status', authorizeRole('hr', 'super_admin'), leaveContr
 router.get('/approved', authorizeRole('manager', 'hr', 'super_admin'), leaveController.getApprovedLeaves);
 
 // Holiday management routes (HR and Super Admin only)
-router.post('/holidays', authorizeRole('hr', 'super_admin'), leaveController.createHoliday);
+router.post('/holidays', authorizeRole('hr', 'super_admin'), validateRequest(holidaySchema), leaveController.createHoliday);
 router.delete('/holidays/:id', authorizeRole('hr', 'super_admin'), leaveController.deleteHoliday);
 
 export default router;
-
