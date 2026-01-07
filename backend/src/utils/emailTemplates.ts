@@ -112,7 +112,8 @@ const generateEmailWrapper = (title: string, content: string, footerRefId: strin
     table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
     table td { border-collapse: collapse; }
     p { margin: 1em 0; line-height: 1.6; }
-    h1, h2, h3 { color: #1e3a8a !important; margin: 0; }
+    h1 { margin: 0; }
+    h2, h3 { color: #1e3a8a !important; margin: 0; }
     a { color: #2563eb; text-decoration: underline; }
   </style>
 </head>
@@ -141,7 +142,7 @@ const generateEmailWrapper = (title: string, content: string, footerRefId: strin
           <!-- Footer -->
           <tr>
             <td bgcolor="#f8fafc" align="left" style="padding: 30px 40px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-family: Arial, sans-serif;">
-              <p style="margin: 0;">This is an automated notification from TensorGo Intranet. Please do not reply to this email.</p>
+              <p style="margin: 0;">This is an automated notification from <strong>TensorGo Intranet</strong>. Please do not reply to this email.</p>
               <p style="margin: 10px 0 0 0;">Reference ID: ${footerRefId}</p>
             </td>
           </tr>
@@ -1100,23 +1101,24 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
   const uniqueId = `${timestamp}${randomStr}`;
 
   const content = `
-    <div style="text-align: center; padding: 20px 0;">
-      <h2 style="color: #1e3a8a; font-size: 28px; margin-bottom: 20px;">🎉 Happy Birthday, ${data.employeeName}! 🎂</h2>
-      <p style="font-size: 18px; line-height: 1.6; color: #374151;">
-        On behalf of the entire team at <strong>TensorGo Intranet</strong>, we wish you a very happy birthday and a wonderful year ahead!
+    <div style="text-align: left; padding: 20px 0;">
+      <p style="font-size: 16px; line-height: 1.7; color: #374151; margin-bottom: 20px;">
+        On behalf of Team <strong>TensorGo Intranet</strong>, we extend our best wishes to you on your birthday and for the year ahead.
       </p>
-      <div style="margin: 40px 0; font-size: 50px;">🎁 ✨ 🎈</div>
-      <p style="font-size: 16px; color: #6b7280; font-style: italic;">
-        "May your day be filled with joy, laughter, and everything you love."
+      <p style="font-size: 16px; line-height: 1.7; color: #374151; margin-bottom: 20px;">
+        We appreciate your continued commitment and contributions to the organization. May the coming year bring you sustained success, professional growth, and good health.
+      </p>
+      <p style="font-size: 16px; line-height: 1.7; color: #374151; margin-bottom: 20px;">
+        We wish you a pleasant birthday and a successful year ahead.
       </p>
     </div>
-    <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 30px; text-align: center;">
+    <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 30px; text-align: left;">
       <p style="margin: 0; font-size: 16px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
     </div>
   `;
 
   return generateEmailWrapper(
-    'Happy Birthday!',
+    `HAPPY BIRTHDAY ${data.employeeName.toUpperCase()}`,
     content,
     uniqueId,
     `Wishing you a very happy birthday, ${data.employeeName}!`
@@ -1125,17 +1127,15 @@ const generateBirthdayWishEmailHtml = (data: BirthdayWishEmailData): string => {
 
 const generateBirthdayWishEmailText = (data: BirthdayWishEmailData): string => {
   return `
-Happy Birthday
+HAPPY BIRTHDAY ${data.employeeName.toUpperCase()}
 
 Dear ${data.employeeName},
 
-Warm wishes to you on your birthday.
+On behalf of Team TensorGo Intranet, we extend our best wishes to you on your birthday and for the year ahead.
 
-We value your contributions and commitment, and we appreciate the role you play in supporting our organization's goals. Your professionalism and dedication continue to make a positive impact.
+We appreciate your continued commitment and contributions to the organization. May the coming year bring you sustained success, professional growth, and good health.
 
-May the year ahead bring you continued success, good health, and personal fulfillment.
-
-We wish you a pleasant and memorable birthday.
+We wish you a pleasant birthday and a successful year ahead.
 
 Best Regards,
 TensorGo Intranet

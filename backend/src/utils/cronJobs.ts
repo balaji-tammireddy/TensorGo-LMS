@@ -356,8 +356,8 @@ export const processDailyLeaveCredits = async () => {
               allocatedDays: addedCredits,
               previousBalance: previousBalance,
               newBalance: previousBalance + addedCredits,
-              allocatedBy: 'System (Anniversary)',
-              allocatedByEmpId: 'SYSTEM',
+              allocatedBy: 'Super Admin',
+              allocatedByEmpId: undefined,
               allocationDate: today.toISOString().split('T')[0],
               comment: reason
             });

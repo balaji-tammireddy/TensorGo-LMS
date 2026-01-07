@@ -7,12 +7,12 @@ const nameSchema = z.string()
 
 const safeTextSchema = z.string()
     .max(255, 'Text cannot exceed 255 characters')
-    .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;]*$/, 'Special characters and emojis are not allowed');
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;!?@#$%*\[\]{}\n\r]*$/, 'Special characters and emojis are not allowed');
 
 const addressSchema = z.string()
     .min(1, 'Address is required')
     .max(255, 'Address cannot exceed 255 characters')
-    .regex(/^[a-zA-Z0-9\s\.,\-'()&/#]+$/, 'Special characters and emojis are not allowed in address');
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/#!\n\r]+$/, 'Special characters and emojis are not allowed in address');
 
 const phoneSchema = z.string()
     .length(10, 'Phone number must be exactly 10 digits')
@@ -24,10 +24,21 @@ const aadharSchema = z.string()
 
 const educationSchema = z.object({
     level: z.string().max(50),
-    groupStream: safeTextSchema.optional().or(z.literal('')),
-    collegeUniversity: safeTextSchema.optional().or(z.literal('')),
-    year: z.string().regex(/^\d{4}$/, 'Invalid year format').optional().or(z.literal('')),
-    scorePercentage: z.string().max(10).regex(/^[a-zA-Z0-9\s\.,%]+$/, 'Invalid score format').optional().or(z.literal(''))
+    groupStream: z.union([z.string(), z.null(), z.undefined()]).optional().or(z.literal('')),
+    collegeUniversity: z.union([z.string(), z.null(), z.undefined()]).optional().or(z.literal('')),
+    year: z.union([
+        z.string().regex(/^\d{4}$/, 'Invalid year format'),
+        z.string().length(0),
+        z.number(),
+        z.null(),
+        z.undefined()
+    ]).optional().or(z.literal('')),
+    scorePercentage: z.union([
+        z.string().max(10),
+        z.number(),
+        z.null(),
+        z.undefined()
+    ]).optional().or(z.literal(''))
 });
 
 export const createEmployeeSchema = z.object({
@@ -103,19 +114,19 @@ export const addLeavesSchema = z.object({
 export const updateProfileSchema = z.object({
     body: z.object({
         personalInfo: z.object({
-            firstName: nameSchema.optional(),
-            middleName: nameSchema.optional().or(z.literal('')),
-            lastName: nameSchema.optional(),
-            contactNumber: phoneSchema.optional(),
-            altContact: phoneSchema.optional(),
-            dateOfBirth: z.string().optional(),
-            gender: z.enum(['Male', 'Female', 'Other']).optional(),
-            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional(),
-            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional(),
-            emergencyContactName: nameSchema.optional(),
-            emergencyContactNo: phoneSchema.optional(),
-            emergencyContactRelation: nameSchema.optional()
-        }).optional(),
+            firstName: nameSchema.optional().nullable(),
+            middleName: nameSchema.optional().nullable().or(z.literal('')),
+            lastName: nameSchema.optional().nullable(),
+            contactNumber: phoneSchema.optional().nullable(),
+            altContact: phoneSchema.optional().nullable(),
+            dateOfBirth: z.string().optional().nullable(),
+            gender: z.enum(['Male', 'Female', 'Other']).optional().nullable(),
+            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional().nullable(),
+            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional().nullable(),
+            emergencyContactName: nameSchema.optional().nullable(),
+            emergencyContactNo: phoneSchema.optional().nullable(),
+            emergencyContactRelation: nameSchema.optional().nullable()
+        }).optional().nullable(),
         employmentInfo: z.object({
             designation: nameSchema.optional().nullable(),
             department: nameSchema.optional().nullable(),
@@ -126,10 +137,10 @@ export const updateProfileSchema = z.object({
             panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
         }).optional().nullable(),
         address: z.object({
-            currentAddress: z.string().optional(),
-            permanentAddress: z.string().optional()
-        }).optional(),
-        education: z.array(educationSchema).optional(),
+            currentAddress: z.string().optional().nullable(),
+            permanentAddress: z.string().optional().nullable()
+        }).optional().nullable(),
+        education: z.array(educationSchema).optional().nullable(),
         reportingManagerId: z.number().nullable().optional()
     })
 });

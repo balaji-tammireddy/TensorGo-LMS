@@ -1245,7 +1245,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   // Send email notification if HR or Super Admin updated employee details
-  if ((requesterRole === 'hr' || requesterRole === 'super_admin') && !isOnlyRoleUpdate && !isManagerChanged) {
+  // Only send if it's NOT a role change, status change, or manager change (those have their own emails)
+  if ((requesterRole === 'hr' || requesterRole === 'super_admin') && !isOnlyRoleUpdate && !isManagerChanged && !isRoleChanged && !isStatusChanged) {
     try {
       // Get employee details and requester details for email
       const [employeeResult, requesterResult] = await Promise.all([

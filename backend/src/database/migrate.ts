@@ -69,6 +69,15 @@ async function migrate() {
       CHECK (status IN ('active', 'inactive', 'on_leave', 'terminated', 'resigned', 'on_notice'));
     `);
 
+    // Allow 'intern' in users role check (idempotent)
+    await pool.query(`
+      ALTER TABLE users
+      DROP CONSTRAINT IF EXISTS users_role_check;
+      ALTER TABLE users
+      ADD CONSTRAINT users_role_check
+      CHECK (role IN ('employee', 'manager', 'hr', 'super_admin', 'intern'));
+    `);
+
     // Leave rules insertion disabled - rules cannot be changed until explicitly enabled
     // await pool.query(`
     //   INSERT INTO leave_rules (leave_required_min, leave_required_max, prior_information_days, is_active)

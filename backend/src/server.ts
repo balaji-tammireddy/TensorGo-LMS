@@ -1,4 +1,4 @@
-// Force reload to pick up service changes - v15
+// Force reload to pick up service changes - v16
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -37,8 +37,8 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      // Allow any localhost origin for development
-      if (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
+      // Allow any localhost/127.0.0.1 origin for development
+      if (process.env.NODE_ENV !== 'production' && (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin))) {
         return callback(null, true);
       }
 
