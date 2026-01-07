@@ -174,6 +174,7 @@ const sendBirthdayWishes = async () => {
             birthdayEmployee.email,
             {
               employeeName: birthdayEmployee.employee_name,
+              employeeEmpId: birthdayEmployee.emp_id,
             },
             ccEmails
           );

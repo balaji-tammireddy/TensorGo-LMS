@@ -138,7 +138,7 @@ const emptyEmployeeForm = {
   panNumber: '',
   currentAddress: '',
   permanentAddress: '',
-  status: 'active' as 'active' | 'on_leave' | 'resigned' | 'terminated' | 'on_notice',
+  status: 'active' as 'active' | 'on_leave' | 'resigned' | 'terminated' | 'on_notice' | 'inactive',
   education: baseEducationLevels.map((level) => ({
     level,
     groupStream: '',
@@ -1705,7 +1705,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 <DropdownMenuItem
                                   onClick={() => setNewEmployee({
                                     ...newEmployee,
-                                    status: 'resigned'
+                                    status: 'inactive'
                                   })}
                                 >
                                   Inactive

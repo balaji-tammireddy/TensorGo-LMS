@@ -692,12 +692,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     employeeData.reportingManagerName = null;
   }
 
-  // Prevent role change if there are subordinates reporting to this user
-  const dbRole = String(employeeRole || '').trim().toLowerCase();
+  // Prevent role change OR transition to 'inactive' status if there are subordinates reporting to this user
+  const formattedDbRole = String(employeeRole || '').trim().toLowerCase();
+  const formattedDbStatus = String(dbStatus || '').trim().toLowerCase();
   const requestedRole = employeeData.role ? String(employeeData.role).trim().toLowerCase() : null;
-  const isRoleTransition = requestedRole !== null && requestedRole !== dbRole;
+  const requestedStatus = employeeData.status ? String(employeeData.status).trim().toLowerCase() : null;
 
-  if (isRoleTransition) {
+  const isRoleTransition = requestedRole !== null && requestedRole !== formattedDbRole;
+  const isInactiveTransition = requestedStatus === 'inactive' && formattedDbStatus !== 'inactive';
+
+  if (isRoleTransition || isInactiveTransition) {
     const activeSubordinates = await pool.query(
       'SELECT id FROM users WHERE reporting_manager_id = $1 AND status IN (\'active\', \'on_leave\', \'on_notice\') LIMIT 1',
       [employeeId]
@@ -705,7 +709,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
     if (activeSubordinates.rows.length > 0) {
       const name = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
-      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Role change BLOCKED for user ${employeeId} due to existing active subordinates.`);
+      const actionLabel = isRoleTransition ? 'role' : 'status';
+      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] ${actionLabel} change BLOCKED for user ${employeeId} due to existing active subordinates.`);
       throw new Error(`Please remove the users reporting to ${name} and try again.`);
     }
   }
@@ -912,8 +917,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   await pool.query(query, values);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Database update completed successfully`);
 
-  // Check if status changed to on_notice, resigned, terminated, or inactive
-  const RESTRICTED_STATUSES = ['on_notice', 'resigned', 'terminated', 'inactive'];
+  // Check if status changed to resigned, terminated, or inactive (Not reassigning for 'on_notice')
+  const RESTRICTED_STATUSES = ['resigned', 'terminated', 'inactive'];
   const oldStatus = employeeCheck.rows[0].status;
   const newStatus = employeeData.status;
 

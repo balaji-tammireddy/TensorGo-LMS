@@ -153,7 +153,6 @@ const HolidayManagementPage: React.FC = () => {
                                     onChange={handleDateChange}
                                     placeholder="DD - MM - YYYY"
                                     min={new Date().toISOString().split('T')[0]}
-                                    min={new Date().toISOString().split('T')[0]}
                                     allowManualEntry={true}
                                     isEmployeeVariant={true}
                                 />
