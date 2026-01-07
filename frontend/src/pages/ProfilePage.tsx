@@ -277,6 +277,25 @@ const ProfilePage: React.FC = () => {
       }
     }
 
+    // Validate gap between Date of Birth and Date of Joining (min 18 years)
+    if (formData.personalInfo?.dateOfBirth && formData.employmentInfo?.dateOfJoining) {
+      const dob = new Date(formData.personalInfo.dateOfBirth);
+      const doj = new Date(formData.employmentInfo.dateOfJoining);
+
+      let workAge = doj.getFullYear() - dob.getFullYear();
+      const monthDiff = doj.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
+        workAge--;
+      }
+
+      if (workAge < 18) {
+        showWarning('joining date should be atleast 18 yrs from date of birth');
+        fieldErrors['dateOfBirth'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
+
     checkField(formData.personalInfo, 'gender', 'Gender');
     checkField(formData.personalInfo, 'bloodGroup', 'Blood Group');
     checkField(formData.personalInfo, 'maritalStatus', 'Marital Status');
