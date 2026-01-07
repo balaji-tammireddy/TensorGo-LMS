@@ -833,9 +833,9 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
       LEFT JOIN users l3 ON l2.reporting_manager_id = l3.id
       LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
       WHERE lr.id = $1 
-      AND lr.employee_id != $2
       AND (
-           u.reporting_manager_id = $2    -- I am Direct Manager (L1)
+           lr.employee_id = $2            -- It's my own request
+        OR u.reporting_manager_id = $2    -- I am Direct Manager (L1)
         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2/HR)
         OR l2.reporting_manager_id = $2   -- I am HR's Manager (L3/Super Admin)
       )

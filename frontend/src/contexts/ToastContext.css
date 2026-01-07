@@ -2,6 +2,8 @@
   position: fixed;
   top: 20px;
   right: 20px;
+  left: auto;
+  transform: none;
   z-index: 10000;
   display: flex;
   flex-direction: column;

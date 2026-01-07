@@ -648,6 +648,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Date of Joining must not be in the future if updated
   if (employeeData.dateOfJoining) {
+    logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Validating Date of Joining: ${employeeData.dateOfJoining}`);
     const doj = new Date(employeeData.dateOfJoining);
     const today = new Date();
     today.setHours(23, 59, 59, 999); // Allow joining on current day
@@ -658,6 +659,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     // Validate gap between Date of Birth and Date of Joining (min 18 years)
     // If DOB is also being updated, use new DOB, otherwise fetch current DOB
     let dob: Date | null = null;
+    logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Date of Birth in data: ${employeeData.dateOfBirth}`);
     if (employeeData.dateOfBirth) {
       dob = new Date(employeeData.dateOfBirth);
     } else {

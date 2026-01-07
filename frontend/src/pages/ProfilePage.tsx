@@ -155,11 +155,10 @@ const ProfilePage: React.FC = () => {
   }, [profile]);
 
   const updateMutation = useMutation(profileService.updateProfile, {
-    onSuccess: (_data, variables: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries('profile');
-      setFormData(variables);
-      setInitialFormData(variables);
       setIsEditMode(false);
+      showSuccess(data.message || 'Profile updated successfully!');
     },
     onError: (error: any) => {
       showError(error.response?.data?.error?.message || 'Update failed');
