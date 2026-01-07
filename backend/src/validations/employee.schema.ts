@@ -47,7 +47,7 @@ const educationSchema = z.object({
 
 export const createEmployeeSchema = z.object({
     body: z.object({
-        empId: z.string().max(6).regex(/^[A-Z0-9]+$/, 'Invalid Employee ID format'),
+        empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format'),
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']),
         email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
             (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
@@ -108,10 +108,20 @@ export const updateEmployeeSchema = z.object({
         reportingManagerId: z.number().nullable().optional(),
         reportingManagerName: z.string().max(100).nullable().optional(),
         education: z.array(educationSchema).optional(),
+        empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format').optional(),
+        email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
+            (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
+            { message: 'Only organization mail should be used' }
+        ).optional(),
+        gender: z.enum(['Male', 'Female', 'Other']).optional(),
+        bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional(),
+        maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional(),
         aadharNumber: aadharSchema.optional(),
         panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional(),
         dateOfBirth: z.string().optional(),
-        dateOfJoining: z.string().optional()
+        dateOfJoining: z.string().optional(),
+        currentAddress: addressSchema.optional(),
+        permanentAddress: addressSchema.optional()
     }).refine(data => {
         if (data.dateOfBirth && data.dateOfJoining) {
             const dob = new Date(data.dateOfBirth);

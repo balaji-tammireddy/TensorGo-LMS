@@ -398,8 +398,8 @@ const EmployeeManagementPage: React.FC = () => {
     if (isEmpty(newEmployee.empId)) {
       missingFields.push('Employee ID');
       fieldErrors['empId'] = true;
-    } else if (newEmployee.empId.length > 6) {
-      showWarning('Employee ID max 6 chars');
+    } else if (newEmployee.empId.length > 20) {
+      showWarning('Employee ID max 20 chars');
       fieldErrors['empId'] = true;
       setFormErrors(fieldErrors);
       return;
@@ -1188,14 +1188,14 @@ const EmployeeManagementPage: React.FC = () => {
                             type="text"
                             value={newEmployee.empId || ''}
                             onChange={(e) => {
-                              // Limit to 6 characters, alphanumeric only
-                              const value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+                              // Limit to 20 characters, alphanumeric and hyphens
+                              const value = e.target.value.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 20).toUpperCase();
                               setNewEmployee({
                                 ...newEmployee,
                                 empId: value
                               });
                             }}
-                            maxLength={6}
+                            maxLength={20}
                             disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
                           />
                         </div>
