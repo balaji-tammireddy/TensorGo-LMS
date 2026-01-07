@@ -160,6 +160,7 @@ const ProfilePage: React.FC = () => {
       setFormData(variables);
       setInitialFormData(variables);
       setIsEditMode(false);
+      showSuccess('Profile updated successfully');
     },
     onError: (error: any) => {
       showError(error.response?.data?.error?.message || 'Update failed');
