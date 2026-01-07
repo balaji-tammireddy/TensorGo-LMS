@@ -7,11 +7,11 @@ import { logger } from '../utils/logger';
 export const login = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [LOGIN] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [AUTH] [LOGIN] Email: ${req.body.email}`);
-  
+
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
-    
+
     // Set refresh token in httpOnly cookie
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
@@ -38,19 +38,47 @@ export const login = async (req: AuthRequest, res: Response) => {
 
 export const refresh = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [REFRESH] ========== REQUEST RECEIVED ==========`);
-  
+
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+
+    if (!refreshToken) {
+      logger.warn(`[CONTROLLER] [AUTH] [REFRESH] No refresh token provided`);
+      return res.status(401).json({
+        error: {
+          code: 'TokenMissingError',
+          message: 'Refresh token is required'
+        }
+      });
+    }
+
     const decoded = verifyToken(refreshToken);
-    
+
+    // Check if user exists and is active
+    const user = await authService.validateUser(decoded.userId);
+    if (!user) {
+      logger.warn(`[CONTROLLER] [AUTH] [REFRESH] User not found or inactive: ${decoded.userId}`);
+      return res.status(401).json({
+        error: {
+          code: 'InvalidUserError',
+          message: 'User not found or inactive'
+        }
+      });
+    }
+
     const newAccessToken = generateAccessToken({
-      userId: decoded.userId,
-      email: decoded.email,
-      role: decoded.role
+      userId: user.id,
+      email: user.email,
+      role: user.role
     });
 
-    logger.info(`[CONTROLLER] [AUTH] [REFRESH] Token refreshed successfully - User ID: ${decoded.userId}`);
-    res.json({ accessToken: newAccessToken });
+    logger.info(`[CONTROLLER] [AUTH] [REFRESH] Token refreshed successfully - User ID: ${user.id}`);
+
+    // Return both token and user data to satisfy frontend requirements
+    res.json({
+      accessToken: newAccessToken,
+      user
+    });
   } catch (error: any) {
     logger.error(`[CONTROLLER] [AUTH] [REFRESH] Token refresh failed:`, error);
     res.status(403).json({
@@ -65,7 +93,7 @@ export const refresh = async (req: AuthRequest, res: Response) => {
 export const logout = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [LOGOUT] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [AUTH] [LOGOUT] User ID: ${req.user?.id || 'unknown'}`);
-  
+
   res.clearCookie('refreshToken');
   logger.info(`[CONTROLLER] [AUTH] [LOGOUT] Logout successful`);
   res.json({ message: 'Logged out successfully' });
@@ -74,7 +102,7 @@ export const logout = async (req: AuthRequest, res: Response) => {
 export const changePassword = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] User ID: ${req.user?.id || 'unknown'}`);
-  
+
   try {
     if (!req.user) {
       logger.warn(`[CONTROLLER] [AUTH] [CHANGE PASSWORD] User not authenticated`);
@@ -105,15 +133,15 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 export const forgotPassword = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Email: ${req.body.email}`);
-  
+
   try {
     const { email } = req.body;
     await authService.requestPasswordReset(email);
 
     logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Password reset request processed`);
     // Always return success to prevent email enumeration
-    res.json({ 
-      message: 'If the email exists, an OTP has been sent to your registered email address.' 
+    res.json({
+      message: 'If the email exists, an OTP has been sent to your registered email address.'
     });
   } catch (error: any) {
     logger.error(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Password reset request failed:`, error);
@@ -129,7 +157,7 @@ export const forgotPassword = async (req: AuthRequest, res: Response) => {
 export const verifyOTP = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [VERIFY OTP] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [AUTH] [VERIFY OTP] Email: ${req.body.email}`);
-  
+
   try {
     const { email, otp } = req.body;
     const isValid = await authService.verifyPasswordResetOTP(email, otp);
@@ -160,7 +188,7 @@ export const verifyOTP = async (req: AuthRequest, res: Response) => {
 export const resetPassword = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [RESET PASSWORD] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [AUTH] [RESET PASSWORD] Email: ${req.body.email}`);
-  
+
   try {
     const { email, otp, newPassword } = req.body;
     await authService.resetPasswordWithOTP(email, otp, newPassword);
