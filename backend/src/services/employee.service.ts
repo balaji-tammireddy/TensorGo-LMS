@@ -561,13 +561,14 @@ export const createEmployee = async (employeeData: any) => {
   // Send welcome email with credentials
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
-    const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const loginUrl = 'http://51.15.227.10/login';
     const temporaryPassword = employeeData.password || 'tensorgo@2023';
 
     await emailTemplates.sendNewEmployeeCredentialsEmail(employeeData.email, {
       employeeName: `${employeeData.firstName} ${employeeData.middleName || ''} ${employeeData.lastName || ''}`.trim(),
       employeeEmpId: empId,
       email: employeeData.email,
+      role: employeeData.role,
       temporaryPassword: temporaryPassword,
       loginUrl: loginUrl
     });
@@ -671,12 +672,26 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     throw new Error('Employee not found');
   }
 
+  // Track important changes for notifications
+  const oldRole = employeeCheck.rows[0].role;
+  const newRole = employeeData.role;
+  const isRoleChanged = newRole && newRole !== oldRole;
+
+  const oldStatus = employeeCheck.rows[0].status;
+  const newStatus = employeeData.status;
+  const isStatusChanged = newStatus && newStatus !== oldStatus;
+
+  const oldManagerId = employeeCheck.rows[0].reporting_manager_id;
+  const newManagerId = employeeData.reportingManagerId;
+  const isManagerChanged = newManagerId !== undefined && Number(newManagerId) !== Number(oldManagerId);
+
   // Education validation if updated
   if (employeeData.education && Array.isArray(employeeData.education)) {
     const dobValue = employeeData.dateOfBirth || employeeCheck.rows[0].date_of_birth;
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
     const educationYears: Record<string, number> = {};
+
 
     for (const edu of employeeData.education) {
       const isMandatory = ['UG', '12th'].includes(edu.level);
@@ -976,8 +991,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if status changed to resigned, terminated, or inactive (Not reassigning for 'on_notice')
   const RESTRICTED_STATUSES = ['resigned', 'terminated', 'inactive'];
-  const oldStatus = employeeCheck.rows[0].status;
-  const newStatus = employeeData.status;
 
   if (newStatus && RESTRICTED_STATUSES.includes(newStatus) && oldStatus !== newStatus) {
     logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager status changed from ${oldStatus} to ${newStatus}. Checking for subordinates to reassign.`);
@@ -1034,6 +1047,68 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       }
     } else {
       logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] No subordinates found for the updated employee.`);
+    }
+  }
+
+  // Item 9: If an employee's reporting manager was manually changed, notify that employee
+  if (isManagerChanged) {
+    try {
+      const empResult = await pool.query(
+        'SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name, reporting_manager_name FROM users WHERE id = $1',
+        [employeeId]
+      );
+      if (empResult.rows.length > 0 && empResult.rows[0].email) {
+        const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
+        await sendReportingManagerChangeEmail(empResult.rows[0].email, {
+          employeeName: empResult.rows[0].name,
+          previousManagerName: employeeCheck.rows[0].reporting_manager_name || 'N/A',
+          newManagerName: empResult.rows[0].reporting_manager_name || 'New Manager',
+          newManagerEmpId: '' // We don't have it easily here without another join, but it's optional in template
+        });
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
+      }
+    } catch (e) {
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending manual manager change notification:`, e);
+    }
+  }
+
+  // Item 15: Role changed notification
+  if (isRoleChanged) {
+    try {
+      const empResult = await pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]);
+      const requesterResult = await pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId]);
+      const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
+
+      if (empResult.rows.length > 0 && empResult.rows[0].email) {
+        const { sendRoleChangeEmail } = await import('../utils/emailTemplates');
+        await sendRoleChangeEmail(empResult.rows[0].email, {
+          employeeName: empResult.rows[0].name,
+          newRole,
+          updatedBy: requesterName
+        });
+      }
+    } catch (e) {
+      logger.error('Error sending role change notification:', e);
+    }
+  }
+
+  // Item 16: Status changed notification
+  if (isStatusChanged) {
+    try {
+      const empResult = await pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]);
+      const requesterResult = await pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId]);
+      const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
+
+      if (empResult.rows.length > 0 && empResult.rows[0].email) {
+        const { sendStatusChangeEmail } = await import('../utils/emailTemplates');
+        await sendStatusChangeEmail(empResult.rows[0].email, {
+          employeeName: empResult.rows[0].name,
+          newStatus,
+          updatedBy: requesterName
+        });
+      }
+    } catch (e) {
+      logger.error('Error sending status change notification:', e);
     }
   }
 
@@ -1132,8 +1207,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         await emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
-          employeeEmpId: employeeResult.rows[0].emp_id || '',
-          updatedFields: employeeData,
           updatedBy: requesterName
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
@@ -1326,7 +1399,8 @@ export const addLeavesToEmployee = async (
     try {
       const employeeResult = await pool.query(
         `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name, u.emp_id,
-                approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+                approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+                approver.emp_id as approver_emp_id
          FROM users u
          LEFT JOIN users approver ON approver.id = $1
          WHERE u.id = $2`,
@@ -1348,6 +1422,7 @@ export const addLeavesToEmployee = async (
           previousBalance: previousBalance,
           newBalance: newBalance,
           allocatedBy: employee.approver_name || 'HR/Admin',
+          allocatedByEmpId: employee.approver_emp_id || '',
           allocationDate: formatDateLocal(new Date()) || '',
           comment: comment
         });
@@ -1485,10 +1560,12 @@ export const convertLopToCasual = async (
 
     // Send email notification to employee
     try {
-      const { sendLeaveAllocationEmail } = await import('../utils/emailTemplates');
+      const { sendLopToCasualConversionEmail } = await import('../utils/emailTemplates');
       const employeeResult = await pool.query(
         `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name, u.emp_id,
-                approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+                approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+                approver.emp_id as approver_emp_id,
+                approver.role as approver_role
          FROM users u
          LEFT JOIN users approver ON approver.id = $1
          WHERE u.id = $2`,
@@ -1498,16 +1575,26 @@ export const convertLopToCasual = async (
       if (employeeResult.rows.length > 0) {
         const employee = employeeResult.rows[0];
 
-        await sendLeaveAllocationEmail(employee.email, {
+        await sendLopToCasualConversionEmail(employee.email, {
           employeeName: employee.employee_name || 'Employee',
           employeeEmpId: employee.emp_id || '',
+          recipientName: employee.employee_name || 'Employee',
+          recipientRole: 'employee',
           leaveType: 'casual',
-          allocatedDays: count,
-          previousBalance: currentCasual,
-          newBalance: newCasual,
-          allocatedBy: employee.approver_name || 'HR/Admin',
-          allocationDate: formatDateLocal(new Date()) || '',
-          conversionNote: `${count} LOP leave(s) converted to casual leave(s). LOP balance: ${currentLop} → ${newLop}`
+          startDate: new Date().toISOString(), // Manual adjustment, using today
+          startType: 'full',
+          endDate: new Date().toISOString(),
+          endType: 'full',
+          noOfDays: count,
+          reason: 'Manual LOP to Casual Conversion',
+          converterName: employee.approver_name || 'HR/Admin',
+          converterEmpId: employee.approver_emp_id || '',
+          converterRole: employee.approver_role || 'hr',
+          previousLopBalance: currentLop,
+          newLopBalance: newLop,
+          previousCasualBalance: currentCasual,
+          newCasualBalance: newCasual,
+          conversionDate: new Date().toISOString()
         });
         logger.info(`✅ LOP to casual conversion email sent to employee: ${employee.email}`);
       }

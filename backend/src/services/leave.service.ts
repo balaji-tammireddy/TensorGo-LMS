@@ -619,12 +619,11 @@ export const applyLeave = async (
         const toEmail = chain.l1_email;
         const toName = chain.l1_name || 'Reporting Manager';
 
-        // CC list: Upstream managers (L2, L3)
+        // CC list: Reporting HR (L2) only if employee/intern applied
         const ccSet = new Set<string>();
         if (chain.l2_email) ccSet.add(chain.l2_email);
-        if (chain.l3_email) ccSet.add(chain.l3_email);
 
-        // Remove 'To' email from CC if somehow duplicated (unlikely with this query but safe)
+        // Remove 'To' email from CC if somehow duplicated
         if (toEmail) ccSet.delete(toEmail);
 
         const ccEmails = Array.from(ccSet);
@@ -1447,6 +1446,7 @@ export const convertLeaveRequestLopToCasual = async (
       u.role as employee_role,
       u.reporting_manager_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as converter_name,
+      approver.emp_id as converter_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,
@@ -1627,6 +1627,7 @@ export const convertLeaveRequestLopToCasual = async (
       noOfDays: newNoOfDays,
       reason: leave.reason || '',
       converterName: leave.converter_name || 'Converter',
+      converterEmpId: leave.converter_emp_id || '',
       converterRole: userRole,
       previousLopBalance: currentLop,
       newLopBalance: newLopBalance,
@@ -1640,19 +1641,9 @@ export const convertLeaveRequestLopToCasual = async (
 
     if (leave.employee_email) {
       try {
-        // Build CC list based on converter role
+        // No CC for LOP to Casual conversion (Item 5: send mail only to the employee)
         const ccEmails: string[] = [];
-
-        if (userRole === 'super_admin') {
-          // Super Admin converts → Employee (TO), HR (CC)
-          if (leave.hr_email && leave.hr_email !== leave.employee_email) {
-            ccEmails.push(leave.hr_email);
-          }
-          logger.info(`[EMAIL] Super Admin conversion - sending email to employee (TO) with HR (CC)`);
-        } else {
-          // HR converts → Employee (TO) only
-          logger.info(`[EMAIL] HR conversion - sending email to employee (TO)`);
-        }
+        logger.info(`[EMAIL] sending LOP to Casual conversion email to employee (TO) only`);
 
         const emailResult = await sendLopToCasualConversionEmail(leave.employee_email, {
           ...emailData,
@@ -2090,6 +2081,7 @@ export const approveLeave = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      approver.emp_id as approver_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,

@@ -581,6 +581,7 @@ export interface NewEmployeeCredentialsEmailData {
   employeeName: string;
   employeeEmpId: string;
   email: string;
+  role: string;
   temporaryPassword: string;
   loginUrl: string;
 }
@@ -595,11 +596,13 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
 
   const detailsTable = generateDetailsTable([
     { label: 'Employee ID:', value: data.employeeEmpId, isBold: true },
-    { label: 'Email Address:', value: data.email, isBold: true },
+    { label: 'Official Email:', value: data.email, isBold: true },
+    { label: 'Role:', value: data.role, isBold: true },
     {
       label: 'Temporary Password:',
       value: `<code style="font-family: Courier, monospace; letter-spacing: 1px; background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${data.temporaryPassword}</code>`,
-      isHtml: true
+      isHtml: true,
+      isBold: true
     }
   ]);
 
@@ -647,6 +650,7 @@ Welcome to TensorGo Leave Management System! Your account has been created succe
 Your Login Credentials:
 - Employee ID: ${data.employeeEmpId}
 - Email: ${data.email}
+- Role: ${data.role}
 - Temporary Password: ${data.temporaryPassword}
 
 Login URL: ${data.loginUrl}
@@ -694,6 +698,7 @@ export interface LeaveAllocationEmailData {
   previousBalance: number;
   newBalance: number;
   allocatedBy: string;
+  allocatedByEmpId?: string; // ID of the person allocating leaves
   allocationDate: string;
   comment?: string; // Optional comment from the person allocating leaves
   conversionNote?: string; // Optional note for LOP to casual conversions
@@ -719,7 +724,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
       isHtml: true,
       isBold: true
     },
-    { label: 'Allocated By:', value: data.allocatedBy },
+    { label: 'Allocated By:', value: data.allocatedByEmpId ? `${data.allocatedBy} (${data.allocatedByEmpId})` : data.allocatedBy },
     { label: 'Allocation Date:', value: allocationDateDisplay },
     ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : [])
   ]);
@@ -1419,8 +1424,6 @@ Reference ID: ${uniqueId}
  */
 export interface EmployeeDetailsUpdateEmailData {
   employeeName: string;
-  employeeEmpId: string;
-  updatedFields: Record<string, string | number | boolean>;
   updatedBy: string;
 }
 
@@ -1432,18 +1435,14 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const detailsRows = [];
-  for (const [key, value] of Object.entries(data.updatedFields)) {
-    detailsRows.push({ label: `${key}:`, value: String(value), isBold: true });
-  }
-
-  const detailsTable = generateDetailsTable(detailsRows);
-
   const content = `
     <p>Dear ${data.employeeName},</p>
     <p>This is to inform you that your profile details have been updated in the <strong>TensorGo Leave Management System</strong> by <strong>${data.updatedBy}</strong>.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Updated Information</h3>
-    ${detailsTable}
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; margin: 30px 0; border-radius: 6px;">
+      <p style="margin: 0; color: #475569; line-height: 1.6;">
+        For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
+      </p>
+    </div>
     <p style="margin-top: 30px;">If you did not authorize this change or have any questions, please contact the HR department immediately.</p>
     <p>Best regards,<br/><strong>TensorGo</strong></p>
   `;
@@ -1460,10 +1459,6 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
  * Generate employee details update email plain text
  */
 const generateEmployeeDetailsUpdateEmailText = (data: EmployeeDetailsUpdateEmailData): string => {
-  const fieldsText = Object.entries(data.updatedFields)
-    .map(([key, value]) => `- ${key}: ${value}`)
-    .join('\n');
-
   return `
 Profile Update Notification
 
@@ -1471,8 +1466,7 @@ Dear ${data.employeeName},
 
 This is to inform you that your profile details have been updated in the TensorGo Leave Management System by ${data.updatedBy}.
 
-Updated Information:
-${fieldsText}
+For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
 
 If you did not authorize this change or have any questions, please contact the HR department immediately.
 
@@ -1522,13 +1516,14 @@ export interface LopToCasualConversionEmailData {
   noOfDays: number;
   reason: string;
   converterName: string;
+  converterEmpId: string; // ID of the person converting
   converterRole: string;
   previousLopBalance: number;
   newLopBalance: number;
   previousCasualBalance: number;
   newCasualBalance: number;
-  conversionDate: string; // Added for the new HTML template
-  comment?: string; // Added for the new HTML template
+  conversionDate: string;
+  comment?: string;
 }
 
 /**
@@ -1543,7 +1538,7 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
     { label: 'Dates Range:', value: `${formatDateForDisplay(data.startDate)} to ${formatDateForDisplay(data.endDate)}`, isBold: true },
     { label: 'Days Converted:', value: `${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}`, isBold: true },
     { label: 'Conversion Date:', value: formatDateForDisplay(data.conversionDate) },
-    { label: 'Converted By:', value: data.converterRole === 'hr' ? 'HR' : 'Super Admin' },
+    { label: 'Converted By:', value: `${data.converterName} (${data.converterEmpId})` },
     ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : [])
   ]);
 
@@ -1605,7 +1600,7 @@ Conversion Details:
 - Dates Range: ${startDateDisplay} to ${endDateDisplay}
 - Days Converted: ${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}
 - Conversion Date: ${formatDateForDisplay(data.conversionDate)}
-- Converted By: ${converterRoleDisplay}
+- Converted By: ${data.converterName} (${data.converterEmpId})
 ${data.comment ? `- Comment: ${data.comment}` : ''}
 
 Balance Changes:
@@ -1795,5 +1790,95 @@ export const sendReportingManagerChangeEmail = async (
     subject: `Your Reporting Manager has been updated [Ref: ${uniqueId}]`,
     html: generateReportingManagerChangeEmailHtml(data),
     text: generateReportingManagerChangeEmailText(data),
+  });
+};
+
+// ============================================================================
+// ROLE CHANGE NOTIFICATION EMAIL
+// ============================================================================
+
+export interface RoleChangeEmailData {
+  employeeName: string;
+  newRole: string;
+  updatedBy: string;
+}
+
+export const sendRoleChangeEmail = async (recipientEmail: string, data: RoleChangeEmailData): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const content = `
+    <p>Dear ${data.employeeName},</p>
+    <p>This is to inform you that your role in the <strong>TensorGo Leave Management System</strong> has been updated.</p>
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 6px;">
+      <p style="margin: 0; font-size: 16px; color: #1e3a8a;"><strong>New Role:</strong> ${data.newRole.toUpperCase()}</p>
+      <p style="margin: 10px 0 0 0; font-size: 14px; color: #64748b;">Updated by: ${data.updatedBy}</p>
+    </div>
+    <p>If you have any questions regarding this change, please contact your reporting manager or the HR department.</p>
+    <p>Best regards,<br/><strong>TensorGo</strong></p>
+  `;
+
+  return await sendEmail({
+    to: recipientEmail,
+    subject: `Your Role has been updated [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper('Role Update Notification', content, uniqueId, `Your role has been updated to ${data.newRole}`),
+    text: `
+Role Update Notification
+
+Dear ${data.employeeName},
+
+This is to inform you that your role has been updated to ${data.newRole.toUpperCase()} by ${data.updatedBy}.
+
+If you have any questions, please contact HR.
+
+Best regards,
+TensorGo
+    `
+  });
+};
+
+// ============================================================================
+// STATUS CHANGE NOTIFICATION EMAIL
+// ============================================================================
+
+export interface StatusChangeEmailData {
+  employeeName: string;
+  newStatus: string;
+  updatedBy: string;
+}
+
+export const sendStatusChangeEmail = async (recipientEmail: string, data: StatusChangeEmailData): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const content = `
+    <p>Dear ${data.employeeName},</p>
+    <p>This is to inform you that your employment status in the <strong>TensorGo Leave Management System</strong> has been updated.</p>
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 6px;">
+      <p style="margin: 0; font-size: 16px; color: #1e3a8a;"><strong>New Status:</strong> ${data.newStatus.toUpperCase()}</p>
+      <p style="margin: 10px 0 0 0; font-size: 14px; color: #64748b;">Updated by: ${data.updatedBy}</p>
+    </div>
+    <p>If you have any questions regarding this change, please contact the HR department.</p>
+    <p>Best regards,<br/><strong>TensorGo</strong></p>
+  `;
+
+  return await sendEmail({
+    to: recipientEmail,
+    subject: `Your Employment Status has been updated [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper('Status Update Notification', content, uniqueId, `Your status has been updated to ${data.newStatus}`),
+    text: `
+Status Update Notification
+
+Dear ${data.employeeName},
+
+This is to inform you that your employment status has been updated to ${data.newStatus.toUpperCase()} by ${data.updatedBy}.
+
+If you have any questions, please contact HR.
+
+Best regards,
+TensorGo
+    `
   });
 };
