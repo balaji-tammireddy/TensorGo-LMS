@@ -7,11 +7,17 @@ export const validateRequest = (schema: ZodSchema) => {
     console.log(`[VALIDATE] Body:`, req.body);
     console.log(`[VALIDATE] Params:`, req.params);
     try {
-      schema.parse({
+      const parsed = schema.parse({
         body: req.body,
         query: req.query,
         params: req.params
       });
+
+      // Update request with parsed/sanitized data (strips extra fields)
+      req.body = parsed.body;
+      req.query = parsed.query;
+      req.params = parsed.params;
+
       console.log(`[VALIDATE] ✅ Validation passed`);
       next();
     } catch (error) {
@@ -22,12 +28,12 @@ export const validateRequest = (schema: ZodSchema) => {
           const field = err.path.join('.');
           return `${field}: ${err.message}`;
         });
-        
+
         return res.status(400).json({
           error: {
             code: 'VALIDATION_ERROR',
-            message: errorMessages.length === 1 
-              ? errorMessages[0] 
+            message: errorMessages.length === 1
+              ? errorMessages[0]
               : `Validation failed: ${errorMessages.join(', ')}`,
             details: error.errors
           }

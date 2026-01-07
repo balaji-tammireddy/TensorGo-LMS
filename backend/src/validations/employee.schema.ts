@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const nameSchema = z.string()
     .min(1, 'Name is required')
-    .max(50, 'Name cannot exceed 50 characters')
+    .max(25, 'Name cannot exceed 25 characters')
     .regex(/^[a-zA-Z\s]+$/, 'Name should only contain letters and spaces');
 
 const safeTextSchema = z.string()
@@ -14,6 +14,10 @@ const addressSchema = z.string()
     .max(255, 'Address cannot exceed 255 characters')
     .regex(/^[a-zA-Z0-9\s\.,\-'()&/#]+$/, 'Special characters and emojis are not allowed in address');
 
+const longerTextSchema = z.string()
+    .max(100, 'Text cannot exceed 100 characters')
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;]*$/, 'Special characters and emojis are not allowed');
+
 const phoneSchema = z.string()
     .length(10, 'Phone number must be exactly 10 digits')
     .regex(/^\d+$/, 'Phone number must contain only digits');
@@ -24,10 +28,16 @@ const aadharSchema = z.string()
 
 const educationSchema = z.object({
     level: z.string().max(50),
-    groupStream: safeTextSchema.optional().or(z.literal('')),
-    collegeUniversity: safeTextSchema.optional().or(z.literal('')),
-    year: z.string().regex(/^\d{4}$/, 'Invalid year format').optional().or(z.literal('')),
-    scorePercentage: z.string().max(10).regex(/^[a-zA-Z0-9\s\.,%]+$/, 'Invalid score format').optional().or(z.literal(''))
+    groupStream: longerTextSchema.nullable().optional().or(z.literal('')),
+    collegeUniversity: longerTextSchema.nullable().optional().or(z.literal('')),
+    year: z.union([
+        z.string().regex(/^\d{4}$/, 'Invalid year format'),
+        z.number()
+    ]).nullable().optional().or(z.literal('')),
+    scorePercentage: z.union([
+        z.string().max(10).regex(/^[a-zA-Z0-9\s\.,%]+$/, 'Invalid score format'),
+        z.number()
+    ]).nullable().optional().or(z.literal(''))
 });
 
 export const createEmployeeSchema = z.object({
@@ -39,7 +49,7 @@ export const createEmployeeSchema = z.object({
             { message: 'Only organization mail should be used' }
         ),
         firstName: nameSchema,
-        middleName: nameSchema.optional().or(z.literal('')),
+        middleName: nameSchema.nullable().optional().or(z.literal('')),
         lastName: nameSchema,
         contactNumber: phoneSchema,
         altContact: phoneSchema,
@@ -58,9 +68,18 @@ export const createEmployeeSchema = z.object({
         currentAddress: addressSchema,
         permanentAddress: addressSchema,
         reportingManagerId: z.number().nullable().optional(),
-        reportingManagerName: nameSchema.nullable().optional(),
+        reportingManagerName: z.string().max(100).nullable().optional(),
         education: z.array(educationSchema).min(1, 'Education details are required'),
         status: z.enum(['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive']).optional()
+    }).refine(data => {
+        const dob = new Date(data.dateOfBirth);
+        const doj = new Date(data.dateOfJoining);
+        const minDoj = new Date(dob);
+        minDoj.setFullYear(minDoj.getFullYear() + 18);
+        return doj >= minDoj;
+    }, {
+        message: "Joining Date must be at least 18 years after Date of Birth",
+        path: ["dateOfJoining"]
     })
 });
 
@@ -70,7 +89,7 @@ export const updateEmployeeSchema = z.object({
     }),
     body: z.object({
         firstName: nameSchema.optional(),
-        middleName: nameSchema.optional().or(z.literal('')),
+        middleName: nameSchema.nullable().optional().or(z.literal('')),
         lastName: nameSchema.optional(),
         contactNumber: phoneSchema.optional(),
         altContact: phoneSchema.optional(),
@@ -82,10 +101,24 @@ export const updateEmployeeSchema = z.object({
         status: z.enum(['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive']).optional(),
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']).optional(),
         reportingManagerId: z.number().nullable().optional(),
-        reportingManagerName: z.string().nullable().optional(),
+        reportingManagerName: z.string().max(100).nullable().optional(),
         education: z.array(educationSchema).optional(),
         aadharNumber: aadharSchema.optional(),
-        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional()
+        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional(),
+        dateOfBirth: z.string().optional(),
+        dateOfJoining: z.string().optional()
+    }).refine(data => {
+        if (data.dateOfBirth && data.dateOfJoining) {
+            const dob = new Date(data.dateOfBirth);
+            const doj = new Date(data.dateOfJoining);
+            const minDoj = new Date(dob);
+            minDoj.setFullYear(minDoj.getFullYear() + 18);
+            return doj >= minDoj;
+        }
+        return true;
+    }, {
+        message: "Joining Date must be at least 18 years after Date of Birth",
+        path: ["dateOfJoining"]
     })
 });
 
@@ -104,7 +137,7 @@ export const updateProfileSchema = z.object({
     body: z.object({
         personalInfo: z.object({
             firstName: nameSchema.optional(),
-            middleName: nameSchema.optional().or(z.literal('')),
+            middleName: nameSchema.nullable().optional().or(z.literal('')),
             lastName: nameSchema.optional(),
             contactNumber: phoneSchema.optional(),
             altContact: phoneSchema.optional(),
@@ -126,10 +159,22 @@ export const updateProfileSchema = z.object({
             panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
         }).optional().nullable(),
         address: z.object({
-            currentAddress: z.string().optional(),
-            permanentAddress: z.string().optional()
+            currentAddress: z.string().max(500, 'Address cannot exceed 500 characters').optional(),
+            permanentAddress: z.string().max(500, 'Address cannot exceed 500 characters').optional()
         }).optional(),
         education: z.array(educationSchema).optional(),
         reportingManagerId: z.number().nullable().optional()
+    }).refine(data => {
+        if (data.personalInfo?.dateOfBirth && data.employmentInfo?.dateOfJoining) {
+            const dob = new Date(data.personalInfo.dateOfBirth);
+            const doj = new Date(data.employmentInfo.dateOfJoining);
+            const minDoj = new Date(dob);
+            minDoj.setFullYear(minDoj.getFullYear() + 18);
+            return doj >= minDoj;
+        }
+        return true;
+    }, {
+        message: "Joining Date must be at least 18 years after Date of Birth",
+        path: ["employmentInfo", "dateOfJoining"]
     })
 });

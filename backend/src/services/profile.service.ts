@@ -99,18 +99,43 @@ export const updateProfile = async (userId: number, profileData: any) => {
   logger.info(`[PROFILE] [UPDATE PROFILE] User ID: ${userId}`);
   logger.info(`[PROFILE] [UPDATE PROFILE] Sections to update: ${Object.keys(profileData).join(', ')}`);
 
-  // Validate date of birth - employee must be at least 18 years old
-  if (profileData.personalInfo?.dateOfBirth) {
-    logger.info(`[PROFILE] [UPDATE PROFILE] Validating date of birth`);
-    const dob = new Date(profileData.personalInfo.dateOfBirth);
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-      age--;
-    }
-    if (age < 18) {
-      throw new Error('Employee must be at least 18 years old');
+  // Validate date of birth and gap with joining date
+  if (profileData.personalInfo?.dateOfBirth || profileData.employmentInfo?.dateOfJoining) {
+    const currentValues = await pool.query('SELECT date_of_birth, date_of_joining FROM users WHERE id = $1', [userId]);
+    const currentDob = currentValues.rows[0].date_of_birth;
+    const currentDoj = currentValues.rows[0].date_of_joining;
+
+    const dobStr = profileData.personalInfo?.dateOfBirth || currentDob;
+    const dojStr = profileData.employmentInfo?.dateOfJoining || currentDoj;
+
+    if (dobStr) {
+      const dob = new Date(dobStr);
+
+      // Age check (DOB vs Today)
+      if (profileData.personalInfo?.dateOfBirth) {
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+          age--;
+        }
+        if (age < 18) {
+          throw new Error('Employee must be at least 18 years old');
+        }
+      }
+
+      // Gap check (DOB vs DOJ)
+      if (dojStr) {
+        const doj = new Date(dojStr);
+        let workAge = doj.getFullYear() - dob.getFullYear();
+        const monthDiff = doj.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
+          workAge--;
+        }
+        if (workAge < 18) {
+          throw new Error('Joining Date must be at least 18 years after Date of Birth');
+        }
+      }
     }
   }
 
