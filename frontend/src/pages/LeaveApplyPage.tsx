@@ -2438,7 +2438,16 @@ const LeaveApplyPage: React.FC = () => {
               <thead>
                 <tr>
                   <th>S No</th>
-                  <th>Applied Date</th>
+                  <th className="sortable-header" onClick={() => handleSort('appliedDate')}>
+                    <div className="header-sort-wrapper">
+                      Applied Date
+                      {sortConfig.key === 'appliedDate' ? (
+                        sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                      ) : (
+                        <FaSort className="sort-icon" />
+                      )}
+                    </div>
+                  </th>
                   <th>Leave Reason</th>
                   <th className="sortable-header" onClick={() => handleSort('startDate')}>
                     <div className="header-sort-wrapper">
