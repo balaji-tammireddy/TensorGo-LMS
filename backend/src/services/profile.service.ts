@@ -184,6 +184,12 @@ export const updateProfile = async (userId: number, profileData: any) => {
     const requiredPersonalInfo = ['firstName', 'lastName', 'email', 'contactNumber', 'dateOfBirth', 'gender', 'bloodGroup', 'maritalStatus'];
     for (const [key, value] of Object.entries(profileData.personalInfo)) {
       const dbKey = fieldMap[key] || key;
+
+      // Prevent updating immutable fields
+      if (key === 'empId' || key === 'email') {
+        continue;
+      }
+
       if (value !== undefined) {
         // Treat empty strings as null
         const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
