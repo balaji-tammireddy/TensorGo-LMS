@@ -1738,7 +1738,7 @@ const LeaveApplyPage: React.FC = () => {
                     <tbody>
                       {holidays.map((holiday, idx) => (
                         <tr key={idx}>
-                          <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd/MM/yyyy')}</td>
+                          <td>{format(new Date(holiday.date + 'T00:00:00'), 'dd-MM-yyyy')}</td>
                           <td>{holiday.name}</td>
                         </tr>
                       ))}
@@ -2529,18 +2529,18 @@ const LeaveApplyPage: React.FC = () => {
                           className={isUpdating ? 'updating-row' : ''}
                         >
                           <td>{idx + 1}</td>
-                          <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}</td>
+                          <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd-MM-yyyy') : '-'}</td>
                           <td>
                             <div className="reason-cell">
                               {request.leaveReason}
                             </div>
                           </td>
                           <td>
-                            {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                            {request.startDate ? format(new Date(request.startDate + 'T12:00:00'), 'dd-MM-yyyy') : '-'}
                             {request.startDate && request.startType && request.startType !== 'full' ? formatHalfLabel(request.startType) : ''}
                           </td>
                           <td>
-                            {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
+                            {request.endDate ? format(new Date(request.endDate + 'T12:00:00'), 'dd-MM-yyyy') : '-'}
                             {request.endDate && request.endType && request.endType !== 'full' ? formatHalfLabel(request.endType) : ''}
                           </td>
                           <td>{request.noOfDays}</td>
@@ -2556,8 +2556,8 @@ const LeaveApplyPage: React.FC = () => {
                                 return '-';
                               }
                               if (!approvedDates.length) return '-';
-                              if (approvedDates.length === 1) return format(approvedDates[0], 'dd/MM/yyyy');
-                              return `${format(approvedDates[0], 'dd/MM/yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd/MM/yyyy')}`;
+                              if (approvedDates.length === 1) return format(approvedDates[0], 'dd-MM-yyyy');
+                              return `${format(approvedDates[0], 'dd-MM-yyyy')} to ${format(approvedDates[approvedDates.length - 1], 'dd-MM-yyyy')}`;
                             })()}
                           </td>
                           <td>

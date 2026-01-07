@@ -48,11 +48,11 @@ const formatDateForDisplay = (dateStr: string): string => {
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${day}-${month}-${year}`;
 };
 
 /**
- * Format date and time for display (DD/MM/YYYY HH:MM AM/PM)
+ * Format date and time for display (DD-MM-YYYY HH:MM AM/PM)
  */
 const formatDateTimeForDisplay = (dateStr: string): string => {
   const date = new Date(dateStr);
@@ -66,7 +66,7 @@ const formatDateTimeForDisplay = (dateStr: string): string => {
   hours = hours % 12;
   hours = hours ? hours : 12; // the hour '0' should be '12'
 
-  return `${day}/${month}/${year} (${hours}:${minutes} ${ampm})`;
+  return `${day}-${month}-${year} (${hours}:${minutes} ${ampm})`;
 };
 
 /**
@@ -406,6 +406,7 @@ export interface LeaveStatusEmailData {
   noOfDays: number;
   reason: string;
   approverName: string;
+  approverEmpId: string;
   approverRole: string;
   comment?: string | null;
   status: 'approved' | 'partially_approved' | 'rejected';
@@ -426,9 +427,9 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
   // Determine message based on recipient role
   let mainMessage = '';
   if (data.recipientRole === 'employee') {
-    mainMessage = `Your leave request has been <strong>${statusDisplay.toLowerCase()}</strong> by ${data.approverName} (${approverRoleDisplay}).`;
+    mainMessage = `Your leave request has been <strong>${statusDisplay.toLowerCase()}</strong> by ${data.approverName} (${data.approverEmpId}).`;
   } else {
-    mainMessage = `Your team member's leave request has been <strong>${statusDisplay.toLowerCase()}</strong> by ${data.approverName} (${approverRoleDisplay}).`;
+    mainMessage = `Your team member's leave request has been <strong>${statusDisplay.toLowerCase()}</strong> by ${data.approverName} (${data.approverEmpId}).`;
   }
 
   // Add unique identifier to prevent email threading
@@ -471,7 +472,7 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
     ${detailsTable}
     <div style="margin-top: 30px; padding: 15px; background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
       <p style="margin: 0; font-size: 14px; color: #1e40af;">
-        <strong>${data.status === 'approved' ? 'Approved' : data.status === 'partially_approved' ? 'Partially Approved' : 'Rejected'} by:</strong> ${data.approverName} (${approverRoleDisplay})
+        <strong>${data.status === 'approved' ? 'Approved' : data.status === 'partially_approved' ? 'Partially Approved' : 'Rejected'} by:</strong> ${data.approverName} (${data.approverEmpId})
       </p>
     </div>
     <p style="margin-top: 30px;">Best regards,<br/><strong>TensorGo</strong></p>
@@ -500,9 +501,9 @@ const generateLeaveStatusEmailText = (data: LeaveStatusEmailData): string => {
   // Determine message based on recipient role
   let mainMessage = '';
   if (data.recipientRole === 'employee') {
-    mainMessage = `Your leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).`;
+    mainMessage = `Your leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${data.approverEmpId}).`;
   } else {
-    mainMessage = `Your team member's leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${approverRoleDisplay}).`;
+    mainMessage = `Your team member's leave request has been ${statusDisplay.toLowerCase()} by ${data.approverName} (${data.approverEmpId}).`;
   }
 
   let text = `
@@ -529,7 +530,7 @@ Reason: ${data.reason}
   }
 
   text += `Status: ${statusDisplay}
-${data.status === 'approved' || data.status === 'partially_approved' ? 'Approved' : 'Rejected'} by: ${data.approverName} (${approverRoleDisplay})
+${data.status === 'approved' || data.status === 'partially_approved' ? 'Approved' : 'Rejected'} by: ${data.approverName} (${data.approverEmpId})
 
 Best regards,
 TensorGo
@@ -1424,6 +1425,7 @@ Reference ID: ${uniqueId}
  */
 export interface EmployeeDetailsUpdateEmailData {
   employeeName: string;
+  employeeEmpId: string;
   updatedBy: string;
 }
 

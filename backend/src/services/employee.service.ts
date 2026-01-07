@@ -1207,6 +1207,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         await emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
+          employeeEmpId: employeeResult.rows[0].emp_id || '',
           updatedBy: requesterName
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);

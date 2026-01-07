@@ -2291,6 +2291,7 @@ export const approveLeave = async (
         noOfDays: parseFloat(leave.no_of_days),
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
+        approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment || null,
         status: 'approved' as const
@@ -2326,6 +2327,7 @@ export const rejectLeave = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      approver.emp_id as approver_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,
@@ -2563,6 +2565,7 @@ export const rejectLeave = async (
         noOfDays: parseFloat(leave.no_of_days),
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
+        approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment || null,
         status: 'rejected' as const
@@ -2649,6 +2652,7 @@ export const approveLeaveDay = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      approver.emp_id as approver_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,
@@ -2829,6 +2833,7 @@ export const approveLeaveDay = async (
         noOfDays: parseFloat(leave.no_of_days),
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
+        approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment || null,
         status: 'approved' as const
@@ -2871,6 +2876,7 @@ export const approveLeaveDays = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      approver.emp_id as approver_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,
@@ -3088,6 +3094,7 @@ export const approveLeaveDays = async (
         noOfDays: parseFloat(leave.no_of_days),
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
+        approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment || null,
         status: emailStatus
@@ -3127,6 +3134,7 @@ export const rejectLeaveDay = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      approver.emp_id as approver_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,
@@ -3354,6 +3362,7 @@ export const rejectLeaveDay = async (
         noOfDays: 1, // Single day rejected
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
+        approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment || null,
         status: 'rejected' as const
@@ -3390,6 +3399,7 @@ export const rejectLeaveDays = async (
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
       approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+      approver.emp_id as approver_emp_id,
       manager.email as manager_email,
       manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
       hr.email as hr_email,
@@ -3551,6 +3561,7 @@ export const rejectLeaveDays = async (
         noOfDays: totalRefund, // Days rejected in this batch
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
+        approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment,
         status: 'rejected' as const
@@ -3778,7 +3789,8 @@ export const updateLeaveStatus = async (
           manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
           hr.email as hr_email,
           hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
-          approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name
+          approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
+          approver.emp_id as approver_emp_id
          FROM leave_requests lr
          JOIN users u ON lr.employee_id = u.id
          LEFT JOIN users approver ON approver.id = $2
@@ -3826,6 +3838,7 @@ export const updateLeaveStatus = async (
             noOfDays: parseFloat(emailLeave.no_of_days),
             reason: emailLeave.reason,
             approverName: emailLeave.approver_name || 'Approver',
+            approverEmpId: emailLeave.approver_emp_id || '',
             approverRole: approverRole,
             comment: newStatus === 'rejected' ? (rejectReason || null) : null,
             status: newStatus as 'approved' | 'partially_approved' | 'rejected'
