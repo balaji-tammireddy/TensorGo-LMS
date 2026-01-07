@@ -511,7 +511,7 @@ const LeaveApplyPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0,
-      refetchInterval: 30000, // Polling every 30 seconds
+      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -530,7 +530,7 @@ const LeaveApplyPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0, // Always refetch when year changes
-      refetchInterval: 60000, // Polling every minute
+      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       keepPreviousData: true, // Keep old year's data while fetching new year
       refetchOnMount: true, // Always refetch when component mounts
@@ -569,7 +569,7 @@ const LeaveApplyPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0,
-      refetchInterval: 15000, // Polling every 15 seconds
+      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {

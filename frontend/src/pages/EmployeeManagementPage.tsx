@@ -200,7 +200,7 @@ const EmployeeManagementPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0,
-      refetchInterval: 30000, // Polling every 30 seconds
+      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
       cacheTime: 5 * 60 * 1000,
       keepPreviousData: true,
       enabled: showLeaveHistory && !!editingEmployeeId && (user?.role === 'hr' || user?.role === 'super_admin')
@@ -220,7 +220,7 @@ const EmployeeManagementPage: React.FC = () => {
     {
       retry: false,
       staleTime: 0,
-      refetchInterval: 30000, // Polling every 30 seconds
+      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
       keepPreviousData: true,
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
@@ -333,8 +333,11 @@ const EmployeeManagementPage: React.FC = () => {
     ({ employeeId, leaveType, count, comment }: { employeeId: number; leaveType: 'casual' | 'sick' | 'lop'; count: number; comment?: string }) =>
       employeeService.addLeavesToEmployee(employeeId, leaveType, count, comment),
     {
-      onSuccess: () => {
+      onSuccess: (_, variables) => {
         queryClient.invalidateQueries('employees');
+        queryClient.invalidateQueries(['employeeLeaveBalances', variables.employeeId]);
+        queryClient.invalidateQueries('leaveBalances');
+        queryClient.invalidateQueries('myLeaveRequests');
         setAddLeavesModalOpen(false);
         setSelectedEmployeeForLeaves(null);
         showSuccess('Leaves added!');

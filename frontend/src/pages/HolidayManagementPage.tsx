@@ -37,7 +37,7 @@ const HolidayManagementPage: React.FC = () => {
         {
             retry: false,
             staleTime: 0,
-            refetchInterval: 30000, // Polling every 30 seconds
+            refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
             cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
             keepPreviousData: true, // Keep old data while fetching new
             refetchOnMount: true
