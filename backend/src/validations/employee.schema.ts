@@ -7,7 +7,7 @@ const nameSchema = z.string()
 
 const safeTextSchema = z.string()
     .max(255, 'Text cannot exceed 255 characters')
-    .regex(/^[a-zA-Z0-9\s\.,\-'()&/]+$/, 'Special characters and emojis are not allowed');
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;]*$/, 'Special characters and emojis are not allowed');
 
 const addressSchema = z.string()
     .min(1, 'Address is required')
@@ -24,10 +24,16 @@ const aadharSchema = z.string()
 
 const educationSchema = z.object({
     level: z.string().max(50),
-    groupStream: safeTextSchema.optional().or(z.literal('')),
-    collegeUniversity: safeTextSchema.optional().or(z.literal('')),
-    year: z.string().regex(/^\d{4}$/, 'Invalid year format').optional().or(z.literal('')),
-    scorePercentage: z.string().max(10).regex(/^[a-zA-Z0-9\s\.,%]+$/, 'Invalid score format').optional().or(z.literal(''))
+    groupStream: safeTextSchema.nullable().optional().or(z.literal('')),
+    collegeUniversity: safeTextSchema.nullable().optional().or(z.literal('')),
+    year: z.union([
+        z.string().regex(/^\d{4}$/, 'Invalid year format'),
+        z.number()
+    ]).nullable().optional().or(z.literal('')),
+    scorePercentage: z.union([
+        z.string().max(10).regex(/^[a-zA-Z0-9\s\.,%]+$/, 'Invalid score format'),
+        z.number()
+    ]).nullable().optional().or(z.literal(''))
 });
 
 export const createEmployeeSchema = z.object({
@@ -39,7 +45,7 @@ export const createEmployeeSchema = z.object({
             { message: 'Only organization mail should be used' }
         ),
         firstName: nameSchema,
-        middleName: nameSchema.optional().or(z.literal('')),
+        middleName: nameSchema.nullable().optional().or(z.literal('')),
         lastName: nameSchema,
         contactNumber: phoneSchema,
         altContact: phoneSchema,
@@ -70,7 +76,7 @@ export const updateEmployeeSchema = z.object({
     }),
     body: z.object({
         firstName: nameSchema.optional(),
-        middleName: nameSchema.optional().or(z.literal('')),
+        middleName: nameSchema.nullable().optional().or(z.literal('')),
         lastName: nameSchema.optional(),
         contactNumber: phoneSchema.optional(),
         altContact: phoneSchema.optional(),
@@ -104,7 +110,7 @@ export const updateProfileSchema = z.object({
     body: z.object({
         personalInfo: z.object({
             firstName: nameSchema.optional(),
-            middleName: nameSchema.optional().or(z.literal('')),
+            middleName: nameSchema.nullable().optional().or(z.literal('')),
             lastName: nameSchema.optional(),
             contactNumber: phoneSchema.optional(),
             altContact: phoneSchema.optional(),
