@@ -20,7 +20,7 @@ const sendDailyPendingLeaveReminders = async () => {
         u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name
       FROM users u
       WHERE u.role IN ('manager', 'hr')
-        AND u.status = 'active'
+        AND u.status NOT IN ('inactive', 'resigned')
         AND EXISTS (
           SELECT 1 FROM leave_requests lr
           JOIN users emp ON lr.employee_id = emp.id
@@ -135,7 +135,7 @@ const sendBirthdayWishes = async () => {
         emp_id,
         first_name || ' ' || COALESCE(last_name, '') as employee_name
       FROM users
-      WHERE status = 'active'
+      WHERE status NOT IN ('inactive', 'resigned')
         AND date_of_birth IS NOT NULL
         AND EXTRACT(MONTH FROM date_of_birth) = $1
         AND EXTRACT(DAY FROM date_of_birth) = $2`,
@@ -154,7 +154,7 @@ const sendBirthdayWishes = async () => {
           emp_id,
           first_name || ' ' || COALESCE(last_name, '') as employee_name
         FROM users
-        WHERE status = 'active'`
+        WHERE status NOT IN ('inactive', 'resigned')`
       );
 
       const allEmployees = allEmployeesResult.rows;
@@ -213,7 +213,7 @@ const checkAndSendHolidayListReminder = async () => {
     // 1. Get all HRs
     const hrResult = await pool.query(
       `SELECT email, first_name || ' ' || COALESCE(last_name, '') as name 
-       FROM users WHERE role = 'hr' AND status = 'active'`
+       FROM users WHERE role = 'hr' AND status NOT IN ('inactive', 'resigned')`
     );
 
     if (hrResult.rows.length === 0) {
@@ -223,7 +223,7 @@ const checkAndSendHolidayListReminder = async () => {
 
     // 2. Get all Super Admins for CC
     const adminResult = await pool.query(
-      `SELECT email FROM users WHERE role = 'super_admin' AND status = 'active'`
+      `SELECT email FROM users WHERE role = 'super_admin' AND status NOT IN ('inactive', 'resigned')`
     );
 
     // Filter out admins who might also be HR to avoid duplicate/confusion (optional, but safe)
@@ -292,7 +292,7 @@ export const processDailyLeaveCredits = async () => {
     const result = await pool.query(
       `SELECT id, emp_id, date_of_joining, email, first_name || ' ' || COALESCE(last_name, '') as name 
        FROM users 
-       WHERE status = 'active' AND date_of_joining IS NOT NULL`
+       WHERE status NOT IN ('inactive', 'resigned') AND date_of_joining IS NOT NULL`
     );
 
     const employees = result.rows;
