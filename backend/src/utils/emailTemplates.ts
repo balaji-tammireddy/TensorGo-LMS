@@ -106,53 +106,84 @@ const formatTime = (timeStr: string | null | undefined): string => {
 const generateEmailWrapper = (title: string, content: string, footerRefId: string, previewText: string = ''): string => {
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="x-apple-disable-message-reformatting" />
   <title>${title}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style type="text/css">
-    body { width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f7fa; }
-    #backgroundTable { margin: 0; padding: 0; width: 100% !important; line-height: 100% !important; }
-    img { outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; border: none; }
-    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    table td { border-collapse: collapse; }
+    /* Reset Styles */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    table { border-collapse: collapse !important; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; height: 100% !important; background-color: #f5f7fa; font-family: Arial, sans-serif; }
+    
+    /* Client Specific Resets */
+    a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; font-size: inherit !important; font-family: inherit !important; font-weight: inherit !important; line-height: inherit !important; }
+    
+    /* Content Styles */
     p { margin: 1em 0; line-height: 1.6; }
-    h1 { margin: 0; }
-    h2, h3 { color: #1e3a8a !important; margin: 0; }
     a { color: #2563eb; text-decoration: underline; }
+    
+    /* NO MOBILE MEDIA QUERIES - FORCE DESKTOP */
   </style>
+  <!--[if mso]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f7fa;">
+<body style="margin: 0; padding: 0; background-color: #f5f7fa;">
   <div style="display: none; max-height: 0px; overflow: hidden; font-size: 1px; color: #f5f7fa;">
     ${previewText}
   </div>
-  <table cellpadding="0" cellspacing="0" border="0" id="backgroundTable" style="margin: 0; padding: 0; width: 100%; background-color: #f5f7fa;">
+  
+  <!-- Outer Wrapper -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
     <tr>
-      <td align="center" style="padding: 40px 10px;">
-        <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-          <!-- Header -->
+      <td bgcolor="#f5f7fa" align="center" style="padding: 40px 10px;">
+        
+        <!-- Main Container - Fixed Width 600px -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" style="width: 600px;">
           <tr>
-            <td bgcolor="#1e3a8a" align="left" style="padding: 35px 40px;">
-              <h1 style="margin: 0; color: #ffffff !important; font-size: 24px; font-weight: bold; font-family: Arial, sans-serif;">${title}</h1>
-            </td>
-          </tr>
-          
-          <!-- Body Content -->
-          <tr>
-            <td align="left" style="padding: 40px; color: #374151; font-size: 16px; font-family: Arial, sans-serif;">
-              ${content}
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td bgcolor="#f8fafc" align="left" style="padding: 30px 40px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; font-family: Arial, sans-serif;">
-              <p style="margin: 0;">This is an automated notification from <strong>TensorGo Intranet</strong>. Please do not reply to this email.</p>
-              <p style="margin: 10px 0 0 0;">Reference ID: ${footerRefId}</p>
+            <td bgcolor="#ffffff" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              
+              <!-- Header -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td bgcolor="#1e3a8a" align="left" style="padding: 35px 40px; mso-line-height-rule: exactly; font-size: 24px; line-height: 1.5; font-weight: bold; color: #ffffff; font-family: Arial, sans-serif;">
+                      ${title}
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Body Content -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="left" style="padding: 40px; color: #374151; font-size: 16px; font-family: Arial, sans-serif;">
+                    ${content}
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Footer -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td bgcolor="#f8fafc" align="left" style="padding: 30px 40px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; line-height: 1.5; font-family: Arial, sans-serif;">
+                    <p style="margin: 0;">This is an automated notification from <strong>TensorGo Intranet</strong>. Please do not reply to this email.</p>
+                    <p style="margin: 10px 0 0 0;">Reference ID: ${footerRefId}</p>
+                  </td>
+                </tr>
+              </table>
+              
             </td>
           </tr>
         </table>
+        
       </td>
     </tr>
   </table>
