@@ -1766,7 +1766,7 @@ const LeaveApplyPage: React.FC = () => {
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Holiday name</th>
+                        <th>Holiday Name</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2471,7 +2471,7 @@ const LeaveApplyPage: React.FC = () => {
             <table className="requests-table">
               <thead>
                 <tr>
-                  <th>S No</th>
+                  <th>S. No</th>
                   <th className="sortable-header" onClick={() => handleSort('appliedDate')}>
                     <div className="header-sort-wrapper">
                       Applied Date
@@ -2485,7 +2485,7 @@ const LeaveApplyPage: React.FC = () => {
                   <th>Leave Reason</th>
                   <th className="sortable-header" onClick={() => handleSort('startDate')}>
                     <div className="header-sort-wrapper">
-                      Start date
+                      Start Date
                       {sortConfig.key === 'startDate' ? (
                         sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
                       ) : (
@@ -2503,7 +2503,7 @@ const LeaveApplyPage: React.FC = () => {
                       )}
                     </div>
                   </th>
-                  <th>No Of Days</th>
+                  <th>No. Of Days</th>
                   <th>Leave Type</th>
                   <th>Approved Dates</th>
                   <th>Current Status</th>
