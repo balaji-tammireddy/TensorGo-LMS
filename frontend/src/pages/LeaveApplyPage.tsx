@@ -99,7 +99,7 @@ const LeaveApplyPage: React.FC = () => {
 
   // Check if a date is a weekend (Sunday = 0, Saturday = 6)
   // For interns, Saturday is a working day, so only Sunday is considered a weekend.
-  const isWeekend = (dateStr: string): boolean => {
+  const isWeekend = useCallback((dateStr: string): boolean => {
     if (!dateStr) return false;
     const date = new Date(dateStr + 'T00:00:00');
     const dayOfWeek = date.getDay();
@@ -108,7 +108,9 @@ const LeaveApplyPage: React.FC = () => {
     const isIntern = user?.role === 'intern';
 
     return isSunday || (isSaturday && !isIntern);
-  };
+  }, [user?.role]);
+
+
 
   const formatHalfLabel = (val?: string) => {
     if (!val) return '';
@@ -357,21 +359,7 @@ const LeaveApplyPage: React.FC = () => {
     }
   }, [formData.leaveType]);
 
-  // Set default dates on component mount if not editing/viewing
-  useEffect(() => {
-    if (!editingId && !deleteRequestId && !viewModalOpen && !formData.startDate) {
-      // Default to Casual leave logic (Today + 3 days)
-      const today = new Date();
-      const futureDate = addDays(today, 3);
-      const futureDateStr = format(futureDate, 'yyyy-MM-dd');
 
-      setFormData(prev => ({
-        ...prev,
-        startDate: futureDateStr,
-        endDate: futureDateStr
-      }));
-    }
-  }, [editingId, deleteRequestId, viewModalOpen]); // Run once on mount (effectively) when IDs are checked
 
   // When the leave spans a single day (start === end and not permission), force endType to follow startType
   useEffect(() => {
@@ -558,6 +546,52 @@ const LeaveApplyPage: React.FC = () => {
       return dateA.getTime() - dateB.getTime();
     });
   }, [holidaysData, selectedYear]);
+
+  // Helper to find the next valid working date starting from a given date
+  const getNextWorkingDate = useCallback((startDate: Date) => {
+    let currentDate = new Date(startDate);
+    // Limit lookahead to avoid infinite loops (e.g., 60 days)
+    for (let i = 0; i < 60; i++) {
+      const dateStr = format(currentDate, 'yyyy-MM-dd');
+
+      // Check if it's a weekend
+      if (isWeekend(dateStr)) {
+        currentDate = addDays(currentDate, 1);
+        continue;
+      }
+
+      // Check if it's a holiday
+      const isHoliday = holidays.some((h: any) => h.date === dateStr);
+      if (isHoliday) {
+        currentDate = addDays(currentDate, 1);
+        continue;
+      }
+
+      // It's a valid working day
+      return currentDate;
+    }
+    return startDate; // Fallback
+  }, [holidays, isWeekend]);
+
+  // Set default dates on component mount if not editing/viewing
+  useEffect(() => {
+    if (!editingId && !deleteRequestId && !viewModalOpen && !formData.startDate && !holidaysLoading && user) {
+      // Default to Casual leave logic (Today + 3 days)
+      const today = new Date();
+      let futureDate = addDays(today, 3);
+
+      // Adjust if futureDate falls on a non-working day
+      futureDate = getNextWorkingDate(futureDate);
+
+      const futureDateStr = format(futureDate, 'yyyy-MM-dd');
+
+      setFormData(prev => ({
+        ...prev,
+        startDate: futureDateStr,
+        endDate: futureDateStr
+      }));
+    }
+  }, [editingId, deleteRequestId, viewModalOpen, holidaysLoading, user, getNextWorkingDate]); // Run once holidays are loaded
   const { data: rules = [], isLoading: rulesLoading, error: rulesError } = useQuery(
     'leaveRules',
     leaveService.getLeaveRules,
