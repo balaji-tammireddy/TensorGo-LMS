@@ -96,13 +96,13 @@
   align-items: center;
   justify-content: center;
   padding: 0 8px;
-  color: #3c6ff2;
+  color: #000000;
   cursor: pointer;
   transition: color 0.2s;
 }
 
 .date-picker-icon-container:hover {
-  color: #2951c8;
+  color: #333333;
 }
 
 .date-picker-calendar {

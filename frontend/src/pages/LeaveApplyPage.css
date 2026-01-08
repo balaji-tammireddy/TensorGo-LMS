@@ -742,11 +742,11 @@
 
 .filter-date-controls .date-picker-icon-container {
   padding-right: 12px;
-  color: #666;
+  color: #000000;
 }
 
 .filter-date-controls .date-picker-icon-container:hover {
-  color: #3c6ff2;
+  color: #333333;
 }
 
 .filter-clear-button {
