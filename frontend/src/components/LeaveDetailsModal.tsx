@@ -168,6 +168,11 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   };
 
   const handleApproveClick = () => {
+    // Validation: If start date is given, end date must also be given
+    if (fromDate && !toDate) {
+      return;
+    }
+
     if (isMultiDay && pendingDays.length > 0) {
       // For multi-day, approve selected range or all pending if no range selected
       const daysToApprove = fromDate && toDate
@@ -634,16 +639,6 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 <div className="leave-detail-item leave-detail-item-full">
                   <label>Select Date Range to Approve/Reject</label>
                   <div className="date-range-picker-container">
-                    {!fromDate && !toDate && (
-                      <div className="date-range-selection-hint">
-                        Select a date range above to approve specific dates, or leave empty to process all pending dates. Note: Reject can only be used for all pending dates.
-                      </div>
-                    )}
-                    {fromDate && toDate && (
-                      <div className="date-range-selection-hint">
-                        Partial approval selected. Remaining dates will be automatically rejected.
-                      </div>
-                    )}
                     <div className="date-range-inputs">
                       <div className="date-range-input-group">
                         <label>Approved Date From</label>
@@ -654,6 +649,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           max={maxDate}
                           disabled={isLoading}
                           placeholder="DD-MM-YYYY"
+                          isEmployeeVariant={true}
                         />
                       </div>
                       <div className="date-range-input-group">
@@ -665,6 +661,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           max={maxDate}
                           disabled={isLoading || !fromDate}
                           placeholder="DD-MM-YYYY"
+                          isEmployeeVariant={true}
                         />
                       </div>
                     </div>
@@ -698,6 +695,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           }}
                           disabled={isLoading}
                           placeholder="DD-MM-YYYY"
+                          isEmployeeVariant={true}
                         />
                       </div>
                       <div className="date-range-input-group">
@@ -714,6 +712,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           }}
                           disabled={isLoading || !fromDate}
                           placeholder="DD-MM-YYYY"
+                          isEmployeeVariant={true}
                         />
                       </div>
                     </div>
@@ -822,7 +821,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                   <button
                     className="leave-details-modal-button leave-details-modal-button-approve"
                     onClick={handleApproveClick}
-                    disabled={isLoading}
+                    disabled={isLoading || (!!fromDate && !toDate)}
                   >
                     {isLoading ? (
                       <>
@@ -831,7 +830,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <FaCheck /> {fromDate && toDate ? 'Approve Selected' : 'Approve'}
+                        <FaCheck /> {isMultiDay && !fromDate && !toDate ? 'Approve All' : 'Approve'}
                       </>
                     )}
                   </button>
