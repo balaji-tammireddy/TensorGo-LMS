@@ -158,6 +158,7 @@ const EmployeeManagementPage: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -208,14 +209,15 @@ const EmployeeManagementPage: React.FC = () => {
   );
 
   const { data: employeesData, isLoading: employeesLoading, error } = useQuery(
-    ['employees', appliedSearch, statusFilter],
+    ['employees', appliedSearch, statusFilter, roleFilter],
     () =>
       employeeService.getEmployees(
         1,
         20,
         appliedSearch,
         undefined,
-        statusFilter || undefined
+        statusFilter || undefined,
+        roleFilter || undefined
       ),
     {
       retry: false,
@@ -996,7 +998,41 @@ const EmployeeManagementPage: React.FC = () => {
                     </div>
                   </th>
                   <th>Emp Name</th>
-                  <th>Role</th>
+                  <th>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      Role
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            style={{
+                              padding: '0 4px',
+                              height: '20px',
+                              border: roleFilter ? '1px solid #2563eb' : 'none',
+                              backgroundColor: roleFilter ? '#eff6ff' : 'transparent',
+                              color: roleFilter ? '#2563eb' : 'inherit'
+                            }}
+                          >
+                            <ChevronDown style={{ width: '12px', height: '12px' }} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => setRoleFilter('')}>
+                            All Roles
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {['super_admin', 'hr', 'manager', 'employee', 'intern'].map((role) => (
+                            <DropdownMenuItem key={role} onClick={() => setRoleFilter(role)}>
+                              {role === 'super_admin' ? 'Super Admin' :
+                                role === 'hr' ? 'HR' :
+                                  role.charAt(0).toUpperCase() + role.slice(1)}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </th>
                   <th className="sortable-header" onClick={() => handleSort('joiningDate')}>
                     <div className="header-sort-wrapper">
                       Joining Date

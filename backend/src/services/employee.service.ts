@@ -10,10 +10,11 @@ export const getEmployees = async (
   limit: number = 20,
   search?: string,
   joiningDate?: string,
-  status?: string
+  status?: string,
+  role?: string
 ) => {
   logger.info(`[EMPLOYEE] [GET EMPLOYEES] ========== FUNCTION CALLED ==========`);
-  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}`);
+  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}, Role: ${role || 'none'}`);
 
   const offset = (page - 1) * limit;
   let query = `
@@ -48,6 +49,11 @@ export const getEmployees = async (
     }
   }
 
+  if (role) {
+    query += ` AND role = $${params.length + 1}`;
+    params.push(role);
+  }
+
   if (joiningDate) {
     // Filter by exact date of joining (YYYY-MM-DD)
     query += ` AND date_of_joining::date = $${params.length + 1}`;
@@ -76,6 +82,11 @@ export const getEmployees = async (
       countQuery += ` AND status = $${countParams.length + 1}`;
       countParams.push(status);
     }
+  }
+
+  if (role) {
+    countQuery += ` AND role = $${countParams.length + 1}`;
+    countParams.push(role);
   }
 
   if (joiningDate) {

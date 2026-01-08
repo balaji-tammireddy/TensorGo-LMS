@@ -15,8 +15,9 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
     const search = req.query.search as string | undefined;
     const joiningDate = req.query.joiningDate as string | undefined;
     const status = req.query.status as string | undefined;
+    const role = req.query.role as string | undefined;
 
-    const result = await employeeService.getEmployees(page, limit, search, joiningDate, status);
+    const result = await employeeService.getEmployees(page, limit, search, joiningDate, status, role);
     logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] Retrieved ${result.employees.length} employees, Total: ${result.pagination.total}`);
     res.json(result);
   } catch (error: any) {

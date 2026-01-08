@@ -25,12 +25,14 @@ export const getEmployees = async (
   limit: number = 20,
   search?: string,
   joiningDate?: string,
-  status?: string
+  status?: string,
+  role?: string
 ): Promise<EmployeeListResponse> => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   if (search) params.append('search', search);
   if (joiningDate) params.append('joiningDate', joiningDate);
   if (status) params.append('status', status);
+  if (role) params.append('role', role);
   const response = await api.get(`/employees?${params}`);
   return response.data;
 };
