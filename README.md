@@ -1,201 +1,121 @@
-# TensorGo LMS - HR Management System
+# 🚀 TensorGo LMS - Complete User & System Guide
 
-A comprehensive, production-ready HR Leave Management System (LMS) designed to streamline employee leave tracking, approvals, and personnel management. Built with a modern tech stack ensuring performance, scalability, and a premium user experience.
+Welcome to the **TensorGo Leave Management System (LMS)**. This portal is a comprehensive HR solution designed to manage the entire lifecycle of an employee while providing a robust, rule-based engine for leave tracking and organizational hierarchy management.
 
-## 🚀 Features
+---
 
-### 👤 Role-Based Access Control
-- **Super Admin**: 
-  - Complete control over the system.
-  - Can manage HR, Managers, and Employees.
-  - View and edit all leave records.
-  - Bypass approval hierarchies if necessary.
-- **HR**: 
-  - Full employee lifecycle management (Onboarding to Exit).
-  - Can view and manage leave history for all employees.
-  - Override manager decisions if required.
-- **Manager**: 
-  - View team structure and direct reports.
-  - Approve or reject leave applications.
-  - Track team leave balances.
-- **Employee**: 
-  - Self-service portal for leave applications.
-  - View personal leave history and balances.
-  - Manage personal profile.
+## 👥 1. User Roles & Responsibilities
+The system is built on a strict **Role-Based Access Control (RBAC)** model. Each role has specific permissions tailored to their position in the company.
 
-### 📅 Advanced Leave Management
+### **🛡️ Super Admin**
+The "God Mode" of the system. 
+- **System Configuration**: Manage global settings, holiday lists, and infrastructure keys.
+- **Ultimate Authority**: Can edit, approve, or delete any record in the system, bypassing hierarchy constraints if necessary.
+- **User Management**: Creating and managing high-level roles like HR and other Admins.
+- **Security Oversight**: Monitoring audit logs and managing sensitive infrastructure data.
 
-#### 📝 Leave Application
-- **Multiple Leave Types**: Support for **Casual**, **Sick**, **LOP** (Loss of Pay), and **Permission**.
-- **Permission Leave**: 
-  - Special logic for short absences (max **2 hours**).
-  - Restricted to office hours (10 AM - 7 PM).
-- **Validation & Business Logic**:
-  - **LOP (Loss of Pay)**: Inclusive logic—Saturdays, Sundays, and Holidays are **counted** as leave days if they fall within the LOP period.
-  - **Casual/Sick Leave**: Exclusive logic—Weekends and Holidays are automatically **excluded** from the duration.
-  - **Sick Leave**: Retrospective application (past 3 days) supported; future dates restricted to next day.
-  - **Casual Leave**: Requires 3 days advance notice.
-  - **Overlap Detection**: Real-time checking across all request statuses (Approved, Pending, Partially Approved).
-- **Documentation**: S3-backed file upload for medical certificates (Sick leave).
-- **LOP to Casual Conversion**: HR/Admins can instantly convert an LOP request to Casual leave with automatic balance reconciliation and duration recalculation.
+### **💼 Human Resources (HR)**
+The primary operators of the personnel database.
+- **Employee Lifecycle**: Handing everything from "Onboarding" (creating new records) to "Exit" (marking as resigned/inactive).
+- **Compliance**: Ensuring all employee documents (PAN, Aadhar) are valid and formatted correctly.
+- **Manual Leave Allocation**: Power to grant additional leaves to any employee for rewards or special cases.
+- **Infrastructure Management**: Managing the organizational structure and reporting lines for everyone except Super Admins.
+- **Hierarchy Boundary**: Cannot edit other HR users or Super Admins to ensure mutual accountability.
 
-#### ✅ Approval Workflow
-- **Dashboard**: Centralized "Pending Requests" view for Managers/HR.
-- **Filtering**: Filter requests by Leave Type (Casual, Sick, LOP) or Status.
-- **Search**: Quick search by Employee Name or ID.
-- **Batch Actions**: Bulk approve or reject leaves for efficiency.
-- **Granular Control**: Approve specific days within a multi-day request while rejecting others.
-- **Optimistic UI**: Instant feedback on actions before server confirmation for a snappy experience.
-- **LOP Conversion**: Ability for HR/Admin to convert LOP requests to Casual leave.
+### **👔 Manager**
+The frontline decision-makers for their teams.
+- **Team Oversight**: Real-time view of direct reports, their leave history, and current balances.
+- **Leave Approvals**: Authority to Approve, Reject, or **Partially Approve** (approving only specific days) leave requests.
+- **Reporting**: Monitoring team availability to ensure project continuity.
 
-#### 📊 History & Tracking
-- **Live Updates**: "Leave History" view automatically fetches the latest data without page reloads.
-- **Status Tracking**: Clear visual indicators for Pending, Approved, Rejected, and Partially Approved states.
-- **Balance Tracking**: Automated deduction and tracking of available leave balances.
-- **Holiday Calendar**: Integrated holiday list view customized by year.
+### **👤 Employee / Intern**
+The self-service users.
+- **Leave Application**: Submitting requests with smart validation (prevents picking holidays, weekends, or overlapping dates).
+- **Personal Dashboard**: Tracking personal leave balances (Casual, Sick, LOP) and application history.
+- **Profile Management**: Updating personal details and uploading profile photos.
+- **Security**: Forced password change on first login to ensure account integrity.
 
-### 🚀 Performance & UX Optimization
+---
 
-#### ⚡ Backend Performance
-- **N+1 Query Resolution**: Refactored major API endpoints (`getMyLeaveRequests`, `getPendingLeaveRequests`, `getApprovedLeaves`) to fetch data in efficient batches. This eliminates database bottlenecks and ensures smooth table loading even with thousands of records.
-- **Gzip Content Compression**: All API responses are compressed using Gzip, reducing payload sizes by up to 80% and improving load times on slower networks.
-- **Efficient Caching**: Implemented intelligent cache headers for static assets (profile photos, medical certificates) and optimized `React Query` cache times for frequently accessed data.
+## 📅 2. The Smart Leave Engine (Core Logics)
+Our system doesn't just record dates; it applies complex business logic to ensure company policies are automatically enforced.
 
-#### 🎨 Snappy User Experience
-- **True Optimistic Updates**: Leave applications and balance changes are reflected in the UI **instantly**. The system predicts the result and updates the cache before the server even responds, creating a zero-latency feel.
-- **Intelligent Data Prefetching**: Profile data, leave balances, and holidays are proactively loaded in the background as soon as a user logs in, making the first click on any module feel instantaneous.
-- **Localized Loading States**: Replaced jarring full-page loaders with refined, localized skeleton states and background "fetching" indicators. This ensures the UI remains stable and interactive during data refreshes.
-- **Memoized Logic**: Complex data processing and filtering (e.g., in the Leave Approval dashboard) are wrapped in `useMemo` to prevent UI jank during high-frequency interactions.
+### **Leave Type Breakdown**
+| Leave Type | Logic | Monthly Cap | Key Feature |
+| :--- | :--- | :--- | :--- |
+| **Casual** | Exclusive | 10 Days | Requires advance notice. Excludes weekends/holidays. |
+| **Sick** | Exclusive | Unlimited* | 3-day past-date buffer. Future requests only for "Tomorrow". |
+| **LOP (Loss of Pay)** | **Inclusive** | 5 Days | **Harsh Logic:** Weekends/Holidays are *counted* if within the period. |
+| **Permission** | Special | Hourly | Max 2 hours per request. Restricted to 10 AM - 7 PM window. |
 
-### � Email Services & Automation
-- **Email Notifications**: 
-  - Powered by **Nodemailer** using SMTP (Gmail/Custom).
-  - Reliable delivery with error handling and logging.
-- **Automated Cron Jobs**: 
-  - **Daily Reminders (9:00 AM)**: auto-emails Managers and HR about pending leave requests.
-  - **Birthday Wishes (9:00 AM)**: Sends automated birthday greetings to employees, CC'ing the rest of the team.
-- **Smart Scheduling**: Uses `node-cron` for precise timing and timezone management (Asia/Kolkata).
+### **Advance Notice Logic (Casual Leave)**
+To ensure team planning, the system enforces the following notice periods:
+- **Small (0.5 - 2 Days)**: Must apply **3 days** in advance.
+- **Medium (3 - 5 Days)**: Must apply **1 week (7 days)** in advance.
+- **Large (> 5 Days)**: Must apply **1 month (30 days)** in advance.
 
-### ☁️ Cloud Storage & Security
-- **Object Storage**: Integrated with **OVHcloud** (S3-compatible) for secure file storage.
-- **Signed URLs**: Generates time-limited signed URLs for private file access (e.g., medical certificates).
-- **Public URLs**: Supports public access for non-sensitive assets like profile placeholders.
-- **Secure Authentication**: JWT-based login system with auto-expiry handling.
-- **Force Password Change**: Security feature forcing users to change default passwords on first login.
-- **Profile Management**:
-  - **Photo Upload**: Secure profile picture upload directly to cloud storage.
-  - **Data Privacy**: Employees can view but not edit sensitive employment fields (Role, Department, etc.).
+### **"On Notice" Status Logic**
+When an employee resigns and is in their notice period:
+- **Casual Leave is DISABLED**: To ensure they are available for handovers.
+- **Restricted Access**: They can only apply for *Sick*, *LOP*, or *Permission*.
 
-### 👥 Employee Management (HR/Admin)
-- **Centralized Directory**: Searchable list of all employees with advanced filtering.
-- **Onboarding**: Comprehensive multi-step form capturing Personal, Employment, Document (Aadhar/PAN), and Educational details.
-- **Validation**: Strict validation for PAN format, Aadhar length (12 digits), Age (18+), and Phone numbers.
-- **Direct Leave Assignment**: HR/Admins can grant leaves directly to employees.
+### **The "Inclusive" LOP Rule**
+If an employee takes LOP from Friday to Monday:
+- **Casual Logic**: Counts as 2 days (Fri, Mon).
+- **LOP Logic**: Counts as 4 days (Fri, **Sat, Sun**, Mon).
 
-## 🛠️ Tech Stack
+---
 
-### Frontend
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **State Management**: React Query (TanStack Query) for efficient server state management and caching.
-- **Routing**: React Router v6
-- **Styling**: Vanilla CSS with modern aesthetics, `clsx`, `tailwind-merge`.
-- **UI Components**: Radix UI primitives, React Icons, Lucide React.
-- **Forms**: React Hook Form + Zod validation.
-- **Date Handling**: `date-fns` for robust date math and formatting.
+## 🏗️ 3. Organizational Hierarchy & Automated Flow
+The system manages a deep **L1 ➔ L2 ➔ L3** reporting chain to ensure no action goes unmonitored.
 
-### Backend
-- **Runtime**: Node.js with Express
-- **Language**: TypeScript
-- **Database**: PostgreSQL 14+
-- **ORM/Querying**: Raw SQL / `pg` (custom service layer for performance).
-- **Validation**: Zod schema validation.
-- **Authentication**: JSON Web Tokens (JWT).
-- **Logging**: Winston logger.
-- **Email**: Nodemailer + SMTP.
-- **Scheduling**: Node-cron.
-- **Storage**: AWS SDK v3 (S3 Client) for OVHcloud.
+- **Primary Approver (L1)**: Usually the Manager.
+- **Secondary Oversight (L2)**: Usually the HR.
+- **Global Oversight (L3)**: The Super Admin.
 
-## 📂 Project Structure
+### **⚡ Automated Reassignment (The "Safety Net")**
+If a Manager's status is changed to *Resigned*, *Inactive*, or *Terminated*:
+1.  **Detection**: The system scans for all employees reporting to that manager.
+2.  **Re-routing**: Every reportee is automatically moved to report to the **Super Admin**.
+3.  **Notification**: An automated "Reporting Manager Changed" email is sent to every affected employee.
 
-```
-TensorGo-LMS/
-├── backend/          # Express.js API server
-│   ├── src/
-│   │   ├── controllers/ # Request handlers
-│   │   ├── services/    # Business logic & DB interaction
-│   │   ├── routes/      # API route definitions
-│   │   ├── utils/       # Helpers (Email, Storage, Cron, Logger)
-│   │   ├── database/    # Migrations & Seeds
-│   │   └── ...
-├── frontend/         # React + Vite SPA
-│   ├── src/
-│   │   ├── components/  # Reusable UI components
-│   │   ├── pages/       # Route components (Logic heavy)
-│   │   ├── services/    # Axios API integrations
-│   │   └── ...
-└── README.md
-```
+---
 
-## 🏁 Getting Started
+## 📋 4. Employee Management & Validation Logic
+HR/Admins are guided by strict validation to maintain high data quality:
+- **Identity Documents**: PAN cards must follow the `ABCDE1234F` regex. Aadhar must be exactly 12 digits.
+- **Age Integrity**: Prevents onboarding anyone under **18 years old**.
+- **Educational Gaps**: Validates that 12th happened before UG, and UG before PG.
+- **Joining Verification**: Prevents "Future" joining dates and ensures at least 18 years gap from DOB.
 
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 14+
-- OVHcloud / S3 Credentials (for file uploads)
-- SMTP Credentials (for emails)
+---
 
-### 1. Database Setup
-Create a PostgreSQL database named `hr_lms`.
-```sql
-CREATE DATABASE hr_lms;
-```
+## � 5. Communication & Automation
+The portal never sleeps, thanks to integrated background services.
 
-Update `backend/.env` with your credentials:
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=hr_lms
-DB_USER=postgres
-DB_PASSWORD=your_password
-JWT_SECRET=your-super-secret-jwt-key
+### **Automatic Email Notifications**
+- **Welcome**: New employees get their credentials and a secure login link.
+- **Leave Actions**: Managers get "Urgent" alerts for same-day leaves; Employees get "Status Changed" alerts for approvals.
+- **Hierarchy Changes**: Alerts for role updates or manager shifts.
 
-# Email Config
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=tapp-password
+### **Cron Jobs (Daily 9:00 AM IST)**
+- **Birthday Wishes**: Team-wide emails celebrating birthdays (CC'ing the whole team).
+- **Pending Reminders**: Daily nudges to Managers who have pending leave requests older than 24 hours.
 
-# OVHcloud / S3 Config
-OVH_ENDPOINT=https://s3.gra.cloud.ovh.net
-OVH_REGION=gra
-OVH_BUCKET_NAME=your-bucket
-OVH_ACCESS_KEY=your-access-key
-OVH_SECRET_KEY=your-secret-key
-```
+---
 
-### 2. Backend Setup
-```bash
-cd backend
-npm install
-npm run migrate    # Creates database schema
-npm run seed       # Populates default users
-npm run dev        # Starts server on port 5000
-```
+## 🛠️ 6. Technical Excellence (For Admins)
+- **High Performance**: Uses **React Query** for caching. If two users check the same profile, the second load is instantaneous.
+- **Zero Latency (Optimistic UI)**: When you approve a leave, the UI updates *immediately* before the server even confirms the database update.
+- **Secure File Storage**: Medical certificates and photos are stored in **OVHcloud (S3-Compatible)** using time-limited "Signed URLs" (links that expire for security).
+- **N+1 Optimization**: Critical API endpoints are optimized to handle thousands of records without slowing down the browser.
 
-### 3. Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev        # Starts client on port 5173 (or 3000)
-```
+---
 
-## 🔑 Default Login Credentials
-*(From default seed data)*
+## 🏁 7. Getting Started
+1.  **Login**: Use your organization email (`@tensorgo.com` or `@tensorgo.co.in`).
+2.  **Change Password**: You will be prompted to set a permanent password on first login.
+3.  **Explore**: Check your 'Leave History' or apply for your first leave on the 'Apply Leave' page.
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Super Admin** | balajiganesh.tammireddy@tensorgo.co.in | tensorgo@123 |
-| **HR** | jaiwanth888@gmail.com | tensorgo@123 |
-| **Manager** |balajitammireddy@gmail.com | tensorgo@123|
-| **Employee** | jaiwanth.gannavarapu@tensorgo.co.in | tensorgo@123 |
+---
+*Created with ❤️ by the TensorGo Dev Team*

@@ -2,7 +2,17 @@ import { z } from 'zod';
 
 const nameSchema = z.string()
     .min(1, 'Name is required')
+    .max(50, 'Name cannot exceed 50 characters')
     .regex(/^[a-zA-Z\s]+$/, 'Name should only contain letters and spaces');
+
+const safeTextSchema = z.string()
+    .max(255, 'Text cannot exceed 255 characters')
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/]+$/, 'Special characters and emojis are not allowed');
+
+const addressSchema = z.string()
+    .min(1, 'Address is required')
+    .max(255, 'Address cannot exceed 255 characters')
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/#]+$/, 'Special characters and emojis are not allowed in address');
 
 const phoneSchema = z.string()
     .length(10, 'Phone number must be exactly 10 digits')
@@ -14,28 +24,17 @@ const aadharSchema = z.string()
 
 const educationSchema = z.object({
     level: z.string(),
-    groupStream: z.union([z.string(), z.null(), z.undefined()]).optional(),
-    collegeUniversity: z.union([z.string(), z.null(), z.undefined()]).optional(),
-    year: z.union([
-        z.string().regex(/^\d{4}$/, 'Invalid year format'),
-        z.string().length(0),
-        z.number(),
-        z.null(),
-        z.undefined()
-    ]).optional(),
-    scorePercentage: z.union([
-        z.string(),
-        z.number(),
-        z.null(),
-        z.undefined()
-    ]).optional()
+    groupStream: z.string().optional().or(z.literal('')),
+    collegeUniversity: z.string().optional().or(z.literal('')),
+    year: z.string().regex(/^\d{4}$/, 'Invalid year format').optional().or(z.literal('')),
+    scorePercentage: z.string().optional().or(z.literal(''))
 });
 
 export const createEmployeeSchema = z.object({
     body: z.object({
         empId: z.string().max(6).regex(/^[A-Z0-9]+$/, 'Invalid Employee ID format'),
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']),
-        email: z.string().email().refine(
+        email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
             (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
             { message: 'Only organization mail should be used' }
         ),
@@ -56,10 +55,10 @@ export const createEmployeeSchema = z.object({
         dateOfJoining: z.string(),
         aadharNumber: aadharSchema,
         panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
-        currentAddress: z.string().min(1, 'Current address is required'),
-        permanentAddress: z.string().min(1, 'Permanent address is required'),
+        currentAddress: addressSchema,
+        permanentAddress: addressSchema,
         reportingManagerId: z.number().nullable().optional(),
-        reportingManagerName: z.string().nullable().optional(),
+        reportingManagerName: nameSchema.nullable().optional(),
         education: z.array(educationSchema).min(1, 'Education details are required'),
         status: z.enum(['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive']).optional()
     })
@@ -84,9 +83,9 @@ export const updateEmployeeSchema = z.object({
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']).optional(),
         reportingManagerId: z.number().nullable().optional(),
         reportingManagerName: z.string().nullable().optional(),
-        education: z.array(educationSchema).optional().nullable(),
-        aadharNumber: aadharSchema.optional().nullable(),
-        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
+        education: z.array(educationSchema).optional(),
+        aadharNumber: aadharSchema.optional(),
+        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional()
     })
 });
 
@@ -97,7 +96,7 @@ export const addLeavesSchema = z.object({
     body: z.object({
         leaveType: z.enum(['casual', 'sick', 'lop']),
         count: z.number().positive('Count must be positive'),
-        comment: z.string().optional()
+        comment: safeTextSchema.optional()
     })
 });
 
@@ -127,10 +126,10 @@ export const updateProfileSchema = z.object({
             panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
         }).optional().nullable(),
         address: z.object({
-            currentAddress: z.string().optional().nullable(),
-            permanentAddress: z.string().optional().nullable()
-        }).optional().nullable(),
-        education: z.array(educationSchema).optional().nullable(),
+            currentAddress: z.string().optional(),
+            permanentAddress: z.string().optional()
+        }).optional(),
+        education: z.array(educationSchema).optional(),
         reportingManagerId: z.number().nullable().optional()
     })
 });
