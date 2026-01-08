@@ -368,20 +368,41 @@
 }
 
 .form-group .date-picker-input {
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fc;
   padding: 0;
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.form-group .date-picker-input:hover {
+  border-color: #b0b0b0;
 }
 
 .form-group .date-picker-input-field {
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #f8f9fc;
+  border: none;
+  background: transparent;
   font-size: 14px;
   width: 100%;
   box-sizing: border-box;
+  padding-right: 40px;
+  /* Space for icon */
+  height: 42px;
+  /* Set height to match other inputs */
+}
+
+.form-group .date-picker-icon-container {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
 }
 
 .leave-type-dropdown-trigger {
