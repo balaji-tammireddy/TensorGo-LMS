@@ -85,6 +85,30 @@ export const login = async (email: string, password: string): Promise<LoginResul
   return loginResult;
 };
 
+export const validateUser = async (userId: number) => {
+  const result = await pool.query(
+    'SELECT id, emp_id, email, role, first_name, last_name, status, must_change_password FROM users WHERE id = $1',
+    [userId]
+  );
+
+  if (result.rows.length === 0) return null;
+
+  const user = result.rows[0];
+
+  // Allow 'on_notice' users to still have access
+  if (user.status !== 'active' && user.status !== 'on_notice') return null;
+
+  return {
+    id: user.id,
+    empId: user.emp_id,
+    name: `${user.first_name} ${user.last_name || ''}`.trim(),
+    role: user.role,
+    email: user.email,
+    status: user.status,
+    mustChangePassword: !!user.must_change_password
+  };
+};
+
 export const hashPassword = async (password: string): Promise<string> => {
   logger.info(`[AUTH] [HASH PASSWORD] Hashing password`);
   const hash = await bcrypt.hash(password, 12);

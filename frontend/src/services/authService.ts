@@ -61,3 +61,8 @@ export const resetPassword = async (data: ResetPasswordRequest): Promise<{ messa
   return response.data;
 };
 
+export const checkAuth = async (): Promise<LoginResponse> => {
+  const response = await api.post('/auth/refresh', {});
+  return response.data;
+};
+

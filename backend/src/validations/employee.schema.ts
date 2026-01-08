@@ -7,7 +7,7 @@ const nameSchema = z.string()
 
 const safeTextSchema = z.string()
     .max(255, 'Text cannot exceed 255 characters')
-    .regex(/^[a-zA-Z0-9\s\.,\-'()&/]+$/, 'Special characters and emojis are not allowed');
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;]*$/, 'Special characters and emojis are not allowed');
 
 const addressSchema = z.string()
     .min(1, 'Address is required')
@@ -23,11 +23,11 @@ const aadharSchema = z.string()
     .regex(/^\d+$/, 'Aadhar must contain only digits');
 
 const educationSchema = z.object({
-    level: z.string(),
-    groupStream: z.string().optional().or(z.literal('')),
-    collegeUniversity: z.string().optional().or(z.literal('')),
+    level: z.string().max(50),
+    groupStream: safeTextSchema.optional().or(z.literal('')),
+    collegeUniversity: safeTextSchema.optional().or(z.literal('')),
     year: z.string().regex(/^\d{4}$/, 'Invalid year format').optional().or(z.literal('')),
-    scorePercentage: z.string().optional().or(z.literal(''))
+    scorePercentage: z.string().max(10).regex(/^[a-zA-Z0-9\s\.,%]+$/, 'Invalid score format').optional().or(z.literal(''))
 });
 
 export const createEmployeeSchema = z.object({
@@ -39,7 +39,7 @@ export const createEmployeeSchema = z.object({
             { message: 'Only organization mail should be used' }
         ),
         firstName: nameSchema,
-        middleName: nameSchema.optional().nullable().or(z.literal('')),
+        middleName: nameSchema.optional().or(z.literal('')),
         lastName: nameSchema,
         contactNumber: phoneSchema,
         altContact: phoneSchema,
@@ -70,7 +70,7 @@ export const updateEmployeeSchema = z.object({
     }),
     body: z.object({
         firstName: nameSchema.optional(),
-        middleName: nameSchema.optional().nullable().or(z.literal('')),
+        middleName: nameSchema.optional().or(z.literal('')),
         lastName: nameSchema.optional(),
         contactNumber: phoneSchema.optional(),
         altContact: phoneSchema.optional(),
@@ -103,19 +103,19 @@ export const addLeavesSchema = z.object({
 export const updateProfileSchema = z.object({
     body: z.object({
         personalInfo: z.object({
-            firstName: nameSchema.optional().nullable(),
-            middleName: nameSchema.optional().nullable().or(z.literal('')),
-            lastName: nameSchema.optional().nullable(),
-            contactNumber: phoneSchema.optional().nullable(),
-            altContact: phoneSchema.optional().nullable(),
-            dateOfBirth: z.string().optional().nullable(),
-            gender: z.enum(['Male', 'Female', 'Other']).optional().nullable(),
-            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional().nullable(),
-            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional().nullable(),
-            emergencyContactName: nameSchema.optional().nullable(),
-            emergencyContactNo: phoneSchema.optional().nullable(),
-            emergencyContactRelation: nameSchema.optional().nullable()
-        }).optional().nullable(),
+            firstName: nameSchema.optional(),
+            middleName: nameSchema.optional().or(z.literal('')),
+            lastName: nameSchema.optional(),
+            contactNumber: phoneSchema.optional(),
+            altContact: phoneSchema.optional(),
+            dateOfBirth: z.string().optional(),
+            gender: z.enum(['Male', 'Female', 'Other']).optional(),
+            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional(),
+            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional(),
+            emergencyContactName: nameSchema.optional(),
+            emergencyContactNo: phoneSchema.optional(),
+            emergencyContactRelation: nameSchema.optional()
+        }).optional(),
         employmentInfo: z.object({
             designation: nameSchema.optional().nullable(),
             department: nameSchema.optional().nullable(),

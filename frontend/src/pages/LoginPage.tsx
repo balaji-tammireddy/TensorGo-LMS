@@ -12,7 +12,7 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isInactive, setIsInactive] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, logout } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const { showError, showWarning, showSuccess } = useToast();
   const navigate = useNavigate();
 
@@ -27,13 +27,18 @@ const LoginPage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Clear any old session data when component mounts
+  // If user is already authenticated, redirect to dashboard
   React.useEffect(() => {
-    // Clear any stale data when login page loads
-    logout().catch(() => {
-      // Ignore errors - just clear local storage
-    });
+    if (isAuthenticated && user) {
+      if (user.role === 'super_admin') {
+        navigate('/leave-approval');
+      } else {
+        navigate('/leave-apply');
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
 
+  React.useEffect(() => {
     // Prevent body scroll when login page is mounted
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
@@ -43,7 +48,7 @@ const LoginPage: React.FC = () => {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
-  }, [logout]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

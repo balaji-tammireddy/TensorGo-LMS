@@ -18,35 +18,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check if user is already logged in (only if token exists and is valid)
-    const token = localStorage.getItem('accessToken');
-    const storedUser = localStorage.getItem('user');
-    
-    // Only restore user if we're not on login page
-    if (window.location.pathname !== '/login') {
-      if (token && storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (error) {
-          // Clear invalid data
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          setUser(null);
+    const initAuth = async () => {
+      try {
+        // 1. Try to restore from localStorage first for immediate UI feedback
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('accessToken');
+
+        if (storedUser && token) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (e) {
+            // Invalid JSON, ignore
+          }
         }
-      } else {
-        // Clear any stale data
+
+        // 2. Verify session with backend (silent refresh)
+        // This checks the httpOnly cookie and gets fresh data
+        const response = await authService.checkAuth();
+
+        // If successful, ensure state is synced
+        setUser(response.user);
+        localStorage.setItem('accessToken', response.accessToken);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      } catch (error) {
+        // If refresh fails, it means session is invalid or expired
+        console.log('Session check failed', error);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      // On login page, clear everything
-      setUser(null);
-    }
+    };
 
-    setLoading(false);
+    initAuth();
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {

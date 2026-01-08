@@ -21,6 +21,8 @@ import policyRoutes from './routes/policy.routes';
 import { pool } from './database/db';
 import { checkAndCreditMonthlyLeaves } from './services/leaveCredit.service';
 
+import cookieParser from 'cookie-parser';
+
 dotenv.config();
 
 const app = express();
@@ -31,10 +33,27 @@ app.use(helmet());
 app.use(compression()); // Enable Gzip compression
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // Allow any localhost origin for development
+      if (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Check against configured frontend URL
+      const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
+      if (origin === allowedOrigin) {
+        return callback(null, true);
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   })
 );
+app.use(cookieParser());
 
 // Rate limiting removed
 // const limiter = rateLimit({ ... });
