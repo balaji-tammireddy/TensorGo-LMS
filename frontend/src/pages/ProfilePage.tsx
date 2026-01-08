@@ -704,21 +704,25 @@ const ProfilePage: React.FC = () => {
               )}
             </div>
             <div className="picture-actions">
-              <button
-                className="change-photo-button"
-                onClick={handleChangePhotoClick}
-                disabled={uploadPhotoMutation.isLoading}
-              >
-                Change Photo
-              </button>
-              {photoSignedUrl && (
-                <button
-                  className="delete-photo-button"
-                  onClick={handleDeletePhoto}
-                  disabled={deletePhotoMutation.isLoading}
-                >
-                  Delete
-                </button>
+              {isEditMode && (
+                <>
+                  <button
+                    className="change-photo-button"
+                    onClick={handleChangePhotoClick}
+                    disabled={uploadPhotoMutation.isLoading}
+                  >
+                    Change Photo
+                  </button>
+                  {photoSignedUrl && (
+                    <button
+                      className="delete-photo-button"
+                      onClick={handleDeletePhoto}
+                      disabled={deletePhotoMutation.isLoading}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </>
               )}
               <input
                 ref={fileInputRef}
