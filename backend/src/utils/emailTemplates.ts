@@ -113,13 +113,13 @@ const generateEmailWrapper = (title: string, content: string, footerRefId: strin
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style type="text/css">
     body { width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f7fa; }
-    #backgroundTable { margin: 0; padding: 0; width: 100% !important; line-height: 100% !important; }
+    #backgroundTable { margin: 0; padding: 0; width: 100% !important; line-height: normal !important; }
     img { outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; border: none; }
     table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
     table td { border-collapse: collapse; }
     p { margin: 1em 0; line-height: 1.6; }
-    h1 { margin: 0; }
-    h2, h3 { color: #1e3a8a !important; margin: 0; }
+    h1 { margin: 0; line-height: 1.3 !important; }
+    h2, h3, h4 { color: #1e3a8a !important; margin: 0; line-height: 1.4 !important; }
     a { color: #2563eb; text-decoration: underline; }
   </style>
 </head>
@@ -134,7 +134,7 @@ const generateEmailWrapper = (title: string, content: string, footerRefId: strin
           <!-- Header -->
           <tr>
             <td bgcolor="#1e3a8a" align="left" style="padding: 35px 40px;">
-              <h1 style="margin: 0; color: #ffffff !important; font-size: 24px; font-weight: bold; font-family: Arial, sans-serif;">${title}</h1>
+              <h1 style="margin: 0; color: #ffffff !important; font-size: 24px; font-weight: bold; font-family: Arial, sans-serif; line-height: 1.3;">${title}</h1>
             </td>
           </tr>
           
@@ -304,7 +304,7 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
   const content = `
     <p>Dear ${data.managerName},</p>
     <p>A new leave application has been submitted by <strong>${data.employeeName}</strong> (Employee ID: <strong>${data.employeeEmpId}</strong>). Please review the details below and take appropriate action.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Leave Application Details</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">Leave Application Details</h3>
     ${detailsTable}
     <p style="margin-top: 30px;">Please review and take appropriate action on this leave application at your earliest convenience.</p>
     <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
@@ -475,7 +475,7 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
   const content = `
     <p>Dear ${data.recipientName},</p>
     <p>${mainMessage}</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Leave Request Details</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">Leave Request Details</h3>
     ${detailsTable}
     <div style="margin-top: 30px; padding: 15px; background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
       <p style="margin: 0; font-size: 14px; color: #1e40af;">
@@ -617,7 +617,7 @@ const generateNewEmployeeCredentialsEmailHtml = (data: NewEmployeeCredentialsEma
   const content = `
     <p>Dear ${data.employeeName},</p>
     <p>Welcome to <strong>TensorGo Intranet!</strong> Your account has been created successfully. Please find your login credentials below.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Your Login Credentials</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">Your Login Credentials</h3>
     ${detailsTable}
     <div style="margin: 40px 0; text-align: center;">
       <!--[if mso]>
@@ -740,7 +740,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
   const content = `
     <p>Dear ${data.employeeName},</p>
     <p>Additional leaves have been allocated to your account. Please find the allocation details below.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Allocation Details</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">Allocation Details</h3>
     ${detailsTable}
     ${data.conversionNote ? `
       <div style="margin-top: 30px; padding: 15px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
@@ -846,7 +846,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
               <table role="presentation" style="width: 100%; border-collapse: collapse;">
                 <tr>
                   <td style="padding: 32px 40px; background-color: #1e3a8a; text-align: left;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.5px;">Password Changed</h1>
+                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.5px; line-height: 1.3;">Password Changed</h1>
                   </td>
                 </tr>
               </table>
@@ -873,7 +873,7 @@ const generatePasswordChangeSecurityEmailHtml = (data: PasswordChangeSecurityEma
               
               <!-- Change Details Card -->
               <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #3b82f6; padding: 28px; margin: 28px 0; border-radius: 6px;">
-                <h3 style="margin: 0 0 20px 0; color: #1e3a8a; font-size: 17px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.2px;">Change Details</h3>
+                <h3 style="margin: 0 0 20px 0; color: #1e3a8a; font-size: 17px; font-family: 'Poppins', sans-serif; font-weight: 600; letter-spacing: 0.2px; line-height: 1.4;">Change Details</h3>
                 
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
@@ -1006,7 +1006,7 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
     <div style="margin-top: 30px;">
       ${data.pendingLeaves.map((leave, index) => `
         <div style="padding: 20px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 15px;">
-          <h4 style="margin: 0 0 10px 0; color: #1e293b; font-size: 15px;">${leave.employeeName} (${leave.employeeEmpId})</h4>
+          <h4 style="margin: 0 0 10px 0; color: #1e293b; font-size: 15px; line-height: 1.4;">${leave.employeeName} (${leave.employeeEmpId})</h4>
           <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-size: 13px; color: #64748b;">
             <tr>
               <td style="padding: 2px 0; width: 30%;">Type:</td>
@@ -1223,7 +1223,7 @@ const generateLeaveCarryForwardEmailHtml = (data: LeaveCarryForwardEmailData): s
   const content = `
     <p>Dear ${data.employeeName},</p>
     <p>Your leave balances from <strong>${data.previousYear}</strong> have been carried forward to the new year <strong>${data.newYear}</strong>.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Carry Forward Details</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">Carry Forward Details</h3>
     ${detailsTable}
     <div style="margin-top: 30px; padding: 15px; background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
       <p style="margin: 0; color: #1e40af; font-size: 14px;"><strong>Note:</strong> Carry-forward is subject to the company's leave policy limits.</p>
@@ -1339,7 +1339,7 @@ const generateUrgentLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData
     </div>
     <p>Dear ${data.managerName},</p>
     <p>An urgent leave application has been submitted by <strong>${data.employeeName}</strong> (Employee ID: <strong>${data.employeeEmpId}</strong>). Please review the details below and take appropriate action at your earliest convenience.</p>
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Leave Application Details</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">Leave Application Details</h3>
     ${detailsTable}
     <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
@@ -1545,11 +1545,11 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
     <p>Dear ${data.employeeName},</p>
     <p>Your previous <strong>Loss of Pay (LOP)</strong> leave recorded for the following dates has been converted to <strong>Casual Leave</strong>. This adjustment has been processed successfully.</p>
     
-    <h3 style="margin: 30px 0 10px 0; color: #1e3a8a; font-size: 18px; font-weight: 600;">Conversion Details</h3>
+    <h3 style="margin: 30px 0 10px 0; color: #1e3a8a; font-size: 18px; font-weight: 600; line-height: 1.4;">Conversion Details</h3>
     ${detailsTable}
     
     <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #059669; padding: 24px; margin: 28px 0; border-radius: 6px;">
-      <h3 style="margin: 0 0 16px 0; color: #111827; font-size: 17px; font-weight: 600;">Balance Changes</h3>
+      <h3 style="margin: 0 0 16px 0; color: #111827; font-size: 17px; font-weight: 600; line-height: 1.4;">Balance Changes</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 10px 0; color: #6b7280; font-size: 14px; width: 38%;">LOP Balance:</td>
@@ -1735,7 +1735,7 @@ const generateReportingManagerChangeEmailHtml = (data: ReportingManagerChangeEma
     <p>This is to inform you that your reporting manager has been updated in the <strong>TensorGo Intranet</strong>.</p>
 
     
-    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">New Reporting Manager Details</h3>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px; line-height: 1.4;">New Reporting Manager Details</h3>
     ${detailsTable}
     
     <p style="margin-top: 30px;">From now on, please direct all your leave requests and professional communications to <strong>${data.newManagerName}</strong>.</p>
