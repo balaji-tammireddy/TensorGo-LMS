@@ -999,7 +999,7 @@ const EmployeeManagementPage: React.FC = () => {
                   </th>
                   <th>Emp Name</th>
                   <th>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div className="header-sort-wrapper">
                       Role
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
