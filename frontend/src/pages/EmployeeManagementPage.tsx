@@ -1060,7 +1060,7 @@ const EmployeeManagementPage: React.FC = () => {
                           {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin or other HR, and Super Admin cannot add to themselves */}
                           {/* Also hide for inactive/resigned/terminated employees */}
                           {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
-                            (user?.role === 'super_admin' && employee.id !== user.id)) &&
+                            (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin')) &&
                             (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned') && (
                               <button
                                 className="action-btn add-leaves-btn"
