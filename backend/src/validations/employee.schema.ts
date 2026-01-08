@@ -14,10 +14,21 @@ const aadharSchema = z.string()
 
 const educationSchema = z.object({
     level: z.string(),
-    groupStream: z.string().optional().or(z.literal('')),
-    collegeUniversity: z.string().optional().or(z.literal('')),
-    year: z.string().regex(/^\d{4}$/, 'Invalid year format').optional().or(z.literal('')),
-    scorePercentage: z.string().optional().or(z.literal(''))
+    groupStream: z.union([z.string(), z.null(), z.undefined()]).optional(),
+    collegeUniversity: z.union([z.string(), z.null(), z.undefined()]).optional(),
+    year: z.union([
+        z.string().regex(/^\d{4}$/, 'Invalid year format'),
+        z.string().length(0),
+        z.number(),
+        z.null(),
+        z.undefined()
+    ]).optional(),
+    scorePercentage: z.union([
+        z.string(),
+        z.number(),
+        z.null(),
+        z.undefined()
+    ]).optional()
 });
 
 export const createEmployeeSchema = z.object({
@@ -29,7 +40,7 @@ export const createEmployeeSchema = z.object({
             { message: 'Only organization mail should be used' }
         ),
         firstName: nameSchema,
-        middleName: nameSchema.optional().or(z.literal('')),
+        middleName: nameSchema.optional().nullable().or(z.literal('')),
         lastName: nameSchema,
         contactNumber: phoneSchema,
         altContact: phoneSchema,
@@ -60,7 +71,7 @@ export const updateEmployeeSchema = z.object({
     }),
     body: z.object({
         firstName: nameSchema.optional(),
-        middleName: nameSchema.optional().or(z.literal('')),
+        middleName: nameSchema.optional().nullable().or(z.literal('')),
         lastName: nameSchema.optional(),
         contactNumber: phoneSchema.optional(),
         altContact: phoneSchema.optional(),
@@ -73,9 +84,9 @@ export const updateEmployeeSchema = z.object({
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']).optional(),
         reportingManagerId: z.number().nullable().optional(),
         reportingManagerName: z.string().nullable().optional(),
-        education: z.array(educationSchema).optional(),
-        aadharNumber: aadharSchema.optional(),
-        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional()
+        education: z.array(educationSchema).optional().nullable(),
+        aadharNumber: aadharSchema.optional().nullable(),
+        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
     })
 });
 
@@ -93,33 +104,33 @@ export const addLeavesSchema = z.object({
 export const updateProfileSchema = z.object({
     body: z.object({
         personalInfo: z.object({
-            firstName: nameSchema.optional(),
-            middleName: nameSchema.optional().or(z.literal('')),
-            lastName: nameSchema.optional(),
-            contactNumber: phoneSchema.optional(),
-            altContact: phoneSchema.optional(),
-            dateOfBirth: z.string().optional(),
-            gender: z.enum(['Male', 'Female', 'Other']).optional(),
-            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional(),
-            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional(),
-            emergencyContactName: nameSchema.optional(),
-            emergencyContactNo: phoneSchema.optional(),
-            emergencyContactRelation: nameSchema.optional()
-        }).optional(),
+            firstName: nameSchema.optional().nullable(),
+            middleName: nameSchema.optional().nullable().or(z.literal('')),
+            lastName: nameSchema.optional().nullable(),
+            contactNumber: phoneSchema.optional().nullable(),
+            altContact: phoneSchema.optional().nullable(),
+            dateOfBirth: z.string().optional().nullable(),
+            gender: z.enum(['Male', 'Female', 'Other']).optional().nullable(),
+            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional().nullable(),
+            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional().nullable(),
+            emergencyContactName: nameSchema.optional().nullable(),
+            emergencyContactNo: phoneSchema.optional().nullable(),
+            emergencyContactRelation: nameSchema.optional().nullable()
+        }).optional().nullable(),
         employmentInfo: z.object({
-            designation: nameSchema.optional(),
-            department: nameSchema.optional(),
-            dateOfJoining: z.string().optional()
-        }).optional(),
+            designation: nameSchema.optional().nullable(),
+            department: nameSchema.optional().nullable(),
+            dateOfJoining: z.string().optional().nullable()
+        }).optional().nullable(),
         documents: z.object({
-            aadharNumber: aadharSchema.optional(),
-            panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional()
-        }).optional(),
+            aadharNumber: aadharSchema.optional().nullable(),
+            panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
+        }).optional().nullable(),
         address: z.object({
-            currentAddress: z.string().optional(),
-            permanentAddress: z.string().optional()
-        }).optional(),
-        education: z.array(educationSchema).optional(),
+            currentAddress: z.string().optional().nullable(),
+            permanentAddress: z.string().optional().nullable()
+        }).optional().nullable(),
+        education: z.array(educationSchema).optional().nullable(),
         reportingManagerId: z.number().nullable().optional()
     })
 });
