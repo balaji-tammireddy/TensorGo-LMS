@@ -1497,11 +1497,14 @@ export const convertLeaveRequestLopToCasual = async (
 
   // Recalculate days based on 'casual' rules (excludes weekends/holidays)
   // This handles the edge case where LOP included weekends/holidays but Casual should not.
+  const normalizedStartType = (leave.start_type === 'first_half' || leave.start_type === 'second_half') ? 'half' : leave.start_type;
+  const normalizedEndType = (leave.end_type === 'first_half' || leave.end_type === 'second_half') ? 'half' : leave.end_type;
+
   const { days: newNoOfDays, leaveDays: newLeaveDaysList } = await calculateLeaveDays(
     new Date(leave.start_date),
     new Date(leave.end_date),
-    leave.start_type,
-    leave.end_type,
+    normalizedStartType as 'full' | 'half',
+    normalizedEndType as 'full' | 'half',
     'casual',
     leave.employee_role
   );
