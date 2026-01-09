@@ -1349,7 +1349,7 @@ export const deleteEmployee = async (employeeId: number) => {
 
   // Check if employee exists
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Checking if employee exists`);
-  const result = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
+  const result = await pool.query('SELECT id, role, first_name, last_name FROM users WHERE id = $1', [employeeId]);
   if (result.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -1362,6 +1362,18 @@ export const deleteEmployee = async (employeeId: number) => {
   if (employee.role === 'super_admin') {
     logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Attempt to delete super admin user - Employee ID: ${employeeId}`);
     throw new Error('Cannot delete super admin users');
+  }
+
+  // Check for active subordinates
+  const activeSubordinates = await pool.query(
+    'SELECT count(*) as count FROM users WHERE reporting_manager_id = $1 AND status IN (\'active\', \'on_leave\', \'on_notice\')',
+    [employeeId]
+  );
+
+  if (parseInt(activeSubordinates.rows[0].count) > 0) {
+    const name = `${employee.first_name || ''} ${employee.last_name || ''}`.trim();
+    logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Deletion BLOCKED for user ${employeeId} due to existing active subordinates.`);
+    throw new Error(`Please remove the users reporting to ${name} and try again.`);
   }
 
   // Start transaction to delete all related data
