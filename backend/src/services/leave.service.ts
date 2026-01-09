@@ -2963,7 +2963,7 @@ export const approveLeaveDays = async (
     );
   }
 
-  // Auto-reject remaining pending days
+  // Auto-reject remaining pending days AND Refund Balance
   if (daysToReject.length > 0) {
     await pool.query(
       `UPDATE leave_days
@@ -2973,6 +2973,62 @@ export const approveLeaveDays = async (
        AND (day_status IS NULL OR day_status = 'pending')`,
       [daysToReject, leaveRequestId]
     );
+
+    // Refund balance for these auto-rejected days (except permission)
+    if (leave.leave_type !== 'permission') {
+      // Fetch details of rejected days to calculate exact refund amount
+      const rejectedDaysDetails = await pool.query(
+        'SELECT day_type FROM leave_days WHERE id = ANY($1::int[])',
+        [daysToReject]
+      );
+
+      const refundAmount = rejectedDaysDetails.rows.reduce(
+        (acc, row) => acc + (row.day_type === 'half' ? 0.5 : 1),
+        0
+      );
+
+      if (refundAmount > 0) {
+        const balanceColumn =
+          leave.leave_type === 'casual'
+            ? 'casual_balance'
+            : leave.leave_type === 'sick'
+              ? 'sick_balance'
+              : 'lop_balance';
+
+        if (leave.leave_type === 'lop') {
+          const currentBalanceResult = await pool.query(
+            'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+            [leave.employee_id]
+          );
+          const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+          let newLopBalance = currentLop + refundAmount;
+
+          if (newLopBalance > 10) {
+            const cappedRefund = 10 - currentLop;
+            if (cappedRefund > 0) {
+              await pool.query(
+                `UPDATE leave_balances SET lop_balance = 10 WHERE employee_id = $1`,
+                [leave.employee_id]
+              );
+              logger.warn(
+                `[APPROVE LEAVE DAYS] Auto-reject LOP balance capped at 10. Refunded ${cappedRefund} instead of ${refundAmount}.`
+              );
+            }
+          } else {
+            await pool.query(
+              `UPDATE leave_balances SET lop_balance = lop_balance + $1 WHERE employee_id = $2`,
+              [refundAmount, leave.employee_id]
+            );
+          }
+        } else {
+          await pool.query(
+            `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+            [refundAmount, leave.employee_id]
+          );
+          logger.info(`[APPROVE LEAVE DAYS] Refunded ${refundAmount} ${leave.leave_type} days to employee ${leave.employee_id}`);
+        }
+      }
+    }
   }
 
   // Mark role-specific approval fields
