@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt } from 'react-icons/fa';
+import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt, FaPencilAlt } from 'react-icons/fa';
 import { format, parse, eachDayOfInterval } from 'date-fns';
 import ConfirmationDialog from './ConfirmationDialog';
 import { DatePicker } from './ui/date-picker';
@@ -45,12 +45,14 @@ interface LeaveDetailsModalProps {
     approverRole?: string | null;
     empRole?: string;
     leaveDays?: LeaveDay[];
+    canEdit?: boolean;
   } | null;
   onClose: () => void;
   onApprove: (requestId: number, selectedDayIds?: number[]) => void;
   onReject: (requestId: number, selectedDayIds?: number[], reason?: string) => void;
   onUpdate?: (requestId: number, status: string, selectedDayIds?: number[], rejectReason?: string, leaveReason?: string) => void;
   onConvertLopToCasual?: (requestId: number) => void;
+  onEdit?: () => void;
   isLoading?: boolean;
   isEditMode?: boolean;
   userRole?: string;
@@ -65,6 +67,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   onReject,
   onUpdate,
   onConvertLopToCasual,
+  onEdit,
   isLoading = false,
   isEditMode = false,
   userRole,
@@ -759,6 +762,18 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                   )}
                 </button>
               )}
+
+            {onEdit && leaveRequest.canEdit && (
+              <button
+                className="leave-details-modal-button leave-details-modal-button-convert"
+                onClick={onEdit}
+                disabled={isLoading || isConverting}
+                style={{ background: 'linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%)', border: '1px solid #2951c8' }}
+              >
+                <FaPencilAlt /> Edit Request
+              </button>
+            )}
+
             {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
               <button
                 className="leave-details-modal-button leave-details-modal-button-approve"

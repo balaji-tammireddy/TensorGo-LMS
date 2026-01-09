@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaPencilAlt } from 'react-icons/fa';
 import { format } from 'date-fns';
 import * as leaveService from '../services/leaveService';
 import './LeaveDetailsModal.css';
@@ -29,14 +29,18 @@ interface EmployeeLeaveDetailsModalProps {
     doctorNote?: string | null;
     leaveDays?: LeaveDay[];
     empStatus?: string | null;
+    canEdit?: boolean;
+    canDelete?: boolean;
   } | null;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
 const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
   isOpen,
   leaveRequest,
-  onClose
+  onClose,
+  onEdit
 }) => {
   // Prevent body scrolling when modal is open
   useEffect(() => {
@@ -340,6 +344,19 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
           >
             Close
           </button>
+
+          {onEdit && leaveRequest.canEdit && leaveRequest.canDelete &&
+            leaveRequest.currentStatus !== 'approved' &&
+            leaveRequest.currentStatus !== 'rejected' &&
+            leaveRequest.currentStatus !== 'partially_approved' && (
+              <button
+                className="leave-details-modal-button leave-details-modal-button-convert"
+                onClick={onEdit}
+                style={{ background: 'linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%)', border: '1px solid #2951c8' }}
+              >
+                <FaPencilAlt /> Edit Request
+              </button>
+            )}
         </div>
       </div>
     </div>

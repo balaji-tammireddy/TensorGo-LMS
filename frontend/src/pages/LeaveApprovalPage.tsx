@@ -342,7 +342,18 @@ const LeaveApprovalPage: React.FC = () => {
           approverName: fullRequest.approverName || request.approverName || null,
           approverRole: fullRequest.approverRole || request.approverRole || null,
           empStatus: fullRequest.empStatus || request.empStatus || null,
-          leaveDays: fullRequest.leaveDays || []
+          leaveDays: fullRequest.leaveDays || [],
+          canEdit: (() => {
+            const lastUpdatedBy = fullRequest.lastUpdatedByRole;
+            const userRole = user?.role;
+            const isPast = new Date(request.startDate) < new Date(todayStr);
+
+            if (isPast) return false;
+            if (lastUpdatedBy === 'super_admin' && userRole !== 'super_admin') return false;
+            if (lastUpdatedBy === 'hr' && userRole === 'manager') return false;
+
+            return fullRequest.canEdit;
+          })()
         });
         setIsEditMode(false);
         setIsModalOpen(true);
@@ -1042,39 +1053,6 @@ const LeaveApprovalPage: React.FC = () => {
                                   >
                                     <FaEye />
                                   </button>
-                                  {(() => {
-                                    const lastUpdatedBy = request.lastUpdatedByRole;
-                                    const userRole = user?.role;
-                                    let isEditDisabled = false;
-                                    let editTitle = isUpdating ? 'Loading...' : 'Edit';
-
-                                    if (lastUpdatedBy === 'super_admin' && userRole !== 'super_admin') {
-                                      isEditDisabled = true;
-                                      editTitle = 'Edited by Super Admin';
-                                    } else if (lastUpdatedBy === 'hr' && userRole === 'manager') {
-                                      isEditDisabled = true;
-                                      editTitle = 'Edited by HR';
-                                    } else if (new Date(request.startDate) < new Date(todayStr)) {
-                                      isEditDisabled = true;
-                                      editTitle = 'Cannot edit past leave';
-                                    }
-
-                                    return (
-                                      <button
-                                        className={`action-btn edit-btn ${isUpdating || isEditDisabled ? 'disabled' : ''}`}
-                                        title={editTitle}
-                                        onClick={() => !isUpdating && !isEditDisabled && handleEditApprovedLeave(request.id)}
-                                        disabled={isUpdating || isEditDisabled}
-                                        style={isEditDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                                      >
-                                        {isUpdating && editingRequestId === request.id ? (
-                                          <span className="loading-spinner-small"></span>
-                                        ) : (
-                                          <FaPencilAlt />
-                                        )}
-                                      </button>
-                                    );
-                                  })()}
                                 </div>
                               )}
                             </div>
@@ -1088,7 +1066,7 @@ const LeaveApprovalPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      </AppLayout >
       <LeaveDetailsModal
         isOpen={isModalOpen}
         leaveRequest={selectedRequest}
@@ -1101,10 +1079,16 @@ const LeaveApprovalPage: React.FC = () => {
         onReject={handleModalReject}
         onUpdate={handleUpdateStatus}
         onConvertLopToCasual={handleConvertLopToCasual}
-        isLoading={approveMutation.isLoading || rejectMutation.isLoading || updateStatusMutation.isLoading || isRefetchingRequest}
+        isLoading={updateStatusMutation.isLoading || isRefetchingRequest}
         isConverting={convertLopToCasualMutation.isLoading}
         isEditMode={isEditMode}
         userRole={user?.role}
+        onEdit={() => {
+          setIsModalOpen(false);
+          if (selectedRequest) {
+            handleEditApprovedLeave(selectedRequest.id);
+          }
+        }}
       />
     </>
   );

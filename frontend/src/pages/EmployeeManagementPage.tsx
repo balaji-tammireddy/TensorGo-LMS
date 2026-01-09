@@ -776,7 +776,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   };
 
-  const handleEditEmployee = (employeeId: number) => openEmployeeModal(employeeId, 'edit');
+
   const handleViewEmployee = (employeeId: number) => openEmployeeModal(employeeId, 'view');
 
   const handleDelete = (employeeId: number) => {
@@ -1062,16 +1062,7 @@ const EmployeeManagementPage: React.FC = () => {
                           >
                             <FaEye />
                           </button>
-                          {/* HR cannot edit super_admin or other HR users or their own details */}
-                          {!(user?.role === 'hr' && (employee.role === 'super_admin' || employee.role === 'hr')) && (
-                            <button
-                              className="action-btn edit-btn"
-                              title="Edit"
-                              onClick={() => handleEditEmployee(employee.id)}
-                            >
-                              <FaPencilAlt />
-                            </button>
-                          )}
+                          {/* Edit button moved to view modal */}
                           {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin or other HR, and Super Admin cannot add to themselves */}
                           {/* Also hide for inactive/resigned/terminated employees */}
                           {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
@@ -2124,18 +2115,48 @@ const EmployeeManagementPage: React.FC = () => {
 
               <div className="employee-modal-footer">
                 {isViewMode ? (
-                  <button
-                    type="button"
-                    className="modal-save-button"
-                    onClick={() => {
-                      if (!showLeaveHistory) {
-                        refetchLeaveHistory();
-                      }
-                      setShowLeaveHistory(!showLeaveHistory);
-                    }}
-                  >
-                    {showLeaveHistory ? 'Back to Details' : 'Leave History'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="modal-save-button"
+                      onClick={() => {
+                        if (!showLeaveHistory) {
+                          refetchLeaveHistory();
+                        }
+                        setShowLeaveHistory(!showLeaveHistory);
+                      }}
+                    >
+                      {showLeaveHistory ? 'Back to Details' : 'Leave History'}
+                    </button>
+                    {/* Edit Employee Button (HR/Super Admin only) */}
+                    {user && (user.role === 'super_admin' || user.role === 'hr') && (
+                      <button
+                        type="button"
+                        className="modal-save-button"
+                        style={{
+                          marginLeft: '10px',
+                          background: 'linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%)',
+                          border: '1px solid #2951c8'
+                        }}
+                        onClick={() => {
+                          // Check permissions
+                          if (user.role === 'hr') {
+                            // HR cannot edit super_admin or other HR
+                            if (newEmployee.role === 'super_admin' || newEmployee.role === 'hr') {
+                              showWarning('You are not authorized to edit this employee');
+                              return;
+                            }
+                          }
+                          setIsViewMode(false);
+                          setIsEditMode(true);
+                          // Also hide leave history if showing
+                          setShowLeaveHistory(false);
+                        }}
+                      >
+                        <FaPencilAlt style={{ marginRight: '6px' }} /> Edit Employee
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <>
                     <button

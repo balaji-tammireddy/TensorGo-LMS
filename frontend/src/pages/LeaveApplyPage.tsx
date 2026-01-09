@@ -18,7 +18,7 @@ import { Button } from '../components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
-import { FaPencilAlt, FaTrash, FaEye, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaTrash, FaEye, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import './LeaveApplyPage.css';
 
@@ -1485,7 +1485,9 @@ const LeaveApplyPage: React.FC = () => {
         approverRole: request.approverRole || null,
         doctorNote: request.doctorNote || null,
         leaveDays: request.leaveDays || [],
-        empStatus: request.empStatus || null
+        empStatus: request.empStatus || null,
+        canEdit: request.canEdit,
+        canDelete: request.canDelete
       });
       setViewModalOpen(true);
     } else {
@@ -2631,18 +2633,6 @@ const LeaveApplyPage: React.FC = () => {
                               {request.canEdit && request.canDelete && request.currentStatus !== 'approved' && request.currentStatus !== 'rejected' && request.currentStatus !== 'partially_approved' && (
                                 <>
                                   <button
-                                    className={`action-btn edit-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
-                                    title={isUpdating ? 'Updating...' : 'Edit'}
-                                    onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleEdit(request.id)}
-                                    disabled={isUpdating || applyMutation.isLoading || deleteMutation.isLoading}
-                                  >
-                                    {isUpdating && editingId === request.id ? (
-                                      <span className="loading-spinner-small"></span>
-                                    ) : (
-                                      <FaPencilAlt />
-                                    )}
-                                  </button>
-                                  <button
                                     className={`action-btn delete-btn ${isUpdating || applyMutation.isLoading || deleteMutation.isLoading ? 'disabled' : ''}`}
                                     title={isUpdating ? 'Updating...' : 'Delete'}
                                     onClick={() => !isUpdating && !applyMutation.isLoading && !deleteMutation.isLoading && handleDelete(request.id)}
@@ -2673,6 +2663,12 @@ const LeaveApplyPage: React.FC = () => {
         onClose={() => {
           setViewModalOpen(false);
           setViewRequest(null);
+        }}
+        onEdit={() => {
+          setViewModalOpen(false);
+          if (viewRequest) {
+            handleEdit(viewRequest.id);
+          }
         }}
       />
       <ConfirmationDialog
