@@ -686,44 +686,6 @@ const LeaveApprovalPage: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="filter-box">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="leave-filter-dropdown"
-                  >
-                    <span>{filter === '' ? 'All Types' : filter === 'casual' ? 'Casual' : filter === 'sick' ? 'Sick' : 'LOP'}</span>
-                    <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="leave-type-dropdown-content">
-                  <DropdownMenuItem
-                    onClick={() => setFilter('')}
-                  >
-                    All Types
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setFilter('casual')}
-                  >
-                    Casual
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setFilter('sick')}
-                  >
-                    Sick
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setFilter('lop')}
-                  >
-                    LOP
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </div>
 
           <div className="pending-requests-section">
@@ -760,7 +722,43 @@ const LeaveApprovalPage: React.FC = () => {
                         )}
                       </div>
                     </th>
-                    <th>LEAVE TYPE</th>
+                    <th>
+                      <div className="header-sort-wrapper">
+                        LEAVE TYPE
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              style={{
+                                padding: '0 4px',
+                                height: '20px',
+                                border: filter ? '1px solid #2563eb' : 'none',
+                                backgroundColor: filter ? '#eff6ff' : 'transparent',
+                                color: filter ? '#2563eb' : 'inherit'
+                              }}
+                            >
+                              <ChevronDown style={{ width: '12px', height: '12px' }} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => setFilter('')}>
+                              All Types
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setFilter('casual')}>
+                              Casual
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilter('sick')}>
+                              Sick
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilter('lop')}>
+                              LOP
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </th>
                     <th>NO OF DAYS</th>
                     <th>LEAVE REASON</th>
                     <th>CURRENT STATUS</th>
