@@ -756,7 +756,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -957,10 +957,24 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     allowedFields.push('date_of_joining');
     allowedFields.push('emp_id');
   } else {
-    // If not super_admin, strictly forbid these fields if they are being updated
-    if (employeeData.email) throw new Error('Only Super Admin can update Official Email');
-    if (employeeData.dateOfJoining) throw new Error('Only Super Admin can update Date of Joining');
-    if (employeeData.empId) throw new Error('Only Super Admin can update Employee ID');
+    // If not super_admin, forbid these fields ONLY if they are being changed
+    // We compare with the existing database values
+
+    if (employeeData.email && employeeData.email.trim().toLowerCase() !== employeeCheck.rows[0].email.toLowerCase()) {
+      throw new Error('Only Super Admin can update Official Email');
+    }
+
+    // Normalize dates for comparison (ignoring time)
+    const existingDOJ = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
+    const newDOJ = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
+
+    if (newDOJ && newDOJ !== existingDOJ) {
+      throw new Error('Only Super Admin can update Date of Joining');
+    }
+
+    if (employeeData.empId && employeeData.empId.trim().toUpperCase() !== employeeCheck.rows[0].emp_id) {
+      throw new Error('Only Super Admin can update Employee ID');
+    }
   }
 
   // Check if emp_id is being updated and validate uniqueness
