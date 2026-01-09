@@ -186,7 +186,7 @@
   color: white;
   border-color: #2951c8;
   box-shadow: 0 4px 10px rgba(60, 111, 242, 0.22);
-  transform: translateY(-5px);
+  transform: translateY(-8px);
 }
 
 .modal-footer .submit-button:hover:not(:disabled) {
@@ -201,4 +201,3 @@
   transform: none;
   box-shadow: none;
 }
-
