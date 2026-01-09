@@ -503,3 +503,36 @@
   align-items: center;
   gap: 10px;
 }
+
+.recent-filter-controls .date-picker-input {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fc;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  width: auto;
+  min-width: 180px;
+  transition: all 0.2s;
+}
+
+.recent-filter-controls .date-picker-input:hover {
+  border: 1px solid #b0b0b0;
+}
+
+.recent-filter-controls .date-picker-input-field {
+  border: none !important;
+  background: transparent !important;
+  padding: 8px 12px;
+  height: 38px;
+  box-shadow: none !important;
+}
+
+.recent-filter-controls .date-picker-icon-container {
+  padding-right: 12px;
+  color: #000000;
+}
+
+.recent-filter-controls .date-picker-icon-container:hover {
+  color: #333333;
+}

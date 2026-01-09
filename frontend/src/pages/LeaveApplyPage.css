@@ -750,7 +750,7 @@
 }
 
 .filter-date-controls .date-picker-input:hover {
-  border-color: #b0b0b0;
+  border: 1px solid #b0b0b0;
 }
 
 .filter-date-controls .date-picker-input-field {
