@@ -41,6 +41,7 @@ const LeaveApprovalPage: React.FC = () => {
     key: 'appliedDate',
     direction: 'desc'
   });
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   const handleRecentSort = (key: string) => {
     setRecentSortConfig((prev) => ({
@@ -606,8 +607,8 @@ const LeaveApprovalPage: React.FC = () => {
       }
 
       return pendingSortConfig.direction === 'asc' ? valA - valB : valB - valA;
-    });
-  }, [pendingData, pendingSortConfig]);
+    }).filter((request: any) => request.startDate >= todayStr); // Only show FUTURE pending requests
+  }, [pendingData, pendingSortConfig, todayStr]);
 
   // Initial loading state (only for first-time page load)
   if ((pendingLoading && !pendingData) || (approvedLoading && !approvedData)) {
@@ -942,11 +943,13 @@ const LeaveApprovalPage: React.FC = () => {
                     // Filter and sort approved requests
                     const filteredSortedRequests = (approvedData?.requests || [])
                       .filter((request: any) => {
-                        // Filter out any requests that still have pending days
+                        // Filter out any requests that still have pending days UNLESS they are in the past
                         const hasPendingDays = request.leaveDays?.some((day: any) =>
                           (day.status || 'pending') === 'pending'
                         );
-                        if (hasPendingDays || request.leaveStatus === 'pending') return false;
+                        const isPast = request.startDate < todayStr;
+                        // If it has pending days and is NOT past, exclude it (it belongs in top table)
+                        if ((hasPendingDays || request.leaveStatus === 'pending') && !isPast) return false;
 
                         // Apply search filter if set (EMP Name or ID)
                         if (recentSearch) {
@@ -1053,6 +1056,9 @@ const LeaveApprovalPage: React.FC = () => {
                                     } else if (lastUpdatedBy === 'hr' && userRole === 'manager') {
                                       isEditDisabled = true;
                                       editTitle = 'Edited by HR';
+                                    } else if (new Date(request.startDate) < new Date(todayStr)) {
+                                      isEditDisabled = true;
+                                      editTitle = 'Cannot edit past leave';
                                     }
 
                                     return (
