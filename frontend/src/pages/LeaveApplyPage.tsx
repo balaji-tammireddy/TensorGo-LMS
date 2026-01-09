@@ -1513,8 +1513,9 @@ const LeaveApplyPage: React.FC = () => {
       defaultStartStr = futureDateStr;
       defaultEndStr = futureDateStr;
     } else if (newType === 'permission') {
-      // Permission defaults to tomorrow
-      const futureDate = addDays(today, 1);
+      // Permission defaults to tomorrow (next working day)
+      const tomorrow = addDays(today, 1);
+      const futureDate = getNextWorkingDate(tomorrow);
       const futureDateStr = format(futureDate, 'yyyy-MM-dd');
       defaultStartStr = futureDateStr;
       defaultEndStr = futureDateStr;
