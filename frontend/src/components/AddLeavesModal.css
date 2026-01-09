@@ -177,7 +177,6 @@
 .modal-footer .cancel-button:hover:not(:disabled) {
   background: linear-gradient(135deg, #cfd7ea 0%, #c3ccdd 100%);
   color: #203050;
-  transform: translateY(-1px);
   box-shadow: 0 6px 14px rgba(63, 81, 181, 0.18);
 }
 
@@ -186,12 +185,10 @@
   color: white;
   border-color: #2951c8;
   box-shadow: 0 4px 10px rgba(60, 111, 242, 0.22);
-  transform: translateY(-8px);
 }
 
 .modal-footer .submit-button:hover:not(:disabled) {
   background: linear-gradient(135deg, #2951c8 0%, #1e3d8f 100%);
-  transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
 }
 
