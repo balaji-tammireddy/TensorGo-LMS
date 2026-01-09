@@ -674,7 +674,7 @@ const LeaveApprovalPage: React.FC = () => {
             <div className="search-box">
               <input
                 type="text"
-                placeholder="Search by Name or Emp ID..."
+                placeholder="Search by Emp Name or Emp ID..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))}
                 onKeyDown={handleSearchKeyDown}
@@ -864,7 +864,7 @@ const LeaveApprovalPage: React.FC = () => {
                 <div className="recent-search-box">
                   <input
                     type="text"
-                    placeholder="Search by Name or Emp ID..."
+                    placeholder="Search by Emp Name or Emp ID..."
                     value={recentSearchInput}
                     onChange={(e) => setRecentSearchInput(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))}
                   />
