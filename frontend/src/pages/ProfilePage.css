@@ -362,19 +362,19 @@
 /* Column width adjustments: widen Group/Stream & College, shrink Year & Score */
 .education-table th:nth-child(2),
 .education-table td:nth-child(2) {
-  width: 34%;
+  width: 32%;
 }
 
 .education-table th:nth-child(3),
 .education-table td:nth-child(3) {
-  width: 38%;
+  width: 36%;
 }
 
 .education-table th:nth-child(4),
 .education-table td:nth-child(4),
 .education-table th:nth-child(5),
 .education-table td:nth-child(5) {
-  width: 8%;
+  width: 12%;
   text-align: center;
 }
 

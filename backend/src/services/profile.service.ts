@@ -354,15 +354,35 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   // Only Super Admin or HR should be able to update reporting manager (via /employees/:id API, not here)
   if (profileData.reportingManagerId !== undefined && (userRole === 'super_admin' || userRole === 'hr')) {
     if (profileData.reportingManagerId) {
-      const managerResult = await pool.query('SELECT status FROM users WHERE id = $1', [profileData.reportingManagerId]);
+      const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [profileData.reportingManagerId]);
       if (managerResult.rows.length > 0) {
-        const status = managerResult.rows[0].status;
-        if (status === 'on_notice') {
+        const { status: managerStatus, role: managerRole } = managerResult.rows[0];
+        const targetRole = currentValues.rows[0].role;
+
+        // Status check
+        if (managerStatus === 'on_notice') {
           throw new Error('Employees in notice period cannot be reporting managers');
         }
-        if (status !== 'active' && status !== 'on_leave') {
+        if (managerStatus !== 'active' && managerStatus !== 'on_leave') {
           throw new Error('Selected reporting manager must be active or on leave');
         }
+
+        // Hierarchy check
+        if (managerRole !== 'super_admin') {
+          if (targetRole === 'intern' || targetRole === 'employee') {
+            if (managerRole !== 'manager') {
+              throw new Error(`For ${targetRole === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
+            }
+          } else if (targetRole === 'manager') {
+            if (managerRole !== 'hr') {
+              throw new Error('For Managers, only HR or Super Admins can be reporting managers');
+            }
+          } else if (targetRole === 'hr') {
+            throw new Error('For HR, only Super Admins can be reporting managers');
+          }
+        }
+      } else {
+        throw new Error('Selected reporting manager does not exist');
       }
     }
     updates.push(`reporting_manager_id = $${paramCount}`);
@@ -383,18 +403,76 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   // Update education
   if (profileData.education) {
     logger.info(`[PROFILE] [UPDATE PROFILE] Updating ${profileData.education.length} education records`);
+
+    const dobValue = profileData.personalInfo?.dateOfBirth || currentValues.rows[0].date_of_birth;
+    const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
+
+    const educationYears: Record<string, number> = {};
+
     for (const edu of profileData.education) {
       if (edu.level) {
-        // Validate year if provided (must be between 1950 and 5 years from current year)
-        if (edu.year) {
-          const year = parseInt(edu.year, 10);
-          const currentYear = new Date().getFullYear();
-          const maxYear = currentYear + 5;
-          if (isNaN(year) || year < 1950 || year > maxYear) {
-            throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
+        const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
+        if (hasAnyField) {
+          if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+            throw new Error(`Please fill complete details for ${edu.level} education`);
           }
-        }
 
+          // Validate for special characters and emojis
+          const nameRegex = /^[a-zA-Z0-9\s.,&()-]+$/;
+          if (!nameRegex.test(edu.groupStream)) {
+            throw new Error(`Group/Stream for ${edu.level} contains invalid characters or emojis`);
+          }
+          if (!nameRegex.test(edu.collegeUniversity)) {
+            throw new Error(`College/University for ${edu.level} contains invalid characters or emojis`);
+          }
+          if (!/^[0-9]{4}$/.test(edu.year)) {
+            throw new Error(`Graduation Year for ${edu.level} must be a valid 4-digit year`);
+          }
+          if (!/^[0-9.]+%?$/.test(edu.scorePercentage)) {
+            throw new Error(`Score/Percentage for ${edu.level} must be a valid number or percentage`);
+          }
+
+          const gradYear = parseInt(edu.year, 10);
+
+          // Minimum 15 years gap between DOB and any graduation year
+          if (birthYear && gradYear - birthYear < 15) {
+            throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
+          }
+
+          educationYears[edu.level] = gradYear;
+        }
+      }
+    }
+
+    // Enforce logical graduation year gaps
+    if (educationYears['10th']) {
+      if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
+        throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
+      }
+      if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
+        throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
+      }
+    }
+
+    if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
+      throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
+    }
+
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] - educationYears['PG'] < 2) {
+      throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
+    }
+
+    // Basic order validation as fallback
+    if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
+      throw new Error('12th Graduation Year must be before UG Graduation Year');
+    }
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] >= educationYears['PG']) {
+      throw new Error('UG Graduation Year must be before PG Graduation Year');
+    }
+
+    // Perform database updates after all validations pass
+    for (const edu of profileData.education) {
+      if (edu.level) {
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
            VALUES ($1, $2, $3, $4, $5, $6)

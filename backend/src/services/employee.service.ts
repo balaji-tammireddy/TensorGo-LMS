@@ -350,6 +350,25 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     }
   }
 
+  // Enforce logical graduation year gaps
+  if (educationYears['10th']) {
+    if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
+      throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
+    }
+    if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
+      throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
+    }
+  }
+
+  if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
+    throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
+  }
+
+  if (educationYears['UG'] && educationYears['PG'] && educationYears['PG'] - educationYears['UG'] < 2) {
+    throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
+  }
+
+  // Basic order validation as fallback
   if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
     throw new Error('12th Graduation Year must be before UG Graduation Year');
   }
@@ -818,6 +837,25 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       }
     }
 
+    // Enforce logical graduation year gaps
+    if (educationYears['10th']) {
+      if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
+        throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
+      }
+      if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
+        throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
+      }
+    }
+
+    if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
+      throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
+    }
+
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['PG'] - educationYears['UG'] < 2) {
+      throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
+    }
+
+    // Basic order validation as fallback
     if (educationYears['12th'] && educationYears['UG'] && educationYears['12th'] >= educationYears['UG']) {
       throw new Error('12th Graduation Year must be before UG Graduation Year');
     }
@@ -906,6 +944,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
           throw new Error('For HR, only Super Admins can be reporting managers');
         }
       }
+    } else {
+      throw new Error('Selected reporting manager does not exist');
     }
   }
 
