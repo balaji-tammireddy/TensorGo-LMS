@@ -961,12 +961,12 @@ const EmployeeManagementPage: React.FC = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => setRoleFilter('')}>
+                          <DropdownMenuItem onSelect={() => setRoleFilter('')}>
                             All Roles
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {['super_admin', 'hr', 'manager', 'employee', 'intern'].map((role) => (
-                            <DropdownMenuItem key={role} onClick={() => setRoleFilter(role)}>
+                            <DropdownMenuItem key={role} onSelect={() => setRoleFilter(role)}>
                               {role === 'super_admin' ? 'Super Admin' :
                                 role === 'hr' ? 'HR' :
                                   role.charAt(0).toUpperCase() + role.slice(1)}
@@ -1006,12 +1006,12 @@ const EmployeeManagementPage: React.FC = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => setStatusFilter('')}>
+                          <DropdownMenuItem onSelect={() => setStatusFilter('')}>
                             All Status
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {['active', 'on_notice', 'inactive'].map((status) => (
-                            <DropdownMenuItem key={status} onClick={() => setStatusFilter(status)}>
+                            <DropdownMenuItem key={status} onSelect={() => setStatusFilter(status)}>
                               {status === 'active' ? 'Active' :
                                 status === 'on_notice' ? 'On Notice' :
                                   'Inactive'}
@@ -1247,11 +1247,10 @@ const EmployeeManagementPage: React.FC = () => {
                                 <React.Fragment key={role}>
                                   <DropdownMenuItem
                                     onSelect={(e) => {
-                                      e.preventDefault();
-
                                       const subCount = newEmployee.subordinateCount ? parseInt(String(newEmployee.subordinateCount), 10) : 0;
 
                                       if (isEditMode && subCount > 0 && newEmployee.role !== role) {
+                                        e.preventDefault();
                                         const name = `${newEmployee.firstName} ${newEmployee.lastName || ''}`.trim();
                                         showWarning(`Please remove the users reporting to ${name} and try again.`);
                                         return;
@@ -1457,19 +1456,19 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="leave-type-dropdown-content">
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, gender: 'Male' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, gender: 'Male' })}
                               >
                                 Male
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, gender: 'Female' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, gender: 'Female' })}
                               >
                                 Female
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, gender: 'Other' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, gender: 'Other' })}
                               >
                                 Other
                               </DropdownMenuItem>
@@ -1509,7 +1508,7 @@ const EmployeeManagementPage: React.FC = () => {
                               {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg, index) => (
                                 <React.Fragment key={bg}>
                                   <DropdownMenuItem
-                                    onClick={() => setNewEmployee({ ...newEmployee, bloodGroup: bg })}
+                                    onSelect={() => setNewEmployee({ ...newEmployee, bloodGroup: bg })}
                                   >
                                     {bg}
                                   </DropdownMenuItem>
@@ -1550,25 +1549,25 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="leave-type-dropdown-content">
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Single' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Single' })}
                               >
                                 Single
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Married' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Married' })}
                               >
                                 Married
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Divorced' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Divorced' })}
                               >
                                 Divorced
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Widowed' })}
+                                onSelect={() => setNewEmployee({ ...newEmployee, maritalStatus: 'Widowed' })}
                               >
                                 Widowed
                               </DropdownMenuItem>
@@ -1738,7 +1737,7 @@ const EmployeeManagementPage: React.FC = () => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent className="leave-type-dropdown-content">
                                 <DropdownMenuItem
-                                  onClick={() => setNewEmployee({
+                                  onSelect={() => setNewEmployee({
                                     ...newEmployee,
                                     status: 'active'
                                   })}
@@ -1747,7 +1746,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() => setNewEmployee({
+                                  onSelect={() => setNewEmployee({
                                     ...newEmployee,
                                     status: 'on_notice'
                                   })}
@@ -1756,7 +1755,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() => setNewEmployee({
+                                  onSelect={() => setNewEmployee({
                                     ...newEmployee,
                                     status: 'inactive'
                                   })}
