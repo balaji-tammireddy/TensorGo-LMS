@@ -116,7 +116,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   }, [value, isEmployeeVariant, displayFormat]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (
         containerRef.current && !containerRef.current.contains(event.target as Node) &&
         popoverRef.current && !popoverRef.current.contains(event.target as Node)
@@ -130,12 +130,14 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       const timeoutId = setTimeout(updatePopoverPosition, 50);
 
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
       window.addEventListener('scroll', updatePopoverPosition, true);
       window.addEventListener('resize', updatePopoverPosition);
 
       return () => {
         clearTimeout(timeoutId);
         document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
         window.removeEventListener('scroll', updatePopoverPosition, true);
         window.removeEventListener('resize', updatePopoverPosition);
       };
@@ -160,8 +162,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       setSelectedDate(date);
       setInputValue(dateStrDisplay);
       onChange(dateStrYMD);
-      setIsOpen(false);
     }
+    // Always close on selection, even if date is undefined (same date clicked)
+    setIsOpen(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

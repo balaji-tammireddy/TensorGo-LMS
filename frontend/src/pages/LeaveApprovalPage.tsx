@@ -547,20 +547,6 @@ const LeaveApprovalPage: React.FC = () => {
   };
 
   // Helper to format leaveDate string (e.g., "2025-12-30 to 2025-12-31" -> "30/12/2025 to 31/12/2025")
-  const formatLeaveDateString = (leaveDateStr: string | null | undefined) => {
-    if (!leaveDateStr) return '';
-    try {
-      // Check if it contains " to " (date range)
-      if (leaveDateStr.includes(' to ')) {
-        const [startDate, endDate] = leaveDateStr.split(' to ');
-        return `${formatDateSafe(startDate.trim())} to ${formatDateSafe(endDate.trim())}`;
-      }
-      // Single date
-      return formatDateSafe(leaveDateStr);
-    } catch {
-      return leaveDateStr || '';
-    }
-  };
 
   // Group requests by ID and show one row per request (not expanded by days)
   const groupedPendingRequests = useMemo(() => {
