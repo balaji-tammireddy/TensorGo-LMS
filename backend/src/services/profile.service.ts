@@ -7,20 +7,20 @@ export const getProfile = async (userId: number) => {
   logger.info(`[PROFILE] [GET PROFILE] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [GET PROFILE] User ID: ${userId}`);
   const result = await pool.query(
-    `SELECT u.*, 
-            COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
-            COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
-            COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id
-     FROM users u
-     LEFT JOIN users rm ON u.reporting_manager_id = rm.id
-     LEFT JOIN LATERAL (
-       SELECT id as sa_id, first_name || ' ' || COALESCE(last_name, '') as sa_full_name, emp_id as sa_emp_id
-       FROM users 
-       WHERE role = 'super_admin'
-       ORDER BY id ASC
-       LIMIT 1
-     ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
-     WHERE u.id = $1`,
+    `SELECT u.*,
+COALESCE(rm.id, sa.sa_id) as reporting_manager_id,
+COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
+COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id
+FROM users u
+LEFT JOIN users rm ON u.reporting_manager_id = rm.id
+LEFT JOIN LATERAL (
+SELECT id as sa_id, first_name || ' ' || COALESCE(last_name, '') as sa_full_name, emp_id as sa_emp_id
+FROM users
+WHERE role = 'super_admin'
+ORDER BY id ASC
+LIMIT 1
+) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
+WHERE u.id = $1`,
     [userId]
   );
 
@@ -350,10 +350,35 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     }
   }
 
-  // Update reporting manager - DISALLOWED in Profile Update API
-  // Reporting manager should only be updated by Admin/HR via Employee Management (Employee Service)
-  if (profileData.reportingManagerId !== undefined) {
-    throw new Error('Reporting Manager cannot be updated through Profile settings');
+  // Update reporting manager (Disabled in ProfilePage.tsx)
+  // Only Super Admin or HR should be able to update reporting manager (via /employees/:id API, not here)
+  if (profileData.reportingManagerId !== undefined && (userRole === 'super_admin' || userRole === 'hr')) {
+    if (profileData.reportingManagerId) {
+      const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [profileData.reportingManagerId]);
+      if (managerResult.rows.length > 0) {
+        const { status: managerStatus, role: managerRole } = managerResult.rows[0];
+        const targetRole = currentValues.rows[0].role;
+
+        // Status check
+        if (managerStatus === 'on_notice') {
+          throw new Error('Employees in notice period cannot be reporting managers');
+        }
+        if (managerStatus !== 'active' && managerStatus !== 'on_leave') {
+          throw new Error('Selected reporting manager must be active or on leave');
+        }
+
+        // Reporting Manager Role check
+        // Any user can report to Manager, HR, or Super Admin
+        if (!['manager', 'hr', 'super_admin'].includes(managerRole)) {
+          throw new Error('Reporting manager must have Manager, HR, or Super Admin role');
+        }
+      } else {
+        throw new Error('Selected reporting manager does not exist');
+      }
+    }
+    updates.push(`reporting_manager_id = $${paramCount}`);
+    values.push(profileData.reportingManagerId || null);
+    paramCount++;
   }
 
   if (updates.length > 0) {
@@ -373,16 +398,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     const dobValue = profileData.personalInfo?.dateOfBirth || currentValues.rows[0].date_of_birth;
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
-    // Fetch existing education to merge with updates for validation
-    const existingEducationResult = await pool.query('SELECT level, year FROM education WHERE employee_id = $1', [userId]);
     const educationYears: Record<string, number> = {};
-
-    // Populate with existing data first
-    for (const edu of existingEducationResult.rows) {
-      if (edu.year && /^[0-9]{4}$/.test(edu.year)) {
-        educationYears[edu.level] = parseInt(edu.year, 10);
-      }
-    }
 
     for (const edu of profileData.education) {
       if (edu.level) {
@@ -409,18 +425,11 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
 
           const gradYear = parseInt(edu.year, 10);
 
-          // Basic logic check for year
-          const currentYear = new Date().getFullYear();
-          if (gradYear < 1950 || gradYear > currentYear + 10) {
-            throw new Error(`Graduation Year for ${edu.level} appears illogical (${gradYear})`);
-          }
-
           // Minimum 15 years gap between DOB and any graduation year
           if (birthYear && gradYear - birthYear < 15) {
             throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
           }
 
-          // Update/Override with new year
           educationYears[edu.level] = gradYear;
         }
       }
@@ -429,19 +438,19 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     // Enforce logical graduation year gaps
     if (educationYears['10th']) {
       if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
-        throw new Error(`Minimum 2 years gap required between 10th (${educationYears['10th']}) and 12th (${educationYears['12th']}) Graduation Year`);
+        throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
       }
       if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
-        throw new Error(`Minimum 5 years gap required between 10th (${educationYears['10th']}) and UG (${educationYears['UG']}) Graduation Year`);
+        throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
       }
     }
 
     if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
-      throw new Error(`Minimum 3 years gap required between 12th (${educationYears['12th']}) and UG (${educationYears['UG']}) Graduation Year`);
+      throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
     }
 
-    if (educationYears['UG'] && educationYears['PG'] && educationYears['PG'] - educationYears['UG'] < 2) {
-      throw new Error(`Minimum 2 years gap required between UG (${educationYears['UG']}) and PG (${educationYears['PG']}) Graduation Year`);
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] - educationYears['PG'] < 2) {
+      throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
     }
 
     // Basic order validation as fallback
@@ -457,12 +466,12 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
       if (edu.level) {
         await pool.query(
           `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT (employee_id, level) DO UPDATE
-           SET group_stream = EXCLUDED.group_stream,
-               college_university = EXCLUDED.college_university,
-               year = EXCLUDED.year,
-               score_percentage = EXCLUDED.score_percentage`,
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (employee_id, level) DO UPDATE
+SET group_stream = EXCLUDED.group_stream,
+college_university = EXCLUDED.college_university,
+year = EXCLUDED.year,
+score_percentage = EXCLUDED.score_percentage`,
           [
             userId,
             edu.level,
@@ -508,27 +517,19 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
 
   // Reporting manager rules:
-  // - Super Admin is always an option for every role
-  // - Interns and Employees also see Managers
-  // - Managers also see HRs
-  // - HRs and Super Admins see only Super Admins
-  let targetRoles: string[] = ['super_admin'];
-
-  if (employeeRole === 'intern' || employeeRole === 'employee') {
-    targetRoles.push('manager');
-  } else if (employeeRole === 'manager') {
-    targetRoles.push('hr');
-  }
+  // - Any user can report to Manager, HR, or Super Admin
+  // - Employee and Intern roles cannot be reporting managers
+  const targetRoles: string[] = ['super_admin', 'hr', 'manager'];
 
   if (targetRoles.length === 0) {
     return { managers: [] };
   }
 
   let query = `
-    SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
-    FROM users
-    WHERE role = ANY($1) AND status IN ('active', 'on_leave')
-  `;
+SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
+FROM users
+WHERE role = ANY($1) AND status IN ('active', 'on_leave')
+`;
   const params: any[] = [targetRoles];
   let paramIndex = 2;
 
@@ -565,4 +566,3 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
     }))
   };
 };
-

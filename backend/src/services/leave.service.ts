@@ -1860,16 +1860,8 @@ export const getPendingLeaveRequests = async (
     query += ` AND lr.employee_id != $1`;
     params.push(approverId);
   }
-  // HR: Strict Hierarchy (L1/L2) + Role Exclusion (No HRs/SAs)
-  else if (normalizedRole === 'hr') {
-    query += ` AND lr.employee_id != $1 AND (
-       u.reporting_manager_id = $1    -- I am Direct Manager (L1)
-       OR l1.reporting_manager_id = $1   -- I am Manager's Manager (L2)
-     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
-    params.push(approverId);
-  }
-  // MANAGER: Strict Hierarchy (L1 only)
-  else if (normalizedRole === 'manager') {
+  // HR & MANAGER: Strict Hierarchy (L1 only) - Can only approve their direct reports
+  else if (normalizedRole === 'hr' || normalizedRole === 'manager') {
     query += ` AND u.reporting_manager_id = $1 AND lr.employee_id != $1`;
     params.push(approverId);
   } else {
@@ -1922,15 +1914,9 @@ export const getPendingLeaveRequests = async (
   // Also filter out approver's own requests to prevent self-approval
   // This ensures data integrity even if query construction has issues
   // Use Number() to handle type coercion (PostgreSQL may return strings)
-  const filteredRows = normalizedRole === 'manager'
-    ? result.rows.filter(row => Number(row.reporting_manager_id) === Number(approverId))
-    : result.rows.filter(row => {
-      // For HR and Super Admin, exclude their own requests (no self-approval)
-      if (approverRole === 'hr' || approverRole === 'super_admin') {
-        return Number(row.employee_id) !== Number(approverId);
-      }
-      return true;
-    });
+  // Additional safeguard: Filter out approver's own requests to prevent self-approval
+  // (SQL already handles this, but keeping as safety net)
+  const filteredRows = result.rows.filter(row => Number(row.employee_id) !== Number(approverId));
 
   // Batch fetch leave days for all request IDs to avoid N+1 query problem
   const requestIds = filteredRows.map(r => r.id);
@@ -2030,16 +2016,8 @@ export const getPendingLeaveRequests = async (
     countQuery += ` AND lr.employee_id != $1`;
     countParams.push(approverId);
   }
-  // HR: Strict Hierarchy + Role Exclusion
-  else if (normalizedRole === 'hr') {
-    countQuery += ` AND lr.employee_id != $1 AND (
-       u.reporting_manager_id = $1    -- I am Direct Manager (L1)
-       OR l1.reporting_manager_id = $1   -- I am Manager's Manager (L2)
-     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
-    countParams.push(approverId);
-  }
-  // MANAGER: Direct Reports
-  else if (normalizedRole === 'manager') {
+  // HR & MANAGER: Strict Hierarchy (L1 only) - Match Main Query
+  else if (normalizedRole === 'hr' || normalizedRole === 'manager') {
     countQuery += ` AND u.reporting_manager_id = $1 AND lr.employee_id != $1`;
     countParams.push(approverId);
   }
@@ -2105,6 +2083,11 @@ export const approveLeave = async (
 
   const leave = leaveResult.rows[0];
 
+  // Block if previously updated by Super Admin (unless Super Admin is updating)
+  if (leave.last_updated_by_role === 'super_admin' && approverRole !== 'super_admin') {
+    throw new Error('Action blocked: Cannot modify a request handled by Super Admin');
+  }
+
   // Block approving an already approved request
   if (leave.current_status === 'approved') {
     throw new Error('Leave request is already approved');
@@ -2125,26 +2108,8 @@ export const approveLeave = async (
   if (approverRole === 'super_admin') {
     // Allowed
   }
-  // HR: Strict L1/L2 + Role Filter
-  else if (approverRole === 'hr') {
-    const permissionCheck = await pool.query(
-      `SELECT 1 
-       FROM users u
-       LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
-       WHERE u.id = $1 
-       AND (
-         u.reporting_manager_id = $2    -- I am Direct Manager (L1)
-         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2)
-       ) 
-       AND LOWER(u.role) IN ('intern', 'employee', 'manager')`,
-      [leave.employee_id, approverId]
-    );
-    if (permissionCheck.rows.length === 0) {
-      throw new Error('Not authorized to approve this leave');
-    }
-  }
-  // Manager: L1
-  else if (approverRole === 'manager') {
+  // HR & Manager: L1 Only (Direct Reports)
+  else if (approverRole === 'hr' || approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to approve this leave');
     }
@@ -2153,71 +2118,24 @@ export const approveLeave = async (
   }
 
   // Update approval status based on role
-  if (approverRole === 'manager') {
-    // Additional safeguard: ensure manager can only approve their direct reports
-    const updateResult = await pool.query(
+  if (approverRole === 'manager' || approverRole === 'hr') {
+    // Both Manager and HR act as "Reporting Manager" now
+    // Approve and set final status (unless there's some specific Super Admin requirement, but user said "only their reporting manager can approve")
+    await pool.query(
       `UPDATE leave_requests 
        SET manager_approval_status = 'approved',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
            manager_approved_by = $2,
-           last_updated_by = $2,
-           last_updated_by_role = 'manager'
-       WHERE id = $3 
-         AND EXISTS (
-           SELECT 1 FROM users u 
-           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
-           AND u.reporting_manager_id = $2
-         )`,
-      [comment || null, approverId, leaveRequestId]
-    );
-
-    if (updateResult.rowCount === 0) {
-      throw new Error('Not authorized to approve this leave');
-    }
-
-    // Check if needs HR approval
-    const managerRoleResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [leave.reporting_manager_id]
-    );
-    if (managerRoleResult.rows[0]?.role === 'hr') {
-      // Manager is HR, so final approval
-      await pool.query(
-        `UPDATE leave_requests 
-         SET current_status = 'approved',
-             hr_approval_status = 'approved',
-             hr_approval_date = CURRENT_TIMESTAMP,
-             hr_approved_by = $1,
-             last_updated_by = $1,
-             last_updated_by_role = 'hr'
-         WHERE id = $2`,
-        [approverId, leaveRequestId]
-      );
-    }
-  } else if (approverRole === 'hr') {
-    await pool.query(
-      `UPDATE leave_requests 
-       SET hr_approval_status = 'approved',
+           hr_approval_status = 'approved', -- Auto-approve HR level since manager approved (flat hierarchy)
            hr_approval_date = CURRENT_TIMESTAMP,
-           hr_approval_comment = $1,
            hr_approved_by = $2,
+           current_status = 'approved',
            last_updated_by = $2,
-           last_updated_by_role = 'hr'
-       WHERE id = $3`,
-      [comment || null, approverId, leaveRequestId]
+           last_updated_by_role = $3
+       WHERE id = $4`,
+      [comment || null, approverId, approverRole, leaveRequestId]
     );
-
-    // Check if needs Super Admin approval (if employee role is hr or super_admin)
-    if (leave.employee_role === 'hr' || leave.employee_role === 'super_admin') {
-      // Needs Super Admin approval
-    } else {
-      // Final approval
-      await pool.query(
-        `UPDATE leave_requests SET current_status = 'approved' WHERE id = $1`,
-        [leaveRequestId]
-      );
-    }
   } else if (approverRole === 'super_admin') {
     await pool.query(
       `UPDATE leave_requests 
@@ -2369,6 +2287,13 @@ export const rejectLeave = async (
     [leaveRequestId]
   );
 
+  // Block if previously updated by Super Admin (unless Super Admin is updating)
+  if (leave.last_updated_by_role === 'super_admin' && approverRole !== 'super_admin') {
+    throw new Error('Action blocked: Cannot modify a request handled by Super Admin');
+  }
+
+
+
   // Check authorization (same as approve) - STRICT HIERARCHY
   // CRITICAL: Prevent self-rejection for HR and super_admin
   // Use Number() for consistent type comparison (PostgreSQL may return integers as strings in some cases)
@@ -2384,26 +2309,8 @@ export const rejectLeave = async (
   if (approverRole === 'super_admin') {
     // Allowed
   }
-  // HR: Strict L1/L2 + Role Filter
-  else if (approverRole === 'hr') {
-    const permissionCheck = await pool.query(
-      `SELECT 1 
-       FROM users u
-       LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
-       WHERE u.id = $1 
-       AND (
-         u.reporting_manager_id = $2    -- I am Direct Manager (L1)
-         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2)
-       ) 
-       AND LOWER(u.role) IN ('intern', 'employee', 'manager')`,
-      [leave.employee_id, approverId]
-    );
-    if (permissionCheck.rows.length === 0) {
-      throw new Error('Not authorized to reject this leave');
-    }
-  }
-  // Manager: L1
-  else if (approverRole === 'manager') {
+  // HR & Manager: L1 Only (Direct Reports)
+  else if (approverRole === 'hr' || approverRole === 'manager') {
     if (Number(leave.reporting_manager_id) !== approverIdNum) {
       throw new Error('Not authorized to reject this leave');
     }
@@ -2412,37 +2319,23 @@ export const rejectLeave = async (
   }
 
   // Update rejection status
-  if (approverRole === 'manager') {
-    // Additional safeguard: ensure manager can only reject their direct reports
-    const updateResult = await pool.query(
+  // Update rejection status based on role
+  if (approverRole === 'manager' || approverRole === 'hr') {
+    // Both Manager and HR act as "Reporting Manager" now - Rejection is final
+    await pool.query(
       `UPDATE leave_requests 
        SET manager_approval_status = 'rejected',
            manager_approval_date = CURRENT_TIMESTAMP,
            manager_approval_comment = $1,
            manager_approved_by = $2,
-           current_status = 'rejected'
-       WHERE id = $3 
-         AND EXISTS (
-           SELECT 1 FROM users u 
-           WHERE u.id = (SELECT employee_id FROM leave_requests WHERE id = $3)
-           AND u.reporting_manager_id = $2
-         )`,
-      [comment, approverId, leaveRequestId]
-    );
-
-    if (updateResult.rowCount === 0) {
-      throw new Error('Not authorized to reject this leave');
-    }
-  } else if (approverRole === 'hr') {
-    await pool.query(
-      `UPDATE leave_requests 
-       SET hr_approval_status = 'rejected',
+           hr_approval_status = 'rejected', -- Auto-reject HR level too
            hr_approval_date = CURRENT_TIMESTAMP,
-           hr_approval_comment = $1,
            hr_approved_by = $2,
-           current_status = 'rejected'
-       WHERE id = $3`,
-      [comment, approverId, leaveRequestId]
+           current_status = 'rejected',
+           last_updated_by = $2,
+           last_updated_by_role = $3
+       WHERE id = $4`,
+      [comment, approverId, approverRole, leaveRequestId]
     );
   } else if (approverRole === 'super_admin') {
     await pool.query(
@@ -2451,7 +2344,9 @@ export const rejectLeave = async (
            super_admin_approval_date = CURRENT_TIMESTAMP,
            super_admin_approval_comment = $1,
            super_admin_approved_by = $2,
-           current_status = 'rejected'
+           current_status = 'rejected',
+           last_updated_by = $2,
+           last_updated_by_role = 'super_admin'
        WHERE id = $3`,
       [comment, approverId, leaveRequestId]
     );
