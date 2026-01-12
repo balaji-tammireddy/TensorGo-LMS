@@ -16,6 +16,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const forceLogout = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    setUser(null);
+  };
 
   useEffect(() => {
     const initAuth = async () => {
@@ -60,13 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     logoutChannel.onmessage = (event) => {
       if (event.data === 'logout') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        setUser(null);
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
+        forceLogout();
       } else if (event.data === 'login') {
         // Sync login state from other tab
         const storedUser = localStorage.getItem('user');
@@ -89,6 +91,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      if (!isLoggingOut) {
+        forceLogout();
+      }
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [isLoggingOut]);
+
   const login = async (email: string, password: string): Promise<User> => {
     const response = await authService.login({ email, password });
     localStorage.setItem('accessToken', response.accessToken);
@@ -104,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    setIsLoggingOut(true);
     // Notify other tabs immediately
     const logoutChannel = new BroadcastChannel('auth_channel');
     logoutChannel.postMessage('logout');
@@ -113,11 +127,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await authService.logout();
     } catch (error) {
       // Ignore logout errors
+    } finally {
+      forceLogout();
+      setIsLoggingOut(false);
     }
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    setUser(null);
   };
 
   return (

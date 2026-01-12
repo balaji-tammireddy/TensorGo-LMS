@@ -225,8 +225,8 @@ const EmployeeManagementPage: React.FC = () => {
       refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
       keepPreviousData: true,
       onError: (error: any) => {
-        if (error.response?.status === 403 || error.response?.status === 401) {
-          window.location.href = '/login';
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          // Handled globally by api.ts interceptor
         }
       }
     }

@@ -503,7 +503,7 @@ const LeaveApplyPage: React.FC = () => {
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
-          window.location.href = '/login';
+          // Handled globally by api.ts interceptor
         }
       }
     }
@@ -607,7 +607,7 @@ const LeaveApplyPage: React.FC = () => {
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
-          window.location.href = '/login';
+          // Handled globally by api.ts interceptor
         }
       }
     }

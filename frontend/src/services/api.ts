@@ -47,10 +47,8 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
 
-        const isLogoutRequest = originalRequest.url?.includes('logout');
-        if (!isLogoutRequest && window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
+        // Dispatch event for AuthContext to handle soft logout
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
         return Promise.reject(refreshError);
       }
     }

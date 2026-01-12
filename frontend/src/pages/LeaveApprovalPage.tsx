@@ -109,7 +109,7 @@ const LeaveApprovalPage: React.FC = () => {
       keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {
         if (error.response?.status === 403 || error.response?.status === 401) {
-          window.location.href = '/login';
+          // Handled globally by api.ts interceptor
         }
       }
     }

@@ -118,8 +118,8 @@ const ProfilePage: React.FC = () => {
       cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       keepPreviousData: true, // Keep old data while fetching new
       onError: (error: any) => {
-        if (error.response?.status === 403 || error.response?.status === 401) {
-          window.location.href = '/login';
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          // Handled globally by api.ts interceptor
         }
       }
     }

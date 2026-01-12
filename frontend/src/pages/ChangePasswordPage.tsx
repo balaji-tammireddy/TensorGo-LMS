@@ -45,7 +45,6 @@ const ChangePasswordPage: React.FC = () => {
       // Force re-login so new token & flags are picked up
       setTimeout(() => {
         logout();
-        window.location.href = '/login';
       }, 1500);
     } catch (err: any) {
       const message =
