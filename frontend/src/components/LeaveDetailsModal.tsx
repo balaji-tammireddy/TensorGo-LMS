@@ -351,7 +351,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       // Check if it's a weekend
       const isSunday = dayOfWeek === 0;
       const isSaturday = dayOfWeek === 6;
-      const isIntern = leaveRequest.empRole === 'intern';
+      const isIntern = leaveRequest.empRole?.toLowerCase() === 'intern';
       const isWeekend = isSunday || (isSaturday && !isIntern);
 
       // Check if it's a holiday - normalize holiday date string too
@@ -368,6 +368,28 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   };
 
   const projectedCasualDays = calculateProjectedCasualDays();
+
+  const isDateDisabled = (date: Date) => {
+    if (leaveRequest?.leaveType === 'lop') return false;
+
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+    const isSunday = dayOfWeek === 0;
+    const isSaturday = dayOfWeek === 6;
+    const isIntern = leaveRequest?.empRole?.toLowerCase() === 'intern';
+    const isWeekend = isSunday || (isSaturday && !isIntern);
+
+    if (isWeekend) return true;
+
+    // Check if it's a holiday
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return holidays.some(h => {
+      try {
+        return format(new Date(h.date), 'yyyy-MM-dd') === dateStr;
+      } catch {
+        return false;
+      }
+    });
+  };
 
   return (
     <>
@@ -663,6 +685,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           disabled={isLoading}
                           placeholder="DD-MM-YYYY"
                           isEmployeeVariant={true}
+                          disabledDates={isDateDisabled}
                         />
                       </div>
                       <div className="date-range-input-group">
@@ -675,6 +698,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           disabled={isLoading || !fromDate}
                           placeholder="DD-MM-YYYY"
                           isEmployeeVariant={true}
+                          disabledDates={isDateDisabled}
                         />
                       </div>
                     </div>
@@ -709,6 +733,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           disabled={isLoading}
                           placeholder="DD-MM-YYYY"
                           isEmployeeVariant={true}
+                          disabledDates={isDateDisabled}
                         />
                       </div>
                       <div className="date-range-input-group">
@@ -726,6 +751,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                           disabled={isLoading || !fromDate}
                           placeholder="DD-MM-YYYY"
                           isEmployeeVariant={true}
+                          disabledDates={isDateDisabled}
                         />
                       </div>
                     </div>
