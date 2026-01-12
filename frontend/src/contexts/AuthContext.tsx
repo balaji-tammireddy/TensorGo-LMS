@@ -55,15 +55,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
+  useEffect(() => {
+    const logoutChannel = new BroadcastChannel('auth_channel');
+
+    logoutChannel.onmessage = (event) => {
+      if (event.data === 'logout') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        setUser(null);
+        window.location.href = '/login';
+      } else if (event.data === 'login') {
+        // Sync login state from other tab
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('accessToken');
+        if (storedUser && token) {
+          try {
+            setUser(JSON.parse(storedUser));
+            // Optional: Reload to ensure fresh state/subscriptions if needed, 
+            // but setUser should trigger React updates (like redirect in LoginPage).
+            // window.location.reload(); 
+          } catch (e) {
+            console.error('Failed to sync login state', e);
+          }
+        }
+      }
+    };
+
+    return () => {
+      logoutChannel.close();
+    };
+  }, []);
+
   const login = async (email: string, password: string): Promise<User> => {
     const response = await authService.login({ email, password });
     localStorage.setItem('accessToken', response.accessToken);
     localStorage.setItem('user', JSON.stringify(response.user));
     setUser(response.user);
+
+    // Notify other tabs
+    const loginChannel = new BroadcastChannel('auth_channel');
+    loginChannel.postMessage('login');
+    loginChannel.close();
+
     return response.user;
   };
 
   const logout = async () => {
+    // Notify other tabs immediately
+    const logoutChannel = new BroadcastChannel('auth_channel');
+    logoutChannel.postMessage('logout');
+    logoutChannel.close();
+
     try {
       await authService.logout();
     } catch (error) {
