@@ -66,10 +66,36 @@ export const refresh = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Verify Token Version (Session Invalidation)
+    const tokenVersion = decoded.tokenVersion;
+    const dbTokenVersion = user.tokenVersion;
+
+    if (tokenVersion !== undefined && tokenVersion !== dbTokenVersion) {
+      logger.warn(`[CONTROLLER] [AUTH] [REFRESH] Token version mismatch. Token: ${tokenVersion}, DB: ${dbTokenVersion}`);
+      return res.status(403).json({
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Session expired (password changed)'
+        }
+      });
+    }
+
+    // Strict check for old tokens (optional but recommended)
+    if (tokenVersion === undefined && dbTokenVersion > 0) {
+      logger.warn(`[CONTROLLER] [AUTH] [REFRESH] Old token rejected (missing version)`);
+      return res.status(403).json({
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Session expired - Please login again'
+        }
+      });
+    }
+
     const newAccessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      tokenVersion: user.tokenVersion
     });
 
     logger.info(`[CONTROLLER] [AUTH] [REFRESH] Token refreshed successfully - User ID: ${user.id}`);

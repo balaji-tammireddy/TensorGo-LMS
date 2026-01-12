@@ -27,7 +27,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
   logger.info(`[AUTH] [LOGIN] Normalized email: ${normalizedEmail}`);
 
   const result = await pool.query(
-    'SELECT id, emp_id, email, password_hash, role, first_name, last_name, status, must_change_password FROM users WHERE LOWER(TRIM(email)) = $1',
+    'SELECT id, emp_id, email, password_hash, role, first_name, last_name, status, must_change_password, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
     [normalizedEmail]
   );
 
@@ -59,7 +59,8 @@ export const login = async (email: string, password: string): Promise<LoginResul
   const tokenPayload = {
     userId: user.id,
     email: user.email,
-    role: user.role
+    role: user.role,
+    tokenVersion: user.token_version || 0 // Default to 0 if null/undefined
   };
 
   logger.info(`[AUTH] [LOGIN] Generating tokens for user ID: ${user.id}`);
@@ -87,7 +88,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
 
 export const validateUser = async (userId: number) => {
   const result = await pool.query(
-    'SELECT id, emp_id, email, role, first_name, last_name, status, must_change_password FROM users WHERE id = $1',
+    'SELECT id, emp_id, email, role, first_name, last_name, status, must_change_password, token_version FROM users WHERE id = $1',
     [userId]
   );
 
@@ -105,7 +106,8 @@ export const validateUser = async (userId: number) => {
     role: user.role,
     email: user.email,
     status: user.status,
-    mustChangePassword: !!user.must_change_password
+    mustChangePassword: !!user.must_change_password,
+    tokenVersion: user.token_version || 0
   };
 };
 
@@ -156,7 +158,7 @@ export const changePassword = async (
 
   logger.info(`[AUTH] [CHANGE PASSWORD] Updating password in database`);
   await pool.query(
-    'UPDATE users SET password_hash = $1, must_change_password = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+    'UPDATE users SET password_hash = $1, must_change_password = false, token_version = COALESCE(token_version, 0) + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
     [newHash, userId]
   );
   logger.info(`[AUTH] [CHANGE PASSWORD] Password updated successfully in database`);
@@ -374,7 +376,7 @@ export const resetPasswordWithOTP = async (
     // Update password
     logger.info(`[AUTH][RESET PASSWORD WITH OTP] Updating password in database`);
     await client.query(
-      'UPDATE users SET password_hash = $1, must_change_password = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE users SET password_hash = $1, must_change_password = false, token_version = COALESCE(token_version, 0) + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newHash, userId]
     );
 

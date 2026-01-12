@@ -390,6 +390,18 @@
   z-index: 1000;
   padding: 20px;
   animation: fadeIn 0.2s ease;
+  pointer-events: auto;
+  /* Enable interaction */
+}
+
+.forgot-password-overlay * {
+  pointer-events: auto !important;
+  /* Force enable interaction for all children */
+  cursor: auto;
+}
+
+.forgot-password-overlay button {
+  cursor: pointer !important;
 }
 
 @keyframes fadeIn {

@@ -167,9 +167,23 @@ async function migrate() {
       await pool.query(perfIndexesFile);
       console.log('Performance indexes migration completed');
     } catch (perfError: any) {
-      // If index already exists, that's fine
       if (!perfError.message.includes('already exists')) {
         console.warn('Performance indexes migration warning:', perfError.message);
+      }
+    }
+
+    // Run token version migration (for session invalidation)
+    try {
+      const tokenVersionMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '006_add_token_version.sql'),
+        'utf-8'
+      );
+      await pool.query(tokenVersionMigrationFile);
+      console.log('Token version (session invalidation) migration completed');
+    } catch (tokenError: any) {
+      // If column already exists (code 42701) or other expected error, log warning
+      if (!tokenError.message.includes('already exists') && !tokenError.message.includes('duplicate')) {
+        console.warn('Token version migration warning:', tokenError.message);
       }
     }
 

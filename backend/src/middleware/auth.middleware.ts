@@ -53,7 +53,7 @@ export const authenticateToken = async (
     try {
       logger.info(`[AUTH] Step 3: Querying DB for userId: ${userId}`);
       result = await pool.query(
-        'SELECT id, emp_id, email, role, first_name, last_name, status FROM users WHERE id = $1',
+        'SELECT id, emp_id, email, role, first_name, last_name, status, token_version FROM users WHERE id = $1',
         [userId]
       );
       logger.info(`[AUTH] Step 4: DB Query success, rows: ${result.rows.length}`);
@@ -83,6 +83,38 @@ export const authenticateToken = async (
     }
 
     const user = result.rows[0];
+
+    // Token Version Verification (Session Invalidation)
+    // If token has version (new tokens) and it doesn't match DB version, or if DB has version and token doesn't
+    const tokenVersion = decoded.tokenVersion; // Might be undefined for old tokens
+    const dbTokenVersion = user.token_version || 0;
+
+    // We compare strict equality if token has version.
+    // If token has NO version (old token) and DB has version > 0, it's invalid?
+    // Let's assume strict equality: tokenVersion matches dbTokenVersion.
+    // NOTE: Newly created tokens will have tokenVersion matching DB.
+    if (tokenVersion !== undefined && tokenVersion !== dbTokenVersion) {
+      logger.warn(`[AUTH] Token version mismatch for user ID: ${userId}. Token: ${tokenVersion}, DB: ${dbTokenVersion}`);
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Session expired (password changed or revoked)'
+        }
+      });
+    }
+
+    // Optional: Forcing logout for old tokens without version if we want to be strict immediately
+    // For now, if we assume migration set token_version=1, and old tokens are undefined,
+    // undefined != 1, so they WILL be logged out. This is good for security.
+    if (tokenVersion === undefined && dbTokenVersion > 0) {
+      logger.warn(`[AUTH] Old token rejected (missing version) for user ID: ${userId}`);
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Session expired - Please login again'
+        }
+      });
+    }
     req.user = {
       id: user.id,
       empId: user.emp_id,
