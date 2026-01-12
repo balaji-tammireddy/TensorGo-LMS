@@ -81,7 +81,7 @@ const LeaveApprovalPage: React.FC = () => {
   }, [recentSearchInput]);
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
-    ['pendingLeaves', search, filter],
+    ['pendingLeaves', search, filter, user?.role],
     () => leaveService.getPendingLeaveRequests(1, 100, search || undefined, filter || undefined),
     {
       retry: false,
@@ -99,7 +99,7 @@ const LeaveApprovalPage: React.FC = () => {
   );
 
   const { data: approvedData, isLoading: approvedLoading, error: approvedError } = useQuery(
-    ['approvedLeaves'],
+    ['approvedLeaves', user?.role],
     () => leaveService.getApprovedLeaves(1, 100),
     {
       retry: false,

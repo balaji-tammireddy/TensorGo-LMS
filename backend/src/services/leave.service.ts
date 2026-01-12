@@ -1914,15 +1914,9 @@ export const getPendingLeaveRequests = async (
   // Also filter out approver's own requests to prevent self-approval
   // This ensures data integrity even if query construction has issues
   // Use Number() to handle type coercion (PostgreSQL may return strings)
-  const filteredRows = normalizedRole === 'manager'
-    ? result.rows.filter(row => Number(row.reporting_manager_id) === Number(approverId))
-    : result.rows.filter(row => {
-      // For HR and Super Admin, exclude their own requests (no self-approval)
-      if (approverRole === 'hr' || approverRole === 'super_admin') {
-        return Number(row.employee_id) !== Number(approverId);
-      }
-      return true;
-    });
+  // Additional safeguard: Filter out approver's own requests to prevent self-approval
+  // (SQL already handles this, but keeping as safety net)
+  const filteredRows = result.rows.filter(row => Number(row.employee_id) !== Number(approverId));
 
   // Batch fetch leave days for all request IDs to avoid N+1 query problem
   const requestIds = filteredRows.map(r => r.id);
@@ -2022,16 +2016,8 @@ export const getPendingLeaveRequests = async (
     countQuery += ` AND lr.employee_id != $1`;
     countParams.push(approverId);
   }
-  // HR: Strict Hierarchy + Role Exclusion
-  else if (normalizedRole === 'hr') {
-    countQuery += ` AND lr.employee_id != $1 AND (
-       u.reporting_manager_id = $1    -- I am Direct Manager (L1)
-       OR l1.reporting_manager_id = $1   -- I am Manager's Manager (L2)
-     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
-    countParams.push(approverId);
-  }
-  // MANAGER: Direct Reports
-  else if (normalizedRole === 'manager') {
+  // HR & MANAGER: Strict Hierarchy (L1 only) - Match Main Query
+  else if (normalizedRole === 'hr' || normalizedRole === 'manager') {
     countQuery += ` AND u.reporting_manager_id = $1 AND lr.employee_id != $1`;
     countParams.push(approverId);
   }
