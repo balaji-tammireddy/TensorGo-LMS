@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { uploadToOVH } from '../utils/storage';
+import { uploadToOVH, getPublicUrlFromOVH } from '../utils/storage';
 
 export const getEmployees = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] ========== REQUEST RECEIVED ==========`);
@@ -302,7 +302,8 @@ export const addLeavesToEmployee = [
         try {
           const key = `leave-documents/${req.user!.id}/${req.file.filename}`;
           const certificateKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
-          documentUrl = certificateKey;
+          // Generate public URL for the email
+          documentUrl = getPublicUrlFromOVH(certificateKey);
 
           // Delete local file
           try {

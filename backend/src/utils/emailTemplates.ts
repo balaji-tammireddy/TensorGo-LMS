@@ -781,7 +781,11 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
     { label: 'Allocated By:', value: data.allocatedByEmpId ? `${data.allocatedBy} (${data.allocatedByEmpId})` : data.allocatedBy },
     { label: 'Allocation Date:', value: allocationDateDisplay },
     ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : []),
-    ...(data.documentUrl ? [{ label: 'Document:', value: 'Attached' }] : [])
+    ...(data.documentUrl ? [{
+      label: 'Document:',
+      value: `<a href="${data.documentUrl}" target="_blank" style="color: #2563eb; text-decoration: underline;">View Attachment</a>`,
+      isHtml: true
+    }] : [])
   ]);
 
   const content = `
@@ -823,7 +827,7 @@ Allocation Details:
 - New Balance: ${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}
 - Allocated By: ${data.allocatedBy}
 - Allocation Date: ${allocationDateDisplay}
-${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}${data.documentUrl ? `\n- Document: Attached` : ''}
+${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}${data.documentUrl ? `\n- Document: ${data.documentUrl}` : ''}
 
 Best Regards,
 TensorGo Intranet

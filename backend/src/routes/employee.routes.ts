@@ -3,7 +3,7 @@ import * as employeeController from '../controllers/employee.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { authorizeRole } from '../middleware/authorize.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
-import { createEmployeeSchema, updateEmployeeSchema, addLeavesSchema } from '../validations/employee.schema';
+import { createEmployeeSchema, updateEmployeeSchema } from '../validations/employee.schema';
 
 const router = Router();
 
@@ -19,7 +19,8 @@ router.put('/:id', validateRequest(updateEmployeeSchema), employeeController.upd
 // Only super_admin can delete employees
 router.delete('/:id', authorizeRole('super_admin'), employeeController.deleteEmployee);
 // HR and Super Admin can add leaves to employees
-router.post('/:id/leaves', validateRequest(addLeavesSchema), employeeController.addLeavesToEmployee);
+// Note: addLeavesToEmployee uses multer for file uploads, so validation is handled in the controller
+router.post('/:id/leaves', employeeController.addLeavesToEmployee);
 // HR and Super Admin can view employee leave balances
 router.get('/:id/leave-balances', employeeController.getEmployeeLeaveBalances);
 // HR and Super Admin can send carryforward emails to all employees
