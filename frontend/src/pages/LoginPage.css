@@ -16,64 +16,42 @@
   justify-content: center;
   padding: 24px;
   box-sizing: border-box;
-}
-
-/* Noise Texture Overlay */
-.login-page::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.04;
-  /* Slightly more visible for premium texture */
   pointer-events: none;
-  z-index: 2;
-  mix-blend-mode: overlay;
+  /* Ensure container itself lets clicks pass if needed, though usually it's full screen */
 }
 
-/* Ambient Light Blobs */
-.ambient-blob {
-  position: absolute;
-  width: 1000px;
-  height: 1000px;
-  border-radius: 50%;
-  filter: blur(120px);
-  z-index: 0;
-  opacity: 0.4;
+.login-page * {
+  cursor: default;
   pointer-events: none;
+  /* Ignore mouse events on background elements */
 }
 
-.blob-1 {
-  top: -400px;
-  left: -400px;
-  background: radial-gradient(circle, rgba(60, 111, 242, 0.2) 0%, transparent 70%);
-  animation: bgFloat 30s infinite alternate linear;
+/* Re-enable events for interactive elements */
+.login-page .login-container,
+.login-page .login-container * {
+  pointer-events: auto;
 }
 
-.blob-2 {
-  bottom: -400px;
-  right: -400px;
-  background: radial-gradient(circle, rgba(255, 145, 0, 0.1) 0%, transparent 70%);
-  animation: bgFloat 35s infinite alternate-reverse linear;
+.login-page button,
+.login-page a,
+.login-page [role="button"],
+.login-page .toggle-password,
+.login-page .forgot-password-button,
+.login-page .close-button,
+.login-page .login-button {
+  cursor: pointer !important;
 }
 
-/* Removed old pseudo-elements in favor of .ambient-blob */
-
-@keyframes bgFloat {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  100% {
-    transform: translate(100px, 50px) rotate(10deg);
-  }
+.login-page input {
+  cursor: text !important;
 }
 
-/* Removed redundant wrappers */
+.login-page button:disabled,
+.login-page .login-button:disabled {
+  cursor: not-allowed !important;
+}
 
+/* Noise and Blobs removed to prevent flickering/cursor artifacts */
 
 @keyframes slideUp {
   from {
@@ -206,7 +184,7 @@
   color: #1a1f36;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  font-family: inherit;
+  box-sizing: border-box;
   box-sizing: border-box;
 }
 
@@ -310,6 +288,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .login-button::before {

@@ -191,8 +191,6 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="login-page">
-      <div className="ambient-blob blob-1"></div>
-      <div className="ambient-blob blob-2"></div>
       <div className="login-container">
         {isInactive ? (
           <>
