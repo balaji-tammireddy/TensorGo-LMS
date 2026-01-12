@@ -711,7 +711,7 @@ const ProfilePage: React.FC = () => {
                     onClick={handleChangePhotoClick}
                     disabled={uploadPhotoMutation.isLoading}
                   >
-                    Change Photo
+                    {photoSignedUrl ? 'Change Photo' : 'Upload Photo'}
                   </button>
                   {photoSignedUrl && (
                     <button
