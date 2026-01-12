@@ -799,8 +799,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     const dobValue = employeeData.dateOfBirth || employeeCheck.rows[0].date_of_birth;
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
+    // Fetch existing education to merge with updates for validation
+    const existingEducationResult = await pool.query('SELECT level, year FROM education WHERE employee_id = $1', [employeeId]);
     const educationYears: Record<string, number> = {};
 
+    // Populate with existing data first
+    for (const edu of existingEducationResult.rows) {
+      if (edu.year && /^[0-9]{4}$/.test(edu.year)) {
+        educationYears[edu.level] = parseInt(edu.year, 10);
+      }
+    }
 
     for (const edu of employeeData.education) {
       const isMandatory = ['UG', '12th'].includes(edu.level);
@@ -828,6 +836,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         const gradYear = parseInt(edu.year, 10);
 
+        // Basic logic check for year
+        const currentYear = new Date().getFullYear();
+        if (gradYear < 1950 || gradYear > currentYear + 10) {
+          throw new Error(`Graduation Year for ${edu.level} appears illogical (${gradYear})`);
+        }
+
         // Minimum 15 years gap between DOB and any graduation year
         if (birthYear && gradYear - birthYear < 15) {
           throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
@@ -840,19 +854,19 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     // Enforce logical graduation year gaps
     if (educationYears['10th']) {
       if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
-        throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
+        throw new Error(`Minimum 2 years gap required between 10th (${educationYears['10th']}) and 12th (${educationYears['12th']}) Graduation Year`);
       }
       if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
-        throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
+        throw new Error(`Minimum 5 years gap required between 10th (${educationYears['10th']}) and UG (${educationYears['UG']}) Graduation Year`);
       }
     }
 
     if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
-      throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
+      throw new Error(`Minimum 3 years gap required between 12th (${educationYears['12th']}) and UG (${educationYears['UG']}) Graduation Year`);
     }
 
     if (educationYears['UG'] && educationYears['PG'] && educationYears['PG'] - educationYears['UG'] < 2) {
-      throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
+      throw new Error(`Minimum 2 years gap required between UG (${educationYears['UG']}) and PG (${educationYears['PG']}) Graduation Year`);
     }
 
     // Basic order validation as fallback

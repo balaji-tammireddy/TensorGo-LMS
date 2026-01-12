@@ -490,7 +490,9 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    updateMutation.mutate(formData);
+    // Exclude reportingManagerId from the payload - it cannot be updated via Profile page
+    const { reportingManagerId, ...submissionData } = formData;
+    updateMutation.mutate(submissionData);
   };
 
   const handleChangePhotoClick = () => {

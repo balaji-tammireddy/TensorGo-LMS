@@ -350,44 +350,10 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     }
   }
 
-  // Update reporting manager (Disabled in ProfilePage.tsx)
-  // Only Super Admin or HR should be able to update reporting manager (via /employees/:id API, not here)
-  if (profileData.reportingManagerId !== undefined && (userRole === 'super_admin' || userRole === 'hr')) {
-    if (profileData.reportingManagerId) {
-      const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [profileData.reportingManagerId]);
-      if (managerResult.rows.length > 0) {
-        const { status: managerStatus, role: managerRole } = managerResult.rows[0];
-        const targetRole = currentValues.rows[0].role;
-
-        // Status check
-        if (managerStatus === 'on_notice') {
-          throw new Error('Employees in notice period cannot be reporting managers');
-        }
-        if (managerStatus !== 'active' && managerStatus !== 'on_leave') {
-          throw new Error('Selected reporting manager must be active or on leave');
-        }
-
-        // Hierarchy check
-        if (managerRole !== 'super_admin') {
-          if (targetRole === 'intern' || targetRole === 'employee') {
-            if (managerRole !== 'manager') {
-              throw new Error(`For ${targetRole === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
-            }
-          } else if (targetRole === 'manager') {
-            if (managerRole !== 'hr') {
-              throw new Error('For Managers, only HR or Super Admins can be reporting managers');
-            }
-          } else if (targetRole === 'hr') {
-            throw new Error('For HR, only Super Admins can be reporting managers');
-          }
-        }
-      } else {
-        throw new Error('Selected reporting manager does not exist');
-      }
-    }
-    updates.push(`reporting_manager_id = $${paramCount}`);
-    values.push(profileData.reportingManagerId || null);
-    paramCount++;
+  // Update reporting manager - DISALLOWED in Profile Update API
+  // Reporting manager should only be updated by Admin/HR via Employee Management (Employee Service)
+  if (profileData.reportingManagerId !== undefined) {
+    throw new Error('Reporting Manager cannot be updated through Profile settings');
   }
 
   if (updates.length > 0) {
@@ -407,7 +373,16 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     const dobValue = profileData.personalInfo?.dateOfBirth || currentValues.rows[0].date_of_birth;
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
+    // Fetch existing education to merge with updates for validation
+    const existingEducationResult = await pool.query('SELECT level, year FROM education WHERE employee_id = $1', [userId]);
     const educationYears: Record<string, number> = {};
+
+    // Populate with existing data first
+    for (const edu of existingEducationResult.rows) {
+      if (edu.year && /^[0-9]{4}$/.test(edu.year)) {
+        educationYears[edu.level] = parseInt(edu.year, 10);
+      }
+    }
 
     for (const edu of profileData.education) {
       if (edu.level) {
@@ -434,11 +409,18 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
 
           const gradYear = parseInt(edu.year, 10);
 
+          // Basic logic check for year
+          const currentYear = new Date().getFullYear();
+          if (gradYear < 1950 || gradYear > currentYear + 10) {
+            throw new Error(`Graduation Year for ${edu.level} appears illogical (${gradYear})`);
+          }
+
           // Minimum 15 years gap between DOB and any graduation year
           if (birthYear && gradYear - birthYear < 15) {
             throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
           }
 
+          // Update/Override with new year
           educationYears[edu.level] = gradYear;
         }
       }
@@ -447,19 +429,19 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     // Enforce logical graduation year gaps
     if (educationYears['10th']) {
       if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
-        throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
+        throw new Error(`Minimum 2 years gap required between 10th (${educationYears['10th']}) and 12th (${educationYears['12th']}) Graduation Year`);
       }
       if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
-        throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
+        throw new Error(`Minimum 5 years gap required between 10th (${educationYears['10th']}) and UG (${educationYears['UG']}) Graduation Year`);
       }
     }
 
     if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
-      throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
+      throw new Error(`Minimum 3 years gap required between 12th (${educationYears['12th']}) and UG (${educationYears['UG']}) Graduation Year`);
     }
 
-    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] - educationYears['PG'] < 2) {
-      throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['PG'] - educationYears['UG'] < 2) {
+      throw new Error(`Minimum 2 years gap required between UG (${educationYears['UG']}) and PG (${educationYears['PG']}) Graduation Year`);
     }
 
     // Basic order validation as fallback
