@@ -141,5 +141,5 @@ export const formatDateLocal = (date: Date | string | null | undefined): string 
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `${day}-${month}-${year}`;
+  return `${year}-${month}-${day}`;
 };

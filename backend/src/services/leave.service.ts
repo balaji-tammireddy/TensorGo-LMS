@@ -15,7 +15,7 @@ const formatDate = (date: Date | string): string => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `${day}-${month}-${year}`;
+  return `${year}-${month}-${day}`;
 };
 
 export interface LeaveBalance {
@@ -702,7 +702,7 @@ export const getMyLeaveRequests = async (
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
-      return `${day}-${month}-${year}`;
+      return `${year}-${month}-${day}`;
     };
 
     const requestIds = result.rows.map(r => r.id);
@@ -883,7 +883,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    return `${day}-${month}-${year}`;
+    return `${year}-${month}-${day}`;
   };
 
   // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)
