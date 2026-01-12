@@ -1028,39 +1028,12 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
   const content = `
     <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
       <p style="margin: 0; color: #92400e; font-weight: bold; font-size: 14px;">
-        Action Required: You have ${data.pendingLeaves.length} pending leave ${data.pendingLeaves.length === 1 ? 'request' : 'requests'} awaiting review.
+        Action Required: You have pending leave requests awaiting review.
       </p>
     </div>
     <p>Dear ${data.managerName},</p>
-    <p>This is a reminder that there are leave applications pending your approval. Please review them at your earliest convenience.</p>
-    
-    <div style="margin-top: 30px;">
-      ${data.pendingLeaves.map((leave, index) => `
-        <div style="padding: 20px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 15px;">
-          <h4 style="margin: 0 0 10px 0; color: #1e293b; font-size: 15px;">${leave.employeeName} (${leave.employeeEmpId})</h4>
-          <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-size: 13px; color: #64748b;">
-            <tr>
-              <td style="padding: 2px 0; width: 30%;">Type:</td>
-              <td style="padding: 2px 0; color: #334155;"><strong>${formatLeaveType(leave.leaveType)}</strong></td>
-            </tr>
-            <tr>
-              <td style="padding: 2px 0;">Dates:</td>
-              <td style="padding: 2px 0; color: #334155;"><strong>${formatDateForDisplay(leave.startDate)} - ${formatDateForDisplay(leave.endDate)}</strong></td>
-            </tr>
-            <tr>
-              <td style="padding: 2px 0;">Duration:</td>
-              <td style="padding: 2px 0; color: #334155;"><strong>${leave.noOfDays} ${leave.noOfDays === 1 ? 'day' : 'days'}</strong></td>
-            </tr>
-            <tr>
-              <td style="padding: 2px 0;">Pending for:</td>
-              <td style="padding: 2px 0; color: #b45309;"><strong>${leave.daysPending} ${leave.daysPending === 1 ? 'day' : 'days'}</strong></td>
-            </tr>
-          </table>
-        </div>
-      `).join('')}
-    </div>
-    
-    <p style="margin-top: 30px;">Please log in to the portal to take action on these requests.</p>
+    <p>This is a reminder that there are leave applications pending your approval.</p>
+    <p style="margin-top: 30px;">Please login to the portal to check and take action on these requests.</p>
     <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
@@ -1068,7 +1041,7 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
     'Pending Leave Approvals Reminder',
     content,
     uniqueId,
-    `You have ${data.pendingLeaves.length} pending leave requests`
+    `You have pending leave requests`
   );
 };
 
@@ -1078,18 +1051,9 @@ Pending Leave Approvals Reminder
 
 Dear ${data.managerName},
 
-You have ${data.pendingLeaves.length} pending leave ${data.pendingLeaves.length === 1 ? 'request' : 'requests'} awaiting your approval.
+This is a reminder that there are leave applications pending your approval.
 
-Pending Leave Requests:
-${data.pendingLeaves.map((leave, index) => `
-${index + 1}. ${leave.employeeName} (${leave.employeeEmpId})
-   - Leave Type: ${formatLeaveType(leave.leaveType)}
-   - Dates: ${formatDateForDisplay(leave.startDate)} to ${formatDateForDisplay(leave.endDate)}
-   - Days: ${leave.noOfDays} ${leave.noOfDays === 1 ? 'day' : 'days'}
-   - Pending for ${leave.daysPending} ${leave.daysPending === 1 ? 'day' : 'days'}
-`).join('')}
-
-Please review and take appropriate action on these leave requests at your earliest convenience.
+Please login to the portal to check and take action on these requests.
 
 Best Regards,
 TensorGo Intranet
@@ -1108,7 +1072,7 @@ export const sendPendingLeaveReminderEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const emailSubject = `Reminder: ${data.pendingLeaves.length} Pending Leave ${data.pendingLeaves.length === 1 ? 'Request' : 'Requests'} Awaiting Approval [Ref: ${uniqueId}]`;
+  const emailSubject = `Reminder: Pending Leave Requests Awaiting Approval [Ref: ${uniqueId}]`;
   const emailHtml = generatePendingLeaveReminderEmailHtml(data);
   const emailText = generatePendingLeaveReminderEmailText(data);
 
