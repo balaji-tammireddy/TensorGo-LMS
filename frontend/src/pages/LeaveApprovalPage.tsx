@@ -82,7 +82,7 @@ const LeaveApprovalPage: React.FC = () => {
 
   const { data: pendingData, isLoading: pendingLoading, error: pendingError } = useQuery(
     ['pendingLeaves', search, filter],
-    () => leaveService.getPendingLeaveRequests(1, 10, search || undefined, filter || undefined),
+    () => leaveService.getPendingLeaveRequests(1, 100, search || undefined, filter || undefined),
     {
       retry: false,
       staleTime: 5000, // Cache for 5 seconds to reduce redundant hits
@@ -100,7 +100,7 @@ const LeaveApprovalPage: React.FC = () => {
 
   const { data: approvedData, isLoading: approvedLoading, error: approvedError } = useQuery(
     ['approvedLeaves'],
-    () => leaveService.getApprovedLeaves(1, 10),
+    () => leaveService.getApprovedLeaves(1, 100),
     {
       retry: false,
       staleTime: 5000, // Cache for 5 seconds
@@ -618,8 +618,53 @@ const LeaveApprovalPage: React.FC = () => {
       }
 
       return pendingSortConfig.direction === 'asc' ? valA - valB : valB - valA;
-    }).filter((request: any) => request.startDate >= todayStr); // Only show FUTURE pending requests
+    });
   }, [pendingData, pendingSortConfig, todayStr]);
+
+  // Filter and sort approved requests for the bottom table
+  const filteredApprovedRequests = useMemo(() => {
+    const requests = (approvedData?.requests || [])
+      .filter((request: any) => {
+        // Apply search filter if set (EMP Name or ID)
+        if (recentSearch) {
+          const searchTerm = recentSearch.toLowerCase();
+          const matchesName = request.empName?.toLowerCase().includes(searchTerm);
+          const matchesId = request.empId?.toString().toLowerCase().includes(searchTerm);
+          if (!matchesName && !matchesId) return false;
+        }
+
+        // Apply date filter if set
+        if (!recentFilterDate) return true;
+
+        const filterStr = recentFilterDate;
+
+        // Check if filterDate matches applied date
+        const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
+        if (appliedStr === filterStr) return true;
+
+        // Check if filterDate falls within start-end date range
+        if (request.startDate && request.endDate) {
+          const start = request.startDate;
+          const end = request.endDate;
+          if (filterStr >= start && filterStr <= end) return true;
+        }
+
+        return false;
+      })
+      .sort((a: any, b: any) => {
+        if (!recentSortConfig.key || !recentSortConfig.direction) return 0;
+
+        const valA = a[recentSortConfig.key] ? new Date(a[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
+        const valB = b[recentSortConfig.key] ? new Date(b[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
+
+        if (recentSortConfig.direction === 'asc') {
+          return valA - valB;
+        } else {
+          return valB - valA;
+        }
+      });
+    return requests;
+  }, [approvedData, recentSearch, recentFilterDate, recentSortConfig, todayStr]);
 
   // Initial loading state (only for first-time page load)
   if ((pendingLoading && !pendingData) || (approvedLoading && !approvedData)) {
@@ -701,7 +746,7 @@ const LeaveApprovalPage: React.FC = () => {
 
           <div className="pending-requests-section">
             <div
-              className={`requests-table-container ${groupedPendingRequests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || pendingLoading ? 'updating' : ''}`}
+              className={`requests-table-container ${groupedPendingRequests.length > 6 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || pendingLoading ? 'updating' : ''}`}
               style={{
                 pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading || pendingLoading) ? 'none' : 'auto',
                 opacity: (approveMutation.isLoading || rejectMutation.isLoading || pendingLoading) ? 0.8 : 1
@@ -900,7 +945,7 @@ const LeaveApprovalPage: React.FC = () => {
               </div>
             </div>
             <div
-              className={`requests-table-container ${approvedData?.requests && approvedData.requests.length > 3 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || approvedLoading ? 'updating' : ''}`}
+              className={`requests-table-container ${filteredApprovedRequests.length > 6 ? 'scrollable' : ''} ${approveMutation.isLoading || rejectMutation.isLoading || approvedLoading ? 'updating' : ''}`}
               style={{
                 pointerEvents: (approveMutation.isLoading || rejectMutation.isLoading || approvedLoading) ? 'none' : 'auto',
                 opacity: (approveMutation.isLoading || rejectMutation.isLoading || approvedLoading) ? 0.8 : 1
@@ -948,71 +993,17 @@ const LeaveApprovalPage: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : (() => {
-                    // Filter and sort approved requests
-                    const filteredSortedRequests = (approvedData?.requests || [])
-                      .filter((request: any) => {
-                        // Filter out any requests that still have pending days UNLESS they are in the past
-                        const hasPendingDays = request.leaveDays?.some((day: any) =>
-                          (day.status || 'pending') === 'pending'
-                        );
-                        const isPast = request.startDate < todayStr;
-                        // If it has pending days and is NOT past, exclude it (it belongs in top table)
-                        if ((hasPendingDays || request.leaveStatus === 'pending') && !isPast) return false;
-
-                        // Apply search filter if set (EMP Name or ID)
-                        if (recentSearch) {
-                          const searchTerm = recentSearch.toLowerCase();
-                          const matchesName = request.empName?.toLowerCase().includes(searchTerm);
-                          const matchesId = request.empId?.toString().toLowerCase().includes(searchTerm);
-                          if (!matchesName && !matchesId) return false;
-                        }
-
-                        // Apply date filter if set
-                        if (!recentFilterDate) return true;
-
-                        const filterStr = recentFilterDate;
-
-                        // Check if filterDate matches applied date
-                        const appliedStr = request.appliedDate ? request.appliedDate.split('T')[0] : '';
-                        if (appliedStr === filterStr) return true;
-
-                        // Check if filterDate falls within start-end date range
-                        if (request.startDate && request.endDate) {
-                          const start = request.startDate;
-                          const end = request.endDate;
-                          if (filterStr >= start && filterStr <= end) return true;
-                        }
-
-                        return false;
-                      })
-                      .sort((a: any, b: any) => {
-                        if (!recentSortConfig.key || !recentSortConfig.direction) return 0;
-
-                        const valA = a[recentSortConfig.key] ? new Date(a[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
-                        const valB = b[recentSortConfig.key] ? new Date(b[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
-
-                        if (recentSortConfig.direction === 'asc') {
-                          return valA - valB;
-                        } else {
-                          return valB - valA;
-                        }
-                      });
-
-                    if (filteredSortedRequests.length === 0) {
-                      return (
-                        <tr>
-                          <td colSpan={9} style={{ padding: 0 }}>
-                            <EmptyState
-                              title={recentFilterDate ? "No Results Found" : "No Recent Activity"}
-                              description={recentFilterDate ? "Try adjusting your filter to find what you're looking for." : "No recently approved or rejected leave requests found."}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    return filteredSortedRequests.map((request: any, idx: number) => {
+                  ) : filteredApprovedRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: 0 }}>
+                        <EmptyState
+                          title={recentFilterDate ? "No Results Found" : "No Recent Activity"}
+                          description={recentFilterDate ? "Try adjusting your filter to find what you're looking for." : "No recently approved or rejected leave requests found."}
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredApprovedRequests.map((request: any, idx: number) => {
                       const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
                       return (
                         <tr
@@ -1025,7 +1016,7 @@ const LeaveApprovalPage: React.FC = () => {
                             {request.empName}
                           </td>
                           <td>{formatDateSafe(request.appliedDate)}</td>
-                          <td>{formatLeaveDateString(request.leaveDate) || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
+                          <td>{request.leaveDate || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`}</td>
                           <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                           <td>{request.noOfDays}</td>
                           <td>
@@ -1059,8 +1050,8 @@ const LeaveApprovalPage: React.FC = () => {
                           </td>
                         </tr>
                       );
-                    });
-                  })()}
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

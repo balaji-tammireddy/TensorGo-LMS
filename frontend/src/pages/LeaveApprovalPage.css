@@ -90,11 +90,14 @@
 /* Table container with fixed height and scrolling */
 .requests-table-container {
   width: 100%;
-  min-height: 400px;
-  max-height: 400px;
-  overflow-y: auto;
   overflow-x: hidden;
   transition: opacity 0.3s ease, pointer-events 0.3s ease;
+}
+
+.requests-table-container.scrollable {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 5px;
 }
 
 .requests-table-container.updating {
@@ -125,10 +128,20 @@
   background: #555;
 }
 
+/* Sticky Header Implementation */
+.requests-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fc;
+  z-index: 10;
+  box-shadow: inset 0 -1px 0 #ddd, inset 0 1px 0 #ddd;
+}
+
 .requests-table {
   width: 100%;
-  margin-top: 15px;
-  border-collapse: collapse;
+  margin-top: 0;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .requests-table th,
