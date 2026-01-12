@@ -7,14 +7,15 @@ import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplica
 
 // Local date formatter to avoid timezone shifts
 const formatDate = (date: Date | string): string => {
-  if (typeof date === 'string') {
-    return date;
-  }
+  if (!date) return '';
   const d = new Date(date);
+  if (isNaN(d.getTime())) {
+    return typeof date === 'string' ? date : '';
+  }
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${day}-${month}-${year}`;
 };
 
 export interface LeaveBalance {
@@ -693,15 +694,15 @@ export const getMyLeaveRequests = async (
 
     // Helper function to format date without timezone conversion
     const formatDate = (date: Date | string): string => {
-      if (typeof date === 'string') {
-        return date;
-      }
+      if (!date) return '';
       const d = new Date(date);
-      // Use local timezone to avoid day shift
+      if (isNaN(d.getTime())) {
+        return typeof date === 'string' ? date : '';
+      }
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      return `${day}-${month}-${year}`;
     };
 
     const requestIds = result.rows.map(r => r.id);
@@ -874,15 +875,15 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
 
   // Helper function to format date without timezone conversion
   const formatDate = (date: Date | string): string => {
-    if (typeof date === 'string') {
-      return date;
-    }
+    if (!date) return '';
     const d = new Date(date);
-    // Use local timezone to avoid day shift
+    if (isNaN(d.getTime())) {
+      return typeof date === 'string' ? date : '';
+    }
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return `${day}-${month}-${year}`;
   };
 
   // Get rejection reason only if status is rejected (priority: super_admin > hr > manager)

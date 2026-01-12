@@ -278,6 +278,79 @@ const cleanupOldHolidays = async () => {
     logger.error('❌ Error in old holidays cleanup job:', error);
   }
 };
+/**
+ * Auto-approve pending leave requests where the end date has passed
+ * Runs daily at 00:01 AM
+ */
+const autoApprovePastPendingLeaves = async () => {
+  try {
+    logger.info('🔄 Starting auto-approval of past pending leaves job...');
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Find all pending leave requests where the end date is before today
+      // Using CURRENT_DATE ensures we compare with the start of today
+      const pastPendingResult = await client.query(
+        `SELECT id, employee_id, leave_type, no_of_days 
+         FROM leave_requests 
+         WHERE current_status = 'pending' 
+           AND end_date < CURRENT_DATE`
+      );
+
+      const pastRequests = pastPendingResult.rows;
+      logger.info(`Found ${pastRequests.length} past pending leave requests for auto-approval`);
+
+      if (pastRequests.length > 0) {
+        // Get a Super Admin ID to use as the system approver
+        const superAdminResult = await client.query(
+          "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
+        );
+        const superAdminId = superAdminResult.rows[0]?.id;
+
+        if (!superAdminId) {
+          throw new Error('No Super Admin found in the database for auto-approval attribution');
+        }
+
+        for (const request of pastRequests) {
+          // 2. Update leave_requests header
+          await client.query(
+            `UPDATE leave_requests 
+             SET current_status = 'approved',
+                 super_admin_approval_status = 'approved',
+                 super_admin_approval_date = CURRENT_TIMESTAMP,
+                 super_admin_approval_comment = 'Auto-approved: Leave date has passed',
+                 super_admin_approved_by = $1,
+                 last_updated_by = $1,
+                 last_updated_by_role = 'super_admin',
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [superAdminId, request.id]
+          );
+
+          // 3. Update all associated leave_days
+          await client.query(
+            "UPDATE leave_days SET day_status = 'approved' WHERE leave_request_id = $1",
+            [request.id]
+          );
+
+          logger.info(`✅ Auto-approved past pending leave request ID: ${request.id} for employee ID: ${request.employee_id}`);
+        }
+      }
+
+      await client.query('COMMIT');
+      logger.info(`✅ Auto-approval of past pending leaves job completed. Processed ${pastRequests.length} requests.`);
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    logger.error('❌ Error in auto-approval of past pending leaves job:', error);
+  }
+};
 
 /**
  * Process daily leave credits (Anniversaries)
@@ -415,8 +488,15 @@ export const initializeCronJobs = () => {
   });
   logger.info('✅ Cron job scheduled: Daily Leave Credits (Anniversary) (00:01 AM)');
 
+  // Auto-approve past pending leaves at 00:01 AM
+  cron.schedule('1 0 * * *', autoApprovePastPendingLeaves, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Auto-approve past pending leaves (00:01 AM)');
+
   // Run on startup to ensure clean state
   cleanupOldHolidays();
+  autoApprovePastPendingLeaves();
 
   // Run immediately on startup for testing (optional - remove in production)
   // sendDailyPendingLeaveReminders();
