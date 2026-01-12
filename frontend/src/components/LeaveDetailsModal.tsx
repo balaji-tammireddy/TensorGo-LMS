@@ -144,7 +144,14 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const allLeaveDates = leaveRequest.leaveDays || [];
   const dateMap = new Map<string, { id: number; type: string; status: string }>();
   allLeaveDates.forEach(day => {
-    dateMap.set(day.date, { id: day.id, type: day.type, status: day.status });
+    // Normalize date to YYYY-MM-DD to match the format used in getSelectedDayIds
+    try {
+      const dateKey = format(new Date(day.date), 'yyyy-MM-dd');
+      dateMap.set(dateKey, { id: day.id, type: day.type, status: day.status });
+    } catch (e) {
+      // Fallback to original string if parsing fails
+      dateMap.set(day.date, { id: day.id, type: day.type, status: day.status });
+    }
   });
 
   // Get selected date range as day IDs
