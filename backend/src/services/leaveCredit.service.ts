@@ -339,7 +339,8 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           carryForwardCasual = eligibleForCarryForward - 1;
         }
 
-        // Sick leaves are reset to the carry forward value (previosuly 0, now potentially 1)
+        // Sick leaves are reset to the carry forward value (1 if eligible > 1, else 0)
+        // User Logic: "sick will be 0 + jan accrual" (if <= 1) or "(1 + 0.5(jan))" (if > 1)
         const afterCarryForwardSick = carryForwardSick;
 
         // Set LOP leaves to 10 at year-end (no carry forward, reset to yearly credit of 10)
@@ -392,7 +393,7 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           logger.info(
             `Year-end for employee ${employee.emp_id} (${employee.name}): ` +
             `Carry forward: Casual ${currentCasual} → ${carryForwardCasual} (${casualDeleted > 0 ? `-${casualDeleted} deleted` : 'no change'}), ` +
-            `Sick ${currentSick} → 0 (all deleted), LOP ${currentLop} → 10. ` +
+            `Sick ${currentSick} → ${afterCarryForwardSick} (reset to ${carryForwardSick} from casual), LOP ${currentLop} → 10. ` +
             `January credit skipped (would exceed limit). Final: Casual ${finalCasualLimited}, Sick ${finalSickLimited}, LOP ${finalLop}`
           );
         } else if (finalSick > 99) {
@@ -612,8 +613,8 @@ export const sendCarryForwardEmailsToAll = async (
         if (carryForwardSick > 0) {
           carriedForwardLeaves.sick = carryForwardSick;
         }
-        // Sick leaves are reset to the carry forward value (so effectively sick leaves "carried forward" is just this 1, if applicable)
-        // logic is simpler: we are just saying these amount were carried over.
+        // Sick leaves are reset to the carry forward value
+        const emailSickBalance = carryForwardSick;
 
         // LOP is not carried forward (set to 10)
 
