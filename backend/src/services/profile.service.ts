@@ -367,19 +367,10 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
           throw new Error('Selected reporting manager must be active or on leave');
         }
 
-        // Hierarchy check
-        if (managerRole !== 'super_admin') {
-          if (targetRole === 'intern' || targetRole === 'employee') {
-            if (managerRole !== 'manager') {
-              throw new Error(`For ${targetRole === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
-            }
-          } else if (targetRole === 'manager') {
-            if (managerRole !== 'hr') {
-              throw new Error('For Managers, only HR or Super Admins can be reporting managers');
-            }
-          } else if (targetRole === 'hr') {
-            throw new Error('For HR, only Super Admins can be reporting managers');
-          }
+        // Reporting Manager Role check
+        // Any user can report to Manager, HR, or Super Admin
+        if (!['manager', 'hr', 'super_admin'].includes(managerRole)) {
+          throw new Error('Reporting manager must have Manager, HR, or Super Admin role');
         }
       } else {
         throw new Error('Selected reporting manager does not exist');
@@ -526,17 +517,9 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   logger.info(`[PROFILE] [GET REPORTING MANAGERS] Search: ${search || 'none'}, Employee Role: ${employeeRole || 'none'}, Exclude Employee ID: ${excludeEmployeeId || 'none'}`);
 
   // Reporting manager rules:
-  // - Super Admin is always an option for every role
-  // - Interns and Employees also see Managers
-  // - Managers also see HRs
-  // - HRs and Super Admins see only Super Admins
-  let targetRoles: string[] = ['super_admin'];
-
-  if (employeeRole === 'intern' || employeeRole === 'employee') {
-    targetRoles.push('manager');
-  } else if (employeeRole === 'manager') {
-    targetRoles.push('hr');
-  }
+  // - Any user can report to Manager, HR, or Super Admin
+  // - Employee and Intern roles cannot be reporting managers
+  const targetRoles: string[] = ['super_admin', 'hr', 'manager'];
 
   if (targetRoles.length === 0) {
     return { managers: [] };

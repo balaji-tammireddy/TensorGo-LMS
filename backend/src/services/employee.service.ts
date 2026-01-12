@@ -500,18 +500,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       }
 
       // Hierarchy check
-      if (managerRole !== 'super_admin') {
-        if (role === 'intern' || role === 'employee') {
-          if (managerRole !== 'manager') {
-            throw new Error(`For ${role === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
-          }
-        } else if (role === 'manager') {
-          if (managerRole !== 'hr') {
-            throw new Error('For Managers, only HR or Super Admins can be reporting managers');
-          }
-        } else if (role === 'hr') {
-          throw new Error('For HR, only Super Admins can be reporting managers');
-        }
+      // Any user can report to Manager, HR, or Super Admin
+      if (!['manager', 'hr', 'super_admin'].includes(managerRole)) {
+        throw new Error('Reporting manager must have Manager, HR, or Super Admin role');
       }
     } else {
       throw new Error('Selected reporting manager does not exist');
@@ -931,18 +922,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       }
 
       // Hierarchy check
-      if (managerRole !== 'super_admin') {
-        if (targetRole === 'intern' || targetRole === 'employee') {
-          if (managerRole !== 'manager') {
-            throw new Error(`For ${targetRole === 'intern' ? 'Interns' : 'Employees'}, only Managers or Super Admins can be reporting managers`);
-          }
-        } else if (targetRole === 'manager') {
-          if (managerRole !== 'hr') {
-            throw new Error('For Managers, only HR or Super Admins can be reporting managers');
-          }
-        } else if (targetRole === 'hr') {
-          throw new Error('For HR, only Super Admins can be reporting managers');
-        }
+      // Any user can report to Manager, HR, or Super Admin
+      if (!['manager', 'hr', 'super_admin'].includes(managerRole)) {
+        throw new Error('Reporting manager must have Manager, HR, or Super Admin role');
       }
     } else {
       throw new Error('Selected reporting manager does not exist');
