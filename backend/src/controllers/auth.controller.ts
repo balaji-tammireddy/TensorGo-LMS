@@ -17,7 +17,8 @@ export const login = async (req: AuthRequest, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/'
     });
 
     logger.info(`[CONTROLLER] [AUTH] [LOGIN] Login successful - User ID: ${result.user.id}, Role: ${result.user.role}`);
@@ -118,9 +119,23 @@ export const refresh = async (req: AuthRequest, res: Response) => {
 
 export const logout = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [AUTH] [LOGOUT] ========== REQUEST RECEIVED ==========`);
-  logger.info(`[CONTROLLER] [AUTH] [LOGOUT] User ID: ${req.user?.id || 'unknown'}`);
+  const userId = req.user?.id;
+  logger.info(`[CONTROLLER] [AUTH] [LOGOUT] User ID: ${userId || 'unknown'}`);
 
-  res.clearCookie('refreshToken');
+  if (userId) {
+    try {
+      await authService.invalidateSession(userId);
+    } catch (error) {
+      logger.warn(`[CONTROLLER] [AUTH] [LOGOUT] Failed to invalidate session:`, error);
+    }
+  }
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/'
+  });
   logger.info(`[CONTROLLER] [AUTH] [LOGOUT] Logout successful`);
   res.json({ message: 'Logged out successfully' });
 };

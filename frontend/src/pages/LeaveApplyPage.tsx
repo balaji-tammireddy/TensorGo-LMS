@@ -1110,7 +1110,7 @@ const LeaveApplyPage: React.FC = () => {
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysUntilStart = Math.ceil((start.getTime() - today.getTime()) / msPerDay);
 
-      if (requestedDays <= 2) {
+      if (requestedDays < 3) {
         if (daysUntilStart < 3) {
           showWarning('Casual leaves of 0.5 to 2.0 days must be applied at least 3 days in advance.');
           return;

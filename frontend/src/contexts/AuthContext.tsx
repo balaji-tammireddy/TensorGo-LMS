@@ -64,7 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         setUser(null);
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       } else if (event.data === 'login') {
         // Sync login state from other tab
         const storedUser = localStorage.getItem('user');

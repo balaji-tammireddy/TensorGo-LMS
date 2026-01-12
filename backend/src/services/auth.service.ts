@@ -420,3 +420,14 @@ export const resetPasswordWithOTP = async (
   }
 };
 
+
+export const invalidateSession = async (userId: number): Promise<void> => {
+  logger.info(`[AUTH] [INVALIDATE SESSION] Revoking sessions for user ID: ${userId}`);
+
+  await pool.query(
+    'UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1',
+    [userId]
+  );
+
+  logger.info(`[AUTH] [INVALIDATE SESSION] Session revoked (token_version incremented) for user ID: ${userId}`);
+};
