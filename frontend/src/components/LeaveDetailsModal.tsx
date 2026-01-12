@@ -435,14 +435,17 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         className="leave-type-dropdown-trigger"
                         disabled={isLoading}
                         style={{
-                          padding: '6px 8px',
-                          fontSize: '12px',
+                          width: '100%',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          fontSize: '15px',
                           fontFamily: 'Poppins, sans-serif',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          backgroundColor: 'transparent',
-                          color: '#1f2a3d',
-                          height: 'auto'
+                          border: '1px solid #e6e8f0',
+                          borderRadius: '8px',
+                          backgroundColor: '#ffffff',
+                          color: '#203050',
+                          height: 'auto',
+                          fontWeight: 500
                         }}
                       >
                         <span>
