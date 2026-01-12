@@ -3140,6 +3140,23 @@ export const approveLeaveDays = async (
         logger.info(`[EMAIL] Manager days approval - sending email to employee (TO)`);
       }
 
+      let approvedStartDate: string | undefined;
+      let approvedEndDate: string | undefined;
+
+      if (emailStatus === 'partially_approved') {
+        const approvedDaysResult = await pool.query(
+          `SELECT leave_date FROM leave_days 
+           WHERE leave_request_id = $1 AND day_status = 'approved' 
+           ORDER BY leave_date ASC`,
+          [leaveRequestId]
+        );
+
+        if (approvedDaysResult.rows.length > 0) {
+          approvedStartDate = formatDate(approvedDaysResult.rows[0].leave_date);
+          approvedEndDate = formatDate(approvedDaysResult.rows[approvedDaysResult.rows.length - 1].leave_date);
+        }
+      }
+
       await sendLeaveStatusEmail(leave.employee_email, {
         employeeName: leave.employee_name || 'Employee',
         employeeEmpId: leave.employee_emp_id || '',
@@ -3156,7 +3173,9 @@ export const approveLeaveDays = async (
         approverEmpId: leave.approver_emp_id || '',
         approverRole: approverRole,
         comment: comment || null,
-        status: emailStatus
+        status: emailStatus,
+        approvedStartDate,
+        approvedEndDate
       }, ccEmails.length > 0 ? ccEmails : undefined);
 
       logger.info(`[EMAIL] ✅ Days approval email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
@@ -3884,6 +3903,23 @@ export const updateLeaveStatus = async (
             logger.info(`[EMAIL] Super Admin update - sending email to employee (TO) with manager and HR (CC)`);
           }
 
+          let approvedStartDate: string | undefined;
+          let approvedEndDate: string | undefined;
+
+          if (newStatus === 'partially_approved') {
+            const approvedDaysResult = await pool.query(
+              `SELECT leave_date FROM leave_days 
+               WHERE leave_request_id = $1 AND day_status = 'approved' 
+               ORDER BY leave_date ASC`,
+              [leaveRequestId]
+            );
+
+            if (approvedDaysResult.rows.length > 0) {
+              approvedStartDate = formatDate(approvedDaysResult.rows[0].leave_date);
+              approvedEndDate = formatDate(approvedDaysResult.rows[approvedDaysResult.rows.length - 1].leave_date);
+            }
+          }
+
           const emailData = {
             employeeName: emailLeave.employee_name || 'Employee',
             employeeEmpId: emailLeave.employee_emp_id || '',
@@ -3900,7 +3936,9 @@ export const updateLeaveStatus = async (
             approverEmpId: emailLeave.approver_emp_id || '',
             approverRole: approverRole,
             comment: newStatus === 'rejected' ? (rejectReason || null) : null,
-            status: newStatus as 'approved' | 'partially_approved' | 'rejected'
+            status: newStatus as 'approved' | 'partially_approved' | 'rejected',
+            approvedStartDate,
+            approvedEndDate
           };
 
           const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);

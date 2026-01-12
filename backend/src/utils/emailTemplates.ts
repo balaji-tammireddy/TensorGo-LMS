@@ -448,6 +448,8 @@ export interface LeaveStatusEmailData {
   approverRole: string;
   comment?: string | null;
   status: 'approved' | 'partially_approved' | 'rejected';
+  approvedStartDate?: string;
+  approvedEndDate?: string;
 }
 
 /**
@@ -493,6 +495,18 @@ const generateLeaveStatusEmailHtml = (data: LeaveStatusEmailData): string => {
     },
     { label: 'Duration:', value: `${data.noOfDays} ${data.noOfDays === 1 ? 'day' : 'days'}` },
     { label: 'Reason:', value: data.reason },
+    ...(data.status === 'partially_approved' && data.approvedStartDate && data.approvedEndDate ? [
+      {
+        label: 'Approved From:',
+        value: formatDateForDisplay(data.approvedStartDate),
+        isBold: true
+      },
+      {
+        label: 'Approved To:',
+        value: formatDateForDisplay(data.approvedEndDate),
+        isBold: true
+      }
+    ] : []),
     ...(data.comment ? [
       { label: `${data.status === 'rejected' ? 'Rejection' : 'Approval'} Comment:`, value: data.comment }
     ] : []),
