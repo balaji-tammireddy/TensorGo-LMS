@@ -57,8 +57,12 @@ export const deleteEmployee = async (id: number) => {
   return response.data;
 };
 
-export const addLeavesToEmployee = async (employeeId: number, leaveType: 'casual' | 'sick' | 'lop', count: number, comment?: string) => {
-  const response = await api.post(`/employees/${employeeId}/leaves`, { leaveType, count, comment });
+export const addLeavesToEmployee = async (employeeId: number, formData: FormData) => {
+  const response = await api.post(`/employees/${employeeId}/leaves`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
   return response.data;
 };
 

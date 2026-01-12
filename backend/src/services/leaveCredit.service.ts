@@ -316,11 +316,31 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
         // ============================================
         // STEP 1: CARRY FORWARD LEAVES
         // ============================================
-        // Cap casual leaves at 8 for carry forward (delete excess)
-        const carryForwardCasual = Math.min(currentCasual, 8);
+        // Cap casual leaves at 8 for carry forward logic (base pool for carry forward)
+        const eligibleForCarryForward = Math.min(currentCasual, 8);
 
-        // Reset sick leaves to 0 (all unused sick leaves are deleted)
-        const afterCarryForwardSick = 0;
+        // Define carry forward split:
+        // 1. If 1 leave is being carry forwarded then add it to casual leave.
+        // 2. If more than 1 leave is being carry forwarded then add 1 to sick leave and others to casual.
+
+        let carryForwardCasual = 0;
+        let carryForwardSick = 0;
+
+        if (eligibleForCarryForward <= 0) {
+          carryForwardCasual = 0;
+          carryForwardSick = 0;
+        } else if (eligibleForCarryForward <= 1) {
+          // Exactly 1 or less (e.g. 0.5) -> All to Casual
+          carryForwardCasual = eligibleForCarryForward;
+          carryForwardSick = 0;
+        } else {
+          // More than 1 -> 1 to Sick, rest to Casual
+          carryForwardSick = 1;
+          carryForwardCasual = eligibleForCarryForward - 1;
+        }
+
+        // Sick leaves are reset to the carry forward value (previosuly 0, now potentially 1)
+        const afterCarryForwardSick = carryForwardSick;
 
         // Set LOP leaves to 10 at year-end (no carry forward, reset to yearly credit of 10)
         const afterCarryForwardLop = 10;
@@ -566,16 +586,36 @@ export const sendCarryForwardEmailsToAll = async (
         const currentSick = parseFloat(employee.current_sick) || 0;
         const currentLop = parseFloat(employee.current_lop) || 0;
 
-        // Cap casual leaves at 8 for carry forward (same logic as year-end)
-        const carryForwardCasual = Math.min(currentCasual, 8);
+        // Cap casual leaves at 8 for carry forward (base pool)
+        const eligibleForCarryForward = Math.min(currentCasual, 8);
+
+        // Define carry forward split:
+        let carryForwardCasual = 0;
+        let carryForwardSick = 0;
+
+        if (eligibleForCarryForward <= 0) {
+          carryForwardCasual = 0;
+          carryForwardSick = 0;
+        } else if (eligibleForCarryForward <= 1) {
+          carryForwardCasual = eligibleForCarryForward;
+          carryForwardSick = 0;
+        } else {
+          carryForwardSick = 1;
+          carryForwardCasual = eligibleForCarryForward - 1;
+        }
 
         // Prepare carry forward data
         const carriedForwardLeaves: { casual?: number; sick?: number; lop?: number } = {};
         if (carryForwardCasual > 0) {
           carriedForwardLeaves.casual = carryForwardCasual;
         }
-        // Sick leaves are not carried forward (reset to 0)
-        // LOP is not carried forward (set to 10, not from previous year)
+        if (carryForwardSick > 0) {
+          carriedForwardLeaves.sick = carryForwardSick;
+        }
+        // Sick leaves are reset to the carry forward value (so effectively sick leaves "carried forward" is just this 1, if applicable)
+        // logic is simpler: we are just saying these amount were carried over.
+
+        // LOP is not carried forward (set to 10)
 
         await sendLeaveCarryForwardEmail(employee.email, {
           employeeName: employee.name,
@@ -585,7 +625,7 @@ export const sendCarryForwardEmailsToAll = async (
           carriedForwardLeaves,
           newYearBalances: {
             casual: carryForwardCasual,
-            sick: 0, // Sick leaves reset to 0
+            sick: carryForwardSick, // Sick leaves reset to carryForwardSick (0 or 1)
             lop: 10  // LOP reset to 10
           }
         });

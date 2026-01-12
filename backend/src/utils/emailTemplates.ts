@@ -755,6 +755,7 @@ export interface LeaveAllocationEmailData {
   allocationDate: string;
   comment?: string; // Optional comment from the person allocating leaves
   conversionNote?: string; // Optional note for LOP to casual conversions
+  documentUrl?: string; // Optional document URL or key
 }
 
 /**
@@ -779,7 +780,8 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
     },
     { label: 'Allocated By:', value: data.allocatedByEmpId ? `${data.allocatedBy} (${data.allocatedByEmpId})` : data.allocatedBy },
     { label: 'Allocation Date:', value: allocationDateDisplay },
-    ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : [])
+    ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : []),
+    ...(data.documentUrl ? [{ label: 'Document:', value: 'Attached' }] : [])
   ]);
 
   const content = `
@@ -821,7 +823,7 @@ Allocation Details:
 - New Balance: ${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}
 - Allocated By: ${data.allocatedBy}
 - Allocation Date: ${allocationDateDisplay}
-${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}
+${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}${data.documentUrl ? `\n- Document: Attached` : ''}
 
 Best Regards,
 TensorGo Intranet

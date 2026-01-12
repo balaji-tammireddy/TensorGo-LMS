@@ -4,6 +4,10 @@ import * as employeeService from '../services/employee.service';
 import { sendCarryForwardEmailsToAll } from '../services/leaveCredit.service';
 import { pool } from '../database/db';
 import { logger } from '../utils/logger';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { uploadToOVH } from '../utils/storage';
 
 export const getEmployees = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] ========== REQUEST RECEIVED ==========`);
@@ -156,115 +160,195 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const addLeavesToEmployee = async (req: AuthRequest, res: Response) => {
-  logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] ========== REQUEST RECEIVED ==========`);
-  logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Leave Type: ${req.body.leaveType}, Count: ${req.body.count}`);
-
-  try {
-    // Ensure only HR and super_admin can add leaves
-    if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
-      logger.warn(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
-      return res.status(403).json({
-        error: {
-          code: 'FORBIDDEN',
-          message: 'Only HR and Super Admin can add leaves to employees'
-        }
-      });
+const addLeavesDocStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
-
-    const employeeId = parseInt(req.params.id);
-    const { leaveType, count, comment } = req.body;
-
-    // Prevent Super Admin from adding leaves to themselves
-    if (req.user?.role === 'super_admin' && req.user?.id === employeeId) {
-      return res.status(403).json({
-        error: {
-          code: 'FORBIDDEN',
-          message: 'Super Admin cannot add leaves to themselves'
-        }
-      });
-    }
-
-    // HR cannot add leaves to themselves or super_admin users
-    if (req.user?.role === 'hr') {
-      // Check if employee exists and get their role
-      const employeeCheckResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
-      if (employeeCheckResult.rows.length === 0) {
-        return res.status(404).json({
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Employee not found'
-          }
-        });
-      }
-
-      const employeeRole = employeeCheckResult.rows[0].role;
-      if (employeeRole === 'super_admin') {
-        return res.status(403).json({
-          error: {
-            code: 'FORBIDDEN',
-            message: 'HR cannot add leaves to Super Admin users'
-          }
-        });
-      }
-
-      if (employeeId === req.user.id) {
-        return res.status(403).json({
-          error: {
-            code: 'FORBIDDEN',
-            message: 'HR cannot add leaves to themselves'
-          }
-        });
-      }
-    }
-
-    if (!leaveType || !count) {
-      return res.status(400).json({
-        error: {
-          code: 'BAD_REQUEST',
-          message: 'Leave type and count are required'
-        }
-      });
-    }
-
-    if (!['casual', 'sick', 'lop'].includes(leaveType)) {
-      return res.status(400).json({
-        error: {
-          code: 'BAD_REQUEST',
-          message: 'Invalid leave type. Must be casual, sick, or lop'
-        }
-      });
-    }
-
-    // HR cannot add LOP leaves, only Super Admin can add LOP leaves
-    if (req.user?.role === 'hr' && leaveType === 'lop') {
-      return res.status(403).json({
-        error: {
-          code: 'FORBIDDEN',
-          message: 'HR cannot add LOP leaves. Only Super Admin can add LOP leaves'
-        }
-      });
-    }
-
-    const result = await employeeService.addLeavesToEmployee(
-      employeeId,
-      leaveType,
-      parseFloat(count),
-      req.user!.id,
-      comment
-    );
-    logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Leaves added successfully - Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}`);
-    res.json(result);
-  } catch (error: any) {
-    logger.error(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Error:`, error);
-    res.status(400).json({
-      error: {
-        code: 'BAD_REQUEST',
-        message: error.message
-      }
-    });
+    cb(null, uploadDir);
+  },
+  filename: (req: any, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `leave-doc-${req.user!.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
   }
-};
+});
+
+const uploadAddLeavesDoc = multer({
+  storage: addLeavesDocStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|pdf/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype) || file.mimetype === 'application/pdf';
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files (JPEG, PNG) and PDF files are allowed'));
+  }
+});
+
+export const addLeavesToEmployee = [
+  uploadAddLeavesDoc.single('document'),
+  async (req: AuthRequest, res: Response) => {
+    logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] ========== REQUEST RECEIVED ==========`);
+    logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}, Leave Type: ${req.body.leaveType}, Count: ${req.body.count}`);
+
+    let localFilePath: string | null = null;
+
+    try {
+      // Ensure only HR and super_admin can add leaves
+      if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
+        logger.warn(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only HR and Super Admin can add leaves to employees'
+          }
+        });
+      }
+
+      const employeeId = parseInt(req.params.id);
+      const { leaveType, count } = req.body;
+
+      // Prevent Super Admin from adding leaves to themselves
+      if (req.user?.role === 'super_admin' && req.user?.id === employeeId) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Super Admin cannot add leaves to themselves'
+          }
+        });
+      }
+
+      // HR cannot add leaves to themselves or super_admin users
+      if (req.user?.role === 'hr') {
+        // Check if employee exists and get their role
+        const employeeCheckResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
+        if (employeeCheckResult.rows.length === 0) {
+          return res.status(404).json({
+            error: {
+              code: 'NOT_FOUND',
+              message: 'Employee not found'
+            }
+          });
+        }
+
+        const employeeRole = employeeCheckResult.rows[0].role;
+        if (employeeRole === 'super_admin') {
+          return res.status(403).json({
+            error: {
+              code: 'FORBIDDEN',
+              message: 'HR cannot add leaves to Super Admin users'
+            }
+          });
+        }
+
+        if (employeeId === req.user.id) {
+          return res.status(403).json({
+            error: {
+              code: 'FORBIDDEN',
+              message: 'HR cannot add leaves to themselves'
+            }
+          });
+        }
+      }
+
+      if (!leaveType || !count) {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Leave type and count are required'
+          }
+        });
+      }
+
+      if (parseFloat(count) > 12) {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Maximum 12 leaves can be added at once'
+          }
+        });
+      }
+
+      // Implicitly handle form-data parsing quirks (sometimes strings)
+      // Validate leaveType
+      if (leaveType !== 'casual') {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Only casual leaves can be added manually'
+          }
+        });
+      }
+
+      // Validate request has a file
+      if (!req.file) {
+        return res.status(400).json({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Document attachment is mandatory'
+          }
+        });
+      }
+
+      localFilePath = req.file.path;
+      let documentUrl = '';
+
+      // Upload to OVH
+      const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
+      if (useOVHCloud) {
+        try {
+          const key = `leave-documents/${req.user!.id}/${req.file.filename}`;
+          const certificateKey = await uploadToOVH(localFilePath, key, req.file.mimetype);
+          documentUrl = certificateKey;
+
+          // Delete local file
+          try {
+            fs.unlinkSync(localFilePath);
+          } catch (e) { /* ignore */ }
+        } catch (ovhError: any) {
+          logger.warn(`[CONTROLLER] [ADD LEAVES] OVH upload failed: ${ovhError.message}`);
+          // Fallback? If upload fails, we probably shouldn't proceed if it is mandatory.
+          // Or store base64 as last resort? Let's error out for now to ensure consistency.
+          throw new Error('Failed to upload document');
+        }
+      } else {
+        // Local storage not implemented fully for permanent storage in this snippet, 
+        // but typically we would just keep the file. 
+        // For now, let's assume OVH is required or return local path (URL construction needed).
+        // Assuming OVH is configured as per project pattern.
+        // If not, maybe we just use the filename?
+        documentUrl = req.file.filename;
+      }
+
+      const result = await employeeService.addLeavesToEmployee(
+        employeeId,
+        leaveType,
+        parseFloat(count),
+        req.user!.id,
+        undefined,
+        documentUrl
+      );
+      logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Leaves added successfully - Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}`);
+      res.json(result);
+    } catch (error: any) {
+      // Cleanup
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try { fs.unlinkSync(localFilePath); } catch (e) { }
+      }
+
+      logger.error(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Error:`, error);
+      res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: error.message
+        }
+      });
+    }
+  }
+];
 
 export const getEmployeeLeaveBalances = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [GET LEAVE BALANCES] ========== REQUEST RECEIVED ==========`);

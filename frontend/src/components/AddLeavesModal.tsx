@@ -1,15 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
+import { FaTimes, FaCloudUploadAlt } from 'react-icons/fa';
 import { useQuery } from 'react-query';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
-import { Button } from './ui/button';
-import { ChevronDown } from 'lucide-react';
 import * as employeeService from '../services/employeeService';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +9,7 @@ import './AddLeavesModal.css';
 interface AddLeavesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (leaveType: 'casual' | 'sick' | 'lop', count: number, comment?: string) => void;
+  onAdd: (formData: FormData) => void;
   employeeId: number;
   employeeName: string;
   employeeStatus?: string;
@@ -34,10 +25,12 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   employeeStatus,
   isLoading = false
 }) => {
-  const [leaveType, setLeaveType] = useState<'casual' | 'sick' | 'lop'>('casual');
   const [count, setCount] = useState<string>('');
-  const [comment, setComment] = useState<string>('');
+  /* comment removed */
+
+  const [file, setFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { showWarning } = useToast();
   useAuth();
 
@@ -54,14 +47,14 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   // Reset form when modal closes or employee changes
   useEffect(() => {
     if (!isOpen) {
-      setLeaveType('casual');
       setCount('');
-      setComment('');
+      /* comment removed */
+
+      setFile(null);
       setValidationError('');
-    } else if (employeeStatus === 'on_notice' && leaveType === 'casual') {
-      setLeaveType('lop');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [isOpen, employeeId, employeeStatus, leaveType]);
+  }, [isOpen, employeeId]);
 
   // Prevent body scrolling when modal is open
   useEffect(() => {
@@ -70,14 +63,26 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     } else {
       document.body.style.overflow = '';
     }
-
-    // Cleanup on unmount
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      // Validate file type (image or pdf)
+      const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+      if (!validTypes.includes(selectedFile.type)) {
+        showWarning('Only images (JPEG, PNG) and PDF files are allowed.');
+        e.target.value = '';
+        return;
+      }
+      setFile(selectedFile);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,28 +93,20 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
       return;
     }
 
-    // Check if it's an integer or .5
     if (countNum % 1 !== 0 && countNum % 1 !== 0.5) {
       setValidationError('Use whole numbers or .5');
       return;
     }
 
-    // Get current balance for the selected leave type
-    const currentBalance = balances
-      ? (leaveType === 'casual' ? balances.casual : leaveType === 'sick' ? balances.sick : balances.lop)
-      : 0;
-
+    // Always casual
+    const currentBalance = balances ? balances.casual : 0;
     const newTotal = currentBalance + countNum;
 
-    // Check if count is 3 digits or more (100+)
-    if (countNum >= 100) {
-      const errorMsg = 'Max 2 digits allowed.';
-      setValidationError(errorMsg);
-      showWarning(errorMsg);
+    if (countNum > 12) {
+      showWarning('Maximum 12 leaves can be added at once.');
       return;
     }
 
-    // Check if total would exceed 99
     if (newTotal > 99) {
       const errorMsg = `Limit exceeded. Max: 99.`;
       setValidationError(errorMsg);
@@ -117,56 +114,60 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
       return;
     }
 
+    if (!file) {
+      setValidationError('Please attach a document.');
+      showWarning('Document attachment is mandatory.');
+      return;
+    }
+
     setValidationError('');
-    onAdd(leaveType, countNum, comment);
+
+    const formData = new FormData();
+    formData.append('leaveType', 'casual');
+    formData.append('count', countNum.toString());
+    /* comment removed */
+
+    formData.append('document', file);
+
+    // We also need employeeId, passing it might be handled by caller or here. 
+    // Usually standard to pass it in formData if the API expects it in body not path.
+    // Assuming API is updated to take it from body or path. Service usually takes ID + payload.
+    // Let's stick to onAdd(formData) and let the parent handle the ID passed to service.
+
+    onAdd(formData);
   };
 
   const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-
-    // Allow digits and at most one decimal point
     value = value.replace(/[^0-9.]/g, '');
     const parts = value.split('.');
     if (parts.length > 2) {
       value = parts[0] + '.' + parts.slice(1).join('');
     }
-
-    // If there is a decimal part, it must eventually be '5'
     if (parts.length === 2 && parts[1].length > 1) {
       value = parts[0] + '.' + parts[1].slice(0, 1);
     }
 
     const countNum = parseFloat(value);
-
-    // Prevent 3-digit numbers (100 and above)
-    if (!isNaN(countNum) && countNum >= 100) {
-      setValidationError('Max 2 digits allowed.');
+    if (!isNaN(countNum) && countNum > 12) {
+      showWarning('Maximum 12 leaves can be added at once.');
       return;
     }
-
     setCount(value);
-    setValidationError(''); // Clear error when user types
+    setValidationError('');
 
     if (!isNaN(countNum) && countNum > 0 && balances) {
-      const currentBalance = leaveType === 'casual' ? balances.casual : leaveType === 'sick' ? balances.sick : balances.lop;
-      const newTotal = currentBalance + countNum;
-
-      if (newTotal > 99) {
+      if ((balances.casual + countNum) > 99) {
         setValidationError(`Total exceeds 99.`);
       }
     }
   };
 
-  const handleLeaveTypeChange = (value: 'casual' | 'sick' | 'lop') => {
-    setLeaveType(value);
-    setCount('');
-    setValidationError('');
-  };
-
   const handleClose = () => {
-    setLeaveType('casual');
     setCount('');
-    setComment('');
+    /* comment removed */
+
+    setFile(null);
     onClose();
   };
 
@@ -174,7 +175,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     <div className="modal-overlay">
       <div className="add-leaves-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Add Leaves</h2>
+          <h2>Add Casual Leaves</h2>
           <button className="close-button" onClick={handleClose} disabled={isLoading}>
             <FaTimes />
           </button>
@@ -191,68 +192,12 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
           ) : (
             <form id="add-leaves-form" onSubmit={handleSubmit}>
               <div className="form-group">
-                <label htmlFor="leaveType">Leave Type <span className="required">*</span></label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="leave-type-dropdown-trigger"
-                      disabled={isLoading || balancesLoading}
-                      style={{
-                        width: '100%',
-                        justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        fontSize: '12px',
-                        fontFamily: 'Poppins, sans-serif',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        backgroundColor: 'transparent',
-                        color: '#1f2a3d',
-                        height: '42px'
-                      }}
-                    >
-                      <span>
-                        {leaveType === 'casual' ? `Casual (Current: ${balances?.casual || 0})` :
-                          leaveType === 'sick' ? `Sick (Current: ${balances?.sick || 0})` :
-                            `LOP (Current: ${balances?.lop || 0})`}
-                      </span>
-                      <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="leave-type-dropdown-content">
-                    {employeeStatus !== 'on_notice' ? (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('casual')}
-                        >
-                          Casual (Current: {balances?.casual || 0})
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('sick')}
-                        >
-                          Sick (Current: {balances?.sick || 0})
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('sick')}
-                        >
-                          Sick (Current: {balances?.sick || 0})
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('lop')}
-                    >
-                      LOP (Current: {balances?.lop || 0})
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <label>Leave Type</label>
+                <div className="static-leave-type">
+                  Casual Leave (Current Balance: <strong>{balances?.casual || 0}</strong>)
+                </div>
               </div>
+
               <div className="form-group">
                 <label htmlFor="count">Count <span className="required">*</span></label>
                 <input
@@ -261,57 +206,36 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                   inputMode="decimal"
                   value={count}
                   onChange={handleCountChange}
-                  onKeyDown={(e) => {
-                    // Allow digits, decimal point, backspace, delete, tab, and arrow keys
-                    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', '.'];
-                    if (!/[0-9]/.test(e.key) && !allowedKeys.includes(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
                   disabled={isLoading || balancesLoading}
                   required
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    fontSize: '12px',
-                    fontFamily: 'Poppins, sans-serif',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    backgroundColor: 'transparent',
-                    color: '#1f2a3d',
-                    height: '42px',
-                    boxSizing: 'border-box'
-                  }}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                 />
                 <small className="help-text">Enter number of leaves (e.g. 0.5, 1, 2, etc.)</small>
-                {validationError && (
-                  <div style={{ color: '#f44336', fontSize: '12px', marginTop: '5px' }}>
-                    {validationError}
-                  </div>
-                )}
               </div>
+
               <div className="form-group">
-                <label htmlFor="comment">Comment</label>
-                <textarea
-                  id="comment"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={3}
-                  disabled={isLoading || balancesLoading}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                    fontFamily: 'Poppins, sans-serif',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    resize: 'none',
-                    marginTop: '5px',
-                    height: '80px',
-                    boxSizing: 'border-box'
-                  }}
-                />
+                <label htmlFor="document">Attach Document <span className="required">*</span></label>
+                <div className="file-upload-container">
+                  <input
+                    type="file"
+                    id="document"
+                    ref={fileInputRef}
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                    className="file-input"
+                    required
+                  />
+                  <label htmlFor="document" className="file-upload-label">
+                    <FaCloudUploadAlt className="upload-icon" />
+                    <span className="upload-text">{file ? file.name : "Choose PDF or Image"}</span>
+                  </label>
+                </div>
+                {validationError && !file && <div className="error-text">Document is required</div>}
               </div>
+
+              {/* Comment field removed */}
+
+              {validationError && <div className="error-summary" style={{ color: 'red', marginTop: '10px' }}>{validationError}</div>}
             </form>
           )}
         </div>
@@ -323,7 +247,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
             type="submit"
             form="add-leaves-form"
             className="submit-button"
-            disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !!validationError}
+            disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !file}
           >
             {isLoading ? 'Adding...' : 'Add Leaves'}
           </button>

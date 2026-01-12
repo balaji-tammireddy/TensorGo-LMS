@@ -198,3 +198,79 @@
   transform: none;
   box-shadow: none;
 }
+/* File Upload Styles */
+.file-upload-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.file-input {
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.file-upload-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px dashed #3c6ff2;
+  border-radius: 6px;
+  background-color: #f0f5ff;
+  color: #3c6ff2;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.file-upload-label:hover {
+  background-color: #e6eeff;
+  border-color: #2951c8;
+}
+
+.upload-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.upload-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.error-text {
+  color: #f44336;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Static Leave Type */
+.static-leave-type {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: 'Poppins', sans-serif;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  color: #1f2a3d;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.static-leave-type strong {
+  margin-left: 4px;
+  font-weight: 600;
+}

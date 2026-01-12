@@ -1479,7 +1479,8 @@ export const addLeavesToEmployee = async (
   leaveType: 'casual' | 'sick' | 'lop',
   count: number,
   updatedBy: number,
-  comment?: string
+  comment?: string,
+  documentUrl?: string
 ) => {
   logger.info(`[EMPLOYEE] [ADD LEAVES] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [ADD LEAVES] Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}, Updated By: ${updatedBy}`);
@@ -1612,7 +1613,8 @@ export const addLeavesToEmployee = async (
           allocatedBy: employee.approver_name || 'HR/Admin',
           allocatedByEmpId: employee.approver_emp_id || '',
           allocationDate: formatDateLocal(new Date()) || '',
-          comment: comment
+          comment: comment,
+          documentUrl: documentUrl
         });
         logger.info(`✅ Leave allocation email sent to employee: ${employee.email}`);
       }
