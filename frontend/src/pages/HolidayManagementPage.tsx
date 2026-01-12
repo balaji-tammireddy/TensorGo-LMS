@@ -262,7 +262,7 @@ const HolidayManagementPage: React.FC = () => {
                                         {holidays.map((holiday: any) => {
                                             const holidayDate = new Date(holiday.date + 'T00:00:00');
                                             const dayName = holidayDate.toLocaleDateString('en-US', { weekday: 'long' });
-                                            const formattedDate = format(holidayDate, 'dd MMM yyyy');
+                                            const formattedDate = format(holidayDate, 'dd-MM-yyyy');
 
                                             return (
                                                 <tr key={holiday.id || holiday.date}>

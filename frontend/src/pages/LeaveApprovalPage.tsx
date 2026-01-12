@@ -1004,8 +1004,8 @@ const LeaveApprovalPage: React.FC = () => {
                           <td>{formatDateSafe(request.appliedDate)}</td>
                           <td>
                             {request.leaveDate && request.leaveDate.includes(' to ')
-                              ? request.leaveDate.split(' to ').map(d => formatDateSafe(d)).join(' to ')
-                              : request.leaveDate || `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`
+                              ? request.leaveDate.split(' to ').map((d: string) => formatDateSafe(d)).join(' to ')
+                              : formatDateSafe(request.leaveDate || request.startDate) + (request.startDate !== request.endDate && !request.leaveDate ? ` to ${formatDateSafe(request.endDate)}` : '')
                             }
                           </td>
                           <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
