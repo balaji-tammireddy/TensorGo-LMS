@@ -41,7 +41,8 @@ const ProfilePage: React.FC = () => {
   const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
 
   const sanitizeName = (value: string) => {
-    return value.replace(/[^a-zA-Z\s]/g, '').slice(0, 25);
+    const sanitized = value.replace(/[^a-zA-Z\s]/g, '').slice(0, 25);
+    return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
   };
 
   const sanitizePhone = (value: string) => {
@@ -105,7 +106,8 @@ const ProfilePage: React.FC = () => {
     return null;
   };
   const sanitizeLettersOnly = (value: string) => {
-    return value.replace(/[^a-zA-Z\s]/g, '');
+    const sanitized = value.replace(/[^a-zA-Z\s]/g, '');
+    return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
   };
 
   const { data: profile, isLoading, error } = useQuery(
@@ -1284,141 +1286,133 @@ const ProfilePage: React.FC = () => {
                     address: { ...prev.address, currentAddress: value }
                   }));
                 }}
-                disabled={!isEditMode || isSameAddress}
+                disabled={!isEditMode}
                 rows={4}
               />
-              <div className="checkbox-group">
-                <input
-                  type="checkbox"
-                  id="same-address"
-                  checked={isSameAddress}
-                  onChange={(e) => handleSameAsCurrentAddress(e.target.checked)}
-                  disabled={!isEditMode}
-                />
-                <label htmlFor="same-address">Same as Permanent Address</label>
-              </div>
             </div>
           </div>
 
-          <div className="profile-section">
-            <h2>Education Information</h2>
-            <table className="education-table">
-              <thead>
-                <tr>
-                  <th className="education-level-col"></th>
-                  <th>Group/Stream</th>
-                  <th>College/University</th>
-                  <th>Graduation Year</th>
-                  <th>Score %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.education?.map((edu: any, idx: number) => (
-                  <tr key={edu.level} className={(formErrors[`edu_${idx}_groupStream`] || formErrors[`edu_${idx}_collegeUniversity`] || formErrors[`edu_${idx}_year`] || formErrors[`edu_${idx}_scorePercentage`]) ? 'has-error' : ''}>
-                    <td className="education-level-cell">
-                      {formatEducationLevel(edu.level)}
-                      {(edu.level === 'UG' || edu.level === '12th') && (
-                        <span className="required-indicator">*</span>
-                      )}
-                    </td>
-                    <td className={formErrors[`edu_${idx}_groupStream`] ? 'has-error' : ''}>
-                      <input
-                        type="text"
-                        value={edu.groupStream || ''}
-                        onChange={(e) => {
-                          const value = sanitizeLettersOnly(e.target.value);
-                          const newEducation = [...formData.education];
-                          newEducation[idx] = { ...edu, groupStream: value };
-                          setFormData({ ...formData, education: newEducation });
-                        }}
-                        disabled={!isEditMode}
-                      />
-                    </td>
-                    <td className={formErrors[`edu_${idx}_collegeUniversity`] ? 'has-error' : ''}>
-                      <input
-                        type="text"
-                        value={edu.collegeUniversity || ''}
-                        onChange={(e) => {
-                          const value = sanitizeLettersOnly(e.target.value);
-                          const newEducation = [...formData.education];
-                          newEducation[idx] = { ...edu, collegeUniversity: value };
-                          setFormData({ ...formData, education: newEducation });
-                        }}
-                        disabled={!isEditMode}
-                      />
-                    </td>
-                    <td className={formErrors[`edu_${idx}_year`] ? 'has-error' : ''}>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={4}
-                        value={edu.year || ''}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
-                          const newEducation = [...formData.education];
-                          newEducation[idx] = { ...edu, year: value };
-                          setFormData({ ...formData, education: newEducation });
-                        }}
-                        onBlur={(e) => {
-                          const year = parseInt(e.target.value, 10);
-                          const currentYear = new Date().getFullYear();
-                          const maxYear = currentYear + 5;
-                          if (e.target.value && (isNaN(year) || year < 1950 || year > maxYear)) {
-                            showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
-                          }
-                        }}
-                        disabled={!isEditMode}
-                      />
-                    </td>
-                    <td className={formErrors[`edu_${idx}_scorePercentage`] ? 'has-error' : ''}>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={
-                          edu.scorePercentage === null || edu.scorePercentage === undefined
-                            ? ''
-                            : String(edu.scorePercentage)
-                        }
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          // Allow one optional decimal point and up to 2 digits after it
-                          const sanitized = raw.replace(/[^0-9.]/g, '');
-                          const [intPartRaw, decPartRaw = ''] = sanitized.split('.');
-                          const intPart = intPartRaw.replace(/^0+(?=\d)/, '');
-                          const decPart = decPartRaw.slice(0, 2);
-
-                          let display = intPart;
-                          if (sanitized.includes('.')) {
-                            display += '.';
-                          }
-                          if (decPart) {
-                            display = `${intPart}.${decPart}`;
-                          }
-
-                          let num: number | null = null;
-                          if (display !== '' && display !== '.') {
-                            num = parseFloat(display);
-                            if (!isNaN(num) && num > 100) {
-                              num = 100;
-                              display = '100';
-                            }
-                          }
-
-                          const newEducation = [...formData.education];
-                          newEducation[idx] = {
-                            ...edu,
-                            scorePercentage: display === '' || display === '.' ? null : display
-                          };
-                          setFormData({ ...formData, education: newEducation });
-                        }}
-                        disabled={!isEditMode}
-                      />
-                    </td>
+          {user?.role !== 'super_admin' && (
+            <div className="profile-section">
+              <h2>Education Information</h2>
+              <table className="education-table">
+                <thead>
+                  <tr>
+                    <th className="education-level-col"></th>
+                    <th>Group/Stream</th>
+                    <th>College/University</th>
+                    <th>Graduation Year</th>
+                    <th>Score %</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {formData.education?.map((edu: any, idx: number) => (
+                    <tr key={edu.level} className={(formErrors[`edu_${idx}_groupStream`] || formErrors[`edu_${idx}_collegeUniversity`] || formErrors[`edu_${idx}_year`] || formErrors[`edu_${idx}_scorePercentage`]) ? 'has-error' : ''}>
+                      <td className="education-level-cell">
+                        {formatEducationLevel(edu.level)}
+                        {(edu.level === 'UG' || edu.level === '12th') && (
+                          <span className="required-indicator">*</span>
+                        )}
+                      </td>
+                      <td className={formErrors[`edu_${idx}_groupStream`] ? 'has-error' : ''}>
+                        <input
+                          type="text"
+                          value={edu.groupStream || ''}
+                          onChange={(e) => {
+                            const value = sanitizeLettersOnly(e.target.value);
+                            const newEducation = [...formData.education];
+                            newEducation[idx] = { ...edu, groupStream: value };
+                            setFormData({ ...formData, education: newEducation });
+                          }}
+                          disabled={!isEditMode}
+                        />
+                      </td>
+                      <td className={formErrors[`edu_${idx}_collegeUniversity`] ? 'has-error' : ''}>
+                        <input
+                          type="text"
+                          value={edu.collegeUniversity || ''}
+                          onChange={(e) => {
+                            const value = sanitizeLettersOnly(e.target.value);
+                            const newEducation = [...formData.education];
+                            newEducation[idx] = { ...edu, collegeUniversity: value };
+                            setFormData({ ...formData, education: newEducation });
+                          }}
+                          disabled={!isEditMode}
+                        />
+                      </td>
+                      <td className={formErrors[`edu_${idx}_year`] ? 'has-error' : ''}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={4}
+                          value={edu.year || ''}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                            const newEducation = [...formData.education];
+                            newEducation[idx] = { ...edu, year: value };
+                            setFormData({ ...formData, education: newEducation });
+                          }}
+                          onBlur={(e) => {
+                            const year = parseInt(e.target.value, 10);
+                            const currentYear = new Date().getFullYear();
+                            const maxYear = currentYear + 5;
+                            if (e.target.value && (isNaN(year) || year < 1950 || year > maxYear)) {
+                              showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
+                            }
+                          }}
+                          disabled={!isEditMode}
+                        />
+                      </td>
+                      <td className={formErrors[`edu_${idx}_scorePercentage`] ? 'has-error' : ''}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={
+                            edu.scorePercentage === null || edu.scorePercentage === undefined
+                              ? ''
+                              : String(edu.scorePercentage)
+                          }
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            // Allow one optional decimal point and up to 2 digits after it
+                            const sanitized = raw.replace(/[^0-9.]/g, '');
+                            const [intPartRaw, decPartRaw = ''] = sanitized.split('.');
+                            const intPart = intPartRaw.replace(/^0+(?=\d)/, '');
+                            const decPart = decPartRaw.slice(0, 2);
+
+                            let display = intPart;
+                            if (sanitized.includes('.')) {
+                              display += '.';
+                            }
+                            if (decPart) {
+                              display = `${intPart}.${decPart}`;
+                            }
+
+                            let num: number | null = null;
+                            if (display !== '' && display !== '.') {
+                              num = parseFloat(display);
+                              if (!isNaN(num) && num > 100) {
+                                num = 100;
+                                display = '100';
+                              }
+                            }
+
+                            const newEducation = [...formData.education];
+                            newEducation[idx] = {
+                              ...edu,
+                              scorePercentage: display === '' || display === '.' ? null : display
+                            };
+                            setFormData({ ...formData, education: newEducation });
+                          }}
+                          disabled={!isEditMode}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {user?.role !== 'super_admin' && (
             <div className="profile-section">

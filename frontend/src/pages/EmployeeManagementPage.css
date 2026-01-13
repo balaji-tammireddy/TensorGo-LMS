@@ -283,36 +283,38 @@
 }
 
 .employee-modal-section {
-  margin-bottom: 12px;
+  padding: 4px 0 0;
+  margin-bottom: 0px;
 }
 
 .employee-modal-section h3 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: #666;
   border-bottom: 1px dashed #dcdcdc;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 .employee-modal-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px 16px;
+  row-gap: 4px;
+  column-gap: 8px;
 }
 
 .employee-modal-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
 }
 
 .employee-modal-field.full-width {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .employee-id-field {
-  grid-column: 1 / span 2;
+  grid-column: auto;
 }
 
 .employee-id-field input {
@@ -320,7 +322,7 @@
 }
 
 .employee-role-field {
-  grid-column: 3 / span 1;
+  grid-column: auto;
 }
 
 .employee-modal-field label {
@@ -331,12 +333,12 @@
 
 .employee-modal-field input,
 .employee-modal-field select {
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
-  height: 42px;
+  height: 36px;
   resize: none;
   background: transparent;
   font-family: 'Poppins', sans-serif;
@@ -345,12 +347,12 @@
 }
 
 .employee-modal-field textarea {
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
-  min-height: 42px;
+  min-height: 36px;
   resize: none;
   background: transparent;
   font-family: 'Poppins', sans-serif;
@@ -359,14 +361,14 @@
 }
 
 .employee-modal-field .date-picker-input-field {
-  padding: 10px 12px;
-  padding-right: 35px;
+  padding: 6px 10px;
+  padding-right: 30px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: transparent;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
-  height: 42px;
+  height: 36px;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   width: 100%;
@@ -713,4 +715,43 @@
 
 .sortable-header:hover .sort-icon:not(.active) {
   color: #718096;
+}
+
+/* Strict override for dropdown triggers to match compact design (36px) */
+.leave-type-dropdown-trigger {
+  width: 100%;
+  justify-content: space-between !important;
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+  font-family: 'Poppins', sans-serif !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  background-color: transparent !important;
+  color: #1f2a3d !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  font-weight: 400 !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.leave-type-dropdown-trigger:disabled {
+  background-color: #f0f0f0 !important;
+  color: #888 !important;
+  border: 1px solid #d1d1d1 !important;
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
+/* Also ensure education table inputs inside modal are compact */
+.education-table input {
+  padding: 6px 10px !important;
+  height: 36px !important;
+  font-size: 13px !important;
+}
+
+.education-table td,
+.education-table th {
+  padding: 6px 8px !important;
 }

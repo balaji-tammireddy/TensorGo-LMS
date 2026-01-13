@@ -25,7 +25,8 @@ import { useAuth } from '../contexts/AuthContext';
 import './EmployeeManagementPage.css';
 
 const sanitizeName = (value: string) => {
-  return value.replace(/[^a-zA-Z\s]/g, '').slice(0, 25);
+  const sanitized = value.replace(/[^a-zA-Z\s]/g, '').slice(0, 25);
+  return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
 };
 
 const sanitizePhone = (value: string) => {
@@ -91,7 +92,8 @@ const validatePan = (pan: string): string | null => {
   return null;
 };
 const sanitizeLettersOnly = (value: string) => {
-  return value.replace(/[^a-zA-Z\s]/g, '');
+  const sanitized = value.replace(/[^a-zA-Z\s]/g, '');
+  return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
 };
 
 const baseEducationLevels = ['PG', 'UG', '12th'];
@@ -1282,6 +1284,22 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
+                        <div className={`employee-modal-field ${formErrors.dateOfBirth ? 'has-error' : ''}`}>
+                          <label>
+                            Date of Birth<span className="required-indicator">*</span>
+                          </label>
+                          <DatePicker
+                            value={newEmployee.dateOfBirth}
+                            onChange={(date) =>
+                              setNewEmployee({ ...newEmployee, dateOfBirth: date })
+                            }
+                            disabled={isViewMode}
+                            placeholder="DD-MM-YYYY"
+                            max={format(new Date(), 'yyyy-MM-dd')}
+                            allowManualEntry={true}
+                            isEmployeeVariant={true}
+                          />
+                        </div>
                         <div className={`employee-modal-field ${formErrors.firstName ? 'has-error' : ''}`}>
                           <label>
                             First Name<span className="required-indicator">*</span>
@@ -1414,22 +1432,7 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className={`employee-modal-field ${formErrors.dateOfBirth ? 'has-error' : ''}`}>
-                          <label>
-                            Date of Birth<span className="required-indicator">*</span>
-                          </label>
-                          <DatePicker
-                            value={newEmployee.dateOfBirth}
-                            onChange={(date) =>
-                              setNewEmployee({ ...newEmployee, dateOfBirth: date })
-                            }
-                            disabled={isViewMode}
-                            placeholder="DD-MM-YYYY"
-                            max={format(new Date(), 'yyyy-MM-dd')}
-                            allowManualEntry={true}
-                            isEmployeeVariant={true}
-                          />
-                        </div>
+
                         <div className={`employee-modal-field ${formErrors.gender ? 'has-error' : ''}`}>
                           <label>
                             Gender<span className="required-indicator">*</span>
@@ -1862,17 +1865,19 @@ const EmployeeManagementPage: React.FC = () => {
                               currentAddress: e.target.value
                             })
                           }
-                          disabled={isSameAddress || isViewMode}
+                          disabled={(isSameAddress && !isEditMode) || isViewMode}
                         />
-                        <label className="same-address-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={isSameAddress}
-                            onChange={(e) => handleSameAsCurrentAddress(e.target.checked)}
-                            disabled={isViewMode}
-                          />
-                          Same as Permanent Address
-                        </label>
+                        {!isEditMode && !isViewMode && (
+                          <label className="same-address-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isSameAddress}
+                              onChange={(e) => handleSameAsCurrentAddress(e.target.checked)}
+                              disabled={isViewMode}
+                            />
+                            Same as Permanent Address
+                          </label>
+                        )}
                       </div>
                     </div>
 

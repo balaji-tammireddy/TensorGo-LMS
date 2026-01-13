@@ -147,30 +147,30 @@
 }
 
 .profile-section {
-  padding: 10px 0 4px;
-  margin-bottom: 4px;
+  padding: 4px 0 0;
+  margin-bottom: 0px;
 }
 
 .profile-section h2 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   color: #666;
   border-bottom: 1px dashed #dcdcdc;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  column-gap: 16px;
-  row-gap: 10px;
+  column-gap: 8px;
+  row-gap: 4px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
 }
 
 .form-group label {
@@ -186,12 +186,12 @@
 
 .form-group input,
 .form-group select {
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid #ddd !important;
   border-radius: 4px !important;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
-  height: 42px;
+  height: 36px;
   background-color: #ffffff;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
@@ -199,12 +199,12 @@
 }
 
 .form-group textarea {
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid #ddd !important;
   border-radius: 4px !important;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
-  min-height: 42px;
+  min-height: 36px;
   resize: none;
   background-color: #ffffff;
   font-family: 'Poppins', sans-serif;
@@ -216,14 +216,14 @@
   width: 100%;
   display: flex !important;
   justify-content: space-between !important;
-  padding: 10px 12px !important;
-  font-size: 14px !important;
+  padding: 6px 10px !important;
+  font-size: 13px !important;
   font-family: 'Poppins', sans-serif !important;
   border: 1px solid #ddd !important;
   border-radius: 4px !important;
   background-color: #ffffff !important;
   color: #1f2a3d !important;
-  height: 42px !important;
+  height: 36px !important;
 }
 
 .profile-field-trigger:disabled {
@@ -235,14 +235,14 @@
 }
 
 .form-group .date-picker-input-field {
-  padding: 10px 12px;
-  padding-right: 35px;
+  padding: 6px 10px;
+  padding-right: 30px;
   border: 1px solid #ddd !important;
   border-radius: 4px !important;
   background: transparent;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
-  height: 42px;
+  height: 36px;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   width: 100%;
