@@ -5,7 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { DatePicker } from '../components/ui/date-picker';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaTrash, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaTrash, FaPen, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmptyState from '../components/common/EmptyState';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import './HolidayManagementPage.css';
@@ -101,6 +101,30 @@ const HolidayManagementPage: React.FC = () => {
         }
     );
 
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editHolidayId, setEditHolidayId] = useState<number | null>(null);
+
+    // Update holiday mutation
+    const updateMutation = useMutation(
+        ({ id, holidayDate, holidayName }: { id: number; holidayDate: string; holidayName: string }) =>
+            leaveService.updateHoliday(id, holidayDate, holidayName),
+        {
+            onSuccess: () => {
+                showSuccess('Holiday updated!');
+                setFormData({ holidayDate: '', holidayName: '' });
+                setIsEditMode(false);
+                setEditHolidayId(null);
+                setResetKey(prev => prev + 1);
+                queryClient.invalidateQueries(['holidays', selectedYear]);
+                queryClient.invalidateQueries('holidays');
+            },
+            onError: (error: any) => {
+                const errorMessage = error.response?.data?.error?.message || error.message || 'Update failed';
+                showError(errorMessage);
+            }
+        }
+    );
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -118,20 +142,42 @@ const HolidayManagementPage: React.FC = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        if (selectedDate < today) {
-            showError('Holiday Cannot be Added in Past Dates');
-            return;
-        }
+        if (isEditMode && editHolidayId) {
+            updateMutation.mutate({
+                id: editHolidayId,
+                holidayDate: formData.holidayDate,
+                holidayName: formData.holidayName.trim()
+            });
+        } else {
+            if (selectedDate < today) {
+                showError('Holiday Cannot be Added in Past Dates');
+                return;
+            }
 
-        createMutation.mutate({
-            holidayDate: formData.holidayDate,
-            holidayName: formData.holidayName.trim()
-        });
+            createMutation.mutate({
+                holidayDate: formData.holidayDate,
+                holidayName: formData.holidayName.trim()
+            });
+        }
     };
 
     const handleReset = () => {
         setFormData({ holidayDate: '', holidayName: '' });
+        setIsEditMode(false);
+        setEditHolidayId(null);
         setResetKey(prev => prev + 1);
+    };
+
+    const handleEdit = (holiday: any) => {
+        setFormData({
+            holidayDate: holiday.date,
+            holidayName: holiday.name
+        });
+        setEditHolidayId(holiday.id);
+        setIsEditMode(true);
+        setResetKey(prev => prev + 1); // Force datepicker refresh
+        // Scroll to form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleDelete = (holidayId: number, holidayName: string) => {
@@ -156,7 +202,7 @@ const HolidayManagementPage: React.FC = () => {
 
                 {/* Add Holiday Form */}
                 <div className="hm-form-section">
-                    <h2>Add New Holiday</h2>
+                    <h2>{isEditMode ? 'Edit Holiday' : 'Add New Holiday'}</h2>
                     <form onSubmit={handleSubmit} className="hm-form">
                         <div className="hm-form-row">
                             <div className="hm-form-group hm-form-group-date">
@@ -189,7 +235,7 @@ const HolidayManagementPage: React.FC = () => {
                                     className="hm-submit-button"
                                     disabled={createMutation.isLoading}
                                 >
-                                    {createMutation.isLoading ? 'Adding...' : 'Add Holiday'}
+                                    {createMutation.isLoading || updateMutation.isLoading ? 'Processing...' : (isEditMode ? 'Update Holiday' : 'Add Holiday')}
                                 </button>
                                 <button
                                     type="button"
@@ -264,20 +310,45 @@ const HolidayManagementPage: React.FC = () => {
                                             const dayName = holidayDate.toLocaleDateString('en-US', { weekday: 'long' });
                                             const formattedDate = format(holidayDate, 'dd-MM-yyyy');
 
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            const isPast = holidayDate < today;
+
                                             return (
                                                 <tr key={holiday.id || holiday.date}>
                                                     <td>{formattedDate}</td>
                                                     <td>{holiday.name}</td>
                                                     <td>{dayName}</td>
                                                     <td>
-                                                        <button
-                                                            className="action-btn delete-btn"
-                                                            onClick={() => handleDelete(holiday.id, holiday.name)}
-                                                            disabled={deleteMutation.isLoading}
-                                                            title="Delete holiday"
-                                                        >
-                                                            <FaTrash />
-                                                        </button>
+                                                        <div className="actions-wrapper" style={{ display: 'flex', gap: '8px' }}>
+                                                            <button
+                                                                className="action-btn edit-btn"
+                                                                onClick={() => !isPast && handleEdit(holiday)}
+                                                                title={isPast ? "Cannot edit past holidays" : "Edit holiday"}
+                                                                disabled={isPast}
+                                                                style={{
+                                                                    backgroundColor: 'transparent',
+                                                                    border: 'none',
+                                                                    cursor: isPast ? 'not-allowed' : 'pointer',
+                                                                    color: isPast ? '#a0a0a0' : '#3c6ff2',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    fontSize: '16px'
+                                                                }}
+                                                            >
+                                                                <FaPen />
+                                                            </button>
+                                                            <button
+                                                                className="action-btn delete-btn"
+                                                                onClick={() => !isPast && handleDelete(holiday.id, holiday.name)}
+                                                                disabled={deleteMutation.isLoading || isPast}
+                                                                title={isPast ? "Cannot delete past holidays" : "Delete holiday"}
+                                                                style={isPast ? { cursor: 'not-allowed', color: '#a0a0a0' } : {}}
+                                                            >
+                                                                <FaTrash />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -308,4 +379,3 @@ const HolidayManagementPage: React.FC = () => {
 };
 
 export default HolidayManagementPage;
-

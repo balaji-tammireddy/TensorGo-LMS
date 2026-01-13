@@ -4098,3 +4098,35 @@ export const getApprovedLeaves = async (
   };
 };
 
+
+export const updateHoliday = async (id: number, holidayDate: string, holidayName: string) => {
+  logger.info(`[LEAVE SERVICE] [UPDATE HOLIDAY] ========== FUNCTION CALLED ==========`);
+  logger.info(`[LEAVE SERVICE] [UPDATE HOLIDAY] ID: ${id}, Date: ${holidayDate}, Name: ${holidayName}`);
+
+  const checkResult = await pool.query(
+    'SELECT id, holiday_date FROM holidays WHERE id = $1',
+    [id]
+  );
+
+  if (checkResult.rows.length === 0) {
+    throw new Error('Holiday not found');
+  }
+
+  // Check if another holiday exists on the new date
+  const duplicateCheck = await pool.query(
+    'SELECT id FROM holidays WHERE holiday_date = $1::date AND id != $2 AND is_active = true',
+    [holidayDate, id]
+  );
+
+  if (duplicateCheck.rows.length > 0) {
+    throw new Error('A holiday already exists for this date');
+  }
+
+  const result = await pool.query(
+    'UPDATE holidays SET holiday_date = $1, holiday_name = $2 WHERE id = $3 RETURNING id, holiday_date, holiday_name',
+    [holidayDate, holidayName, id]
+  );
+
+  logger.info(`[LEAVE SERVICE] [UPDATE HOLIDAY] Holiday updated successfully - ID: ${id}`);
+  return result.rows[0];
+};

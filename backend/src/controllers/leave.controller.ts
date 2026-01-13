@@ -1077,3 +1077,85 @@ export const deleteHoliday = async (req: AuthRequest, res: Response) => {
   }
 };
 
+
+/**
+ * Update a holiday
+ * Only HR and Super Admin can update holidays
+ */
+export const updateHoliday = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Holiday ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
+
+  try {
+    const holidayId = parseInt(req.params.id);
+    if (isNaN(holidayId)) {
+        logger.warn(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Invalid holiday ID: ${req.params.id}`);
+        return res.status(400).json({
+            error: {
+                code: 'BAD_REQUEST',
+                message: 'Invalid holiday ID'
+            }
+        });
+    }
+
+    const { holidayDate, holidayName } = req.body;
+
+    if (!holidayDate || !holidayName) {
+      logger.warn(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Missing required fields`);
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Holiday date and name are required'
+        }
+      });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(holidayDate)) {
+      logger.warn(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Invalid date format: ${holidayDate}`);
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid date format. Use YYYY-MM-DD'
+        }
+      });
+    }
+
+    const holiday = await leaveService.updateHoliday(holidayId, holidayDate, holidayName);
+
+    logger.info(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Holiday updated successfully - ID: ${holidayId}`);
+
+    res.json({
+      success: true,
+      holiday
+    });
+  } catch (error: any) {
+    logger.error(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Error:`, error);
+
+    if (error.message === 'A holiday already exists for this date') {
+      return res.status(400).json({
+        error: {
+          code: 'DUPLICATE_HOLIDAY',
+          message: error.message
+        }
+      });
+    }
+
+    if (error.message === 'Holiday not found') {
+        return res.status(404).json({
+            error: {
+                code: 'NOT_FOUND',
+                message: 'Holiday not found'
+            }
+        });
+    }
+
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: error.message || 'Failed to update holiday'
+      }
+    });
+  }
+};
