@@ -526,7 +526,7 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   }
 
   let query = `
-SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name
+SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name, role
 FROM users
 WHERE role = ANY($1) AND status IN ('active', 'on_leave')
 `;
@@ -562,7 +562,8 @@ WHERE role = ANY($1) AND status IN ('active', 'on_leave')
     managers: result.rows.map(row => ({
       id: row.id,
       name: row.name,
-      empId: row.emp_id
+      empId: row.emp_id,
+      role: row.role
     }))
   };
 };

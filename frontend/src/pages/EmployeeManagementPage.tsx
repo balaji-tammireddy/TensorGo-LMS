@@ -2057,7 +2057,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 side="top"
                                 align="start"
                                 className="leave-type-dropdown-content"
-                                style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '250px' }}
+                                style={{ maxHeight: '300px', overflowY: 'auto', width: 'var(--radix-dropdown-menu-trigger-width)' }}
                               >
                                 <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
                                   <input
@@ -2094,7 +2094,25 @@ const EmployeeManagementPage: React.FC = () => {
                                           setManagerSearch(''); // Reset search on select
                                         }}
                                       >
-                                        {manager.name} ({manager.empId})
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                          <span>{manager.name} ({manager.empId})</span>
+                                          <span style={{
+                                            fontSize: '11px',
+                                            padding: '2px 8px',
+                                            borderRadius: '12px',
+                                            backgroundColor: '#eff6ff',
+                                            color: '#1d4ed8',
+                                            border: '1px solid #dbeafe',
+                                            fontWeight: 500,
+                                            textAlign: 'center',
+                                            minWidth: '90px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}>
+                                            {getRoleLabel(manager.role)}
+                                          </span>
+                                        </div>
                                       </DropdownMenuItem>
                                       {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
                                     </React.Fragment>

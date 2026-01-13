@@ -50,6 +50,7 @@ export interface ReportingManager {
   id: number;
   name: string;
   empId: string;
+  role: string;
 }
 
 export const getProfile = async (): Promise<Profile> => {
