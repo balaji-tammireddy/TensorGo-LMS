@@ -2072,22 +2072,54 @@ const EmployeeManagementPage: React.FC = () => {
                                 style={{ maxHeight: '300px', overflowY: 'auto', width: 'var(--radix-dropdown-menu-trigger-width)' }}
                               >
                                 <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
-                                  <input
-                                    type="text"
-                                    placeholder="Search by name or ID..."
-                                    value={managerSearch}
-                                    onChange={(e) => setManagerSearch(e.target.value)}
-                                    autoFocus
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px 12px',
-                                      fontSize: '13px',
-                                      border: '1px solid #ddd',
-                                      borderRadius: '4px',
-                                      fontFamily: 'Poppins, sans-serif'
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
+                                  <div style={{ position: 'relative' }}>
+                                    <input
+                                      type="text"
+                                      placeholder="Search by name or ID..."
+                                      value={managerSearch}
+                                      onChange={(e) => setManagerSearch(e.target.value)}
+                                      autoFocus
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 30px 8px 12px',
+                                        fontSize: '13px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        fontFamily: 'Poppins, sans-serif'
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    {managerSearch && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setManagerSearch('');
+                                        }}
+                                        style={{
+                                          position: 'absolute',
+                                          right: '8px',
+                                          top: '50%',
+                                          transform: 'translateY(-50%)',
+                                          background: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          color: '#999',
+                                          fontSize: '18px',
+                                          padding: 0,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          width: '20px',
+                                          height: '20px',
+                                          borderRadius: '50%'
+                                        }}
+                                        aria-label="Clear search"
+                                      >
+                                        ×
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                                 {managersData?.length === 0 ? (
                                   <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666' }}>
