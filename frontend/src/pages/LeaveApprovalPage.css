@@ -157,10 +157,10 @@
   width: 60px;
 }
 
-/* 2. Name */
+/* 2. Name - Flexible width */
 .leave-approval-page .requests-table th:nth-child(2),
 .leave-approval-page .requests-table td:nth-child(2) {
-  width: 180px;
+  width: auto;
 }
 
 /* 3. Applied Date */
@@ -188,17 +188,28 @@
   text-align: center;
 }
 
-/* 7. Status - Restrict width to pull Actions closer */
+/* 7. Reason - Flexible width to use extra space */
 .leave-approval-page .requests-table th:nth-child(7),
 .leave-approval-page .requests-table td:nth-child(7) {
+  width: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+  /* Allow growth but cap if needed */
+}
+
+/* 8. Status - Restrict width to pull Actions closer */
+.leave-approval-page .requests-table th:nth-child(8),
+.leave-approval-page .requests-table td:nth-child(8) {
   width: 160px;
   /* Enough for "Partially Approved" badge */
   text-align: center;
 }
 
-/* 8. Actions - Keep narrow */
-.leave-approval-page .requests-table th:nth-child(8),
-.leave-approval-page .requests-table td:nth-child(8) {
+/* 9. Actions - Keep narrow */
+.leave-approval-page .requests-table th:nth-child(9),
+.leave-approval-page .requests-table td:nth-child(9) {
   width: 90px;
   text-align: center;
 }
