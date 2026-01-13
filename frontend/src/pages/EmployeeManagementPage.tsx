@@ -935,10 +935,9 @@ const EmployeeManagementPage: React.FC = () => {
             <table className="employees-table">
               <thead>
                 <tr>
-                  <th>S No</th>
                   <th className="sortable-header" onClick={() => handleSort('empId')}>
                     <div className="header-sort-wrapper">
-                      Emp ID
+                      Id
                       {sortConfig.key === 'empId' ? (
                         sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
                       ) : (
@@ -946,7 +945,7 @@ const EmployeeManagementPage: React.FC = () => {
                       )}
                     </div>
                   </th>
-                  <th>Emp Name</th>
+                  <th>Name</th>
                   <th>
                     <div className="header-sort-wrapper">
                       Role

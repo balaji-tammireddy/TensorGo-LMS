@@ -253,7 +253,7 @@ const HolidayManagementPage: React.FC = () => {
                                                     {sortDirection === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />}
                                                 </div>
                                             </th>
-                                            <th>Holiday Name</th>
+                                            <th>Name</th>
                                             <th>Day</th>
                                             <th>Actions</th>
                                         </tr>

@@ -116,53 +116,48 @@
 }
 
 /* Fix column widths so alignment stays constant when filtering */
+/* Fix column widths so alignment stays constant when filtering */
 .employees-table th:nth-child(1),
 .employees-table td:nth-child(1) {
-  width: 60px;
-  /* S No */
+  width: 100px;
+  /* ID */
 }
 
 .employees-table th:nth-child(2),
 .employees-table td:nth-child(2) {
-  width: 100px;
-  /* Emp ID */
+  width: 220px;
+  /* Name */
 }
 
 .employees-table th:nth-child(3),
 .employees-table td:nth-child(3) {
-  width: 220px;
-  /* Emp Name */
+  width: 130px;
+  /* Role */
 }
 
 .employees-table th:nth-child(4),
 .employees-table td:nth-child(4) {
   width: 130px;
-  /* Role */
+  /* Joining Date */
 }
 
 .employees-table th:nth-child(5),
 .employees-table td:nth-child(5) {
-  width: 130px;
-  /* Joining Date */
-}
-
-.employees-table th:nth-child(6),
-.employees-table td:nth-child(6) {
   width: 120px;
   /* Status */
 }
 
-.employees-table th:nth-child(7),
-.employees-table td:nth-child(7) {
+.employees-table th:nth-child(6),
+.employees-table td:nth-child(6) {
   width: 110px;
   /* Actions */
 }
 
 /* Prevent content from shifting column widths */
+.employees-table td:nth-child(1),
 .employees-table td:nth-child(2),
 .employees-table td:nth-child(3),
-.employees-table td:nth-child(4),
-.employees-table td:nth-child(5) {
+.employees-table td:nth-child(4) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -441,7 +436,11 @@
   font-weight: 700;
   text-align: center;
   color: #333;
+  color: #333;
   border-bottom: 2px solid #eee;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .education-level-col {

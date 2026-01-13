@@ -741,12 +741,11 @@ const LeaveApprovalPage: React.FC = () => {
               <table className="requests-table">
                 <thead>
                   <tr>
-                    <th>S No</th>
-                    <th>EMP ID</th>
-                    <th>EMP NAME</th>
+                    <th>ID</th>
+                    <th>Name</th>
                     <th className="sortable-header" onClick={() => handlePendingSort('appliedDate')}>
                       <div className="header-sort-wrapper">
-                        APPLIED DATE
+                        Applied Date
                         {pendingSortConfig.key === 'appliedDate' ? (
                           pendingSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
                         ) : (
@@ -756,7 +755,7 @@ const LeaveApprovalPage: React.FC = () => {
                     </th>
                     <th className="sortable-header" onClick={() => handlePendingSort('startDate')}>
                       <div className="header-sort-wrapper">
-                        LEAVE DATE
+                        Leave Date
                         {pendingSortConfig.key === 'startDate' ? (
                           pendingSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
                         ) : (
@@ -766,7 +765,7 @@ const LeaveApprovalPage: React.FC = () => {
                     </th>
                     <th>
                       <div className="header-sort-wrapper">
-                        LEAVE TYPE
+                        Leave Type
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -801,10 +800,10 @@ const LeaveApprovalPage: React.FC = () => {
                         </DropdownMenu>
                       </div>
                     </th>
-                    <th>NO OF DAYS</th>
-                    <th>LEAVE REASON</th>
-                    <th>CURRENT STATUS</th>
-                    <th>ACTIONS</th>
+                    <th>Days</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -838,7 +837,7 @@ const LeaveApprovalPage: React.FC = () => {
                           key={request.id}
                           className={isUpdating ? 'updating-row' : ''}
                         >
-                          <td>{idx + 1}</td>
+
                           <td>{request.empId}</td>
                           <td>
                             {request.empName}
@@ -940,12 +939,11 @@ const LeaveApprovalPage: React.FC = () => {
               <table className="requests-table">
                 <thead>
                   <tr>
-                    <th>S No</th>
-                    <th>EMP ID</th>
-                    <th>EMP NAME</th>
+                    <th>ID</th>
+                    <th>Name</th>
                     <th className="sortable-header" onClick={() => handleRecentSort('appliedDate')}>
                       <div className="header-sort-wrapper">
-                        APPLIED DATE
+                        Applied Date
                         {recentSortConfig.key === 'appliedDate' ? (
                           recentSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
                         ) : (
@@ -955,7 +953,7 @@ const LeaveApprovalPage: React.FC = () => {
                     </th>
                     <th className="sortable-header" onClick={() => handleRecentSort('startDate')}>
                       <div className="header-sort-wrapper">
-                        LEAVE DATE
+                        Leave Date
                         {recentSortConfig.key === 'startDate' ? (
                           recentSortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
                         ) : (
@@ -963,10 +961,10 @@ const LeaveApprovalPage: React.FC = () => {
                         )}
                       </div>
                     </th>
-                    <th>LEAVE TYPE</th>
-                    <th>NO OF DAYS</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
+                    <th>Leave Type</th>
+                    <th>Days</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -996,7 +994,7 @@ const LeaveApprovalPage: React.FC = () => {
                           key={request.id}
                           className={isUpdating ? 'updating-row' : ''}
                         >
-                          <td>{idx + 1}</td>
+
                           <td>{request.empId}</td>
                           <td>
                             {request.empName}

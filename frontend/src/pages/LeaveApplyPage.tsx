@@ -1769,7 +1769,7 @@ const LeaveApplyPage: React.FC = () => {
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Holiday Name</th>
+                        <th>Name</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2474,7 +2474,7 @@ const LeaveApplyPage: React.FC = () => {
             <table className="requests-table">
               <thead>
                 <tr>
-                  <th>S. No</th>
+
                   <th className="sortable-header" onClick={() => handleSort('appliedDate')}>
                     <div className="header-sort-wrapper">
                       Applied Date
@@ -2574,7 +2574,7 @@ const LeaveApplyPage: React.FC = () => {
                           key={request.id}
                           className={isUpdating ? 'updating-row' : ''}
                         >
-                          <td>{idx + 1}</td>
+
                           <td>{request.appliedDate ? format(new Date(request.appliedDate + 'T12:00:00'), 'dd-MM-yyyy') : '-'}</td>
                           <td>
                             <div className="reason-cell">
