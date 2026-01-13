@@ -2054,7 +2054,12 @@ const EmployeeManagementPage: React.FC = () => {
                                 >
                                   <span>
                                     {newEmployee.reportingManagerName
-                                      ? `${newEmployee.reportingManagerName} (${managersData?.find((m: any) => m.id === newEmployee.reportingManagerId)?.empId || ''})`
+                                      ? (() => {
+                                        const manager = managersData?.find((m: any) => m.id === newEmployee.reportingManagerId);
+                                        const roleLabel = manager?.role ? getRoleLabel(manager.role) : '';
+                                        // Only show role in selected text if it exists and isn't a placeholder
+                                        return `${newEmployee.reportingManagerName}${roleLabel && roleLabel !== '-' ? ` (${roleLabel})` : ''} (${manager?.empId || ''})`;
+                                      })()
                                       : 'Select Reporting Manager'}
                                   </span>
                                   <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
