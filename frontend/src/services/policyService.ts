@@ -12,3 +12,26 @@ export const getPolicies = async (): Promise<PolicyData[]> => {
     const response = await api.get('/policies');
     return response.data;
 };
+
+export const createPolicy = async (title: string, file: File): Promise<PolicyData> => {
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('file', file);
+    const response = await api.post('/policies', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+};
+
+export const updatePolicy = async (id: number | string, file: File): Promise<PolicyData> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.put(`/policies/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+};
+
+export const deletePolicy = async (id: number | string): Promise<void> => {
+    await api.delete(`/policies/${id}`);
+};

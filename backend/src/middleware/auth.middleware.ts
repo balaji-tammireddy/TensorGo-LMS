@@ -135,3 +135,29 @@ export const authenticateToken = async (
     });
   }
 };
+
+export const authorizeRole = (allowedRoles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      logger.warn('[AUTH] authorizeRole called but user not authenticated');
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'User not authenticated'
+        }
+      });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      logger.warn(`[AUTH] Access denied. User role: ${req.user.role}, Allowed: ${allowedRoles.join(', ')}`);
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access denied'
+        }
+      });
+    }
+
+    next();
+  };
+};
