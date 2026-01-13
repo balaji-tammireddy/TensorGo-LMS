@@ -31,7 +31,7 @@ const LoginPage: React.FC = () => {
   React.useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === 'super_admin') {
-        navigate('/leave-approval');
+        navigate('/dashboard');
       } else {
         navigate('/leave-apply');
       }
@@ -62,7 +62,7 @@ const LoginPage: React.FC = () => {
 
       const loggedInUser = await login(trimmedEmail, trimmedPassword);
       if (loggedInUser.role === 'super_admin') {
-        navigate('/leave-approval');
+        navigate('/dashboard');
       } else {
         navigate('/leave-apply');
       }

@@ -17,6 +17,7 @@ import leaveRoutes from './routes/leave.routes';
 import employeeRoutes from './routes/employee.routes';
 import profileRoutes from './routes/profile.routes';
 import policyRoutes from './routes/policy.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 import { pool } from './database/db';
 import { checkAndCreditMonthlyLeaves } from './services/leaveCredit.service';
@@ -82,6 +83,7 @@ app.use('/api/leave', leaveRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/policies', policyRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error handling
 app.use(errorHandler);

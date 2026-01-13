@@ -889,15 +889,13 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   // Super admin should not have a reporting manager
-  if (isRoleBeingUpdated && employeeData.role === 'super_admin') {
-    employeeData.reportingManagerId = null;
-    employeeData.reportingManagerName = null;
-  } else if (employeeRole === 'super_admin' && (employeeData.reportingManagerId !== undefined || employeeData.reportingManagerName !== undefined)) {
+  const finalRole = employeeData.role || employeeRole;
+  if (finalRole === 'super_admin') {
     employeeData.reportingManagerId = null;
     employeeData.reportingManagerName = null;
   }
 
-  // Prevent role change OR transition to 'inactive' status if there are subordinates reporting to this user
+  // Prevent role change (DOWNGRADE ONLY) OR transition to 'inactive' status if there are subordinates reporting to this user
   const formattedDbRole = String(employeeRole || '').trim().toLowerCase();
   const formattedDbStatus = String(dbStatus || '').trim().toLowerCase();
   const requestedRole = employeeData.role ? String(employeeData.role).trim().toLowerCase() : null;
@@ -906,7 +904,19 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const isRoleTransition = requestedRole !== null && requestedRole !== formattedDbRole;
   const isInactiveTransition = requestedStatus === 'inactive' && formattedDbStatus !== 'inactive';
 
-  if (isRoleTransition || isInactiveTransition) {
+  // Define Hierarchy Levels
+  const highHierarchy = ['super_admin', 'hr', 'manager'];
+  const lowHierarchy = ['employee', 'intern'];
+
+  // Check if this is a downgrade (High -> Low)
+  const isDowngrade = isRoleTransition &&
+    highHierarchy.includes(formattedDbRole) &&
+    lowHierarchy.includes(requestedRole!);
+
+  // Block if:
+  // 1. It is a Downgrade (High -> Low) AND has subordinates
+  // 2. OR Status changing to Inactive AND has subordinates
+  if (isDowngrade || isInactiveTransition) {
     const activeSubordinates = await pool.query(
       'SELECT id FROM users WHERE reporting_manager_id = $1 AND status IN (\'active\', \'on_leave\', \'on_notice\') LIMIT 1',
       [employeeId]
@@ -914,9 +924,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
     if (activeSubordinates.rows.length > 0) {
       const name = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
-      const actionLabel = isRoleTransition ? 'role' : 'status';
-      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] ${actionLabel} change BLOCKED for user ${employeeId} due to existing active subordinates.`);
-      throw new Error(`Please remove the users reporting to ${name} and try again.`);
+      const reason = isDowngrade
+        ? 'downgrading to a role that cannot approve leaves'
+        : 'deactivating the user';
+
+      logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Action BLOCKED for user ${employeeId} due to existing active subordinates. Reason: ${reason}`);
+      throw new Error(`Cannot proceed with ${reason}. Please remove the users reporting to ${name} and try again.`);
     }
   }
 

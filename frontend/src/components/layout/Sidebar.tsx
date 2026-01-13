@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -42,6 +42,11 @@ const Sidebar: React.FC = memo(() => {
     if (!user) return [];
 
     const routes: Array<{ path: string; icon: React.ReactNode; label: string }> = [];
+
+    // Dashboard - Only for Super Admin
+    if (user.role === 'super_admin') {
+      routes.push({ path: '/dashboard', icon: <FaChartPie />, label: 'Dashboard' });
+    }
 
     // Leave Apply available to everyone except super_admin
     if (user.role !== 'super_admin') {

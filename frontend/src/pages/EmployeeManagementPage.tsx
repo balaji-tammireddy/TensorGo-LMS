@@ -22,6 +22,7 @@ import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
 import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
 import './EmployeeManagementPage.css';
 
 const sanitizeName = (value: string) => {
@@ -268,6 +269,10 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
   }, [showLeaveHistory, isModalOpen]);
+
+  const location = useLocation();
+
+
 
 
 
@@ -787,6 +792,29 @@ const EmployeeManagementPage: React.FC = () => {
 
   const handleViewEmployee = (employeeId: number) => openEmployeeModal(employeeId, 'view');
 
+  // Deep linking for Dashboard
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const deepLinkEmpId = searchParams.get('empId');
+
+    if (deepLinkEmpId && !isModalOpen) {
+      const findAndOpen = async () => {
+        try {
+          const result = await employeeService.getEmployees(1, 1, deepLinkEmpId);
+          if (result.employees && result.employees.length > 0) {
+            const employee = result.employees[0];
+            if (employee.empId === deepLinkEmpId) {
+              openEmployeeModal(employee.id, 'view');
+            }
+          }
+        } catch (e) {
+          console.error("Deep link failed", e);
+        }
+      }
+      findAndOpen();
+    }
+  }, [location.search]);
+
   const handleDelete = (employeeId: number) => {
     setDeleteEmployeeId(employeeId);
     setDeleteConfirmOpen(true);
@@ -1256,19 +1284,21 @@ const EmployeeManagementPage: React.FC = () => {
                                     onSelect={(e) => {
                                       const subCount = newEmployee.subordinateCount ? parseInt(String(newEmployee.subordinateCount), 10) : 0;
 
-                                      if (isEditMode && subCount > 0 && newEmployee.role !== role) {
+                                      const highHierarchy = ['super_admin', 'hr', 'manager'];
+                                      const lowHierarchy = ['employee', 'intern'];
+                                      const isDowngrade = highHierarchy.includes(newEmployee.role) && lowHierarchy.includes(role);
+
+                                      if (isEditMode && subCount > 0 && newEmployee.role !== role && isDowngrade) {
                                         e.preventDefault();
                                         const name = `${newEmployee.firstName} ${newEmployee.lastName || ''}`.trim();
-                                        showWarning(`Please remove the users reporting to ${name} and try again.`);
+                                        showWarning(`Cannot proceed with downgrading to a role that cannot approve leaves. Please remove the users reporting to ${name} and try again.`);
                                         return;
                                       }
 
                                       const newRole = role;
                                       setNewEmployee({
                                         ...newEmployee,
-                                        role: newRole,
-                                        reportingManagerId: null,
-                                        reportingManagerName: ''
+                                        role: newRole
                                       });
                                     }}
                                   >
