@@ -48,6 +48,7 @@ app.use(
         return callback(null, true);
       }
 
+      logger.warn(`Blocked by CORS: Origin '${origin}' does not match allowed origin '${allowedOrigin}'`);
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
