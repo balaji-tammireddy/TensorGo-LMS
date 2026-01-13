@@ -174,6 +174,7 @@ const EmployeeManagementPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
   const [managerSearch, setManagerSearch] = useState('');
   const [appliedManagerSearch, setAppliedManagerSearch] = useState<string | undefined>(undefined);
+  const [initialEmployeeData, setInitialEmployeeData] = useState<any>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'empId', direction: 'asc' });
 
   const handleSort = (key: string) => {
@@ -352,7 +353,9 @@ const EmployeeManagementPage: React.FC = () => {
 
   const handleOpenAddEmployee = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    setNewEmployee({ ...emptyEmployeeForm, dateOfJoining: today });
+    const initial = { ...emptyEmployeeForm, dateOfJoining: today };
+    setNewEmployee(initial);
+    setInitialEmployeeData(initial);
     setIsSameAddress(false);
     setIsEditMode(false);
     setIsViewMode(false);
@@ -731,7 +734,7 @@ const EmployeeManagementPage: React.FC = () => {
 
       const employeeDetail = data.employee || data;
 
-      setNewEmployee({
+      const fetchedEmployee = {
         ...emptyEmployeeForm,
         empId: employeeDetail.emp_id || '',
         role: employeeDetail.role || '',
@@ -741,7 +744,7 @@ const EmployeeManagementPage: React.FC = () => {
         lastName: employeeDetail.last_name || '',
         contactNumber: employeeDetail.contact_number || employeeDetail.contactNumber || '',
         altContact: employeeDetail.alt_contact || employeeDetail.altContact || '',
-        dateOfBirth: employeeDetail.date_of_birth ? (typeof employeeDetail.date_of_birth === 'string' ? employeeDetail.date_of_birth.split('T')[0] : employeeDetail.date_of_birth.toISOString().split('T')[0]) : '',
+        dateOfBirth: employeeDetail.date_of_birth ? (typeof employeeDetail.date_of_birth === 'string' ? employeeDetail.date_of_birth.split('T')[0] : new Date(employeeDetail.date_of_birth).toISOString().split('T')[0]) : '',
         gender: employeeDetail.gender || '',
         bloodGroup: employeeDetail.blood_group || '',
         maritalStatus: employeeDetail.marital_status || '',
@@ -751,7 +754,7 @@ const EmployeeManagementPage: React.FC = () => {
         designation: employeeDetail.designation || '',
         department: employeeDetail.department || '',
         dateOfJoining: employeeDetail.date_of_joining
-          ? employeeDetail.date_of_joining.split('T')[0]
+          ? (typeof employeeDetail.date_of_joining === 'string' ? employeeDetail.date_of_joining.split('T')[0] : new Date(employeeDetail.date_of_joining).toISOString().split('T')[0])
           : today,
         aadharNumber: employeeDetail.aadhar_number || '',
         panNumber: employeeDetail.pan_number || '',
@@ -762,7 +765,10 @@ const EmployeeManagementPage: React.FC = () => {
         reportingManagerName: employeeDetail.reporting_manager_full_name || employeeDetail.reporting_manager_name || '',
         reportingManagerId: employeeDetail.reporting_manager_id || null,
         subordinateCount: employeeDetail.subordinate_count ? parseInt(String(employeeDetail.subordinate_count), 10) : 0
-      });
+      };
+
+      setNewEmployee(fetchedEmployee);
+      setInitialEmployeeData(fetchedEmployee);
 
       setIsSameAddress(same);
       setIsEditMode(mode === 'edit');
@@ -1704,7 +1710,7 @@ const EmployeeManagementPage: React.FC = () => {
                             isEmployeeVariant={true}
                           />
                         </div>
-                        {isEditMode && (
+                        {(isEditMode || isViewMode) && (
                           <div className="employee-modal-field">
                             <label>Status</label>
                             <DropdownMenu>
@@ -1712,6 +1718,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 <Button
                                   variant="outline"
                                   className="leave-type-dropdown-trigger"
+                                  disabled={isViewMode}
                                   style={{
                                     width: '100%',
                                     justifyContent: 'space-between',
@@ -2162,6 +2169,7 @@ const EmployeeManagementPage: React.FC = () => {
                               return;
                             }
                           }
+                          setInitialEmployeeData(newEmployee);
                           setIsViewMode(false);
                           setIsEditMode(true);
                           // Also hide leave history if showing
@@ -2178,11 +2186,18 @@ const EmployeeManagementPage: React.FC = () => {
                       type="button"
                       className="modal-cancel-button"
                       onClick={() => {
-                        setIsModalOpen(false);
-                        setIsEditMode(false);
-                        setIsViewMode(false);
-                        setEditingEmployeeId(null);
-                        setShowLeaveHistory(false);
+                        if (editingEmployeeId) {
+                          // If editing an existing employee, go back to view mode
+                          setIsViewMode(true);
+                          setIsEditMode(false);
+                        } else {
+                          // If adding a new employee, close the modal
+                          setIsModalOpen(false);
+                          setIsEditMode(false);
+                          setIsViewMode(false);
+                          setEditingEmployeeId(null);
+                          setShowLeaveHistory(false);
+                        }
                       }}
                     >
                       Cancel
@@ -2191,7 +2206,15 @@ const EmployeeManagementPage: React.FC = () => {
                       type="button"
                       className="modal-save-button"
                       onClick={handleCreateEmployee}
-                      disabled={createMutation.isLoading || updateEmployeeMutation.isLoading}
+                      disabled={
+                        createMutation.isLoading ||
+                        updateEmployeeMutation.isLoading ||
+                        (isEditMode && JSON.stringify(newEmployee) === JSON.stringify(initialEmployeeData))
+                      }
+                      style={{
+                        opacity: (isEditMode && JSON.stringify(newEmployee) === JSON.stringify(initialEmployeeData)) ? 0.5 : 1,
+                        cursor: (isEditMode && JSON.stringify(newEmployee) === JSON.stringify(initialEmployeeData)) ? 'not-allowed' : 'pointer'
+                      }}
                     >
                       {(createMutation.isLoading || updateEmployeeMutation.isLoading) ? (
                         <>
