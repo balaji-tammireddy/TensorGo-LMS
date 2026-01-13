@@ -144,73 +144,141 @@
   border-spacing: 0;
 }
 
-/* Scope to leave-approval-page to match user request "only in leave approval module" */
+/* SHARED Table Styles */
 .leave-approval-page .requests-table {
   table-layout: fixed;
-  /* Force column widths */
+  /* Fixed layout for consistent distribution */
   width: 100%;
 }
 
-/* 1. ID */
-.leave-approval-page .requests-table th:nth-child(1),
-.leave-approval-page .requests-table td:nth-child(1) {
-  width: 60px;
-}
-
-/* 2. Name - Flexible width */
-.leave-approval-page .requests-table th:nth-child(2),
-.leave-approval-page .requests-table td:nth-child(2) {
-  width: auto;
-}
-
-/* 3. Applied Date */
-.leave-approval-page .requests-table th:nth-child(3),
-.leave-approval-page .requests-table td:nth-child(3) {
-  width: 120px;
-}
-
-/* 4. Leave Date (Range can be long) */
-.leave-approval-page .requests-table th:nth-child(4),
-.leave-approval-page .requests-table td:nth-child(4) {
-  width: 200px;
-}
-
-/* 5. Leave Type */
-.leave-approval-page .requests-table th:nth-child(5),
-.leave-approval-page .requests-table td:nth-child(5) {
-  width: 100px;
-}
-
-/* 6. Days */
-.leave-approval-page .requests-table th:nth-child(6),
-.leave-approval-page .requests-table td:nth-child(6) {
-  width: 70px;
-  text-align: center;
-}
-
-/* 7. Reason - Flexible width to use extra space */
-.leave-approval-page .requests-table th:nth-child(7),
-.leave-approval-page .requests-table td:nth-child(7) {
-  width: auto;
+/* Force headers to stay on one line */
+.leave-approval-page .requests-table th {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 300px;
-  /* Allow growth but cap if needed */
+  padding: 12px;
 }
 
-/* 8. Status - Restrict width to pull Actions closer */
-.leave-approval-page .requests-table th:nth-child(8),
-.leave-approval-page .requests-table td:nth-child(8) {
-  width: 160px;
-  /* Enough for "Partially Approved" badge */
+.leave-approval-page .requests-table td {
+  padding: 12px;
+  vertical-align: middle;
+  word-wrap: break-word;
+  /* Allow content to wrap if needed */
+}
+
+/* --- Pending Requests (9 Columns) --- */
+/* Total = 100% */
+/* 1. ID */
+.pending-requests-section .requests-table th:nth-child(1),
+.pending-requests-section .requests-table td:nth-child(1) {
+  width: 5%;
+}
+
+/* 2. Name */
+.pending-requests-section .requests-table th:nth-child(2),
+.pending-requests-section .requests-table td:nth-child(2) {
+  width: 14%;
+}
+
+/* 3. Applied Date */
+.pending-requests-section .requests-table th:nth-child(3),
+.pending-requests-section .requests-table td:nth-child(3) {
+  width: 10%;
+}
+
+/* 4. Leave Date */
+.pending-requests-section .requests-table th:nth-child(4),
+.pending-requests-section .requests-table td:nth-child(4) {
+  width: 16%;
+}
+
+/* 5. Leave Type */
+.pending-requests-section .requests-table th:nth-child(5),
+.pending-requests-section .requests-table td:nth-child(5) {
+  width: 10%;
+}
+
+/* 6. Days */
+.pending-requests-section .requests-table th:nth-child(6),
+.pending-requests-section .requests-table td:nth-child(6) {
+  width: 5%;
   text-align: center;
 }
 
-/* 9. Actions - Keep narrow */
-.leave-approval-page .requests-table th:nth-child(9),
-.leave-approval-page .requests-table td:nth-child(9) {
-  width: 90px;
+/* 7. Reason */
+.pending-requests-section .requests-table th:nth-child(7),
+.pending-requests-section .requests-table td:nth-child(7) {
+  width: 20%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 8. Status */
+.pending-requests-section .requests-table th:nth-child(8),
+.pending-requests-section .requests-table td:nth-child(8) {
+  width: 12%;
+  text-align: center;
+}
+
+/* 9. Actions */
+.pending-requests-section .requests-table th:nth-child(9),
+.pending-requests-section .requests-table td:nth-child(9) {
+  width: 8%;
+  text-align: center;
+}
+
+
+/* --- Approved/Recent Requests (8 Columns) --- */
+/* Total = 100% */
+/* 1. ID */
+.approved-requests-section .requests-table th:nth-child(1),
+.approved-requests-section .requests-table td:nth-child(1) {
+  width: 5%;
+}
+
+/* 2. Name (Flexible - fills space) */
+.approved-requests-section .requests-table th:nth-child(2),
+.approved-requests-section .requests-table td:nth-child(2) {
+  width: 18%;
+}
+
+/* 3. Applied Date */
+.approved-requests-section .requests-table th:nth-child(3),
+.approved-requests-section .requests-table td:nth-child(3) {
+  width: 12%;
+}
+
+/* 4. Leave Date */
+.approved-requests-section .requests-table th:nth-child(4),
+.approved-requests-section .requests-table td:nth-child(4) {
+  width: 22%;
+}
+
+/* 5. Leave Type */
+.approved-requests-section .requests-table th:nth-child(5),
+.approved-requests-section .requests-table td:nth-child(5) {
+  width: 12%;
+}
+
+/* 6. Days */
+.approved-requests-section .requests-table th:nth-child(6),
+.approved-requests-section .requests-table td:nth-child(6) {
+  width: 6%;
+  text-align: center;
+}
+
+/* 7. Status */
+.approved-requests-section .requests-table th:nth-child(7),
+.approved-requests-section .requests-table td:nth-child(7) {
+  width: 15%;
+  text-align: center;
+}
+
+/* 8. Actions */
+.approved-requests-section .requests-table th:nth-child(8),
+.approved-requests-section .requests-table td:nth-child(8) {
+  width: 10%;
   text-align: center;
 }
 
