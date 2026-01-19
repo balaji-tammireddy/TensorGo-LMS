@@ -20,7 +20,8 @@ import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown, FaHistory, FaPlus, FaFilter, FaDownload } from 'react-icons/fa';
+import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import './EmployeeManagementPage.css';
@@ -182,6 +183,8 @@ const EmployeeManagementPage: React.FC = () => {
   const [managerSearch, setManagerSearch] = useState('');
   const [appliedManagerSearch, setAppliedManagerSearch] = useState<string | undefined>(undefined);
   const [initialEmployeeData, setInitialEmployeeData] = useState<any>(null);
+  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<any>(null);
+  const [isLeaveDetailsModalOpen, setIsLeaveDetailsModalOpen] = useState(false);
   const location = useLocation();
 
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'empId', direction: 'asc' });
@@ -1229,6 +1232,7 @@ const EmployeeManagementPage: React.FC = () => {
                               <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>End Date</th>
                               <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Days</th>
                               <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Status</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1245,6 +1249,17 @@ const EmployeeManagementPage: React.FC = () => {
                                 if (status === 'partially_approved') return 'Partially Approved';
                                 return 'Pending';
                               };
+
+                              const handleViewDetails = () => {
+                                setSelectedLeaveRequest({
+                                  ...request,
+                                  empStatus: newEmployee.status,
+                                  canEdit: false,
+                                  canDelete: false
+                                });
+                                setIsLeaveDetailsModalOpen(true);
+                              };
+
                               return (
                                 <tr key={request.id} style={{ borderBottom: '1px solid #e5e5e5' }}>
                                   <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
@@ -1256,6 +1271,17 @@ const EmployeeManagementPage: React.FC = () => {
                                     <span className={`status-badge ${getStatusClass(request.currentStatus)}`}>
                                       {getStatusLabel(request.currentStatus)}
                                     </span>
+                                  </td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>
+                                    <div className="actions-wrapper" style={{ justifyContent: 'center' }}>
+                                      <button
+                                        className="action-btn view-btn"
+                                        onClick={handleViewDetails}
+                                        title="View Details"
+                                      >
+                                        <FaEye />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -2287,6 +2313,13 @@ const EmployeeManagementPage: React.FC = () => {
         employeeName={selectedEmployeeForLeaves?.name || ''}
         employeeStatus={selectedEmployeeForLeaves?.status || 'active'}
         isLoading={addLeavesMutation.isLoading}
+      />
+
+      {/* Employee Leave Details Modal */}
+      <EmployeeLeaveDetailsModal
+        isOpen={isLeaveDetailsModalOpen}
+        leaveRequest={selectedLeaveRequest}
+        onClose={() => setIsLeaveDetailsModalOpen(false)}
       />
     </AppLayout>
   );

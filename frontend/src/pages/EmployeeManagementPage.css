@@ -753,6 +753,7 @@
 .education-table th {
   padding: 6px 8px !important;
 }
+
 .modal-section-heading {
   font-size: 16px;
   font-weight: 600;
@@ -814,7 +815,8 @@
   flex-direction: column !important;
   overflow-y: hidden !important;
   padding-bottom: 0px !important;
-  max-height: calc(90vh - 60px) !important; /* Modal height minus header */
+  max-height: calc(90vh - 60px) !important;
+  /* Modal height minus header */
 }
 
 .leave-details-fixed-header {
@@ -824,7 +826,8 @@
 
 .leave-history-table-container {
   flex: 1;
-  overflow: auto !important; /* Handles both x and y scrolling */
+  overflow: auto !important;
+  /* Handles both x and y scrolling */
   min-height: 0;
   margin-top: 8px;
   border: 1px solid #e5e5e5;
@@ -834,7 +837,8 @@
 .leave-history-table-container table {
   width: 100%;
   border-spacing: 0;
-  border-collapse: separate; /* Required for sticky headers with borders to work best in some cases */
+  border-collapse: separate;
+  /* Required for sticky headers with borders to work best in some cases */
 }
 
 .leave-history-table-container table thead th {
@@ -843,7 +847,8 @@
   z-index: 20;
   background-color: #f8f9fa;
   padding: 10px 8px;
-  box-shadow: inset 0 -1px 0 #e5e5e5; /* The "fixed" bottom border for sticky header */
+  box-shadow: inset 0 -1px 0 #e5e5e5;
+  /* The "fixed" bottom border for sticky header */
   font-weight: 600;
   text-align: left;
 }
