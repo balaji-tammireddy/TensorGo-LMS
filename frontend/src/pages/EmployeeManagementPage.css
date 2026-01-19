@@ -377,7 +377,7 @@
 
 .employee-modal-field .date-picker-input {
   border: none;
-  border-radius: 0;
+  border-radius: 4px;
   background: transparent;
   padding: 0;
   display: flex;
@@ -391,11 +391,15 @@
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #000000;
+  color: #64748b;
   pointer-events: none;
   display: flex;
   align-items: center;
   z-index: 1;
+}
+
+.employee-modal-field .date-picker-input-disabled .date-picker-icon-container {
+  color: #94a3b8 !important;
 }
 
 .same-address-checkbox {
@@ -539,12 +543,6 @@
 .modal-save-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
-}
-
-.modal-save-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-  transform: none;
 }
 
 /* Skeleton Loader Styles for Employee Management Page */
@@ -739,7 +737,7 @@
 .leave-type-dropdown-trigger:disabled {
   background-color: #f0f0f0 !important;
   color: #888 !important;
-  border: 1px solid #d1d1d1 !important;
+  border: none !important;
   opacity: 1 !important;
   cursor: default !important;
 }

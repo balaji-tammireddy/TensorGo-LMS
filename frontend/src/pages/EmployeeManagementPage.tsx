@@ -119,6 +119,7 @@ const formatEducationLevel = (level: string): React.ReactNode => {
 };
 
 const emptyEmployeeForm = {
+  id: null as number | null,
   empId: '',
   role: '',
   email: '',
@@ -747,6 +748,7 @@ const EmployeeManagementPage: React.FC = () => {
 
       const fetchedEmployee = {
         ...emptyEmployeeForm,
+        id: employeeDetail.id,
         empId: employeeDetail.emp_id || '',
         role: employeeDetail.role || '',
         email: employeeDetail.email || '',
@@ -1099,26 +1101,38 @@ const EmployeeManagementPage: React.FC = () => {
                           >
                             <FaEye />
                           </button>
-                          {/* Edit button moved to view modal */}
-                          {/* HR and Super Admin can add leaves, but HR cannot add to themselves or super_admin or other HR, and Super Admin cannot add to themselves */}
-                          {/* Also hide for inactive/resigned/terminated employees */}
-                          {((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
-                            (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin')) &&
-                            (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned') && (
-                              <button
-                                className="action-btn add-leaves-btn"
-                                title="Add Leaves"
-                                onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
-                              >
-                                <FaCalendarPlus />
-                              </button>
-                            )}
-                          {/* Super Admin can delete employees but not themselves */}
-                          {user?.role === 'super_admin' && employee.id !== user.id && (
+                          {/* Add Leaves button (Always visible, disabled if no permission) */}
+                          <button
+                            className="action-btn add-leaves-btn"
+                            title={
+                              !(employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
+                                ? "Cannot add leaves for inactive/resigned employees"
+                                : ((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
+                                  (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin'))
+                                  ? "Add Leaves"
+                                  : "You do not have permission to add leaves for this employee"
+                            }
+                            onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
+                            disabled={
+                              !(((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
+                                (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin')) &&
+                                (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned'))
+                            }
+                          >
+                            <FaCalendarPlus />
+                          </button>
+
+                          {/* Delete button (Visible to Super Admin and HR) */}
+                          {(user?.role === 'super_admin' || user?.role === 'hr') && (
                             <button
                               className="action-btn delete-btn"
-                              title="Delete"
+                              title={
+                                user?.role === 'hr'
+                                  ? "HR does not have permission to delete employees"
+                                  : (employee.id === user.id ? "You cannot delete your own account" : "Delete")
+                              }
                               onClick={() => handleDelete(employee.id)}
+                              disabled={user?.role === 'hr' || employee.id === user.id}
                             >
                               <FaTrash />
                             </button>
@@ -1161,7 +1175,7 @@ const EmployeeManagementPage: React.FC = () => {
                 )}
                 {showLeaveHistory ? (
                   <div className="employee-modal-section" style={{ marginTop: 0, marginBottom: 0 }}>
-                    <h3 style={{ marginTop: 0 }}>Leave History</h3>
+                    <h3 style={{ marginTop: 0 }}>Leave Details</h3>
                     {leaveHistoryLoading ? (
                       <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
                         Loading leave history...
@@ -1213,7 +1227,7 @@ const EmployeeManagementPage: React.FC = () => {
                       </div>
                     ) : (
                       <EmptyState
-                        title="No Leave History"
+                        title="No Leave Details"
                         description="This employee hasn't applied for any leaves yet."
                       />
                     )}
@@ -1252,20 +1266,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 variant="outline"
                                 className="leave-type-dropdown-trigger"
                                 disabled={isViewMode || (isEditMode && user?.role !== 'hr' && user?.role !== 'super_admin')}
-                                style={{
-                                  width: '100%',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 12px',
-                                  fontSize: '14px',
-                                  fontFamily: 'Poppins, sans-serif',
-                                  border: '1px solid #ddd',
-                                  borderRadius: '4px',
-                                  backgroundColor: 'transparent',
-                                  color: '#1f2a3d',
-                                  height: 'auto',
-                                  minHeight: '42px',
-                                  lineHeight: '1.5'
-                                }}
                               >
                                 <span>
                                   {newEmployee.role === '' ? '' :
@@ -1477,20 +1477,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 variant="outline"
                                 className="leave-type-dropdown-trigger"
                                 disabled={isViewMode}
-                                style={{
-                                  width: '100%',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 12px',
-                                  fontSize: '14px',
-                                  fontFamily: 'Poppins, sans-serif',
-                                  border: '1px solid #ddd',
-                                  borderRadius: '4px',
-                                  backgroundColor: 'transparent',
-                                  color: '#1f2a3d',
-                                  height: 'auto',
-                                  minHeight: '42px',
-                                  lineHeight: '1.5'
-                                }}
                               >
                                 <span>{newEmployee.gender || ''}</span>
                                 <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
@@ -1527,20 +1513,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 variant="outline"
                                 className="leave-type-dropdown-trigger"
                                 disabled={isViewMode}
-                                style={{
-                                  width: '100%',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 12px',
-                                  fontSize: '14px',
-                                  fontFamily: 'Poppins, sans-serif',
-                                  border: '1px solid #ddd',
-                                  borderRadius: '4px',
-                                  backgroundColor: 'transparent',
-                                  color: '#1f2a3d',
-                                  height: 'auto',
-                                  minHeight: '42px',
-                                  lineHeight: '1.5'
-                                }}
                               >
                                 <span>{newEmployee.bloodGroup || ''}</span>
                                 <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
@@ -1570,20 +1542,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 variant="outline"
                                 className="leave-type-dropdown-trigger"
                                 disabled={isViewMode}
-                                style={{
-                                  width: '100%',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 12px',
-                                  fontSize: '14px',
-                                  fontFamily: 'Poppins, sans-serif',
-                                  border: '1px solid #ddd',
-                                  borderRadius: '4px',
-                                  backgroundColor: 'transparent',
-                                  color: '#1f2a3d',
-                                  height: 'auto',
-                                  minHeight: '42px',
-                                  lineHeight: '1.5'
-                                }}
                               >
                                 <span>{newEmployee.maritalStatus || ''}</span>
                                 <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
@@ -1755,20 +1713,6 @@ const EmployeeManagementPage: React.FC = () => {
                                   variant="outline"
                                   className="leave-type-dropdown-trigger"
                                   disabled={isViewMode}
-                                  style={{
-                                    width: '100%',
-                                    justifyContent: 'space-between',
-                                    padding: '10px 12px',
-                                    fontSize: '14px',
-                                    fontFamily: 'Poppins, sans-serif',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                    backgroundColor: 'transparent',
-                                    color: '#1f2a3d',
-                                    height: 'auto',
-                                    minHeight: '42px',
-                                    lineHeight: '1.5'
-                                  }}
                                 >
                                   <span>
                                     {newEmployee.status === 'active' ? 'Active' :
@@ -2052,18 +1996,6 @@ const EmployeeManagementPage: React.FC = () => {
                               variant="outline"
                               className="leave-type-dropdown-trigger"
                               disabled
-                              style={{
-                                width: '100%',
-                                justifyContent: 'space-between',
-                                padding: '6px 8px',
-                                fontSize: '12px',
-                                fontFamily: 'Poppins, sans-serif',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                backgroundColor: 'transparent',
-                                color: '#1f2a3d',
-                                height: 'auto'
-                              }}
                             >
                               <span>Please select role first</span>
                               <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
@@ -2075,20 +2007,6 @@ const EmployeeManagementPage: React.FC = () => {
                                   variant="outline"
                                   className="leave-type-dropdown-trigger"
                                   disabled={isViewMode}
-                                  style={{
-                                    width: '100%',
-                                    justifyContent: 'space-between',
-                                    padding: '10px 12px',
-                                    fontSize: '14px',
-                                    fontFamily: 'Poppins, sans-serif',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                    backgroundColor: 'transparent',
-                                    color: '#1f2a3d',
-                                    height: 'auto',
-                                    minHeight: '42px',
-                                    lineHeight: '1.5'
-                                  }}
                                 >
                                   <span>
                                     {newEmployee.reportingManagerName
@@ -2222,28 +2140,26 @@ const EmployeeManagementPage: React.FC = () => {
                         }
                         setShowLeaveHistory(!showLeaveHistory);
                       }}
+                      disabled={newEmployee.role === 'super_admin'}
+                      title={newEmployee.role === 'super_admin' ? "Super Admins do not have leave records" : ""}
                     >
-                      {showLeaveHistory ? 'Back to Details' : 'Leave History'}
+                      {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
                     </button>
                     {/* Edit Employee Button (HR/Super Admin only) */}
                     {user && (user.role === 'super_admin' || user.role === 'hr') && (
                       <button
                         type="button"
                         className="modal-save-button"
-                        style={{
-                          marginLeft: '10px',
-                          background: 'linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%)',
-                          border: '1px solid #2951c8'
-                        }}
+                        style={{ marginLeft: '10px' }}
+                        title={
+                          newEmployee.id === user.id
+                            ? "Please update your own details from the Profile page"
+                            : (user.role === 'hr' && (newEmployee.role === 'super_admin' || newEmployee.role === 'hr'))
+                              ? "HR cannot edit Super Admin or other HR details"
+                              : "Edit Employee"
+                        }
+                        disabled={newEmployee.id === user.id || (user.role === 'hr' && (newEmployee.role === 'super_admin' || newEmployee.role === 'hr'))}
                         onClick={() => {
-                          // Check permissions
-                          if (user.role === 'hr') {
-                            // HR cannot edit super_admin or other HR
-                            if (newEmployee.role === 'super_admin' || newEmployee.role === 'hr') {
-                              showWarning('You are not authorized to edit this employee');
-                              return;
-                            }
-                          }
                           setInitialEmployeeData(newEmployee);
                           setIsViewMode(false);
                           setIsEditMode(true);

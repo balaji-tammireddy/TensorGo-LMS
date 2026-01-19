@@ -226,83 +226,20 @@
   height: 36px !important;
 }
 
-.profile-field-trigger:disabled {
-  background-color: #f0f0f0 !important;
-  color: #888 !important;
-  border: 1px solid #d1d1d1 !important;
-  opacity: 1 !important;
-  cursor: default !important;
-}
-
-.form-group .date-picker-input-field {
-  padding: 6px 10px;
-  padding-right: 30px;
+.date-picker-input-field {
+  padding: 6px 10px !important;
   border: 1px solid #ddd !important;
   border-radius: 4px !important;
-  background: transparent;
-  font-size: 13px;
-  line-height: 1.5;
-  height: 36px;
-  font-family: 'Poppins', sans-serif;
-  color: #1f2a3d;
-  width: 100%;
-  box-sizing: border-box;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  height: 36px !important;
+  background-color: #ffffff !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #1f2a3d !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
-.vp-container {
-  padding: 30px;
-  font-family: 'Poppins', sans-serif;
-  color: #1f2a3d;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.form-group .date-picker-input {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  position: relative;
-  width: 100%;
-}
-
-.form-group .date-picker-icon-container {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #000000;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  z-index: 1;
-}
-
-.date-picker-input-disabled .date-picker-icon-container {
-  color: #888 !important;
-  opacity: 0.6;
-}
-
-.date-picker-input-disabled {
-  background-color: #f0f0f0 !important;
-  border: 1px solid #d1d1d1 !important;
-  border-radius: 4px !important;
-  opacity: 1 !important;
-}
-
-.form-group input:disabled,
-.form-group select:disabled,
-.form-group textarea:disabled,
-.form-group .date-picker-input-field:disabled {
-  background-color: #f0f0f0 !important;
-  color: #888 !important;
-  border: 1px solid #d1d1d1 !important;
-  border-radius: 4px !important;
-  cursor: default !important;
-  opacity: 1 !important;
-}
 
 .checkbox-group {
   display: flex;

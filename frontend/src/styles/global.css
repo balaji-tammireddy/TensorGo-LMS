@@ -61,6 +61,35 @@ select {
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
+input:disabled,
+select:disabled,
+textarea:disabled,
+.button:disabled {
+  background-color: #f0f0f0 !important;
+  color: #888 !important;
+  border: none !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Specific for calendar/date - remove border when disabled */
+input[type="date"]:disabled,
+.date-picker-input-disabled,
+.date-picker-input-disabled .date-picker-input-field {
+  border: none !important;
+  background-color: #f0f0f0 !important;
+  border-radius: 4px !important;
+}
+
+/* Also for selects in view mode - remove arrow and border */
+select:disabled {
+  background-image: none !important;
+  border: none !important;
+  background-color: #f0f0f0 !important;
+}
+
 input[type="date"],
 select {
   height: 42px;
@@ -255,13 +284,6 @@ tr:hover {
   box-shadow: 0 4px 12px rgba(0, 200, 83, 0.25);
 }
 
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
 .status-badge:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);
@@ -275,6 +297,11 @@ td {
 }
 
 button:disabled {
-  opacity: 0.6;
+  background: #e5e7eb !important;
+  color: #9ca3af !important;
+  border: 1px solid #d1d5db !important;
+  opacity: 1 !important;
   cursor: not-allowed;
+  box-shadow: none !important;
+  transform: none !important;
 }
