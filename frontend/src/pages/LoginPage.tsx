@@ -231,8 +231,11 @@ const LoginPage: React.FC = () => {
                 <img src="https://hr--lms.s3.us-east-va.io.cloud.ovh.us/login-page/logo.png" alt="TensorGo logo" />
               </div>
             </div>
+            <div className="welcome-header">
+              <h2 className="welcome-title">WELCOME</h2>
+              <p className="welcome-subtitle">Please sign in to continue</p>
+            </div>
             <form onSubmit={handleSubmit} className="login-form">
-              <h1>INTRANET</h1>
               <div className="form-group">
                 <label>Email</label>
                 <input
