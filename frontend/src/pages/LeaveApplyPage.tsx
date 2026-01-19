@@ -351,9 +351,9 @@ const LeaveApplyPage: React.FC = () => {
 
 
 
-  // Clear doctor note when not needed
+  // Clear doctor note when not needed (Sick or LOP can have proof)
   useEffect(() => {
-    if (formData.leaveType !== 'sick') {
+    if (formData.leaveType !== 'sick' && formData.leaveType !== 'lop') {
       setDoctorNoteFile(null);
       setExistingDoctorNote(null);
     }
@@ -1408,15 +1408,14 @@ const LeaveApplyPage: React.FC = () => {
       };
     }
 
-    // Upload doctor note if provided (optional for all sick leaves)
-    // If editing and no new file is uploaded, preserve existing doctor note
-    if (formData.leaveType === 'sick') {
+    // Upload proof if provided (doctorNote is used for both sick and lop proof)
+    // If editing and no new file is uploaded, preserve existing proof
+    if (formData.leaveType === 'sick' || formData.leaveType === 'lop') {
       if (doctorNoteFile) {
         // Send file directly - backend will handle upload to OVHcloud
         submitData.doctorNote = doctorNoteFile;
       } else if (editingId && existingDoctorNote) {
-        // Preserve existing doctor note when editing without uploading new file
-        // Could be OVHcloud key (medical-certificates/...) or base64 (data:...)
+        // Preserve existing proof when editing without uploading new file
         submitData.doctorNote = existingDoctorNote;
       }
     }
@@ -2112,15 +2111,15 @@ const LeaveApplyPage: React.FC = () => {
                   </div>
                 </>
               )}
-              {formData.leaveType === 'sick' && (
+              {(formData.leaveType === 'sick' || formData.leaveType === 'lop') && (
                 <div className="form-group doctor-note-group">
-                  <label>Doctor Prescription</label>
+                  <label>{formData.leaveType === 'sick' ? 'Doctor Prescription' : 'Upload Proof (Optional)'}</label>
                   <input
                     ref={doctorNoteInputRef}
                     id="doctor-note-input"
                     className="doctor-note-input"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     onChange={(e) => setDoctorNoteFile(e.target.files?.[0] || null)}
                   />
                   <button
@@ -2130,7 +2129,7 @@ const LeaveApplyPage: React.FC = () => {
                       doctorNoteInputRef.current?.click();
                     }}
                   >
-                    {doctorNoteFile ? 'Change prescription file' : 'Upload prescription'}
+                    {doctorNoteFile ? `Change ${formData.leaveType === 'sick' ? 'prescription' : 'proof'} file` : `Upload ${formData.leaveType === 'sick' ? 'prescription' : 'proof'}`}
                   </button>
                   <div className="doctor-note-meta">
                     {doctorNoteFile && (

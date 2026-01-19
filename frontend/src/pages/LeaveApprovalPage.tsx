@@ -28,12 +28,11 @@ const LeaveApprovalPage: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
-  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [updatingRequestIds, setUpdatingRequestIds] = useState<Set<number>>(new Set());
   const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
-  const [isRefetchingRequest, setIsRefetchingRequest] = useState(false);
   const [recentFilterDate, setRecentFilterDate] = useState('');
   const [recentSearchInput, setRecentSearchInput] = useState('');
   const [recentSearch, setRecentSearch] = useState('');
@@ -255,66 +254,7 @@ const LeaveApprovalPage: React.FC = () => {
     rejectMutation.mutate({ id: requestId, dayIds: selectedDayIds, comment: reason });
   };
 
-  const convertLopToCasualMutation = useMutation(
-    (requestId: number) => leaveService.convertLeaveRequestLopToCasual(requestId),
-    {
-      onMutate: async (requestId) => {
-        await queryClient.cancelQueries(['pendingLeaves']);
-        const previousPending = queryClient.getQueryData(['pendingLeaves']);
 
-        // Optimistically update leave type in the list
-        queryClient.setQueryData(['pendingLeaves'], (old: any) => {
-          if (!old?.requests) return old;
-          return {
-            ...old,
-            requests: old.requests.map((r: any) =>
-              r.id === requestId ? { ...r, leaveType: 'casual' } : r
-            )
-          };
-        });
-
-        return { previousPending };
-      },
-      onSuccess: async (_response, requestId) => {
-        // Invalidate in background
-        queryClient.invalidateQueries(['pendingLeaves']);
-        queryClient.invalidateQueries(['approvedLeaves']);
-        queryClient.invalidateQueries(['leaveBalances']);
-        showSuccess('Converted LOP to Casual Successfully!');
-
-        // Update selected request if modal is open - fetch full updated request to get new leave day IDs
-        if (selectedRequest && selectedRequest.id === requestId) {
-          try {
-            setIsRefetchingRequest(true);
-            const updatedRequest = await leaveService.getLeaveRequest(requestId);
-            // We need to merge because leaveService.getLeaveRequest might not have all fields 
-            // used in LeaveApprovalPage (like empId, empName)
-            setSelectedRequest({
-              ...selectedRequest,
-              ...updatedRequest,
-              leaveType: 'casual', // Explicitly set to match state
-              leaveDays: updatedRequest.leaveDays || []
-            });
-          } catch (error) {
-            console.error('Failed to refetch request after conversion:', error);
-          } finally {
-            setIsRefetchingRequest(false);
-          }
-        }
-      },
-      onError: (error: any, _requestId, context) => {
-        // Rollback on error
-        if (context?.previousPending) {
-          queryClient.setQueryData(['pendingLeaves'], context.previousPending);
-        }
-        showError(error.response?.data?.error?.message || 'Conversion failed');
-      }
-    }
-  );
-
-  const handleConvertLopToCasual = (requestId: number) => {
-    convertLopToCasualMutation.mutate(requestId);
-  };
 
 
   const handleViewApprovedLeave = async (requestId: number) => {
@@ -827,7 +767,7 @@ const LeaveApprovalPage: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    groupedPendingRequests.map((request: any, idx: number) => {
+                    groupedPendingRequests.map((request: any) => {
                       const isUpdating = updatingRequestIds.has(request.id);
                       const leaveDateRange = request.leaveDays && request.leaveDays.length > 0
                         ? `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`
@@ -987,7 +927,7 @@ const LeaveApprovalPage: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredApprovedRequests.map((request: any, idx: number) => {
+                    filteredApprovedRequests.map((request: any) => {
                       const isUpdating = updatingRequestIds.has(request.id) || (editingRequestId === request.id);
                       return (
                         <tr
@@ -1058,9 +998,7 @@ const LeaveApprovalPage: React.FC = () => {
         onApprove={handleModalApprove}
         onReject={handleModalReject}
         onUpdate={handleUpdateStatus}
-        onConvertLopToCasual={handleConvertLopToCasual}
-        isLoading={updateStatusMutation.isLoading || isRefetchingRequest}
-        isConverting={convertLopToCasualMutation.isLoading}
+        isLoading={updateStatusMutation.isLoading}
         isEditMode={isEditMode}
         userRole={user?.role}
         onEdit={() => {

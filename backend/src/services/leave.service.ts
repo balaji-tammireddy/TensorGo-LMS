@@ -1415,273 +1415,7 @@ export const updateLeaveRequest = async (
   }
 };
 
-/**
- * Convert leave request from LOP to Casual
- * Only HR and Super Admin can perform this conversion
- * This will:
- * 1. Change leave_type from 'lop' to 'casual'
- * 2. Refund LOP balance (add back the days)
- * 3. Deduct casual balance (if sufficient)
- */
-export const convertLeaveRequestLopToCasual = async (
-  requestId: number,
-  userId: number,
-  userRole: string
-) => {
-  logger.info(`[LEAVE] [CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
-  logger.info(`[LEAVE] [CONVERT LOP TO CASUAL] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}`);
 
-  // Only HR and Super Admin can convert leave types
-  if (userRole !== 'hr' && userRole !== 'super_admin') {
-    logger.warn(`[LEAVE] [CONVERT LOP TO CASUAL] Unauthorized attempt - User ID: ${userId}, Role: ${userRole}`);
-    throw new Error('Only HR and Super Admin can convert leave types');
-  }
-
-  // Get leave request details with employee, approver, manager, and HR information
-  const leaveResult = await pool.query(
-    `SELECT 
-      lr.id, lr.employee_id, lr.leave_type, lr.no_of_days, lr.current_status,
-      lr.start_date, lr.start_type, lr.end_date, lr.end_type, lr.reason,
-      u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
-      u.email as employee_email,
-      u.emp_id as employee_emp_id,
-      u.role as employee_role,
-      u.reporting_manager_id,
-      approver.first_name || ' ' || COALESCE(approver.last_name, '') as converter_name,
-      approver.emp_id as converter_emp_id,
-      manager.email as manager_email,
-      manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
-      hr.email as hr_email,
-      hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name
-     FROM leave_requests lr
-     JOIN users u ON lr.employee_id = u.id
-     LEFT JOIN users approver ON approver.id = $2
-     LEFT JOIN users manager ON u.reporting_manager_id = manager.id
-     LEFT JOIN users hr ON manager.reporting_manager_id = hr.id
-     WHERE lr.id = $1`,
-    [requestId, userId]
-  );
-
-  if (leaveResult.rows.length === 0) {
-    throw new Error('Leave request not found');
-  }
-
-  const leave = leaveResult.rows[0];
-
-  // Restrict conversion to pending requests only
-  if (leave.current_status !== 'pending') {
-    throw new Error('Cannot convert leave type: Request is already approved or rejected');
-  }
-
-  logger.info(`[CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
-  logger.info(`[CONVERT LOP TO CASUAL] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}`);
-  logger.info(`[CONVERT LOP TO CASUAL] Leave data:`, {
-    employee_id: leave.employee_id,
-    employee_name: leave.employee_name,
-    employee_email: leave.employee_email,
-    employee_emp_id: leave.employee_emp_id,
-    leave_type: leave.leave_type,
-    no_of_days: leave.no_of_days,
-    hr_email: leave.hr_email,
-    hr_name: leave.hr_name
-  });
-
-  // Only allow conversion from LOP to Casual
-  if (leave.leave_type !== 'lop') {
-    throw new Error('Can only convert LOP leave requests to Casual. Current leave type is not LOP.');
-  }
-
-  const employeeId = leave.employee_id;
-  /* REMOVED: Old hardcoded noOfDays logic
-  const noOfDays = parseFloat(leave.no_of_days) || 0;
-  if (noOfDays <= 0) { throw new Error('Invalid number of days in leave request'); }
-  */
-
-  // Recalculate days based on 'casual' rules (excludes weekends/holidays)
-  // This handles the edge case where LOP included weekends/holidays but Casual should not.
-  const normalizedStartType = (leave.start_type === 'first_half' || leave.start_type === 'second_half') ? 'half' : leave.start_type;
-  const normalizedEndType = (leave.end_type === 'first_half' || leave.end_type === 'second_half') ? 'half' : leave.end_type;
-
-  const { days: newNoOfDays, leaveDays: newLeaveDaysList } = await calculateLeaveDays(
-    new Date(leave.start_date),
-    new Date(leave.end_date),
-    normalizedStartType as 'full' | 'half',
-    normalizedEndType as 'full' | 'half',
-    'casual',
-    leave.employee_role
-  );
-
-  const originalLopDays = parseFloat(leave.no_of_days) || 0;
-
-  // Get current balances
-  const balanceResult = await pool.query(
-    'SELECT casual_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
-    [employeeId]
-  );
-
-  let currentCasual = 0;
-  let currentLop = 0;
-
-  if (balanceResult.rows.length === 0) {
-    // Create balance record if it doesn't exist
-    await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 0)',
-      [employeeId]
-    );
-  } else {
-    currentCasual = parseFloat(balanceResult.rows[0].casual_balance || '0') || 0;
-    currentLop = parseFloat(balanceResult.rows[0].lop_balance || '0') || 0;
-  }
-
-  // Check if casual balance is sufficient after conversion
-  // Refund ORIGINAL LOP days, Deduct NEW calculated casual days
-  let newLopBalance = currentLop + originalLopDays; // Refund what was originally taken
-  const newCasualBalance = currentCasual - newNoOfDays; // Deduct what is valid for casual
-
-  // Check if casual balance would go negative
-  if (newCasualBalance < 0) {
-    throw new Error(`Insufficient casual balance. Available: ${currentCasual}, Required: ${newNoOfDays}`);
-  }
-
-  // Check if casual balance would exceed 99 days
-  if (newCasualBalance > 99) {
-    throw new Error(`Cannot convert. Casual balance would exceed 99 days. Current: ${currentCasual}, After conversion: ${newCasualBalance}`);
-  }
-
-  // Ensure LOP balance never exceeds 10
-  if (newLopBalance > 10) {
-    logger.warn(
-      `LOP balance would exceed 10 after conversion. Current: ${currentLop}, Refunding: ${originalLopDays}, Would be: ${newLopBalance}. Capping at 10.`
-    );
-    newLopBalance = 10;
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query('BEGIN');
-
-    // Update leave_type AND no_of_days (since casual excludes weekends)
-    await client.query(
-      `UPDATE leave_requests 
-       SET leave_type = 'casual',
-           no_of_days = $1,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [newNoOfDays, requestId]
-    );
-
-    // Delete OLD leave days (which may include weekends/holidays)
-    await client.query('DELETE FROM leave_days WHERE leave_request_id = $1', [requestId]);
-
-    // Insert NEW leave days (only valid casual days)
-    for (const day of newLeaveDaysList) {
-      const leaveDayDate = new Date(day.date);
-      const ldYear = leaveDayDate.getFullYear();
-      const ldMonth = String(leaveDayDate.getMonth() + 1).padStart(2, '0');
-      const ldDay = String(leaveDayDate.getDate()).padStart(2, '0');
-      const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
-
-      await client.query(
-        'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)',
-        [requestId, leaveDayDateStr, day.type, 'casual', employeeId]
-      );
-    }
-
-    // Adjust balances:
-    // Refund LOP (add back the days that were deducted when leave was applied)
-    // Deduct Casual (subtract the days)
-    await client.query(
-      `UPDATE leave_balances 
-       SET lop_balance = $1,
-           casual_balance = $2,
-           last_updated = CURRENT_TIMESTAMP,
-           updated_by = $3
-       WHERE employee_id = $4`,
-      [newLopBalance, newCasualBalance, userId, employeeId]
-    );
-
-    await client.query('COMMIT');
-
-    // Recalculate status just in case (to ensure current_status mirrors the new days)
-    try {
-      await recalcLeaveRequestStatus(requestId);
-    } catch (recalcError) {
-      logger.error(`Failed to recalculate status after conversion for request ${requestId}:`, recalcError);
-    }
-
-    logger.info(
-      `Leave request ${requestId} converted from LOP to Casual by ${userRole} (user ${userId}). ` +
-      `Employee: ${leave.employee_name}. ` +
-      `Days: ${originalLopDays} (LOP) -> ${newNoOfDays} (Casual). ` +
-      `Balances: LOP ${currentLop} → ${newLopBalance} (refunded), Casual ${currentCasual} → ${newCasualBalance} (deducted)`
-    );
-
-    // ========== SEND EMAIL NOTIFICATIONS ==========
-    logger.info(`[EMAIL] ========== STARTING EMAIL NOTIFICATION FOR LOP TO CASUAL CONVERSION ==========`);
-    logger.info(`[EMAIL] Request ID: ${requestId}, Converter ID: ${userId}, Converter Role: ${userRole}`);
-
-    const emailData = {
-      employeeName: leave.employee_name || 'Employee',
-      employeeEmpId: leave.employee_emp_id || '',
-      leaveType: 'casual', // After conversion
-      startDate: leave.start_date,
-      startType: leave.start_type || 'full',
-      endDate: leave.end_date,
-      endType: leave.end_type || 'full',
-      noOfDays: newNoOfDays,
-      reason: leave.reason || '',
-      converterName: leave.converter_name || 'Converter',
-      converterEmpId: leave.converter_emp_id || '',
-      converterRole: userRole,
-      previousLopBalance: currentLop,
-      newLopBalance: newLopBalance,
-      previousCasualBalance: currentCasual,
-      newCasualBalance: newCasualBalance,
-      conversionDate: new Date().toISOString()
-    };
-
-    // Send email notifications based on converter role - ONE EMAIL with TO/CC
-    logger.info(`[EMAIL] Converter role: ${userRole}, Employee email: ${leave.employee_email || 'NO EMAIL'}, HR email: ${leave.hr_email || 'NO EMAIL'}`);
-
-    if (leave.employee_email) {
-      try {
-        // No CC for LOP to Casual conversion (Item 5: send mail only to the employee)
-        const ccEmails: string[] = [];
-        logger.info(`[EMAIL] sending LOP to Casual conversion email to employee (TO) only`);
-
-        const emailResult = await sendLopToCasualConversionEmail(leave.employee_email, {
-          ...emailData,
-          recipientName: leave.employee_name || 'Employee',
-          recipientRole: 'employee' as const
-        }, ccEmails.length > 0 ? ccEmails : undefined);
-
-        logger.info(`[EMAIL] ✅ Conversion email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}, Result: ${emailResult}`);
-      } catch (err: any) {
-        logger.error(`[EMAIL] ❌ Error sending conversion email:`, err);
-        logger.error(`[EMAIL] ❌ Error details:`, err.message, err.stack);
-      }
-    } else {
-      logger.warn(`[EMAIL] ⚠️ No employee email found, cannot send conversion email`);
-    }
-
-    logger.info(`[EMAIL] ========== EMAIL NOTIFICATION COMPLETED FOR LOP TO CASUAL CONVERSION ==========`);
-
-    return {
-      message: `Leave request converted from LOP to Casual successfully`,
-      previousLop: currentLop,
-      newLop: newLopBalance,
-      previousCasual: currentCasual,
-      newCasual: newCasualBalance
-    };
-  } catch (error: any) {
-    await client.query('ROLLBACK');
-    logger.error(`Failed to convert leave request ${requestId} from LOP to Casual:`, error);
-    throw error;
-  } finally {
-    client.release();
-  }
-};
 
 export const deleteLeaveRequest = async (requestId: number, userId: number, userRole?: string) => {
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] ========== FUNCTION CALLED ==========`);
@@ -4130,4 +3864,138 @@ export const updateHoliday = async (id: number, holidayDate: string, holidayName
 
   logger.info(`[LEAVE SERVICE] [UPDATE HOLIDAY] Holiday updated successfully - ID: ${id}`);
   return result.rows[0];
+};
+
+/**
+ * Convert a leave request from LOP to Casual
+ * Only for Super Admin and requires proof (doctor_note)
+ */
+export const convertLeaveRequestLopToCasual = async (requestId: number, adminUserId: number) => {
+  logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] ========== FUNCTION CALLED ==========`);
+  logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Request ID: ${requestId}, Admin User ID: ${adminUserId}`);
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Fetch the leave request with employee details
+    const requestResult = await client.query(
+      `SELECT lr.*, u.id as employee_id, u.first_name, u.last_name, u.emp_id, u.email, u.reporting_manager_id
+       FROM leave_requests lr
+       JOIN users u ON lr.employee_id = u.id
+       WHERE lr.id = $1`,
+      [requestId]
+    );
+
+    if (requestResult.rows.length === 0) {
+      throw new Error('Leave request not found');
+    }
+
+    const request = requestResult.rows[0];
+
+    // 2. Validate it's an LOP request
+    if (request.leave_type !== 'lop') {
+      throw new Error('Only LOP leave requests can be converted to Casual leave');
+    }
+
+    // 3. Validate proof exists (doctor_note is not null)
+    if (!request.doctor_note) {
+      throw new Error('No proof attached. Conversion from LOP to Casual requires an uploaded document.');
+    }
+
+    const employeeId = request.employee_id;
+    const noOfDays = parseFloat(request.no_of_days);
+
+    // 4. Check Casual balance
+    const balanceResult = await client.query(
+      'SELECT casual_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
+      [employeeId]
+    );
+
+    if (balanceResult.rows.length === 0) {
+      throw new Error('Leave balance record not found for employee');
+    }
+
+    const previousCasualBalance = parseFloat(balanceResult.rows[0].casual_balance) || 0;
+    const previousLopBalance = parseFloat(balanceResult.rows[0].lop_balance) || 0;
+
+    if (previousCasualBalance < noOfDays) {
+      throw new Error(`Insufficient Casual leave balance. Available: ${previousCasualBalance}, Required: ${noOfDays}`);
+    }
+
+    // 5. Perform balance adjustment
+    const newCasualBalance = previousCasualBalance - noOfDays;
+    const newLopBalance = previousLopBalance + noOfDays; // Refund LOP
+
+    await client.query(
+      'UPDATE leave_balances SET casual_balance = $1, lop_balance = $2 WHERE employee_id = $3',
+      [newCasualBalance, newLopBalance, employeeId]
+    );
+
+    // 6. Update leave request type
+    await client.query(
+      'UPDATE leave_requests SET leave_type = $1 WHERE id = $2',
+      ['casual', requestId]
+    );
+
+    // 7. Update leave days type
+    await client.query(
+      'UPDATE leave_days SET leave_type = $1 WHERE leave_request_id = $2',
+      ['casual', requestId]
+    );
+
+    // 8. Log the conversion in an audit log (optional but good practice)
+    logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Successfully converted request ${requestId} for employee ${employeeId}`);
+
+    await client.query('COMMIT');
+
+    // 9. Send notification email - Fire and forget
+    (async () => {
+      try {
+        const adminResult = await pool.query('SELECT first_name, emp_id, role FROM users WHERE id = $1', [adminUserId]);
+        const admin = adminResult.rows[0];
+
+        await sendLopToCasualConversionEmail(request.email, {
+          employeeName: `${request.first_name} ${request.last_name}`,
+          employeeEmpId: request.emp_id,
+          recipientName: `${request.first_name} ${request.last_name}`,
+          recipientRole: 'employee',
+          leaveType: 'Casual', // New type
+          startDate: formatDate(request.start_date),
+          startType: request.start_type,
+          endDate: formatDate(request.end_date),
+          endType: request.end_type,
+          noOfDays: noOfDays,
+          reason: request.reason,
+          converterName: admin.first_name,
+          converterEmpId: admin.emp_id,
+          converterRole: admin.role,
+          previousLopBalance,
+          newLopBalance,
+          previousCasualBalance,
+          newCasualBalance,
+          conversionDate: formatDate(new Date())
+        });
+        logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Notification email sent to ${request.email}`);
+      } catch (emailError: any) {
+        logger.error(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Failed to send notification email: ${emailError.message}`);
+      }
+    })();
+
+    return {
+      leaveRequestId: requestId,
+      previousCasualBalance,
+      newCasualBalance,
+      previousLopBalance,
+      newLopBalance
+    };
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Error:`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
 };

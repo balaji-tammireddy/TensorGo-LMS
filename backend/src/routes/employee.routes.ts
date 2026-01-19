@@ -26,7 +26,7 @@ router.get('/:id/leave-balances', employeeController.getEmployeeLeaveBalances);
 // HR and Super Admin can send carryforward emails to all employees
 router.post('/send-carryforward-emails', employeeController.sendCarryForwardEmails);
 // HR and Super Admin can convert LOP leaves to casual leaves (only if LOP balance exists)
-router.post('/:id/convert-lop-to-casual', employeeController.convertLopToCasual);
+
 
 export default router;
 

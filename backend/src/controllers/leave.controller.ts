@@ -158,8 +158,8 @@ export const applyLeave = [
 
       const leaveData = { ...bodyData };
 
-      // Handle medical certificate file upload
-      if (req.file && req.body.leaveType === 'sick') {
+      // Handle medical certificate file upload (Sick or LOP proof)
+      if (req.file && (req.body.leaveType === 'sick' || req.body.leaveType === 'lop')) {
         localFilePath = req.file.path;
         const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
 
@@ -179,7 +179,8 @@ export const applyLeave = [
 
             // Store key instead of base64
             leaveData.doctorNote = certificateKey;
-            logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] Medical certificate uploaded to OVHcloud: ${certificateKey}`);
+            const logMsg = req.body.leaveType === 'lop' ? 'LOP proof' : 'Medical certificate';
+            logger.info(`[CONTROLLER] [LEAVE] [APPLY LEAVE] ${logMsg} uploaded to OVHcloud: ${certificateKey}`);
           } catch (ovhError: any) {
             // Fallback: convert to base64 if OVHcloud upload fails
             logger.warn(`[CONTROLLER] [LEAVE] [APPLY LEAVE] OVHcloud upload failed, falling back to base64: ${ovhError.message}`);
@@ -748,8 +749,8 @@ export const updateLeaveRequest = [
 
       const leaveData = { ...bodyData };
 
-      // Handle medical certificate file upload
-      if (req.file && req.body.leaveType === 'sick') {
+      // Handle medical certificate file upload (Sick or LOP proof)
+      if (req.file && (req.body.leaveType === 'sick' || req.body.leaveType === 'lop')) {
         localFilePath = req.file.path;
         const useOVHCloud = process.env.OVH_ACCESS_KEY && process.env.OVH_SECRET_KEY && process.env.OVH_BUCKET_NAME;
 
@@ -769,7 +770,8 @@ export const updateLeaveRequest = [
 
             // Store key instead of base64
             leaveData.doctorNote = certificateKey;
-            logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] Medical certificate uploaded to OVHcloud: ${certificateKey}`);
+            const logMsg = req.body.leaveType === 'lop' ? 'LOP proof' : 'Medical certificate';
+            logger.info(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] ${logMsg} uploaded to OVHcloud: ${certificateKey}`);
           } catch (ovhError: any) {
             // Fallback: convert to base64 if OVHcloud upload fails
             logger.warn(`[CONTROLLER] [LEAVE] [UPDATE LEAVE REQUEST] OVHcloud upload failed, falling back to base64: ${ovhError.message}`);
@@ -943,68 +945,7 @@ export const deleteLeaveRequest = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Convert leave request from LOP to Casual
- * Only HR and Super Admin can perform this conversion
- */
-export const convertLeaveRequestLopToCasual = async (req: AuthRequest, res: Response) => {
-  logger.info(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] ========== REQUEST RECEIVED ==========`);
-  logger.info(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Request ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
 
-  try {
-    // Ensure only HR and super_admin can convert leave types
-    if (req.user?.role !== 'hr' && req.user?.role !== 'super_admin') {
-      logger.warn(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
-      return res.status(403).json({
-        error: {
-          code: 'FORBIDDEN',
-          message: 'Only HR and Super Admin can convert leave types'
-        }
-      });
-    }
-
-    const requestId = parseInt(req.params.id);
-    if (isNaN(requestId)) {
-      logger.warn(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Invalid leave request ID: ${req.params.id}`);
-      return res.status(400).json({
-        error: {
-          code: 'BAD_REQUEST',
-          message: 'Invalid leave request ID'
-        }
-      });
-    }
-
-    const result = await leaveService.convertLeaveRequestLopToCasual(
-      requestId,
-      req.user!.id,
-      req.user!.role
-    );
-
-    logger.info(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Leave converted successfully - Request ID: ${requestId}`);
-    res.json({
-      success: true,
-      ...result
-    });
-  } catch (error: any) {
-    logger.error(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Error:`, error);
-    const isValidationError = error.message && (
-      error.message.includes('not found') ||
-      error.message.includes('not LOP') ||
-      error.message.includes('Insufficient') ||
-      error.message.includes('exceed')
-    );
-
-    const statusCode = isValidationError ? 400 : 500;
-    const errorCode = isValidationError ? 'BAD_REQUEST' : 'SERVER_ERROR';
-
-    res.status(statusCode).json({
-      error: {
-        code: errorCode,
-        message: error.message || 'An error occurred while converting leave request'
-      }
-    });
-  }
-};
 
 /**
  * Create a new holiday
@@ -1196,6 +1137,56 @@ export const updateHoliday = async (req: AuthRequest, res: Response) => {
       error: {
         code: 'SERVER_ERROR',
         message: error.message || 'Failed to update holiday'
+      }
+    });
+  }
+};
+/**
+ * Convert a leave request from LOP to Casual
+ * Only accessible by Super Admin and requires a proof file
+ */
+export const convertLeaveRequestLopToCasual = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Request ID: ${req.params.id}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
+
+  try {
+    const requestId = parseInt(req.params.id);
+
+    // 1. Verify role is super_admin
+    if (req.user!.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Unauthorized attempt - User ID: ${req.user!.id}, Role: ${req.user!.role}`);
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only Super Admins can convert LOP leave to Casual leave'
+        }
+      });
+    }
+
+    // 2. Call service to perform conversion (includes existence and proof checks)
+    const result = await leaveService.convertLeaveRequestLopToCasual(requestId, req.user!.id);
+
+    logger.info(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Conversion successful - Request ID: ${requestId}`);
+    res.json({
+      success: true,
+      message: 'Leave request converted from LOP to Casual successfully',
+      ...result
+    });
+  } catch (error: any) {
+    logger.error(`[CONTROLLER] [LEAVE] [CONVERT LOP TO CASUAL] Error:`, error);
+
+    // Check for specific error messages to return appropriate status codes
+    const isValidationError = error.message && (
+      error.message.includes('not found') ||
+      error.message.includes('No proof') ||
+      error.message.includes('not LOP') ||
+      error.message.includes('Insufficient')
+    );
+
+    res.status(isValidationError ? 400 : 500).json({
+      error: {
+        code: isValidationError ? 'BAD_REQUEST' : 'SERVER_ERROR',
+        message: error.message || 'Failed to convert leave request'
       }
     });
   }

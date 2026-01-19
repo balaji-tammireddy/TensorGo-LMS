@@ -1513,6 +1513,8 @@ export const sendEmployeeDetailsUpdateEmail = async (
   });
 };
 
+
+
 // ============================================================================
 // LOP TO CASUAL CONVERSION EMAIL
 // ============================================================================
@@ -1601,7 +1603,6 @@ const generateLopToCasualConversionEmailHtml = (data: LopToCasualConversionEmail
 const generateLopToCasualConversionEmailText = (data: LopToCasualConversionEmailData): string => {
   const startDateDisplay = formatDateForDisplay(data.startDate);
   const endDateDisplay = formatDateForDisplay(data.endDate);
-  const converterRoleDisplay = data.converterRole === 'hr' ? 'HR' : 'Super Admin';
 
   return `
 Leave Type Converted - LOP to Casual

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaCheck, FaTimesCircle, FaExchangeAlt, FaPencilAlt } from 'react-icons/fa';
+import { FaTimes, FaCheck, FaTimesCircle, FaPencilAlt } from 'react-icons/fa';
 import { format, parse, eachDayOfInterval } from 'date-fns';
-import ConfirmationDialog from './ConfirmationDialog';
+
 import { DatePicker } from './ui/date-picker';
 import {
   DropdownMenu,
@@ -51,12 +51,10 @@ interface LeaveDetailsModalProps {
   onApprove: (requestId: number, selectedDayIds?: number[]) => void;
   onReject: (requestId: number, selectedDayIds?: number[], reason?: string) => void;
   onUpdate?: (requestId: number, status: string, selectedDayIds?: number[], rejectReason?: string, leaveReason?: string) => void;
-  onConvertLopToCasual?: (requestId: number) => void;
   onEdit?: () => void;
   isLoading?: boolean;
   isEditMode?: boolean;
   userRole?: string;
-  isConverting?: boolean;
 }
 
 const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
@@ -66,19 +64,16 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   onApprove,
   onReject,
   onUpdate,
-  onConvertLopToCasual,
   onEdit,
   isLoading = false,
   isEditMode = false,
   userRole,
-  isConverting = false
 }) => {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
-  const [showConvertConfirmDialog, setShowConvertConfirmDialog] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
 
   // Prevent body scrolling when modal is open
@@ -103,7 +98,6 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setShowRejectDialog(false);
       setRejectReason('');
       setSelectedStatus('');
-      setShowConvertConfirmDialog(false);
     } else if (isOpen && leaveRequest) {
       // Fetch holidays if not already fetched
       if (holidays.length === 0) {
@@ -338,36 +332,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
     return leaveRequest.currentStatus;
   };
 
-  // Calculate projected casual days (excluding weekends and holidays)
-  const calculateProjectedCasualDays = () => {
-    if (!leaveRequest || !leaveRequest.leaveDays) return 0;
 
-    return leaveRequest.leaveDays.reduce((count, day) => {
-      // Normalize dates to YYYY-MM-DD for comparison
-      const dayDateObj = new Date(day.date);
-      const dayDateStr = format(dayDateObj, 'yyyy-MM-dd');
-      const dayOfWeek = dayDateObj.getDay(); // 0 = Sunday, 6 = Saturday
-
-      // Check if it's a weekend
-      const isSunday = dayOfWeek === 0;
-      const isSaturday = dayOfWeek === 6;
-      const isIntern = leaveRequest.empRole?.toLowerCase() === 'intern';
-      const isWeekend = isSunday || (isSaturday && !isIntern);
-
-      // Check if it's a holiday - normalize holiday date string too
-      const isHoliday = holidays.some(h => {
-        const holidayDateStr = format(new Date(h.date), 'yyyy-MM-dd');
-        return holidayDateStr === dayDateStr;
-      });
-
-      if (!isWeekend && !isHoliday) {
-        return count + (day.type === 'half' ? 0.5 : 1);
-      }
-      return count;
-    }, 0);
-  };
-
-  const projectedCasualDays = calculateProjectedCasualDays();
 
   const isDateDisabled = (date: Date) => {
     if (leaveRequest?.leaveType === 'lop') return false;
@@ -570,37 +535,59 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 </div>
               )}
 
-              {leaveRequest.leaveType === 'sick' && leaveRequest.doctorNote && (
+              {(leaveRequest.leaveType === 'sick' || leaveRequest.leaveType === 'lop') && leaveRequest.doctorNote && (
                 <div className="leave-detail-item leave-detail-item-full">
-                  <label>Doctor Prescription</label>
+                  <label>{leaveRequest.leaveType === 'sick' ? 'Doctor Prescription' : 'Leave Proof'}</label>
                   <div className="prescription-container">
                     <button
                       type="button"
                       className="prescription-view-button"
                       onClick={async () => {
-                        let imageUrl: string;
+                        let fileUrl: string;
 
                         // Check if it's an OVHcloud key or base64
                         if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('medical-certificates/')) {
-                          // Request signed URL from backend
                           try {
                             const { signedUrl } = await leaveService.getMedicalCertificateSignedUrl(leaveRequest.id);
-                            imageUrl = signedUrl;
+                            fileUrl = signedUrl;
                           } catch (err) {
                             console.error('Failed to get signed URL:', err);
-                            alert('Failed to load medical certificate. Please try again.');
+                            alert(`Failed to load ${leaveRequest.leaveType === 'sick' ? 'medical certificate' : 'proof'}. Please try again.`);
                             return;
                           }
                         } else if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('data:')) {
-                          // Base64 - use as-is
-                          imageUrl = leaveRequest.doctorNote;
+                          fileUrl = leaveRequest.doctorNote;
                         } else {
-                          // Fallback - try as base64
-                          imageUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
+                          fileUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
                         }
 
+                        // Determine if it's a PDF
+                        const isPDF = fileUrl.toLowerCase().includes('.pdf') || fileUrl.startsWith('data:application/pdf');
+
+                        if (isPDF) {
+                          // For PDFs, open in a new tab
+                          if (fileUrl.startsWith('data:')) {
+                            // Handle base64 PDF
+                            const base64Data = fileUrl.split(',')[1];
+                            const binaryString = window.atob(base64Data);
+                            const len = binaryString.length;
+                            const bytes = new Uint8Array(len);
+                            for (let i = 0; i < len; i++) {
+                              bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            const blob = new Blob([bytes], { type: 'application/pdf' });
+                            const blobUrl = URL.createObjectURL(blob);
+                            window.open(blobUrl, '_blank');
+                          } else {
+                            window.open(fileUrl, '_blank');
+                          }
+                          return;
+                        }
+
+                        // For images, use the existing overlay
                         const img = document.createElement('img');
-                        img.src = imageUrl;
+                        img.src = fileUrl;
+                        img.className = 'proof-preview-image';
                         img.style.maxWidth = '90vw';
                         img.style.maxHeight = '90vh';
                         img.style.objectFit = 'contain';
@@ -625,20 +612,6 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         closeButton.style.alignItems = 'center';
                         closeButton.style.justifyContent = 'center';
                         closeButton.style.zIndex = '10001';
-                        closeButton.style.transition = 'background-color 0.2s';
-                        closeButton.onmouseenter = () => {
-                          closeButton.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-                        };
-                        closeButton.onmouseleave = () => {
-                          closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                        };
-
-                        const closeOverlay = () => {
-                          if (document.body.contains(overlay)) {
-                            document.body.removeChild(overlay);
-                          }
-                        };
-
                         closeButton.onclick = (e) => {
                           e.stopPropagation();
                           closeOverlay();
@@ -656,6 +629,12 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         overlay.style.justifyContent = 'center';
                         overlay.style.zIndex = '10000';
                         overlay.style.cursor = 'pointer';
+
+                        const closeOverlay = () => {
+                          if (document.body.contains(overlay)) {
+                            document.body.removeChild(overlay);
+                          }
+                        };
                         overlay.onclick = closeOverlay;
 
                         overlay.appendChild(img);
@@ -663,7 +642,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                         document.body.appendChild(overlay);
                       }}
                     >
-                      View Prescription
+                      {leaveRequest.leaveType === 'sick' ? 'View Prescription' : 'View Proof'}
                     </button>
                   </div>
                 </div>
@@ -770,45 +749,46 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
             <button
               className="leave-details-modal-button leave-details-modal-button-cancel"
               onClick={onClose}
-              disabled={isLoading || isConverting}
+              disabled={isLoading}
             >
               Close
             </button>
-            {leaveRequest.leaveType === 'lop' &&
-              leaveRequest.currentStatus === 'pending' &&
-              leaveRequest.empStatus !== 'on_notice' &&
-              leaveRequest.empStatus !== 'On Notice' && // Add case-insensitive check just in case
-              (userRole === 'hr' || userRole === 'super_admin') &&
-              onConvertLopToCasual && (
-                <button
-                  className="leave-details-modal-button leave-details-modal-button-convert"
-                  onClick={() => setShowConvertConfirmDialog(true)}
-                  disabled={isLoading || isConverting}
-                  title="Convert LOP to Casual"
-                >
-                  {isConverting ? (
-                    <>
-                      <span className="loading-spinner"></span>
-                      Converting...
-                    </>
-                  ) : (
-                    <>
-                      <FaExchangeAlt /> Convert to Casual
-                    </>
-                  )}
-                </button>
-              )}
+
 
             {onEdit && leaveRequest.canEdit && (
               <button
                 className="leave-details-modal-button leave-details-modal-button-convert"
                 onClick={onEdit}
-                disabled={isLoading || isConverting}
+                disabled={isLoading}
                 style={{ background: 'linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%)', border: '1px solid #2951c8' }}
               >
                 <FaPencilAlt /> Edit Request
               </button>
             )}
+
+            {/* Re-implementing LOP to Casual Conversion - ONLY for Super Admin AND if proof exists */}
+            {userRole === 'super_admin' && leaveRequest.leaveType === 'lop' && leaveRequest.doctorNote && (
+              <button
+                className="leave-details-modal-button leave-details-modal-button-convert"
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to convert this LOP leave to Casual leave? This will refund LOP balance and deduct Casual balance.')) {
+                    try {
+                      await leaveService.convertLeaveRequestLopToCasual(leaveRequest.id);
+                      alert('Leave converted successfully');
+                      onClose(); // Close modal and refresh parent
+                      if (onUpdate) onUpdate(leaveRequest.id, 'casual', [], undefined, undefined); // Trigger refresh
+                    } catch (error: any) {
+                      alert(error.response?.data?.error?.message || 'Failed to convert leave');
+                    }
+                  }
+                }}
+                disabled={isLoading}
+                style={{ backgroundColor: '#10b981', color: 'white' }}
+              >
+                <FaCheck /> Convert to Casual
+              </button>
+            )}
+
 
             {isEditMode && (userRole === 'hr' || userRole === 'super_admin') ? (
               <button
@@ -950,26 +930,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
         </div>
       )}
 
-      <ConfirmationDialog
-        isOpen={showConvertConfirmDialog}
-        title="Convert LOP to Casual"
-        message={
-          leaveRequest
-            ? `Are you sure you want to convert this LOP leave request to Casual?\n\nThis will:\n• Refund ${leaveRequest.noOfDays} ${leaveRequest.noOfDays === 1 ? 'day' : 'days'} to LOP balance\n• Deduct ${projectedCasualDays} ${projectedCasualDays === 1 ? 'day' : 'days'} from Casual balance\n\n⚠️ This action cannot be undone.`
-            : ''
-        }
-        confirmText="Convert"
-        cancelText="Cancel"
-        onConfirm={() => {
-          if (onConvertLopToCasual && leaveRequest) {
-            onConvertLopToCasual(leaveRequest.id);
-          }
-          setShowConvertConfirmDialog(false);
-        }}
-        onCancel={() => setShowConvertConfirmDialog(false)}
-        type="warning"
-        isLoading={isConverting}
-      />
+
     </>
   );
 };

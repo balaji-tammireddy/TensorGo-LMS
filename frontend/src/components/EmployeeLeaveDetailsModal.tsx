@@ -164,37 +164,59 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
               <div className="leave-detail-value">{leaveRequest.leaveReason || 'N/A'}</div>
             </div>
 
-            {leaveRequest.leaveType === 'sick' && leaveRequest.doctorNote && (
+            {(leaveRequest.leaveType === 'sick' || leaveRequest.leaveType === 'lop') && leaveRequest.doctorNote && (
               <div className="leave-detail-item leave-detail-item-full">
-                <label>Doctor Prescription</label>
+                <label>{leaveRequest.leaveType === 'sick' ? 'Doctor Prescription' : 'Leave Proof'}</label>
                 <div className="prescription-container">
                   <button
                     type="button"
                     className="prescription-view-button"
                     onClick={async () => {
-                      let imageUrl: string;
+                      let fileUrl: string;
 
                       // Check if it's an OVHcloud key or base64
                       if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('medical-certificates/')) {
-                        // Request signed URL from backend
                         try {
                           const { signedUrl } = await leaveService.getMedicalCertificateSignedUrl(leaveRequest.id);
-                          imageUrl = signedUrl;
+                          fileUrl = signedUrl;
                         } catch (err) {
                           console.error('Failed to get signed URL:', err);
-                          alert('Failed to load medical certificate. Please try again.');
+                          alert(`Failed to load ${leaveRequest.leaveType === 'sick' ? 'medical certificate' : 'proof'}. Please try again.`);
                           return;
                         }
                       } else if (leaveRequest.doctorNote && leaveRequest.doctorNote.startsWith('data:')) {
-                        // Base64 - use as-is
-                        imageUrl = leaveRequest.doctorNote;
+                        fileUrl = leaveRequest.doctorNote;
                       } else {
-                        // Fallback - try as base64
-                        imageUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
+                        fileUrl = `data:image/jpeg;base64,${leaveRequest.doctorNote}`;
                       }
 
+                      // Determine if it's a PDF
+                      const isPDF = fileUrl.toLowerCase().includes('.pdf') || fileUrl.startsWith('data:application/pdf');
+
+                      if (isPDF) {
+                        // For PDFs, open in a new tab
+                        if (fileUrl.startsWith('data:')) {
+                          // Handle base64 PDF
+                          const base64Data = fileUrl.split(',')[1];
+                          const binaryString = window.atob(base64Data);
+                          const len = binaryString.length;
+                          const bytes = new Uint8Array(len);
+                          for (let i = 0; i < len; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                          }
+                          const blob = new Blob([bytes], { type: 'application/pdf' });
+                          const blobUrl = URL.createObjectURL(blob);
+                          window.open(blobUrl, '_blank');
+                        } else {
+                          window.open(fileUrl, '_blank');
+                        }
+                        return;
+                      }
+
+                      // For images, use the existing overlay
                       const img = document.createElement('img');
-                      img.src = imageUrl;
+                      img.src = fileUrl;
+                      img.className = 'proof-preview-image';
                       img.style.maxWidth = '90vw';
                       img.style.maxHeight = '90vh';
                       img.style.objectFit = 'contain';
@@ -219,20 +241,6 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       closeButton.style.alignItems = 'center';
                       closeButton.style.justifyContent = 'center';
                       closeButton.style.zIndex = '10001';
-                      closeButton.style.transition = 'background-color 0.2s';
-                      closeButton.onmouseenter = () => {
-                        closeButton.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-                      };
-                      closeButton.onmouseleave = () => {
-                        closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                      };
-
-                      const closeOverlay = () => {
-                        if (document.body.contains(overlay)) {
-                          document.body.removeChild(overlay);
-                        }
-                      };
-
                       closeButton.onclick = (e) => {
                         e.stopPropagation();
                         closeOverlay();
@@ -250,6 +258,12 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       overlay.style.justifyContent = 'center';
                       overlay.style.zIndex = '10000';
                       overlay.style.cursor = 'pointer';
+
+                      const closeOverlay = () => {
+                        if (document.body.contains(overlay)) {
+                          document.body.removeChild(overlay);
+                        }
+                      };
                       overlay.onclick = closeOverlay;
 
                       overlay.appendChild(img);
@@ -257,7 +271,7 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
                       document.body.appendChild(overlay);
                     }}
                   >
-                    View Prescription
+                    {leaveRequest.leaveType === 'sick' ? 'View Prescription' : 'View Proof'}
                   </button>
                 </div>
               </div>
