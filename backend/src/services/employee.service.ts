@@ -176,11 +176,40 @@ export const getEmployeeById = async (employeeId: number) => {
 
   const user = result.rows[0];
 
+  const education = [];
+  if (user.pg_stream || user.pg_college || user.pg_year || user.pg_percentage) {
+    education.push({
+      level: 'PG',
+      group_stream: user.pg_stream,
+      college_university: user.pg_college,
+      year: user.pg_year,
+      score_percentage: user.pg_percentage
+    });
+  }
+  if (user.ug_stream || user.ug_college || user.ug_year || user.ug_percentage) {
+    education.push({
+      level: 'UG',
+      group_stream: user.ug_stream,
+      college_university: user.ug_college,
+      year: user.ug_year,
+      score_percentage: user.ug_percentage
+    });
+  }
+  if (user.twelveth_stream || user.twelveth_college || user.twelveth_year || user.twelveth_percentage) {
+    education.push({
+      level: '12th',
+      group_stream: user.twelveth_stream,
+      college_university: user.twelveth_college,
+      year: user.twelveth_year,
+      score_percentage: user.twelveth_percentage
+    });
+  }
+
   return {
     ...user,
     date_of_birth: formatDateLocal(user.date_of_birth),
     date_of_joining: formatDateLocal(user.date_of_joining),
-    education: user.education_details || []
+    education: education
   };
 };
 
@@ -345,15 +374,6 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   }
 
   // Enforce logical graduation year gaps
-  if (educationYears['10th']) {
-    if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
-      throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
-    }
-    if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
-      throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
-    }
-  }
-
   if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
     throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
   }
@@ -573,20 +593,48 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   );
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
 
-  // Update education_details if provided
+  // Update education columns if provided
   if (employeeData.education) {
-    const educationDetails = employeeData.education.map((edu: any) => ({
-      level: edu.level,
-      group_stream: edu.groupStream || null,
-      college_university: edu.collegeUniversity || null,
-      year: edu.year || null,
-      score_percentage: edu.scorePercentage || null
-    }));
+    const fields: Record<string, string> = {
+      'PG': 'pg',
+      'UG': 'ug',
+      '12th': 'twelveth'
+    };
 
-    await pool.query(
-      'UPDATE users SET education_details = $1 WHERE id = $2',
-      [JSON.stringify(educationDetails), userId]
-    );
+    const updates: string[] = [];
+    const values: any[] = [];
+    let p = 1;
+
+    // Reset all education columns first
+    for (const prefix of Object.values(fields)) {
+      updates.push(`${prefix}_stream = NULL, ${prefix}_college = NULL, ${prefix}_year = NULL, ${prefix}_percentage = NULL`);
+    }
+
+    const setClauses: string[] = [];
+    const eduValues: any[] = [];
+    let eduParamIndex = 1;
+
+    for (const edu of employeeData.education) {
+      const prefix = fields[edu.level];
+      if (prefix) {
+        setClauses.push(`${prefix}_stream = $${eduParamIndex++}`);
+        eduValues.push(edu.groupStream || null);
+        setClauses.push(`${prefix}_college = $${eduParamIndex++}`);
+        eduValues.push(edu.collegeUniversity || null);
+        setClauses.push(`${prefix}_year = $${eduParamIndex++}`);
+        eduValues.push(edu.year || null);
+        setClauses.push(`${prefix}_percentage = $${eduParamIndex++}`);
+        eduValues.push(edu.scorePercentage || null);
+      }
+    }
+
+    if (setClauses.length > 0) {
+      eduValues.push(userId);
+      await pool.query(
+        `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${eduParamIndex}`,
+        eduValues
+      );
+    }
   }
 
 
@@ -741,7 +789,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id, education_details FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -766,15 +814,10 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
     // Use existing education from users table for validation
-    const educationDetails = employeeCheck.rows[0].education_details || [];
     const educationYears: Record<string, number> = {};
-
-    // Populate with existing data first
-    for (const edu of educationDetails) {
-      if (edu.year && /^[0-9]{4}$/.test(edu.year)) {
-        educationYears[edu.level] = parseInt(edu.year, 10);
-      }
-    }
+    if (employeeCheck.rows[0].pg_year) educationYears['PG'] = parseInt(employeeCheck.rows[0].pg_year, 10);
+    if (employeeCheck.rows[0].ug_year) educationYears['UG'] = parseInt(employeeCheck.rows[0].ug_year, 10);
+    if (employeeCheck.rows[0].twelveth_year) educationYears['12th'] = parseInt(employeeCheck.rows[0].twelveth_year, 10);
 
     for (const edu of employeeData.education) {
       const isMandatory = ['UG', '12th'].includes(edu.level);
@@ -818,15 +861,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
 
     // Enforce logical graduation year gaps
-    if (educationYears['10th']) {
-      if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
-        throw new Error(`Minimum 2 years gap required between 10th (${educationYears['10th']}) and 12th (${educationYears['12th']}) Graduation Year`);
-      }
-      if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
-        throw new Error(`Minimum 5 years gap required between 10th (${educationYears['10th']}) and UG (${educationYears['UG']}) Graduation Year`);
-      }
-    }
-
     if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
       throw new Error(`Minimum 3 years gap required between 12th (${educationYears['12th']}) and UG (${educationYears['UG']}) Graduation Year`);
     }
@@ -1309,20 +1343,55 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Update education_details if provided
+  // Update education columns if provided
   if (employeeData.education) {
-    const educationDetails = employeeData.education.map((edu: any) => ({
-      level: edu.level,
-      group_stream: edu.groupStream || null,
-      college_university: edu.collegeUniversity || null,
-      year: edu.year || null,
-      score_percentage: edu.scorePercentage || null
-    }));
+    const fields: Record<string, string> = {
+      'PG': 'pg',
+      'UG': 'ug',
+      '12th': 'twelveth'
+    };
 
-    await pool.query(
-      'UPDATE users SET education_details = $1 WHERE id = $2',
-      [JSON.stringify(educationDetails), employeeId]
-    );
+    const setClauses: string[] = [];
+    const eduValues: any[] = [];
+    let eduParamIndex = 1;
+
+    // Initialize all to NULL to handle removals
+    for (const prefix of Object.values(fields)) {
+      setClauses.push(`${prefix}_stream = NULL`);
+      setClauses.push(`${prefix}_college = NULL`);
+      setClauses.push(`${prefix}_year = NULL`);
+      setClauses.push(`${prefix}_percentage = NULL`);
+    }
+
+    // Since we are updating multiple columns, it's easier to reset then update or do it in one query if all levels are present.
+    // The safest is to reset them if we want to support removal of levels.
+    await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = $1`, [employeeId]);
+
+    const actualUpdates: string[] = [];
+    const actualValues: any[] = [];
+    let actualIndex = 1;
+
+    for (const edu of employeeData.education) {
+      const prefix = fields[edu.level];
+      if (prefix) {
+        actualUpdates.push(`${prefix}_stream = $${actualIndex++}`);
+        actualValues.push(edu.groupStream || null);
+        actualUpdates.push(`${prefix}_college = $${actualIndex++}`);
+        actualValues.push(edu.collegeUniversity || null);
+        actualUpdates.push(`${prefix}_year = $${actualIndex++}`);
+        actualValues.push(edu.year || null);
+        actualUpdates.push(`${prefix}_percentage = $${actualIndex++}`);
+        actualValues.push(edu.scorePercentage || null);
+      }
+    }
+
+    if (actualUpdates.length > 0) {
+      actualValues.push(employeeId);
+      await pool.query(
+        `UPDATE users SET ${actualUpdates.join(', ')} WHERE id = $${actualIndex}`,
+        actualValues
+      );
+    }
   }
 
   // Send email notification if HR or Super Admin updated employee details

@@ -31,7 +31,17 @@ WHERE u.id = $1`,
 
   logger.info(`[PROFILE] [GET PROFILE] User found`);
   const user = result.rows[0];
-  const educationDetails = user.education_details || [];
+
+  const education = [];
+  if (user.pg_stream || user.pg_college || user.pg_year || user.pg_percentage) {
+    education.push({ level: 'PG', group_stream: user.pg_stream, college_university: user.pg_college, year: user.pg_year, score_percentage: user.pg_percentage });
+  }
+  if (user.ug_stream || user.ug_college || user.ug_year || user.ug_percentage) {
+    education.push({ level: 'UG', group_stream: user.ug_stream, college_university: user.ug_college, year: user.ug_year, score_percentage: user.ug_percentage });
+  }
+  if (user.twelveth_stream || user.twelveth_college || user.twelveth_year || user.twelveth_percentage) {
+    education.push({ level: '12th', group_stream: user.twelveth_stream, college_university: user.twelveth_college, year: user.twelveth_year, score_percentage: user.twelveth_percentage });
+  }
 
   return {
     personalInfo: {
@@ -63,7 +73,7 @@ WHERE u.id = $1`,
       currentAddress: user.current_address,
       permanentAddress: user.permanent_address
     },
-    education: educationDetails.map((edu: any) => ({
+    education: education.map((edu: any) => ({
       level: edu.level,
       groupStream: edu.group_stream,
       collegeUniversity: edu.college_university,
@@ -430,20 +440,11 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     }
 
     // Enforce logical graduation year gaps
-    if (educationYears['10th']) {
-      if (educationYears['12th'] && educationYears['12th'] - educationYears['10th'] < 2) {
-        throw new Error('Minimum 2 years gap required between 10th and 12th Graduation Year');
-      }
-      if (educationYears['UG'] && educationYears['UG'] - educationYears['10th'] < 5) {
-        throw new Error('Minimum 5 years gap required between 10th and UG Graduation Year');
-      }
-    }
-
     if (educationYears['12th'] && educationYears['UG'] && educationYears['UG'] - educationYears['12th'] < 3) {
       throw new Error('Minimum 3 years gap required between 12th and UG Graduation Year');
     }
 
-    if (educationYears['UG'] && educationYears['PG'] && educationYears['UG'] - educationYears['PG'] < 2) {
+    if (educationYears['UG'] && educationYears['PG'] && educationYears['PG'] - educationYears['UG'] < 2) {
       throw new Error('Minimum 2 years gap required between UG and PG Graduation Year');
     }
 
@@ -455,19 +456,51 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
       throw new Error('UG Graduation Year must be before PG Graduation Year');
     }
 
-    // Update education_details in users table
-    const educationDetails = profileData.education.map((edu: any) => ({
-      level: edu.level,
-      group_stream: edu.groupStream || null,
-      college_university: edu.collegeUniversity || null,
-      year: edu.year || null,
-      score_percentage: edu.scorePercentage || null
-    }));
+    // Update education columns
+    const fields: Record<string, string> = {
+      'PG': 'pg',
+      'UG': 'ug',
+      '12th': 'twelveth'
+    };
 
-    await pool.query(
-      'UPDATE users SET education_details = $1 WHERE id = $2',
-      [JSON.stringify(educationDetails), userId]
-    );
+    const setClauses: string[] = [];
+    const eduValues: any[] = [];
+    let eduParamIndex = 1;
+
+    // Reset all to NULL first
+    for (const prefix of Object.values(fields)) {
+      setClauses.push(`${prefix}_stream = NULL`);
+      setClauses.push(`${prefix}_college = NULL`);
+      setClauses.push(`${prefix}_year = NULL`);
+      setClauses.push(`${prefix}_percentage = NULL`);
+    }
+    await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = $1`, [userId]);
+
+    const actualUpdates: string[] = [];
+    const actualValues: any[] = [];
+    let actualIndex = 1;
+
+    for (const edu of profileData.education) {
+      const prefix = fields[edu.level];
+      if (prefix) {
+        actualUpdates.push(`${prefix}_stream = $${actualIndex++}`);
+        actualValues.push(edu.groupStream || null);
+        actualUpdates.push(`${prefix}_college = $${actualIndex++}`);
+        actualValues.push(edu.collegeUniversity || null);
+        actualUpdates.push(`${prefix}_year = $${actualIndex++}`);
+        actualValues.push(edu.year || null);
+        actualUpdates.push(`${prefix}_percentage = $${actualIndex++}`);
+        actualValues.push(edu.scorePercentage || null);
+      }
+    }
+
+    if (actualUpdates.length > 0) {
+      actualValues.push(userId);
+      await pool.query(
+        `UPDATE users SET ${actualUpdates.join(', ')} WHERE id = $${actualIndex}`,
+        actualValues
+      );
+    }
   }
 
   logger.info(`[PROFILE] [UPDATE PROFILE] Profile update completed successfully - User ID: ${userId}`);

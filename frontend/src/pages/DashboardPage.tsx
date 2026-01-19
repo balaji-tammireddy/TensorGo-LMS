@@ -241,7 +241,6 @@ const DashboardPage: React.FC = () => {
                 <div className="dashboard-header">
                     <div>
                         <h1>Organization Dashboard</h1>
-                        <p>Overview of company structure and workforce statistics</p>
                     </div>
                     <button
                         className="dashboard-refresh-btn"
@@ -254,9 +253,6 @@ const DashboardPage: React.FC = () => {
                 {/* Stats Row */}
                 {/* Stats Row - Unified Card */}
                 <div className="stats-overview-card">
-                    <div className="stats-header">
-                        <h2>Overview</h2>
-                    </div>
                     <div className="stats-content">
                         <div className="stat-column">
                             <span className="stat-label">Total Strength</span>

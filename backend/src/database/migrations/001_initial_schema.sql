@@ -32,7 +32,18 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_by INTEGER REFERENCES users(id),
   updated_by INTEGER REFERENCES users(id),
-  education_details JSONB
+  pg_stream VARCHAR(255),
+  pg_college VARCHAR(255),
+  pg_year VARCHAR(10),
+  pg_percentage VARCHAR(10),
+  ug_stream VARCHAR(255),
+  ug_college VARCHAR(255),
+  ug_year VARCHAR(10),
+  ug_percentage VARCHAR(10),
+  twelveth_stream VARCHAR(255),
+  twelveth_college VARCHAR(255),
+  twelveth_year VARCHAR(10),
+  twelveth_percentage VARCHAR(10)
 );
 
 -- Ensure column exists for existing databases
@@ -130,7 +141,7 @@ CREATE TABLE IF NOT EXISTS leave_rules (
   is_active BOOLEAN DEFAULT true
 );
 
--- Education table removed - data moved to users.education_details
+-- Education table removed - data moved to users table individual columns (pg_*, ug_*, twelveth_*)
 
 -- Audit logs table (removed - not used)
 -- CREATE TABLE IF NOT EXISTS audit_logs (
