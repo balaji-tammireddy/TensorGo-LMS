@@ -1,5 +1,10 @@
 .holiday-management-page {
     padding: 20px;
+    height: calc(100vh - 64px);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 
@@ -41,15 +46,15 @@
 }
 
 .hm-form-group-date {
-    flex: 0.5;
-    /* Reduce date input size */
-    min-width: 150px;
+    flex: 0.8;
+    /* Increase date input size */
+    min-width: 180px;
 }
 
 .hm-form-group-name {
-    flex: 2;
-    /* Increase name input size */
-    min-width: 250px;
+    flex: 1.5;
+    /* Decrease name input size */
+    min-width: 200px;
 }
 
 .hm-form-group label {
@@ -195,6 +200,11 @@
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .hm-header {
@@ -202,6 +212,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-shrink: 0;
 }
 
 .hm-header h2 {
@@ -260,9 +271,10 @@
 }
 
 .hm-table-container {
-    max-height: 500px;
+    max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
+    flex: 1;
 }
 
 .hm-table-container::-webkit-scrollbar {
@@ -348,6 +360,10 @@
 .hm-table-wrapper {
     position: relative;
     width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .hm-table-wrapper.fetching {
