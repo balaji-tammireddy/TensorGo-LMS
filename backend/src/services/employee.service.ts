@@ -1023,11 +1023,34 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
 
     // Normalize dates for comparison (ignoring time)
-    const existingDOJ = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
-    const newDOJ = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
+    // Normalize dates for comparison (ignoring time)
+    let existingDOJ = null;
+    if (employeeCheck.rows[0].date_of_joining) {
+      const d = new Date(employeeCheck.rows[0].date_of_joining);
+      // Create UTC date from local components to avoid timezone shift
+      const utcDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      existingDOJ = utcDate.toISOString().split('T')[0];
+    }
 
-    if (newDOJ && newDOJ !== existingDOJ) {
-      throw new Error('Only Super Admin can update Date of Joining');
+    let newDOJ = null;
+    if (employeeData.dateOfJoining) {
+      // Assuming format is YYYY-MM-DD or compatible
+      const d = new Date(employeeData.dateOfJoining);
+      // If the input string is YYYY-MM-DD, parsing it creates a UTC date.
+      // However, to be safe and consistent with the logic above (in case it parsed as local):
+      // Actually, standard ISO date string "YYYY-MM-DD" parses as UTC.
+      // But if we want to be absolutely sure we extract the intended date:
+
+      // If we simply take the string representation "YYYY-MM-DD" if valid:
+      if (typeof employeeData.dateOfJoining === 'string' && /^\d{4}-\d{2}-\d{2}/.test(employeeData.dateOfJoining)) {
+        newDOJ = employeeData.dateOfJoining.substring(0, 10);
+      } else {
+        newDOJ = d.toISOString().split('T')[0];
+      }
+    }
+
+    if (newDOJ && existingDOJ && newDOJ !== existingDOJ) {
+      throw new Error(`Only Super Admin can update Date of Joining`);
     }
 
     if (employeeData.empId && employeeData.empId.trim().toUpperCase() !== employeeCheck.rows[0].emp_id) {

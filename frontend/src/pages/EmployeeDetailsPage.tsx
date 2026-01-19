@@ -566,7 +566,24 @@ const EmployeeDetailsPage: React.FC = () => {
               </div>
               <div className={`employee-modal-field ${formErrors.firstName ? 'has-error' : ''}`}>
                 <label>First Name<span className="required-indicator">*</span></label>
-                <input type="text" value={employeeData.firstName} onChange={(e) => setEmployeeData({ ...employeeData, firstName: sanitizeName(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={employeeData.firstName}
+                  onChange={(e) => setEmployeeData({ ...employeeData, firstName: sanitizeName(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.firstName || employeeData.firstName.trim() === '') {
+                      showError('First Name is required');
+                      setFormErrors((prev) => ({ ...prev, firstName: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.firstName;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className="employee-modal-field">
                 <label>Middle Name</label>
@@ -574,19 +591,97 @@ const EmployeeDetailsPage: React.FC = () => {
               </div>
               <div className={`employee-modal-field ${formErrors.lastName ? 'has-error' : ''}`}>
                 <label>Last Name<span className="required-indicator">*</span></label>
-                <input type="text" value={employeeData.lastName} onChange={(e) => setEmployeeData({ ...employeeData, lastName: sanitizeName(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={employeeData.lastName}
+                  onChange={(e) => setEmployeeData({ ...employeeData, lastName: sanitizeName(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.lastName || employeeData.lastName.trim() === '') {
+                      showError('Last Name is required');
+                      setFormErrors((prev) => ({ ...prev, lastName: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.lastName;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.email ? 'has-error' : ''}`}>
                 <label>Official Email<span className="required-indicator">*</span></label>
-                <input type="email" value={employeeData.email} onChange={(e) => setEmployeeData({ ...employeeData, email: e.target.value })} disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')} />
+                <input
+                  type="email"
+                  value={employeeData.email}
+                  onChange={(e) => setEmployeeData({ ...employeeData, email: e.target.value })}
+                  onBlur={() => {
+                    if (!employeeData.email || employeeData.email.trim() === '') {
+                      showError('Official Email is required');
+                      setFormErrors((prev) => ({ ...prev, email: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.email;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.contactNumber ? 'has-error' : ''}`}>
                 <label>Contact Number<span className="required-indicator">*</span></label>
-                <input type="text" maxLength={10} value={employeeData.contactNumber} onChange={(e) => setEmployeeData({ ...employeeData, contactNumber: sanitizePhone(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={employeeData.contactNumber}
+                  onChange={(e) => setEmployeeData({ ...employeeData, contactNumber: sanitizePhone(e.target.value) })}
+                  onBlur={() => {
+                    const val = employeeData.contactNumber;
+                    if (!val || val.trim() === '') {
+                      showError('Contact Number is required');
+                      setFormErrors((prev) => ({ ...prev, contactNumber: true }));
+                    } else if (val.length < 10) {
+                      showError('Contact Number must be 10 digits');
+                      setFormErrors((prev) => ({ ...prev, contactNumber: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.contactNumber;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.altContact ? 'has-error' : ''}`}>
                 <label>Alternate Contact<span className="required-indicator">*</span></label>
-                <input type="text" maxLength={10} value={employeeData.altContact} onChange={(e) => setEmployeeData({ ...employeeData, altContact: sanitizePhone(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={employeeData.altContact}
+                  onChange={(e) => setEmployeeData({ ...employeeData, altContact: sanitizePhone(e.target.value) })}
+                  onBlur={() => {
+                    const val = employeeData.altContact;
+                    if (!val || val.trim() === '') {
+                      showError('Alternate Contact Number is required');
+                      setFormErrors((prev) => ({ ...prev, altContact: true }));
+                    } else if (val.length < 10) {
+                      showError('Alternate Contact Number must be 10 digits');
+                      setFormErrors((prev) => ({ ...prev, altContact: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.altContact;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.gender ? 'has-error' : ''}`}>
                 <label>Gender<span className="required-indicator">*</span></label>
@@ -638,15 +733,71 @@ const EmployeeDetailsPage: React.FC = () => {
               </div>
               <div className={`employee-modal-field ${formErrors.emergencyContactName ? 'has-error' : ''}`}>
                 <label>Emergency Contact Name<span className="required-indicator">*</span></label>
-                <input type="text" value={employeeData.emergencyContactName} onChange={(e) => setEmployeeData({ ...employeeData, emergencyContactName: sanitizeName(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={employeeData.emergencyContactName}
+                  onChange={(e) => setEmployeeData({ ...employeeData, emergencyContactName: sanitizeName(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.emergencyContactName || employeeData.emergencyContactName.trim() === '') {
+                      showError('Emergency Contact Name is required');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactName: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.emergencyContactName;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.emergencyContactNo ? 'has-error' : ''}`}>
                 <label>Emergency Contact No<span className="required-indicator">*</span></label>
-                <input type="text" maxLength={10} value={employeeData.emergencyContactNo} onChange={(e) => setEmployeeData({ ...employeeData, emergencyContactNo: sanitizePhone(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={employeeData.emergencyContactNo}
+                  onChange={(e) => setEmployeeData({ ...employeeData, emergencyContactNo: sanitizePhone(e.target.value) })}
+                  onBlur={() => {
+                    const val = employeeData.emergencyContactNo;
+                    if (!val || val.trim() === '') {
+                      showError('Emergency Contact Number is required');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
+                    } else if (val.length < 10) {
+                      showError('Emergency Contact Number must be 10 digits');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.emergencyContactNo;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.emergencyContactRelation ? 'has-error' : ''}`}>
                 <label>Relation<span className="required-indicator">*</span></label>
-                <input type="text" value={employeeData.emergencyContactRelation} onChange={(e) => setEmployeeData({ ...employeeData, emergencyContactRelation: sanitizeLettersOnly(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={employeeData.emergencyContactRelation}
+                  onChange={(e) => setEmployeeData({ ...employeeData, emergencyContactRelation: sanitizeLettersOnly(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.emergencyContactRelation || employeeData.emergencyContactRelation.trim() === '') {
+                      showError('Relation is required');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactRelation: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.emergencyContactRelation;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
             </div>
           </div>
@@ -657,11 +808,45 @@ const EmployeeDetailsPage: React.FC = () => {
             <div className="employee-modal-grid">
               <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
                 <label>Designation<span className="required-indicator">*</span></label>
-                <input type="text" value={employeeData.designation} onChange={(e) => setEmployeeData({ ...employeeData, designation: sanitizeName(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={employeeData.designation}
+                  onChange={(e) => setEmployeeData({ ...employeeData, designation: sanitizeName(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.designation || employeeData.designation.trim() === '') {
+                      showError('Designation is required');
+                      setFormErrors((prev) => ({ ...prev, designation: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.designation;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.department ? 'has-error' : ''}`}>
                 <label>Department<span className="required-indicator">*</span></label>
-                <input type="text" value={employeeData.department} onChange={(e) => setEmployeeData({ ...employeeData, department: sanitizeName(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={employeeData.department}
+                  onChange={(e) => setEmployeeData({ ...employeeData, department: sanitizeName(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.department || employeeData.department.trim() === '') {
+                      showError('Department is required');
+                      setFormErrors((prev) => ({ ...prev, department: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.department;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.dateOfJoining ? 'has-error' : ''}`}>
                 <label>Date of Joining<span className="required-indicator">*</span></label>
@@ -701,11 +886,53 @@ const EmployeeDetailsPage: React.FC = () => {
             <div className="employee-modal-grid">
               <div className={`employee-modal-field ${formErrors.aadharNumber ? 'has-error' : ''}`}>
                 <label>Aadhar Number<span className="required-indicator">*</span></label>
-                <input type="text" value={formatAadhaar(employeeData.aadharNumber)} onChange={(e) => setEmployeeData({ ...employeeData, aadharNumber: sanitizeAadhaar(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  value={formatAadhaar(employeeData.aadharNumber)}
+                  onChange={(e) => setEmployeeData({ ...employeeData, aadharNumber: sanitizeAadhaar(e.target.value) })}
+                  onBlur={() => {
+                    if (!employeeData.aadharNumber || employeeData.aadharNumber.trim() === '') {
+                      showError('Aadhar Number is required');
+                      setFormErrors((prev) => ({ ...prev, aadharNumber: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.aadharNumber;
+                        return next;
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
               <div className={`employee-modal-field ${formErrors.panNumber ? 'has-error' : ''}`}>
                 <label>PAN Number<span className="required-indicator">*</span></label>
-                <input type="text" maxLength={10} value={employeeData.panNumber} onChange={(e) => setEmployeeData({ ...employeeData, panNumber: sanitizePan(e.target.value) })} disabled={!isEditMode} />
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={employeeData.panNumber}
+                  onChange={(e) => setEmployeeData({ ...employeeData, panNumber: sanitizePan(e.target.value) })}
+                  onBlur={() => {
+                    const panVal = employeeData.panNumber || '';
+                    if (!panVal || panVal.trim() === '') {
+                      showError('PAN Number is required');
+                      setFormErrors((prev) => ({ ...prev, panNumber: true }));
+                    } else {
+                      const panError = validatePan(panVal);
+                      if (panError) {
+                        showError(panError);
+                        setFormErrors((prev) => ({ ...prev, panNumber: true }));
+                      } else {
+                        setFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.panNumber;
+                          return next;
+                        });
+                      }
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
             </div>
           </div>
@@ -715,11 +942,45 @@ const EmployeeDetailsPage: React.FC = () => {
             <h3>Address Details</h3>
             <div className={`employee-modal-field full-width ${formErrors.permanentAddress ? 'has-error' : ''}`}>
               <label>Permanent Address<span className="required-indicator">*</span></label>
-              <textarea rows={3} value={employeeData.permanentAddress} onChange={(e) => setEmployeeData((prev: any) => ({ ...prev, permanentAddress: e.target.value, currentAddress: isSameAddress ? e.target.value : prev.currentAddress }))} disabled={!isEditMode} />
+              <textarea
+                rows={3}
+                value={employeeData.permanentAddress}
+                onChange={(e) => setEmployeeData((prev: any) => ({ ...prev, permanentAddress: e.target.value, currentAddress: isSameAddress ? e.target.value : prev.currentAddress }))}
+                onBlur={() => {
+                  if (!employeeData.permanentAddress || employeeData.permanentAddress.trim() === '') {
+                    showError('Permanent Address is required');
+                    setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
+                  } else {
+                    setFormErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.permanentAddress;
+                      return next;
+                    });
+                  }
+                }}
+                disabled={!isEditMode}
+              />
             </div>
             <div className={`employee-modal-field full-width ${formErrors.currentAddress ? 'has-error' : ''}`}>
               <label>Current Address<span className="required-indicator">*</span></label>
-              <textarea rows={3} value={employeeData.currentAddress} onChange={(e) => setEmployeeData({ ...employeeData, currentAddress: e.target.value })} disabled={(isSameAddress && isEditMode) || !isEditMode} />
+              <textarea
+                rows={3}
+                value={employeeData.currentAddress}
+                onChange={(e) => setEmployeeData({ ...employeeData, currentAddress: e.target.value })}
+                onBlur={() => {
+                  if (!employeeData.currentAddress || employeeData.currentAddress.trim() === '') {
+                    showError('Current Address is required');
+                    setFormErrors((prev) => ({ ...prev, currentAddress: true }));
+                  } else {
+                    setFormErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.currentAddress;
+                      return next;
+                    });
+                  }
+                }}
+                disabled={(isSameAddress && isEditMode) || !isEditMode}
+              />
               {isEditMode && (
                 <label className="same-address-checkbox">
                   <input type="checkbox" checked={isSameAddress} onChange={(e) => handleSameAsCurrentAddress(e.target.checked)} />
@@ -750,32 +1011,109 @@ const EmployeeDetailsPage: React.FC = () => {
                       {(edu.level === 'UG' || edu.level === '12th') && <span className="required-indicator">*</span>}
                     </td>
                     <td>
-                      <input type="text" value={edu.groupStream || ''} onChange={(e) => {
-                        const next = [...employeeData.education];
-                        next[idx] = { ...edu, groupStream: sanitizeLettersOnly(e.target.value) };
-                        setEmployeeData({ ...employeeData, education: next });
-                      }} disabled={!isEditMode} />
+                      <input
+                        type="text"
+                        value={edu.groupStream || ''}
+                        onChange={(e) => {
+                          const next = [...employeeData.education];
+                          next[idx] = { ...edu, groupStream: sanitizeLettersOnly(e.target.value) };
+                          setEmployeeData({ ...employeeData, education: next });
+                        }}
+                        onBlur={() => {
+                          if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
+                            showError(`Group/Stream is required for ${edu.level}`);
+                            setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
+                          } else {
+                            setFormErrors((prev) => {
+                              const next = { ...prev };
+                              delete next[`edu_${idx}_groupStream`];
+                              return next;
+                            });
+                          }
+                        }}
+                        disabled={!isEditMode}
+                      />
                     </td>
                     <td>
-                      <input type="text" value={edu.collegeUniversity || ''} onChange={(e) => {
-                        const next = [...employeeData.education];
-                        next[idx] = { ...edu, collegeUniversity: sanitizeLettersOnly(e.target.value) };
-                        setEmployeeData({ ...employeeData, education: next });
-                      }} disabled={!isEditMode} />
+                      <input
+                        type="text"
+                        value={edu.collegeUniversity || ''}
+                        onChange={(e) => {
+                          const next = [...employeeData.education];
+                          next[idx] = { ...edu, collegeUniversity: sanitizeLettersOnly(e.target.value) };
+                          setEmployeeData({ ...employeeData, education: next });
+                        }}
+                        onBlur={() => {
+                          if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
+                            showError(`College/University is required for ${edu.level}`);
+                            setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
+                          } else {
+                            setFormErrors((prev) => {
+                              const next = { ...prev };
+                              delete next[`edu_${idx}_collegeUniversity`];
+                              return next;
+                            });
+                          }
+                        }}
+                        disabled={!isEditMode}
+                      />
                     </td>
                     <td>
-                      <input type="text" maxLength={4} value={edu.year || ''} onChange={(e) => {
-                        const next = [...employeeData.education];
-                        next[idx] = { ...edu, year: e.target.value.replace(/[^0-9]/g, '') };
-                        setEmployeeData({ ...employeeData, education: next });
-                      }} disabled={!isEditMode} />
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={edu.year || ''}
+                        onChange={(e) => {
+                          const next = [...employeeData.education];
+                          next[idx] = { ...edu, year: e.target.value.replace(/[^0-9]/g, '') };
+                          setEmployeeData({ ...employeeData, education: next });
+                        }}
+                        onBlur={(e) => {
+                          const yearStr = e.target.value;
+                          const year = parseInt(yearStr, 10);
+                          const currentYear = new Date().getFullYear();
+                          const maxYear = currentYear + 5;
+
+                          if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
+                            showError(`Graduation Year is required for ${edu.level}`);
+                            setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
+                          } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
+                            showError(`Graduation Year must be between 1950 and ${maxYear}`);
+                            setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
+                          } else {
+                            setFormErrors((prev) => {
+                              const next = { ...prev };
+                              delete next[`edu_${idx}_year`];
+                              return next;
+                            });
+                          }
+                        }}
+                        disabled={!isEditMode}
+                      />
                     </td>
                     <td>
-                      <input type="text" value={edu.scorePercentage || ''} onChange={(e) => {
-                        const next = [...employeeData.education];
-                        next[idx] = { ...edu, scorePercentage: e.target.value };
-                        setEmployeeData({ ...employeeData, education: next });
-                      }} disabled={!isEditMode} />
+                      <input
+                        type="text"
+                        value={edu.scorePercentage || ''}
+                        onChange={(e) => {
+                          const next = [...employeeData.education];
+                          next[idx] = { ...edu, scorePercentage: e.target.value };
+                          setEmployeeData({ ...employeeData, education: next });
+                        }}
+                        onBlur={() => {
+                          if ((edu.level === 'UG' || edu.level === '12th') && (edu.scorePercentage === null || edu.scorePercentage === undefined || String(edu.scorePercentage).trim() === '')) {
+                            showError(`Score % is required for ${edu.level}`);
+                            setFormErrors((prev) => ({ ...prev, [`edu_${idx}_scorePercentage`]: true }));
+                          } else {
+                            setFormErrors((prev) => {
+                              const next = { ...prev };
+                              delete next[`edu_${idx}_scorePercentage`];
+                              return next;
+                            });
+                          }
+                        }}
+                        disabled={!isEditMode}
+                      />
                     </td>
                   </tr>
                 ))}
