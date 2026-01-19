@@ -224,10 +224,16 @@
   display: none;
 }
 
+.rdp-day_button:disabled,
 .rdp-day_disabled .rdp-day_button {
   opacity: 0.3;
   cursor: not-allowed;
   color: #999;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .rdp-day_range_middle .rdp-day_button {
