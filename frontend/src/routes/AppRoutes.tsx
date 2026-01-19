@@ -11,6 +11,8 @@ const LoginPage = lazy(() => import('../pages/LoginPage'));
 const LeaveApplyPage = lazy(() => import('../pages/LeaveApplyPage'));
 const LeaveApprovalPage = lazy(() => import('../pages/LeaveApprovalPage'));
 const EmployeeManagementPage = lazy(() => import('../pages/EmployeeManagementPage'));
+const EmployeeDetailsPage = lazy(() => import('../pages/EmployeeDetailsPage'));
+const EmployeeLeaveHistoryPage = lazy(() => import('../pages/EmployeeLeaveHistoryPage'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const ChangePasswordPage = lazy(() => import('../pages/ChangePasswordPage'));
 const HolidayManagementPage = lazy(() => import('../pages/HolidayManagementPage'));
@@ -99,6 +101,22 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['hr', 'super_admin']}>
               <EmployeeManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-management/view/:id"
+          element={
+            <ProtectedRoute allowedRoles={['hr', 'super_admin']}>
+              <EmployeeDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-management/leaves/:id"
+          element={
+            <ProtectedRoute allowedRoles={['hr', 'super_admin']}>
+              <EmployeeLeaveHistoryPage />
             </ProtectedRoute>
           }
         />

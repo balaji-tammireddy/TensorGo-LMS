@@ -23,7 +23,7 @@ import { format } from 'date-fns';
 import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown, FaHistory, FaPlus, FaFilter, FaDownload } from 'react-icons/fa';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import { useAuth } from '../contexts/AuthContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import './EmployeeManagementPage.css';
 
 const sanitizeName = (value: string) => {
@@ -812,7 +812,11 @@ const EmployeeManagementPage: React.FC = () => {
   };
 
 
-  const handleViewEmployee = (employeeId: number) => openEmployeeModal(employeeId, 'view');
+  /* Navigation to details page */
+  const navigate = useNavigate();
+  const handleViewEmployee = (employeeId: number) => {
+    navigate(`/employee-management/view/${employeeId}`);
+  };
 
   // Deep linking for Dashboard
   useEffect(() => {
@@ -826,7 +830,7 @@ const EmployeeManagementPage: React.FC = () => {
           if (result.employees && result.employees.length > 0) {
             const employee = result.employees[0];
             if (employee.empId === deepLinkEmpId) {
-              openEmployeeModal(employee.id, 'view');
+              navigate(`/employee-management/view/${employee.id}`);
             }
           }
         } catch (e) {
