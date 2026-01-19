@@ -835,13 +835,14 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
       LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
       WHERE lr.id = $1 
       AND (
-           lr.employee_id = $2            -- It's my own request
+           $3 = 'super_admin'             -- Super Admin sees all
+        OR lr.employee_id = $2            -- It's my own request
         OR u.reporting_manager_id = $2    -- I am Direct Manager (L1)
         OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2/HR)
         OR l2.reporting_manager_id = $2   -- I am HR's Manager (L3/Super Admin)
       )
     `;
-    params = [requestId, userId];
+    params = [requestId, userId, userRole];
   } else {
     // Regular employees can only view their own
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
