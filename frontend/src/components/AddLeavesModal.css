@@ -8,7 +8,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 2000;
 }
 
 .add-leaves-modal {
@@ -198,6 +198,7 @@
   transform: none;
   box-shadow: none;
 }
+
 /* File Upload Styles */
 .file-upload-container {
   display: flex;

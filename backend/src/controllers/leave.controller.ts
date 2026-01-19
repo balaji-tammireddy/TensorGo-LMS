@@ -586,6 +586,47 @@ export const updateLeaveStatus = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getEmployeeBalances = async (req: AuthRequest, res: Response) => {
+  logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE BALANCES] ========== REQUEST RECEIVED ==========`);
+  logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE BALANCES] Employee ID: ${req.params.employeeId}, User ID: ${req.user!.id}, Role: ${req.user!.role}`);
+
+  try {
+    // Only HR and Super Admin can view balances for any employee
+    if (req.user!.role !== 'hr' && req.user!.role !== 'super_admin') {
+      logger.warn(`[CONTROLLER] [LEAVE] [GET EMPLOYEE BALANCES] Unauthorized access attempt by user ${req.user!.id} with role ${req.user!.role}`);
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only HR and Super Admin can view employee leave balances'
+        }
+      });
+    }
+
+    const employeeId = parseInt(req.params.employeeId);
+    if (isNaN(employeeId)) {
+      logger.warn(`[CONTROLLER] [LEAVE] [GET EMPLOYEE BALANCES] Invalid employee ID: ${req.params.employeeId}`);
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_EMPLOYEE_ID',
+          message: 'Invalid employee ID'
+        }
+      });
+    }
+
+    const balances = await leaveService.getLeaveBalances(employeeId);
+    logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE BALANCES] Balances retrieved successfully`);
+    res.json(balances);
+  } catch (error: any) {
+    logger.error(`[CONTROLLER] [LEAVE] [GET EMPLOYEE BALANCES] Error:`, error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: error.message
+      }
+    });
+  }
+};
+
 export const getEmployeeLeaveRequests = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] ========== REQUEST RECEIVED ==========`);
   logger.info(`[CONTROLLER] [LEAVE] [GET EMPLOYEE LEAVE REQUESTS] Employee ID: ${req.params.employeeId}, User ID: ${req.user!.id}, Role: ${req.user!.role}, Page: ${req.query.page || 1}, Limit: ${req.query.limit || 10}, Status: ${req.query.status || 'all'}`);
@@ -1089,13 +1130,13 @@ export const updateHoliday = async (req: AuthRequest, res: Response) => {
   try {
     const holidayId = parseInt(req.params.id);
     if (isNaN(holidayId)) {
-        logger.warn(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Invalid holiday ID: ${req.params.id}`);
-        return res.status(400).json({
-            error: {
-                code: 'BAD_REQUEST',
-                message: 'Invalid holiday ID'
-            }
-        });
+      logger.warn(`[CONTROLLER] [LEAVE] [UPDATE HOLIDAY] Invalid holiday ID: ${req.params.id}`);
+      return res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Invalid holiday ID'
+        }
+      });
     }
 
     const { holidayDate, holidayName } = req.body;
@@ -1143,12 +1184,12 @@ export const updateHoliday = async (req: AuthRequest, res: Response) => {
     }
 
     if (error.message === 'Holiday not found') {
-        return res.status(404).json({
-            error: {
-                code: 'NOT_FOUND',
-                message: 'Holiday not found'
-            }
-        });
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Holiday not found'
+        }
+      });
     }
 
     res.status(500).json({
