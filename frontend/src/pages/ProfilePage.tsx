@@ -757,6 +757,17 @@ const ProfilePage: React.FC = () => {
                       personalInfo: { ...formData.personalInfo, firstName: value }
                     });
                   }}
+                  onBlur={() => {
+                    if (!formData.personalInfo?.firstName || formData.personalInfo.firstName.trim() === '') {
+                      setFormErrors((prev) => ({ ...prev, firstName: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.firstName;
+                        return next;
+                      });
+                    }
+                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -791,6 +802,17 @@ const ProfilePage: React.FC = () => {
                       ...formData,
                       personalInfo: { ...formData.personalInfo, lastName: value }
                     });
+                  }}
+                  onBlur={() => {
+                    if (!formData.personalInfo?.lastName || formData.personalInfo.lastName.trim() === '') {
+                      setFormErrors((prev) => ({ ...prev, lastName: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.lastName;
+                        return next;
+                      });
+                    }
                   }}
                   disabled={!isEditMode}
                 />
@@ -849,6 +871,17 @@ const ProfilePage: React.FC = () => {
                       }
                     }, 0);
                   }}
+                  onBlur={() => {
+                    if (!formData.personalInfo?.contactNumber || formData.personalInfo.contactNumber.trim() === '') {
+                      setFormErrors((prev) => ({ ...prev, contactNumber: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.contactNumber;
+                        return next;
+                      });
+                    }
+                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -891,6 +924,17 @@ const ProfilePage: React.FC = () => {
                         inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
                       }
                     }, 0);
+                  }}
+                  onBlur={() => {
+                    if (!formData.personalInfo?.altContact || formData.personalInfo.altContact.trim() === '') {
+                      setFormErrors((prev) => ({ ...prev, altContact: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.altContact;
+                        return next;
+                      });
+                    }
                   }}
                   disabled={!isEditMode}
                 />
@@ -1324,6 +1368,17 @@ const ProfilePage: React.FC = () => {
                             newEducation[idx] = { ...edu, groupStream: value };
                             setFormData({ ...formData, education: newEducation });
                           }}
+                          onBlur={() => {
+                            if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
+                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
+                            } else {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`edu_${idx}_groupStream`];
+                                return next;
+                              });
+                            }
+                          }}
                           disabled={!isEditMode}
                         />
                       </td>
@@ -1336,6 +1391,17 @@ const ProfilePage: React.FC = () => {
                             const newEducation = [...formData.education];
                             newEducation[idx] = { ...edu, collegeUniversity: value };
                             setFormData({ ...formData, education: newEducation });
+                          }}
+                          onBlur={() => {
+                            if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
+                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
+                            } else {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`edu_${idx}_collegeUniversity`];
+                                return next;
+                              });
+                            }
                           }}
                           disabled={!isEditMode}
                         />
@@ -1353,11 +1419,22 @@ const ProfilePage: React.FC = () => {
                             setFormData({ ...formData, education: newEducation });
                           }}
                           onBlur={(e) => {
-                            const year = parseInt(e.target.value, 10);
+                            const yearStr = e.target.value;
+                            const year = parseInt(yearStr, 10);
                             const currentYear = new Date().getFullYear();
                             const maxYear = currentYear + 5;
-                            if (e.target.value && (isNaN(year) || year < 1950 || year > maxYear)) {
+
+                            if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
+                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
+                            } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
                               showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
+                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
+                            } else {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`edu_${idx}_year`];
+                                return next;
+                              });
                             }
                           }}
                           disabled={!isEditMode}
@@ -1403,6 +1480,17 @@ const ProfilePage: React.FC = () => {
                               scorePercentage: display === '' || display === '.' ? null : display
                             };
                             setFormData({ ...formData, education: newEducation });
+                          }}
+                          onBlur={() => {
+                            if ((edu.level === 'UG' || edu.level === '12th') && (edu.scorePercentage === null || edu.scorePercentage === undefined || String(edu.scorePercentage).trim() === '')) {
+                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_scorePercentage`]: true }));
+                            } else {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`edu_${idx}_scorePercentage`];
+                                return next;
+                              });
+                            }
                           }}
                           disabled={!isEditMode}
                         />

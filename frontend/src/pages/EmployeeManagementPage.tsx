@@ -1347,6 +1347,17 @@ const EmployeeManagementPage: React.FC = () => {
                                 firstName: sanitizeName(e.target.value)
                               })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.firstName || newEmployee.firstName.trim() === '') {
+                                setFormErrors((prev) => ({ ...prev, firstName: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.firstName;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1377,6 +1388,17 @@ const EmployeeManagementPage: React.FC = () => {
                                 lastName: sanitizeName(e.target.value)
                               })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.lastName || newEmployee.lastName.trim() === '') {
+                                setFormErrors((prev) => ({ ...prev, lastName: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.lastName;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1390,6 +1412,17 @@ const EmployeeManagementPage: React.FC = () => {
                             onChange={(e) =>
                               setNewEmployee({ ...newEmployee, email: e.target.value })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.email || newEmployee.email.trim() === '') {
+                                setFormErrors((prev) => ({ ...prev, email: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.email;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
                           />
                         </div>
@@ -1432,6 +1465,17 @@ const EmployeeManagementPage: React.FC = () => {
                                 }
                               }, 0);
                             }}
+                            onBlur={() => {
+                              if (!newEmployee.contactNumber || newEmployee.contactNumber.trim() === '') {
+                                setFormErrors((prev) => ({ ...prev, contactNumber: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.contactNumber;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1462,6 +1506,17 @@ const EmployeeManagementPage: React.FC = () => {
                                   inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
                                 }
                               }, 0);
+                            }}
+                            onBlur={() => {
+                              if (!newEmployee.altContact || newEmployee.altContact.trim() === '') {
+                                setFormErrors((prev) => ({ ...prev, altContact: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.altContact;
+                                  return next;
+                                });
+                              }
                             }}
                             disabled={isViewMode}
                           />
@@ -1892,6 +1947,17 @@ const EmployeeManagementPage: React.FC = () => {
                                       return { ...prev, education: next };
                                     });
                                   }}
+                                  onBlur={() => {
+                                    if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
+                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
+                                    } else {
+                                      setFormErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next[`edu_${idx}_groupStream`];
+                                        return next;
+                                      });
+                                    }
+                                  }}
                                   disabled={isViewMode}
                                 />
                               </td>
@@ -1906,6 +1972,17 @@ const EmployeeManagementPage: React.FC = () => {
                                       next[idx] = { ...edu, collegeUniversity: value };
                                       return { ...prev, education: next };
                                     });
+                                  }}
+                                  onBlur={() => {
+                                    if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
+                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
+                                    } else {
+                                      setFormErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next[`edu_${idx}_collegeUniversity`];
+                                        return next;
+                                      });
+                                    }
                                   }}
                                   disabled={isViewMode}
                                 />
@@ -1923,11 +2000,22 @@ const EmployeeManagementPage: React.FC = () => {
                                     });
                                   }}
                                   onBlur={(e) => {
-                                    const year = parseInt(e.target.value, 10);
+                                    const yearStr = e.target.value;
+                                    const year = parseInt(yearStr, 10);
                                     const currentYear = new Date().getFullYear();
                                     const maxYear = currentYear + 5;
-                                    if (e.target.value && (isNaN(year) || year < 1950 || year > maxYear)) {
+
+                                    if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
+                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
+                                    } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
                                       showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
+                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
+                                    } else {
+                                      setFormErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next[`edu_${idx}_year`];
+                                        return next;
+                                      });
                                     }
                                   }}
                                   disabled={isViewMode}
@@ -1974,6 +2062,17 @@ const EmployeeManagementPage: React.FC = () => {
                                       };
                                       return { ...prev, education: next };
                                     });
+                                  }}
+                                  onBlur={() => {
+                                    if ((edu.level === 'UG' || edu.level === '12th') && (edu.scorePercentage === null || edu.scorePercentage === undefined || String(edu.scorePercentage).trim() === '')) {
+                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_scorePercentage`]: true }));
+                                    } else {
+                                      setFormErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next[`edu_${idx}_scorePercentage`];
+                                        return next;
+                                      });
+                                    }
                                   }}
                                   disabled={isViewMode}
                                 />
