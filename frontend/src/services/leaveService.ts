@@ -132,6 +132,11 @@ export const getEmployeeLeaveRequests = async (employeeId: number, page: number 
   return response.data;
 };
 
+export const getEmployeeLeaveBalances = async (employeeId: number): Promise<LeaveBalance> => {
+  const response = await api.get(`/leave/employee/${employeeId}/balances`);
+  return response.data;
+};
+
 export const getPendingLeaveRequests = async (page: number = 1, limit: number = 10, search?: string, filter?: string) => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   if (search) params.append('search', search);

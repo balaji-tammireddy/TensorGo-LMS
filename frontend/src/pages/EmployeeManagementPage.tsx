@@ -218,6 +218,19 @@ const EmployeeManagementPage: React.FC = () => {
     }
   );
 
+  const { data: employeeBalances, isLoading: employeeBalancesLoading, refetch: refetchEmployeeBalances } = useQuery(
+    ['employee-leave-balances', editingEmployeeId],
+    () => leaveService.getEmployeeLeaveBalances(editingEmployeeId!),
+    {
+      retry: false,
+      staleTime: 10000,
+      refetchInterval: 30000,
+      cacheTime: 5 * 60 * 1000,
+      keepPreviousData: true,
+      enabled: showLeaveHistory && !!editingEmployeeId && (user?.role === 'hr' || user?.role === 'super_admin')
+    }
+  );
+
   const { data: employeesData, isLoading: employeesLoading, error } = useQuery(
     ['employees', appliedSearch, statusFilter, roleFilter],
     () =>
@@ -1167,30 +1180,55 @@ const EmployeeManagementPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="employee-modal-body">
+              <div className={`employee-modal-body ${showLeaveHistory ? 'leave-history-mode' : ''}`}>
                 {isDetailLoading && (
                   <div style={{ padding: '8px 0', fontSize: 12, color: '#666' }}>
                     Loading details...
                   </div>
                 )}
                 {showLeaveHistory ? (
-                  <div className="employee-modal-section" style={{ marginTop: 0, marginBottom: 0 }}>
-                    <h3 style={{ marginTop: 0 }}>Leave Details</h3>
-                    {leaveHistoryLoading ? (
-                      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                        Loading leave history...
-                      </div>
-                    ) : leaveHistoryData?.requests && leaveHistoryData.requests.length > 0 ? (
-                      <div style={{ marginTop: '8px', width: '100%', overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '100%' }}>
+                  <>
+                    <div className="leave-details-fixed-header">
+                      <h3 className="modal-section-heading">Leave Details</h3>
+
+                      {/* Leave Balances Section */}
+                      {employeeBalancesLoading ? (
+                        <div className="leave-balances-loading">Loading leave balances...</div>
+                      ) : (
+                        <div className="modal-leave-balances">
+                          <div className="modal-balance-card">
+                            <span className="modal-balance-label">Casual</span>
+                            <span className="modal-balance-value">{employeeBalances?.casual || 0}</span>
+                          </div>
+                          <div className="modal-balance-card">
+                            <span className="modal-balance-label">Sick</span>
+                            <span className="modal-balance-value">{employeeBalances?.sick || 0}</span>
+                          </div>
+                          <div className="modal-balance-card">
+                            <span className="modal-balance-label">LOP</span>
+                            <span className="modal-balance-value">{employeeBalances?.lop || 0}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <h3 className="modal-section-heading" style={{ marginTop: '20px' }}>Leave History</h3>
+                    </div>
+
+                    <div className="leave-history-table-container">
+                      {leaveHistoryLoading ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                          Loading leave history...
+                        </div>
+                      ) : leaveHistoryData?.requests && leaveHistoryData.requests.length > 0 ? (
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12px', minWidth: '100%' }}>
                           <thead>
-                            <tr style={{ borderBottom: '1px solid #e5e5e5', backgroundColor: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Applied Date</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Leave Type</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Start Date</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>End Date</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Days</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+                            <tr style={{ backgroundColor: '#f8f9fa' }}>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Applied Date</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Leave Type</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Start Date</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>End Date</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Days</th>
+                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Status</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1209,12 +1247,12 @@ const EmployeeManagementPage: React.FC = () => {
                               };
                               return (
                                 <tr key={request.id} style={{ borderBottom: '1px solid #e5e5e5' }}>
-                                  <td style={{ padding: '8px' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
-                                  <td style={{ padding: '8px' }}>{format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px' }}>{format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px' }}>{request.noOfDays}</td>
-                                  <td style={{ padding: '8px' }}>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{request.noOfDays}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>
                                     <span className={`status-badge ${getStatusClass(request.currentStatus)}`}>
                                       {getStatusLabel(request.currentStatus)}
                                     </span>
@@ -1224,14 +1262,14 @@ const EmployeeManagementPage: React.FC = () => {
                             })}
                           </tbody>
                         </table>
-                      </div>
-                    ) : (
-                      <EmptyState
-                        title="No Leave Details"
-                        description="This employee hasn't applied for any leaves yet."
-                      />
-                    )}
-                  </div>
+                      ) : (
+                        <EmptyState
+                          title="No Leave Details"
+                          description="This employee hasn't applied for any leaves yet."
+                        />
+                      )}
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="employee-modal-section">
@@ -2137,6 +2175,7 @@ const EmployeeManagementPage: React.FC = () => {
                       onClick={() => {
                         if (!showLeaveHistory) {
                           refetchLeaveHistory();
+                          refetchEmployeeBalances();
                         }
                         setShowLeaveHistory(!showLeaveHistory);
                       }}
