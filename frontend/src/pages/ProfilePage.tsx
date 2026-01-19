@@ -759,6 +759,7 @@ const ProfilePage: React.FC = () => {
                   }}
                   onBlur={() => {
                     if (!formData.personalInfo?.firstName || formData.personalInfo.firstName.trim() === '') {
+                      showError('First Name is required');
                       setFormErrors((prev) => ({ ...prev, firstName: true }));
                     } else {
                       setFormErrors((prev) => {
@@ -805,6 +806,7 @@ const ProfilePage: React.FC = () => {
                   }}
                   onBlur={() => {
                     if (!formData.personalInfo?.lastName || formData.personalInfo.lastName.trim() === '') {
+                      showError('Last Name is required');
                       setFormErrors((prev) => ({ ...prev, lastName: true }));
                     } else {
                       setFormErrors((prev) => {
@@ -872,7 +874,12 @@ const ProfilePage: React.FC = () => {
                     }, 0);
                   }}
                   onBlur={() => {
-                    if (!formData.personalInfo?.contactNumber || formData.personalInfo.contactNumber.trim() === '') {
+                    const val = formData.personalInfo?.contactNumber;
+                    if (!val || val.trim() === '') {
+                      showError('Contact Number is required');
+                      setFormErrors((prev) => ({ ...prev, contactNumber: true }));
+                    } else if (val.length < 10) {
+                      showError('Contact Number must be 10 digits');
                       setFormErrors((prev) => ({ ...prev, contactNumber: true }));
                     } else {
                       setFormErrors((prev) => {
@@ -926,7 +933,12 @@ const ProfilePage: React.FC = () => {
                     }, 0);
                   }}
                   onBlur={() => {
-                    if (!formData.personalInfo?.altContact || formData.personalInfo.altContact.trim() === '') {
+                    const val = formData.personalInfo?.altContact;
+                    if (!val || val.trim() === '') {
+                      showError('Alternate Contact Number is required');
+                      setFormErrors((prev) => ({ ...prev, altContact: true }));
+                    } else if (val.length < 10) {
+                      showError('Alternate Contact Number must be 10 digits');
                       setFormErrors((prev) => ({ ...prev, altContact: true }));
                     } else {
                       setFormErrors((prev) => {
@@ -1107,6 +1119,18 @@ const ProfilePage: React.FC = () => {
                       personalInfo: { ...formData.personalInfo, emergencyContactName: value }
                     });
                   }}
+                  onBlur={() => {
+                    if (!formData.personalInfo?.emergencyContactName || formData.personalInfo.emergencyContactName.trim() === '') {
+                      showError('Emergency Contact Name is required');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactName: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.emergencyContactName;
+                        return next;
+                      });
+                    }
+                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1150,6 +1174,22 @@ const ProfilePage: React.FC = () => {
                       }
                     }, 0);
                   }}
+                  onBlur={() => {
+                    const val = formData.personalInfo?.emergencyContactNo;
+                    if (!val || val.trim() === '') {
+                      showError('Emergency Contact Number is required');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
+                    } else if (val.length < 10) {
+                      showError('Emergency Contact Number must be 10 digits');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.emergencyContactNo;
+                        return next;
+                      });
+                    }
+                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1168,6 +1208,18 @@ const ProfilePage: React.FC = () => {
                       ...formData,
                       personalInfo: { ...formData.personalInfo, emergencyContactRelation: value }
                     });
+                  }}
+                  onBlur={() => {
+                    if (!formData.personalInfo?.emergencyContactRelation || formData.personalInfo.emergencyContactRelation.trim() === '') {
+                      showError('Emergency Contact Relation is required');
+                      setFormErrors((prev) => ({ ...prev, emergencyContactRelation: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.emergencyContactRelation;
+                        return next;
+                      });
+                    }
                   }}
                   disabled={!isEditMode}
                 />
@@ -1194,6 +1246,18 @@ const ProfilePage: React.FC = () => {
                       employmentInfo: { ...formData.employmentInfo, designation: value }
                     });
                   }}
+                  onBlur={() => {
+                    if (!formData.employmentInfo?.designation || formData.employmentInfo.designation.trim() === '') {
+                      showError('Designation is required');
+                      setFormErrors((prev) => ({ ...prev, designation: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.designation;
+                        return next;
+                      });
+                    }
+                  }}
                   disabled={!isEditMode || (user?.role === 'employee')}
                 />
               </div>
@@ -1212,6 +1276,18 @@ const ProfilePage: React.FC = () => {
                       ...formData,
                       employmentInfo: { ...formData.employmentInfo, department: value }
                     });
+                  }}
+                  onBlur={() => {
+                    if (!formData.employmentInfo?.department || formData.employmentInfo.department.trim() === '') {
+                      showError('Department is required');
+                      setFormErrors((prev) => ({ ...prev, department: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.department;
+                        return next;
+                      });
+                    }
                   }}
                   disabled={!isEditMode || (user?.role === 'employee')}
                 />
@@ -1254,6 +1330,23 @@ const ProfilePage: React.FC = () => {
                       documents: { ...formData.documents, aadharNumber: raw }
                     });
                   }}
+                  onBlur={() => {
+                    const val = formData.documents?.aadharNumber;
+                    if (!val || val.trim() === '') {
+                      showError('Aadhar Number is required');
+                      setFormErrors((prev) => ({ ...prev, aadharNumber: true }));
+                    } else if (val.replace(/\s/g, '').length < 12) {
+                      // Aadhar length check (sanitized)
+                      showError('Aadhar Number must be 12 digits');
+                      setFormErrors((prev) => ({ ...prev, aadharNumber: true }));
+                    } else {
+                      setFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.aadharNumber;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="XXXX XXXX XXXX"
                   disabled={!isEditMode}
                 />
@@ -1274,9 +1367,22 @@ const ProfilePage: React.FC = () => {
                     });
                   }}
                   onBlur={() => {
-                    const panError = validatePan(formData.documents?.panNumber || '');
-                    if (panError && formData.documents?.panNumber) {
-                      showWarning(panError);
+                    const panVal = formData.documents?.panNumber || '';
+                    if (!panVal || panVal.trim() === '') {
+                      showError('PAN Number is required');
+                      setFormErrors((prev) => ({ ...prev, panNumber: true }));
+                    } else {
+                      const panError = validatePan(panVal);
+                      if (panError) {
+                        showError(panError);
+                        setFormErrors((prev) => ({ ...prev, panNumber: true }));
+                      } else {
+                        setFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.panNumber;
+                          return next;
+                        });
+                      }
                     }
                   }}
                   placeholder="ABCDE1234F"
@@ -1312,6 +1418,18 @@ const ProfilePage: React.FC = () => {
                     }
                   }));
                 }}
+                onBlur={() => {
+                  if (!formData.address?.permanentAddress || formData.address.permanentAddress.trim() === '') {
+                    showError('Permanent Address is required');
+                    setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
+                  } else {
+                    setFormErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.permanentAddress;
+                      return next;
+                    });
+                  }
+                }}
                 disabled={!isEditMode}
                 rows={4}
               />
@@ -1329,6 +1447,18 @@ const ProfilePage: React.FC = () => {
                     ...prev,
                     address: { ...prev.address, currentAddress: value }
                   }));
+                }}
+                onBlur={() => {
+                  if (!formData.address?.currentAddress || formData.address.currentAddress.trim() === '') {
+                    showError('Current Address is required');
+                    setFormErrors((prev) => ({ ...prev, currentAddress: true }));
+                  } else {
+                    setFormErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.currentAddress;
+                      return next;
+                    });
+                  }
                 }}
                 disabled={!isEditMode}
                 rows={4}
@@ -1370,6 +1500,7 @@ const ProfilePage: React.FC = () => {
                           }}
                           onBlur={() => {
                             if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
+                              showError(`Group/Stream is required for ${edu.level}`);
                               setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
                             } else {
                               setFormErrors((prev) => {
@@ -1394,6 +1525,7 @@ const ProfilePage: React.FC = () => {
                           }}
                           onBlur={() => {
                             if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
+                              showError(`College/University is required for ${edu.level}`);
                               setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
                             } else {
                               setFormErrors((prev) => {
@@ -1425,9 +1557,10 @@ const ProfilePage: React.FC = () => {
                             const maxYear = currentYear + 5;
 
                             if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
+                              showError(`Graduation Year is required for ${edu.level}`);
                               setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
                             } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
-                              showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
+                              showError(`Graduation Year must be between 1950 and ${maxYear}`);
                               setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
                             } else {
                               setFormErrors((prev) => {
@@ -1483,6 +1616,7 @@ const ProfilePage: React.FC = () => {
                           }}
                           onBlur={() => {
                             if ((edu.level === 'UG' || edu.level === '12th') && (edu.scorePercentage === null || edu.scorePercentage === undefined || String(edu.scorePercentage).trim() === '')) {
+                              showError(`Score % is required for ${edu.level}`);
                               setFormErrors((prev) => ({ ...prev, [`edu_${idx}_scorePercentage`]: true }));
                             } else {
                               setFormErrors((prev) => {

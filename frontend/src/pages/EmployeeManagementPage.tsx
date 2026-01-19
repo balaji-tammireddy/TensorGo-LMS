@@ -1413,6 +1413,7 @@ const EmployeeManagementPage: React.FC = () => {
                             }
                             onBlur={() => {
                               if (!newEmployee.firstName || newEmployee.firstName.trim() === '') {
+                                showError('First Name is required');
                                 setFormErrors((prev) => ({ ...prev, firstName: true }));
                               } else {
                                 setFormErrors((prev) => {
@@ -1454,6 +1455,7 @@ const EmployeeManagementPage: React.FC = () => {
                             }
                             onBlur={() => {
                               if (!newEmployee.lastName || newEmployee.lastName.trim() === '') {
+                                showError('Last Name is required');
                                 setFormErrors((prev) => ({ ...prev, lastName: true }));
                               } else {
                                 setFormErrors((prev) => {
@@ -1478,6 +1480,7 @@ const EmployeeManagementPage: React.FC = () => {
                             }
                             onBlur={() => {
                               if (!newEmployee.email || newEmployee.email.trim() === '') {
+                                showError('Official Email is required');
                                 setFormErrors((prev) => ({ ...prev, email: true }));
                               } else {
                                 setFormErrors((prev) => {
@@ -1530,7 +1533,12 @@ const EmployeeManagementPage: React.FC = () => {
                               }, 0);
                             }}
                             onBlur={() => {
-                              if (!newEmployee.contactNumber || newEmployee.contactNumber.trim() === '') {
+                              const val = newEmployee.contactNumber;
+                              if (!val || val.trim() === '') {
+                                showError('Contact Number is required');
+                                setFormErrors((prev) => ({ ...prev, contactNumber: true }));
+                              } else if (val.length < 10) {
+                                showError('Contact Number must be 10 digits');
                                 setFormErrors((prev) => ({ ...prev, contactNumber: true }));
                               } else {
                                 setFormErrors((prev) => {
@@ -1572,7 +1580,12 @@ const EmployeeManagementPage: React.FC = () => {
                               }, 0);
                             }}
                             onBlur={() => {
-                              if (!newEmployee.altContact || newEmployee.altContact.trim() === '') {
+                              const val = newEmployee.altContact;
+                              if (!val || val.trim() === '') {
+                                showError('Alternate Contact Number is required');
+                                setFormErrors((prev) => ({ ...prev, altContact: true }));
+                              } else if (val.length < 10) {
+                                showError('Alternate Contact Number must be 10 digits');
                                 setFormErrors((prev) => ({ ...prev, altContact: true }));
                               } else {
                                 setFormErrors((prev) => {
@@ -1706,6 +1719,18 @@ const EmployeeManagementPage: React.FC = () => {
                                 emergencyContactName: sanitizeName(e.target.value)
                               })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.emergencyContactName || newEmployee.emergencyContactName.trim() === '') {
+                                showError('Emergency Contact Name is required');
+                                setFormErrors((prev) => ({ ...prev, emergencyContactName: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.emergencyContactName;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1748,6 +1773,22 @@ const EmployeeManagementPage: React.FC = () => {
                                 }
                               }, 0);
                             }}
+                            onBlur={() => {
+                              const val = newEmployee.emergencyContactNo;
+                              if (!val || val.trim() === '') {
+                                showError('Emergency Contact Number is required');
+                                setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
+                              } else if (val.length < 10) {
+                                showError('Emergency Contact Number must be 10 digits');
+                                setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.emergencyContactNo;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1764,6 +1805,18 @@ const EmployeeManagementPage: React.FC = () => {
                                 emergencyContactRelation: sanitizeLettersOnly(e.target.value)
                               })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.emergencyContactRelation || newEmployee.emergencyContactRelation.trim() === '') {
+                                showError('Emergency Contact Relation is required');
+                                setFormErrors((prev) => ({ ...prev, emergencyContactRelation: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.emergencyContactRelation;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1786,6 +1839,18 @@ const EmployeeManagementPage: React.FC = () => {
                                 designation: sanitizeName(e.target.value)
                               })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.designation || newEmployee.designation.trim() === '') {
+                                showError('Designation is required');
+                                setFormErrors((prev) => ({ ...prev, designation: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.designation;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1802,6 +1867,18 @@ const EmployeeManagementPage: React.FC = () => {
                                 department: sanitizeName(e.target.value)
                               })
                             }
+                            onBlur={() => {
+                              if (!newEmployee.department || newEmployee.department.trim() === '') {
+                                showError('Department is required');
+                                setFormErrors((prev) => ({ ...prev, department: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.department;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1892,6 +1969,18 @@ const EmployeeManagementPage: React.FC = () => {
                               })
                             }
                             placeholder="XXXX XXXX XXXX"
+                            onBlur={() => {
+                              if (!newEmployee.aadharNumber || newEmployee.aadharNumber.trim() === '') {
+                                showError('Aadhar Number is required');
+                                setFormErrors((prev) => ({ ...prev, aadharNumber: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.aadharNumber;
+                                  return next;
+                                });
+                              }
+                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1910,9 +1999,22 @@ const EmployeeManagementPage: React.FC = () => {
                               });
                             }}
                             onBlur={() => {
-                              const panError = validatePan(newEmployee.panNumber);
-                              if (panError && newEmployee.panNumber) {
-                                showWarning(panError);
+                              const panVal = newEmployee.panNumber || '';
+                              if (!panVal || panVal.trim() === '') {
+                                showError('PAN Number is required');
+                                setFormErrors((prev) => ({ ...prev, panNumber: true }));
+                              } else {
+                                const panError = validatePan(panVal);
+                                if (panError) {
+                                  showError(panError);
+                                  setFormErrors((prev) => ({ ...prev, panNumber: true }));
+                                } else {
+                                  setFormErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next.panNumber;
+                                    return next;
+                                  });
+                                }
                               }
                             }}
                             placeholder="ABCDE1234F"
@@ -1946,6 +2048,18 @@ const EmployeeManagementPage: React.FC = () => {
                                 : prev.currentAddress
                             }))
                           }
+                          onBlur={() => {
+                            if (!newEmployee.permanentAddress || newEmployee.permanentAddress.trim() === '') {
+                              showError('Permanent Address is required');
+                              setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
+                            } else {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.permanentAddress;
+                                return next;
+                              });
+                            }
+                          }}
                           disabled={isViewMode}
                         />
                       </div>
@@ -1962,6 +2076,18 @@ const EmployeeManagementPage: React.FC = () => {
                               currentAddress: e.target.value
                             })
                           }
+                          onBlur={() => {
+                            if (!newEmployee.currentAddress || newEmployee.currentAddress.trim() === '') {
+                              showError('Current Address is required');
+                              setFormErrors((prev) => ({ ...prev, currentAddress: true }));
+                            } else {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.currentAddress;
+                                return next;
+                              });
+                            }
+                          }}
                           disabled={(isSameAddress && !isEditMode) || isViewMode}
                         />
                         {!isEditMode && !isViewMode && (
@@ -2013,6 +2139,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   }}
                                   onBlur={() => {
                                     if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
+                                      showError(`Group/Stream is required for ${edu.level}`);
                                       setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
                                     } else {
                                       setFormErrors((prev) => {
@@ -2039,6 +2166,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   }}
                                   onBlur={() => {
                                     if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
+                                      showError(`College/University is required for ${edu.level}`);
                                       setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
                                     } else {
                                       setFormErrors((prev) => {
@@ -2070,9 +2198,10 @@ const EmployeeManagementPage: React.FC = () => {
                                     const maxYear = currentYear + 5;
 
                                     if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
+                                      showError(`Graduation Year is required for ${edu.level}`);
                                       setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
                                     } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
-                                      showWarning(`Graduation Year must be between 1950 and ${maxYear}`);
+                                      showError(`Graduation Year must be between 1950 and ${maxYear}`);
                                       setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
                                     } else {
                                       setFormErrors((prev) => {
@@ -2129,6 +2258,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   }}
                                   onBlur={() => {
                                     if ((edu.level === 'UG' || edu.level === '12th') && (edu.scorePercentage === null || edu.scorePercentage === undefined || String(edu.scorePercentage).trim() === '')) {
+                                      showError(`Score % is required for ${edu.level}`);
                                       setFormErrors((prev) => ({ ...prev, [`edu_${idx}_scorePercentage`]: true }));
                                     } else {
                                       setFormErrors((prev) => {
