@@ -29,15 +29,9 @@ WHERE u.id = $1`,
     throw new Error('User not found');
   }
 
-  logger.info(`[PROFILE] [GET PROFILE] User found, fetching education records`);
+  logger.info(`[PROFILE] [GET PROFILE] User found`);
   const user = result.rows[0];
-
-  // Get education
-  const educationResult = await pool.query(
-    'SELECT * FROM education WHERE employee_id = $1',
-    [userId]
-  );
-  logger.info(`[PROFILE] [GET PROFILE] Found ${educationResult.rows.length} education records`);
+  const educationDetails = user.education_details || [];
 
   return {
     personalInfo: {
@@ -69,7 +63,7 @@ WHERE u.id = $1`,
       currentAddress: user.current_address,
       permanentAddress: user.permanent_address
     },
-    education: educationResult.rows.map(edu => ({
+    education: educationDetails.map((edu: any) => ({
       level: edu.level,
       groupStream: edu.group_stream,
       collegeUniversity: edu.college_university,
@@ -461,28 +455,19 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
       throw new Error('UG Graduation Year must be before PG Graduation Year');
     }
 
-    // Perform database updates after all validations pass
-    for (const edu of profileData.education) {
-      if (edu.level) {
-        await pool.query(
-          `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (employee_id, level) DO UPDATE
-SET group_stream = EXCLUDED.group_stream,
-college_university = EXCLUDED.college_university,
-year = EXCLUDED.year,
-score_percentage = EXCLUDED.score_percentage`,
-          [
-            userId,
-            edu.level,
-            edu.groupStream || null,
-            edu.collegeUniversity || null,
-            edu.year || null,
-            edu.scorePercentage || null
-          ]
-        );
-      }
-    }
+    // Update education_details in users table
+    const educationDetails = profileData.education.map((edu: any) => ({
+      level: edu.level,
+      group_stream: edu.groupStream || null,
+      college_university: edu.collegeUniversity || null,
+      year: edu.year || null,
+      score_percentage: edu.scorePercentage || null
+    }));
+
+    await pool.query(
+      'UPDATE users SET education_details = $1 WHERE id = $2',
+      [JSON.stringify(educationDetails), userId]
+    );
   }
 
   logger.info(`[PROFILE] [UPDATE PROFILE] Profile update completed successfully - User ID: ${userId}`);

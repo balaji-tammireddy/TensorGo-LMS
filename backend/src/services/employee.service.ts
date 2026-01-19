@@ -176,17 +176,11 @@ export const getEmployeeById = async (employeeId: number) => {
 
   const user = result.rows[0];
 
-  // Get education
-  const educationResult = await pool.query(
-    'SELECT * FROM education WHERE employee_id = $1',
-    [employeeId]
-  );
-
   return {
     ...user,
     date_of_birth: formatDateLocal(user.date_of_birth),
     date_of_joining: formatDateLocal(user.date_of_joining),
-    education: educationResult.rows
+    education: user.education_details || []
   };
 };
 
@@ -579,39 +573,20 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   );
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
 
-  // Insert education if provided
+  // Update education_details if provided
   if (employeeData.education) {
-    for (const edu of employeeData.education) {
-      if (edu.level) {
-        // Validate year if provided (must be between 1950 and 5 years from current year)
-        if (edu.year) {
-          const year = parseInt(edu.year, 10);
-          const currentYear = new Date().getFullYear();
-          const maxYear = currentYear + 5;
-          if (isNaN(year) || year < 1950 || year > maxYear) {
-            throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
-          }
-        }
+    const educationDetails = employeeData.education.map((edu: any) => ({
+      level: edu.level,
+      group_stream: edu.groupStream || null,
+      college_university: edu.collegeUniversity || null,
+      year: edu.year || null,
+      score_percentage: edu.scorePercentage || null
+    }));
 
-        await pool.query(
-          `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT (employee_id, level) DO UPDATE
-           SET group_stream = EXCLUDED.group_stream,
-               college_university = EXCLUDED.college_university,
-               year = EXCLUDED.year,
-               score_percentage = EXCLUDED.score_percentage`,
-          [
-            userId,
-            edu.level,
-            edu.groupStream || null,
-            edu.collegeUniversity || null,
-            edu.year || null,
-            edu.scorePercentage || null
-          ]
-        );
-      }
-    }
+    await pool.query(
+      'UPDATE users SET education_details = $1 WHERE id = $2',
+      [JSON.stringify(educationDetails), userId]
+    );
   }
 
 
@@ -766,7 +741,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id, education_details FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -790,12 +765,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     const dobValue = employeeData.dateOfBirth || employeeCheck.rows[0].date_of_birth;
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
-    // Fetch existing education to merge with updates for validation
-    const existingEducationResult = await pool.query('SELECT level, year FROM education WHERE employee_id = $1', [employeeId]);
+    // Use existing education from users table for validation
+    const educationDetails = employeeCheck.rows[0].education_details || [];
     const educationYears: Record<string, number> = {};
 
     // Populate with existing data first
-    for (const edu of existingEducationResult.rows) {
+    for (const edu of educationDetails) {
       if (edu.year && /^[0-9]{4}$/.test(edu.year)) {
         educationYears[edu.level] = parseInt(edu.year, 10);
       }
@@ -1334,39 +1309,20 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Update education if provided
+  // Update education_details if provided
   if (employeeData.education) {
-    for (const edu of employeeData.education) {
-      if (edu.level) {
-        // Validate year if provided (must be between 1950 and 5 years from current year)
-        if (edu.year) {
-          const year = parseInt(edu.year, 10);
-          const currentYear = new Date().getFullYear();
-          const maxYear = currentYear + 5;
-          if (isNaN(year) || year < 1950 || year > maxYear) {
-            throw new Error(`Graduation Year must be between 1950 and ${maxYear}`);
-          }
-        }
+    const educationDetails = employeeData.education.map((edu: any) => ({
+      level: edu.level,
+      group_stream: edu.groupStream || null,
+      college_university: edu.collegeUniversity || null,
+      year: edu.year || null,
+      score_percentage: edu.scorePercentage || null
+    }));
 
-        await pool.query(
-          `INSERT INTO education (employee_id, level, group_stream, college_university, year, score_percentage)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT (employee_id, level) DO UPDATE
-           SET group_stream = EXCLUDED.group_stream,
-               college_university = EXCLUDED.college_university,
-               year = EXCLUDED.year,
-               score_percentage = EXCLUDED.score_percentage`,
-          [
-            employeeId,
-            edu.level,
-            edu.groupStream || null,
-            edu.collegeUniversity || null,
-            edu.year || null,
-            edu.scorePercentage || null
-          ]
-        );
-      }
-    }
+    await pool.query(
+      'UPDATE users SET education_details = $1 WHERE id = $2',
+      [JSON.stringify(educationDetails), employeeId]
+    );
   }
 
   // Send email notification if HR or Super Admin updated employee details
@@ -1456,10 +1412,7 @@ export const deleteEmployee = async (employeeId: number) => {
     // 3. Delete leave balances
     await client.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
 
-    // 4. Delete education records (has ON DELETE CASCADE, but explicit for clarity)
-    await client.query('DELETE FROM education WHERE employee_id = $1', [employeeId]);
-
-    // 5. Update reporting_manager_id in users table to NULL for employees reporting to this user
+    // 4. Update reporting_manager_id in users table to NULL for employees reporting to this user
     await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
 
     // 6. Update created_by and updated_by references to NULL

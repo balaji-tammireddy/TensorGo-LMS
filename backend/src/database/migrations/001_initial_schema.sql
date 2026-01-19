@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_by INTEGER REFERENCES users(id),
-  updated_by INTEGER REFERENCES users(id)
+  updated_by INTEGER REFERENCES users(id),
+  education_details JSONB
 );
 
 -- Ensure column exists for existing databases
@@ -129,19 +130,7 @@ CREATE TABLE IF NOT EXISTS leave_rules (
   is_active BOOLEAN DEFAULT true
 );
 
--- Education table
-CREATE TABLE IF NOT EXISTS education (
-  id SERIAL PRIMARY KEY,
-  employee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  level VARCHAR(10) NOT NULL CHECK (level IN ('PG', 'UG', '12th')),
-  group_stream VARCHAR(100),
-  college_university VARCHAR(200),
-  year INTEGER,
-  score_percentage DECIMAL(5,2),
-  UNIQUE(employee_id, level)
-);
-
-CREATE INDEX IF NOT EXISTS idx_education_employee ON education(employee_id);
+-- Education table removed - data moved to users.education_details
 
 -- Audit logs table (removed - not used)
 -- CREATE TABLE IF NOT EXISTS audit_logs (
