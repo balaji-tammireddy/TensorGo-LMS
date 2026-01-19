@@ -161,7 +161,10 @@ const EmployeeManagementPage: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('role') || '';
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -178,6 +181,8 @@ const EmployeeManagementPage: React.FC = () => {
   const [managerSearch, setManagerSearch] = useState('');
   const [appliedManagerSearch, setAppliedManagerSearch] = useState<string | undefined>(undefined);
   const [initialEmployeeData, setInitialEmployeeData] = useState<any>(null);
+  const location = useLocation();
+
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'empId', direction: 'asc' });
 
   const handleSort = (key: string) => {
@@ -192,7 +197,7 @@ const EmployeeManagementPage: React.FC = () => {
     () => getReportingManagers(appliedManagerSearch, newEmployee.role, editingEmployeeId || undefined),
     {
       retry: false,
-      staleTime: 0,
+      staleTime: 30000,
       cacheTime: 5 * 60 * 1000,
       keepPreviousData: true,
       enabled: isModalOpen && !!newEmployee.role
@@ -204,8 +209,8 @@ const EmployeeManagementPage: React.FC = () => {
     () => leaveService.getEmployeeLeaveRequests(editingEmployeeId!, 1, 100),
     {
       retry: false,
-      staleTime: 0,
-      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
+      staleTime: 10000,
+      refetchInterval: 30000,
       cacheTime: 5 * 60 * 1000,
       keepPreviousData: true,
       enabled: showLeaveHistory && !!editingEmployeeId && (user?.role === 'hr' || user?.role === 'super_admin')
@@ -225,8 +230,8 @@ const EmployeeManagementPage: React.FC = () => {
       ),
     {
       retry: false,
-      staleTime: 0,
-      refetchInterval: 5000, // Reduced to 5 seconds for immediate updates
+      staleTime: 10000,
+      refetchInterval: 30000,
       keepPreviousData: true,
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -270,7 +275,6 @@ const EmployeeManagementPage: React.FC = () => {
     }
   }, [showLeaveHistory, isModalOpen]);
 
-  const location = useLocation();
 
 
 
@@ -1062,7 +1066,7 @@ const EmployeeManagementPage: React.FC = () => {
               <tbody>
                 {sortedEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 0 }}>
+                    <td colSpan={6} style={{ padding: 0 }}>
                       <EmptyState
                         title="No Employees Found"
                         description="Try adjusting your search or filters to find what you're looking for."
@@ -1070,7 +1074,7 @@ const EmployeeManagementPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  sortedEmployees.map((employee, idx) => (
+                  sortedEmployees.map((employee) => (
                     <tr key={employee.id}>
 
                       <td>{employee.empId}</td>
