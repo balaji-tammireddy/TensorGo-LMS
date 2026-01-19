@@ -971,13 +971,12 @@ const EmployeeManagementPage: React.FC = () => {
             )}
           </div>
 
-          <button
-            type="button"
-            className="add-employee-button"
+          <Button
             onClick={handleOpenAddEmployee}
+            style={{ marginLeft: 'auto' }}
           >
             Add Employee
-          </button>
+          </Button>
         </div>
 
         <div className={`employees-section employees-table-wrapper ${employeesLoading && sortedEmployees.length > 0 ? 'fetching' : ''}`}>
