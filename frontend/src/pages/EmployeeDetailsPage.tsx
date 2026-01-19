@@ -476,6 +476,8 @@ const EmployeeDetailsPage: React.FC = () => {
                 </Button>
                 {(user?.role === 'super_admin' || user?.role === 'hr') && (
                   <Button
+                    className="add-employee-button"
+                    style={{ marginLeft: 0 }}
                     onClick={() => setIsEditMode(true)}
                     disabled={user.role === 'hr' && (employeeData.role === 'super_admin' || employeeData.role === 'hr')}
                   >
@@ -495,7 +497,12 @@ const EmployeeDetailsPage: React.FC = () => {
                 }}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave} disabled={updateEmployeeMutation.isLoading}>
+                <Button
+                  className="add-employee-button"
+                  style={{ marginLeft: 0 }}
+                  onClick={handleSave}
+                  disabled={updateEmployeeMutation.isLoading}
+                >
                   {updateEmployeeMutation.isLoading ? 'Saving...' : 'Save Changes'}
                 </Button>
               </>

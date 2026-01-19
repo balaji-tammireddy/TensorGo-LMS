@@ -4,7 +4,8 @@ import { useQuery } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import { format } from 'date-fns';
 import { Button } from '../components/ui/button';
-import { ArrowLeft, Eye } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { FaEye } from 'react-icons/fa';
 import { useToast } from '../contexts/ToastContext';
 import * as leaveService from '../services/leaveService';
 import EmptyState from '../components/common/EmptyState';
@@ -60,8 +61,8 @@ const EmployeeLeaveHistoryPage: React.FC = () => {
         <AppLayout>
             <div className="employee-management-page">
                 <div className="page-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <Button variant="outline" onClick={() => navigate('/employee-management')} className="flex items-center gap-2">
-                        <ArrowLeft className="h-4 w-4" /> Back
+                    <Button variant="outline" onClick={() => navigate(`/employee-management/view/${id}`)} className="flex items-center gap-2">
+                        <ArrowLeft className="h-4 w-4" /> Back to Details
                     </Button>
                 </div>
 
@@ -119,13 +120,20 @@ const EmployeeLeaveHistoryPage: React.FC = () => {
                                                             {getStatusLabel(request.currentStatus)}
                                                         </span>
                                                     </td>
+
                                                     <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>
-                                                        <Button variant="ghost" size="sm" onClick={() => {
-                                                            setSelectedLeaveRequest(request);
-                                                            setIsDetailsModalOpen(true);
-                                                        }}>
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
+                                                        <div className="actions-wrapper" style={{ justifyContent: 'center', display: 'flex' }}>
+                                                            <button
+                                                                className="action-btn view-btn"
+                                                                onClick={() => {
+                                                                    setSelectedLeaveRequest(request);
+                                                                    setIsDetailsModalOpen(true);
+                                                                }}
+                                                                title="View Details"
+                                                            >
+                                                                <FaEye />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
