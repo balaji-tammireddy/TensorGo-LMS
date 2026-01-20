@@ -45,6 +45,14 @@ const ViewPoliciesPage: React.FC = () => {
     // Confirmation Dialog State
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [policyToDelete, setPolicyToDelete] = useState<{ id: number | string, title: string } | null>(null);
+    const [hiddenPolicyIds, setHiddenPolicyIds] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('hidden_policy_ids');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
 
     const canManage = user?.role === 'super_admin' || user?.role === 'hr';
 
@@ -112,7 +120,22 @@ const ViewPoliciesPage: React.FC = () => {
                     icon: getIconForTitle(p.title),
                     link: p.public_url
                 }));
-                return [...defaultPolicies, ...fetchedPolicies];
+
+                // Overlay fetched policies on top of defaults where titles match
+                // This prevents duplicates and makes defaults "editable" by replacing them
+                const merged = [...defaultPolicies];
+                fetchedPolicies.forEach(fetched => {
+                    const index = merged.findIndex(d =>
+                        d.title.toLowerCase().replace(/\s+/g, ' ').trim() ===
+                        fetched.title.toLowerCase().replace(/\s+/g, ' ').trim()
+                    );
+                    if (index !== -1) {
+                        merged[index] = fetched;
+                    } else {
+                        merged.push(fetched);
+                    }
+                });
+                return merged;
             },
             onError: (error) => {
                 console.error('Error fetching policies:', error);
@@ -184,6 +207,8 @@ const ViewPoliciesPage: React.FC = () => {
 
     const handleEditClick = (policyId: number | string) => {
         if (isProcessing) return;
+
+        // No more blocking string IDs - we'll handle them in handleFileChange
         setSelectedPolicyId(policyId);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -200,6 +225,18 @@ const ViewPoliciesPage: React.FC = () => {
                 if (fileInputRef.current) fileInputRef.current.value = '';
                 return;
             }
+
+            // SMART EDIT: If this is a default policy (string ID), we CREATE it in the DB
+            // using its title. Once created, our smart merging will replace the default.
+            if (typeof selectedPolicyId === 'string' && isNaN(Number(selectedPolicyId))) {
+                const defaultPolicy = defaultPolicies.find(p => p.id === selectedPolicyId);
+                if (defaultPolicy) {
+                    createMutation.mutate({ title: defaultPolicy.title, file });
+                    return;
+                }
+            }
+
+            // Normal update for existing DB policies
             updateMutation.mutate({ id: selectedPolicyId, file });
         } else {
             // If cancelled or no file, reset selection
@@ -210,20 +247,26 @@ const ViewPoliciesPage: React.FC = () => {
     const handleDeleteClick = (policyId: number | string, title: string) => {
         if (isProcessing) return;
 
-        // Prevent deleting default policies (ids are strings like 'asset', DB ids are numbers)
-        if (typeof policyId === 'string' && isNaN(Number(policyId))) {
-            showError("Default policies cannot be deleted.");
-            return;
-        }
-
         setPolicyToDelete({ id: policyId, title });
         setDeleteConfirmOpen(true);
     };
 
     const confirmDelete = () => {
-        if (policyToDelete) {
-            deleteMutation.mutate(policyToDelete.id);
+        if (!policyToDelete) return;
+
+        // If it's a default policy (string ID), we hide it locally
+        if (typeof policyToDelete.id === 'string' && isNaN(Number(policyToDelete.id))) {
+            const newHidden = [...hiddenPolicyIds, policyToDelete.id];
+            setHiddenPolicyIds(newHidden);
+            localStorage.setItem('hidden_policy_ids', JSON.stringify(newHidden));
+            showSuccess('Policy removed from view');
+            setDeleteConfirmOpen(false);
+            setPolicyToDelete(null);
+            return;
         }
+
+        // Normal delete for DB policies
+        deleteMutation.mutate(policyToDelete.id);
     };
 
     const openAddModal = () => {
@@ -253,7 +296,9 @@ const ViewPoliciesPage: React.FC = () => {
         createMutation.mutate({ title: newPolicyTitle, file: newPolicyFile });
     };
 
-    const displayPolicies = policies || (loading ? [] : defaultPolicies);
+    const displayPolicies = (policies || (loading ? [] : defaultPolicies)).filter(
+        p => !hiddenPolicyIds.includes(p.id.toString())
+    );
 
     return (
         <AppLayout>

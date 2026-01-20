@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { uploadToOVH, deleteFromOVH, getPublicUrlFromOVH } from '../utils/storage';
+import { uploadToOVH, deleteFromOVH, getPublicUrlFromOVH, getSignedUrlFromOVH } from '../utils/storage';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -41,7 +41,23 @@ export const getPolicies = async (req: Request, res: Response) => {
     logger.info(`[CONTROLLER] [POLICY] [GET POLICIES] Request received`);
     try {
         const result = await pool.query('SELECT * FROM policies ORDER BY id ASC');
-        res.json(result.rows);
+
+        // Generate fresh signed URLs for all policies to ensure they are accessible
+        const policiesWithUrls = await Promise.all(result.rows.map(async (policy) => {
+            if (policy.s3_key) {
+                try {
+                    // Use a 1-hour expiration for the signed URL
+                    const signedUrl = await getSignedUrlFromOVH(policy.s3_key, 3600);
+                    return { ...policy, public_url: signedUrl };
+                } catch (urlError) {
+                    logger.error(`[CONTROLLER] [POLICY] [GET POLICIES] Failed to sign URL for ${policy.s3_key}:`, urlError);
+                    return policy;
+                }
+            }
+            return policy;
+        }));
+
+        res.json(policiesWithUrls);
     } catch (error: any) {
         logger.error(`[CONTROLLER] [POLICY] [GET POLICIES] Error:`, error);
         res.status(500).json({
@@ -76,10 +92,10 @@ export const createPolicy = [
                 localFilePath = null;
             }
 
-            const publicUrl = getPublicUrlFromOVH(key);
+            const signedUrl = await getSignedUrlFromOVH(key, 3600);
             const result = await pool.query(
                 'INSERT INTO policies (title, s3_key, public_url) VALUES ($1, $2, $3) RETURNING *',
-                [title, key, publicUrl]
+                [title, key, signedUrl]
             );
 
             logger.info(`[CONTROLLER] [POLICY] [CREATE POLICY] Policy created successfully`);
@@ -107,6 +123,15 @@ export const updatePolicy = [
         let localFilePath: string | null = null;
 
         try {
+            // Validate ID is a number to prevent DB crash (default policies have string IDs)
+            if (isNaN(Number(policyId))) {
+                if (req.file) {
+                    localFilePath = req.file.path;
+                    if (fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+                }
+                return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Default policies cannot be edited directly. Please upload a new policy.' } });
+            }
+
             if (!req.file) {
                 return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'No file uploaded' } });
             }
@@ -141,10 +166,10 @@ export const updatePolicy = [
                 }
             }
 
-            const publicUrl = getPublicUrlFromOVH(key);
+            const signedUrl = await getSignedUrlFromOVH(key, 3600);
             const updateResult = await pool.query(
                 'UPDATE policies SET s3_key = $1, public_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-                [key, publicUrl, policyId]
+                [key, signedUrl, policyId]
             );
 
             logger.info(`[CONTROLLER] [POLICY] [UPDATE POLICY] Policy updated successfully`);
@@ -169,6 +194,10 @@ export const deletePolicy = async (req: AuthRequest, res: Response) => {
     logger.info(`[CONTROLLER] [POLICY] [DELETE POLICY] Request received for Policy ID: ${policyId}`);
 
     try {
+        // Validate ID is a number to prevent DB crash
+        if (isNaN(Number(policyId))) {
+            return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Default policies cannot be deleted.' } });
+        }
         const policyResult = await pool.query('SELECT * FROM policies WHERE id = $1', [policyId]);
         if (policyResult.rows.length === 0) {
             return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Policy not found' } });
