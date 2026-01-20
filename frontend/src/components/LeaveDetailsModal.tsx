@@ -46,6 +46,7 @@ interface LeaveDetailsModalProps {
     empRole?: string;
     leaveDays?: LeaveDay[];
     canEdit?: boolean;
+    timeForPermission?: { start: string; end: string } | null;
   } | null;
   onClose: () => void;
   onApprove: (requestId: number, selectedDayIds?: number[]) => void;
@@ -394,30 +395,57 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 <div className="leave-detail-value">{getLeaveTypeLabel(leaveRequest.leaveType)}</div>
               </div>
 
-              <div className="leave-detail-item">
-                <label>Start Date</label>
-                <div className="leave-detail-value">
-                  {formatDateSafe(leaveRequest.startDate)}
-                  {leaveRequest.startType && leaveRequest.startType !== 'full' && (
-                    <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.startType)})</span>
-                  )}
-                </div>
-              </div>
+              {leaveRequest.leaveType === 'permission' ? (
+                <>
+                  <div className="leave-detail-item">
+                    <label>Date</label>
+                    <div className="leave-detail-value">
+                      {formatDateSafe(leaveRequest.startDate)}
+                    </div>
+                  </div>
+                  <div className="leave-detail-item">
+                    <label>Start Time</label>
+                    <div className="leave-detail-value">
+                      <span className="day-type-badge">{leaveRequest.timeForPermission?.start}</span>
+                    </div>
+                  </div>
+                  <div className="leave-detail-item">
+                    <label>End Time</label>
+                    <div className="leave-detail-value">
+                      <span className="day-type-badge">{leaveRequest.timeForPermission?.end}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="leave-detail-item">
+                    <label>Start Date</label>
+                    <div className="leave-detail-value">
+                      {formatDateSafe(leaveRequest.startDate)}
+                      {leaveRequest.startType && leaveRequest.startType !== 'full' && (
+                        <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.startType)})</span>
+                      )}
+                    </div>
+                  </div>
 
-              <div className="leave-detail-item">
-                <label>End Date</label>
-                <div className="leave-detail-value">
-                  {formatDateSafe(leaveRequest.endDate)}
-                  {leaveRequest.endType && leaveRequest.endType !== 'full' && (
-                    <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.endType)})</span>
-                  )}
-                </div>
-              </div>
+                  <div className="leave-detail-item">
+                    <label>End Date</label>
+                    <div className="leave-detail-value">
+                      {formatDateSafe(leaveRequest.endDate)}
+                      {leaveRequest.endType && leaveRequest.endType !== 'full' && (
+                        <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.endType)})</span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
-              <div className="leave-detail-item">
-                <label>Number of Days</label>
-                <div className="leave-detail-value">{leaveRequest.noOfDays}</div>
-              </div>
+              {leaveRequest.leaveType !== 'permission' && (
+                <div className="leave-detail-item">
+                  <label>Number of Days</label>
+                  <div className="leave-detail-value">{leaveRequest.noOfDays}</div>
+                </div>
+              )}
 
               <div className="leave-detail-item">
                 <label>Current Status</label>
@@ -846,7 +874,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                       onClick={handleRejectClick}
                       disabled={isLoading}
                     >
-                      <FaTimesCircle /> Reject All
+                      <FaTimesCircle /> {leaveRequest.noOfDays === 1 ? 'Reject' : 'Reject All'}
                     </button>
                   ) : null}
                   <button

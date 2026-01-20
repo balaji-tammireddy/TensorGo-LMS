@@ -666,7 +666,7 @@ export const getMyLeaveRequests = async (
     const offset = (page - 1) * limit;
     let query = `
     SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
-           lr.no_of_days, lr.leave_type, lr.current_status, lr.doctor_note,
+           lr.no_of_days, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.current_status, lr.doctor_note,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
            lr.last_updated_by, lr.last_updated_by_role,
            last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
@@ -776,6 +776,11 @@ export const getMyLeaveRequests = async (
         doctorNote: row.doctor_note || null,
         // HR and Super Admin can edit/delete any leave, regular users can only edit/delete pending leaves
         canEdit: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
+
+        timeForPermission: row.time_for_permission_start && row.time_for_permission_end ? {
+          start: row.time_for_permission_start.toString().substring(0, 5),
+          end: row.time_for_permission_end.toString().substring(0, 5)
+        } : undefined,
         canDelete: row.current_status === 'pending' || userRole === 'hr' || userRole === 'super_admin',
         leaveDays: days.map(d => ({
           date: formatDate(d.leave_date),
@@ -1572,7 +1577,7 @@ export const getPendingLeaveRequests = async (
   let query = `
     SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status, u.role as emp_role,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
-           lr.leave_type, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
+           lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
            lr.manager_approved_by, lr.hr_approved_by, lr.super_admin_approved_by,
@@ -1704,6 +1709,10 @@ export const getPendingLeaveRequests = async (
         appliedDate: formatDate(row.applied_date),
         leaveDate: `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
         leaveType: row.leave_type,
+        timeForPermission: row.time_for_permission_start && row.time_for_permission_end ? {
+          start: row.time_for_permission_start.toString().substring(0, 5),
+          end: row.time_for_permission_end.toString().substring(0, 5)
+        } : undefined,
         noOfDays: parseFloat(row.no_of_days),
         leaveReason: row.leave_reason,
         currentStatus: row.current_status,
@@ -3611,6 +3620,8 @@ export const getApprovedLeaves = async (
         lr.start_date,
         lr.end_date,
         lr.leave_type,
+        lr.time_for_permission_start,
+        lr.time_for_permission_end,
         lr.no_of_days,
         lr.current_status AS leave_status,
         lr.manager_approval_comment,
@@ -3656,7 +3667,7 @@ export const getApprovedLeaves = async (
     params.push(approverId);
   }
 
-  query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.no_of_days, lr.current_status,
+  query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role,
               last_updater.first_name, last_updater.last_name, u.status, u.role
@@ -3806,6 +3817,10 @@ export const getApprovedLeaves = async (
       startDate: formatDate(row.start_date),
       endDate: formatDate(row.end_date),
       leaveType: row.leave_type,
+      timeForPermission: row.time_for_permission_start && row.time_for_permission_end ? {
+        start: row.time_for_permission_start.toString().substring(0, 5),
+        end: row.time_for_permission_end.toString().substring(0, 5)
+      } : undefined,
       noOfDays,
       leaveStatus: displayStatus,
       rejectionReason,

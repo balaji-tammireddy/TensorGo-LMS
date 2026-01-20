@@ -28,6 +28,7 @@ export interface LeaveRequest {
   rejectionReason?: string;
   canEdit?: boolean;
   canDelete?: boolean;
+  timeForPermission?: { start: string; end: string } | null;
   leaveDays?: Array<{ date: string; type: string; status: string }>;
   approvedDays?: number;
   rejectedDays?: number;
@@ -47,6 +48,7 @@ export interface PendingLeaveRequest {
   noOfDays: number;
   leaveReason: string;
   currentStatus: string;
+  timeForPermission?: { start: string; end: string } | null;
   empStatus?: string;
   empRole?: string;
   leaveDays: Array<{ date: string; type: string }>;
