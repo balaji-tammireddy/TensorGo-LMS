@@ -59,7 +59,7 @@
     font-size: 13px;
     color: #6b7280;
     font-weight: 500;
-    text-transform: uppercase;
+    text-transform: capitalize;
     letter-spacing: 0.05em;
     margin-bottom: 2px;
 }

@@ -15,6 +15,7 @@
     opacity: 0;
     transform: translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -27,7 +28,7 @@
   font-size: 12px;
   font-weight: 600;
   color: #666;
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.5px;
 }
 
@@ -226,7 +227,6 @@
 }
 
 /* Group spacing */
-.dropdown-menu-content > * + * {
+.dropdown-menu-content>*+* {
   margin-top: 2px;
 }
-

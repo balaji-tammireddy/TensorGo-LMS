@@ -127,7 +127,7 @@
   font-size: 12px;
   font-weight: 600;
   color: #5a6c7d;
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.8px;
   margin-bottom: 2px;
 }
@@ -305,7 +305,7 @@
   font-size: 12px;
   font-weight: 600;
   color: #666;
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.5px;
 }
 
@@ -801,7 +801,7 @@
   font-weight: 600;
   padding: 5px 10px;
   border-radius: 16px;
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.5px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
