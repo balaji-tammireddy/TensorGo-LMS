@@ -1621,33 +1621,29 @@ const ProfilePage: React.FC = () => {
                           }
                           onChange={(e) => {
                             const raw = e.target.value;
-                            // Allow one optional decimal point and up to 2 digits after it
+                            if (raw === '') {
+                              const newEducation = [...formData.education];
+                              newEducation[idx] = { ...edu, scorePercentage: null };
+                              setFormData({ ...formData, education: newEducation });
+                              return;
+                            }
+
+                            // Allow only numbers and one decimal point
                             const sanitized = raw.replace(/[^0-9.]/g, '');
-                            const [intPartRaw, decPartRaw = ''] = sanitized.split('.');
-                            const intPart = intPartRaw.replace(/^0+(?=\d)/, '');
-                            const decPart = decPartRaw.slice(0, 2);
+                            const parts = sanitized.split('.');
+                            if (parts.length > 2) return;
 
-                            let display = intPart;
-                            if (sanitized.includes('.')) {
-                              display += '.';
-                            }
-                            if (decPart) {
-                              display = `${intPart}.${decPart}`;
-                            }
+                            const decPart = parts[1] || '';
+                            if (decPart.length > 2) return;
 
-                            let num: number | null = null;
-                            if (display !== '' && display !== '.') {
-                              num = parseFloat(display);
-                              if (!isNaN(num) && num > 100) {
-                                num = 100;
-                                display = '100';
-                              }
-                            }
+                            // Stop if numeric value exceeds 100
+                            const numValue = parseFloat(sanitized);
+                            if (!isNaN(numValue) && numValue > 100) return;
 
                             const newEducation = [...formData.education];
                             newEducation[idx] = {
                               ...edu,
-                              scorePercentage: display === '' || display === '.' ? null : display
+                              scorePercentage: sanitized
                             };
                             setFormData({ ...formData, education: newEducation });
                           }}

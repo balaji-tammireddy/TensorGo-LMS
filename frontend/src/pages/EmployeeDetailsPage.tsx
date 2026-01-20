@@ -1070,8 +1070,25 @@ const EmployeeDetailsPage: React.FC = () => {
                         type="text"
                         value={edu.scorePercentage || ''}
                         onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') {
+                            const next = [...employeeData.education];
+                            next[idx] = { ...edu, scorePercentage: null };
+                            setEmployeeData({ ...employeeData, education: next });
+                            return;
+                          }
+
+                          const sanitized = raw.replace(/[^0-9.]/g, '');
+                          const parts = sanitized.split('.');
+                          if (parts.length > 2) return;
+
+                          if (parts[1] && parts[1].length > 2) return;
+
+                          const numValue = parseFloat(sanitized);
+                          if (!isNaN(numValue) && numValue > 100) return;
+
                           const next = [...employeeData.education];
-                          next[idx] = { ...edu, scorePercentage: e.target.value };
+                          next[idx] = { ...edu, scorePercentage: sanitized };
                           setEmployeeData({ ...employeeData, education: next });
                         }}
                         onBlur={() => {

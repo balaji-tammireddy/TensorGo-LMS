@@ -2205,35 +2205,27 @@ const EmployeeManagementPage: React.FC = () => {
                                   }
                                   onChange={(e) => {
                                     const raw = e.target.value;
+                                    if (raw === '') {
+                                      setNewEmployee((prev: any) => {
+                                        const next = [...(prev.education || [])];
+                                        next[idx] = { ...edu, scorePercentage: null };
+                                        return { ...prev, education: next };
+                                      });
+                                      return;
+                                    }
+
                                     const sanitized = raw.replace(/[^0-9.]/g, '');
-                                    const [intPartRaw, decPartRaw = ''] = sanitized.split('.');
-                                    const intPart = intPartRaw.replace(/^0+(?=\d)/, '');
-                                    const decPart = decPartRaw.slice(0, 2);
+                                    const parts = sanitized.split('.');
+                                    if (parts.length > 2) return;
 
-                                    let display = intPart;
-                                    if (sanitized.includes('.')) {
-                                      display += '.';
-                                    }
-                                    if (decPart) {
-                                      display = `${intPart}.${decPart}`;
-                                    }
+                                    if (parts[1] && parts[1].length > 2) return;
 
-                                    let num: number | null = null;
-                                    if (display !== '' && display !== '.') {
-                                      num = parseFloat(display);
-                                      if (!isNaN(num) && num > 100) {
-                                        num = 100;
-                                        display = '100';
-                                      }
-                                    }
+                                    const numValue = parseFloat(sanitized);
+                                    if (!isNaN(numValue) && numValue > 100) return;
 
                                     setNewEmployee((prev: any) => {
                                       const next = [...(prev.education || [])];
-                                      next[idx] = {
-                                        ...edu,
-                                        scorePercentage:
-                                          display === '' || display === '.' ? null : display
-                                      };
+                                      next[idx] = { ...edu, scorePercentage: sanitized };
                                       return { ...prev, education: next };
                                     });
                                   }}
