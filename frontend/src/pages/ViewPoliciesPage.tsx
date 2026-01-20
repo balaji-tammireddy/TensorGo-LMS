@@ -411,7 +411,10 @@ const ViewPoliciesPage: React.FC = () => {
                                         type="text"
                                         className="vp-input"
                                         value={newPolicyTitle}
-                                        onChange={(e) => setNewPolicyTitle(e.target.value)}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                                            setNewPolicyTitle(val);
+                                        }}
                                         required
                                         disabled={createMutation.isLoading}
                                     />
