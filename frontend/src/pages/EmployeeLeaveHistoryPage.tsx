@@ -98,24 +98,24 @@ const EmployeeLeaveHistoryPage: React.FC = () => {
                                     <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12px', minWidth: '100%' }}>
                                         <thead>
                                             <tr style={{ backgroundColor: '#f8f9fa' }}>
-                                                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Applied Date</th>
-                                                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Leave Type</th>
-                                                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Start Date</th>
-                                                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>End Date</th>
-                                                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Days</th>
-                                                <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Status</th>
+                                                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Applied Date</th>
+                                                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Leave Type</th>
+                                                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Start Date</th>
+                                                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>End Date</th>
+                                                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Days</th>
+                                                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Status</th>
                                                 <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {historyData.requests.map((request: any) => (
                                                 <tr key={request.id} style={{ borderBottom: '1px solid #e5e5e5' }}>
-                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.appliedDate), 'dd/MM/yyyy')}</td>
-                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
-                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.startDate), 'dd/MM/yyyy')}</td>
-                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.endDate), 'dd/MM/yyyy')}</td>
-                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5' }}>{request.noOfDays}</td>
-                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5' }}>
+                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{format(new Date(request.appliedDate), 'dd/MM/yyyy')}</td>
+                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
+                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{format(new Date(request.startDate), 'dd/MM/yyyy')}</td>
+                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{format(new Date(request.endDate), 'dd/MM/yyyy')}</td>
+                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{request.noOfDays}</td>
+                                                    <td style={{ padding: '10px 8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>
                                                         <span className={`status-badge ${getStatusClass(request.currentStatus)}`}>
                                                             {getStatusLabel(request.currentStatus)}
                                                         </span>

@@ -170,7 +170,7 @@
   font-size: 14px;
   font-weight: 600;
   color: #333;
-  text-align: left;
+  text-align: center;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -178,14 +178,14 @@
 
 .employees-table thead th:last-child,
 .employees-table tbody td:last-child {
-  text-align: left;
+  text-align: center;
 }
 
 .employees-table tbody td {
   border-bottom: 1px solid #ddd;
   padding: 12px;
   color: #333;
-  text-align: left;
+  text-align: center;
   vertical-align: middle;
 }
 
@@ -434,6 +434,7 @@
   border: 1px solid #e0e0e0;
   padding: 10px 12px;
   vertical-align: middle;
+  text-align: center;
 }
 
 .education-table thead th {
@@ -463,7 +464,7 @@
 
 .education-table td:nth-child(2),
 .education-table td:nth-child(3) {
-  text-align: left;
+  text-align: center;
 }
 
 .education-table td:nth-child(4),
@@ -697,7 +698,7 @@
 .header-sort-wrapper {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -850,7 +851,7 @@
   box-shadow: inset 0 -1px 0 #e5e5e5;
   /* The "fixed" bottom border for sticky header */
   font-weight: 600;
-  text-align: left;
+  text-align: center;
 }
 
 .leave-history-table-container table tbody td {

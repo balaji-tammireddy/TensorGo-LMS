@@ -303,7 +303,7 @@
 .hm-table th,
 .hm-table td {
     padding: 12px;
-    text-align: left;
+    text-align: center;
     border-bottom: 1px solid #ddd;
     font-size: 13px;
 }
@@ -405,7 +405,7 @@
 .header-sort-wrapper {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     gap: 8px;
 }
 

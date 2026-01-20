@@ -1229,12 +1229,12 @@ const EmployeeManagementPage: React.FC = () => {
                         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12px', minWidth: '100%' }}>
                           <thead>
                             <tr style={{ backgroundColor: '#f8f9fa' }}>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Applied Date</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Leave Type</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Start Date</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>End Date</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Days</th>
-                              <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Status</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Applied Date</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Leave Type</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Start Date</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>End Date</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Days</th>
+                              <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Status</th>
                               <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10, borderBottom: '1px solid #e5e5e5' }}>Actions</th>
                             </tr>
                           </thead>
@@ -1265,12 +1265,12 @@ const EmployeeManagementPage: React.FC = () => {
 
                               return (
                                 <tr key={request.id} style={{ borderBottom: '1px solid #e5e5e5' }}>
-                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
-                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
-                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>{request.noOfDays}</td>
-                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5' }}>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{format(new Date(request.appliedDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{format(new Date(request.startDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{format(new Date(request.endDate + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>{request.noOfDays}</td>
+                                  <td style={{ padding: '8px', borderBottom: '1px solid #e5e5e5', textAlign: 'center' }}>
                                     <span className={`status-badge ${getStatusClass(request.currentStatus)}`}>
                                       {getStatusLabel(request.currentStatus)}
                                     </span>
