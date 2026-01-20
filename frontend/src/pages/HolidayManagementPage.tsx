@@ -341,10 +341,13 @@ const HolidayManagementPage: React.FC = () => {
                                                             </button>
                                                             <button
                                                                 className="action-btn delete-btn"
-                                                                onClick={() => !isPast && handleDelete(holiday.id, holiday.name)}
-                                                                disabled={deleteMutation.isLoading || isPast}
-                                                                title={isPast ? "Cannot delete past holidays" : "Delete holiday"}
-                                                                style={isPast ? { cursor: 'not-allowed', color: '#a0a0a0' } : {}}
+                                                                onClick={() => !isPast && !isEditMode && handleDelete(holiday.id, holiday.name)}
+                                                                disabled={deleteMutation.isLoading || isPast || isEditMode}
+                                                                title={isPast ? "Cannot delete past holidays" : isEditMode ? "Finish editing to delete" : "Delete holiday"}
+                                                                style={{
+                                                                    cursor: (isPast || isEditMode) ? 'not-allowed' : 'pointer',
+                                                                    color: (isPast || isEditMode) ? '#a0a0a0' : undefined
+                                                                }}
                                                             >
                                                                 <FaTrash />
                                                             </button>
