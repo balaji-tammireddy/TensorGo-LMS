@@ -186,27 +186,28 @@
 
 .form-group input,
 .form-group select {
-  padding: 6px 10px;
-  border: 1px solid #ddd !important;
+  padding: 10px 12px;
+  border: 1px solid #d7deec !important;
   border-radius: 4px !important;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
-  height: 36px;
-  background-color: #ffffff;
+  height: 42px;
+  background-color: #f8f9fc;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   box-sizing: border-box;
 }
 
 .form-group textarea {
-  padding: 6px 10px;
-  border: 1px solid #ddd !important;
+  padding: 10px 12px;
+  border: 1px solid #d7deec !important;
   border-radius: 4px !important;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
-  min-height: 36px;
+  min-height: 42px;
+  height: 42px;
   resize: none;
-  background-color: #ffffff;
+  background-color: #f8f9fc;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   box-sizing: border-box;
@@ -216,24 +217,24 @@
   width: 100%;
   display: flex !important;
   justify-content: space-between !important;
-  padding: 6px 10px !important;
-  font-size: 13px !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
   font-family: 'Poppins', sans-serif !important;
-  border: 1px solid #ddd !important;
+  border: 1px solid #d7deec !important;
   border-radius: 4px !important;
-  background-color: #ffffff !important;
+  background-color: #f8f9fc !important;
   color: #1f2a3d !important;
-  height: 36px !important;
+  height: 42px !important;
 }
 
 .date-picker-input-field {
-  padding: 6px 10px !important;
-  border: 1px solid #ddd !important;
+  padding: 10px 12px !important;
+  border: 1px solid #d7deec !important;
   border-radius: 4px !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   line-height: 1.5 !important;
-  height: 36px !important;
-  background-color: #ffffff !important;
+  height: 42px !important;
+  background-color: #f8f9fc !important;
   font-family: 'Poppins', sans-serif !important;
   color: #1f2a3d !important;
   width: 100% !important;
@@ -335,10 +336,12 @@
 
 .education-table input {
   width: 100%;
-  padding: 4px 6px;
-  border: 1px solid #dcdcdc !important;
+  padding: 10px 12px;
+  border: 1px solid #d7deec !important;
   border-radius: 4px !important;
-  font-size: 12px;
+  font-size: 14px;
+  height: 42px;
+  box-sizing: border-box;
 }
 
 .education-table input:disabled {
@@ -454,7 +457,7 @@
 }
 
 .skeleton-input {
-  height: 44px;
+  height: 42px;
   border-radius: 4px !important;
   background: linear-gradient(90deg,
       #f0f0f0 0%,
@@ -466,7 +469,7 @@
 }
 
 .skeleton-button {
-  height: 40px;
+  height: 42px;
   width: 120px;
   border-radius: 4px;
   background: linear-gradient(90deg,

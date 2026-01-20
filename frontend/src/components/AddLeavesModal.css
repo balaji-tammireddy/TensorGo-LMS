@@ -102,6 +102,7 @@
   border: 1px solid #dcdcdc;
   border-radius: 4px;
   font-size: 14px;
+  height: 42px;
   transition: border-color 0.2s;
   box-sizing: border-box;
 }

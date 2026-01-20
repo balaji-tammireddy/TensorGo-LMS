@@ -7,31 +7,27 @@
   position: relative;
   display: flex;
   align-items: center;
-  background: transparent;
-  border: none;
-  border-radius: 0;
+  background: #f8f9fc;
+  border: 1px solid #d7deec;
+  border-radius: 4px;
   padding: 0;
-  font-size: 12px;
+  font-size: 14px;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
-  height: auto;
-  min-height: auto;
+  height: 42px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   width: 100%;
   box-sizing: border-box;
 }
 
 .date-picker-input:hover:not(.date-picker-input-disabled) {
-  border: none;
-  background: transparent;
-  box-shadow: none;
+  border-color: #3c6ff2;
 }
 
 .date-picker-input-open {
-  border: none;
-  background: transparent;
-  box-shadow: none;
+  border-color: #3c6ff2;
+  box-shadow: 0 0 0 3px rgba(60, 111, 242, 0.1);
 }
 
 .date-picker-input-disabled {
@@ -46,12 +42,13 @@
   border: none;
   background: transparent;
   outline: none;
-  font-size: 12px;
+  font-size: 14px;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   cursor: pointer;
-  padding: 6px 8px;
+  padding: 10px 12px;
   width: 100%;
+  height: 100%;
   box-sizing: border-box;
 }
 

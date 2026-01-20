@@ -27,14 +27,14 @@
 }
 
 .search-box input {
-  padding: 10px;
-  border: 1px solid #dcdcdc;
+  padding: 10px 12px;
+  border: 1px solid #d7deec;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
   width: 260px;
-  background-color: #ffffff;
+  background-color: #f8f9fc;
   padding-right: 32px;
-  /* space for clear button */
+  height: 42px;
 }
 
 .search-clear {
@@ -333,42 +333,43 @@
 
 .employee-modal-field input,
 .employee-modal-field select {
-  padding: 6px 10px;
-  border: 1px solid #ddd;
+  padding: 8px 12px;
+  border: 1px solid #d7deec;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
-  height: 36px;
+  height: 42px;
   resize: none;
-  background: transparent;
+  background: #f8f9fc;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   box-sizing: border-box;
 }
 
 .employee-modal-field textarea {
-  padding: 6px 10px;
-  border: 1px solid #ddd;
+  padding: 10px 12px;
+  border: 1px solid #d7deec;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
-  min-height: 36px;
+  min-height: 42px;
+  height: 42px;
   resize: none;
-  background: transparent;
+  background: #f8f9fc;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   box-sizing: border-box;
 }
 
 .employee-modal-field .date-picker-input-field {
-  padding: 6px 10px;
-  padding-right: 30px;
-  border: 1px solid #ddd;
+  padding: 10px 12px;
+  padding-right: 32px;
+  border: 1px solid #d7deec;
   border-radius: 4px;
-  background: transparent;
-  font-size: 13px;
+  background: #f8f9fc;
+  font-size: 14px;
   line-height: 1.5;
-  height: 36px;
+  height: 42px;
   font-family: 'Poppins', sans-serif;
   color: #1f2a3d;
   width: 100%;
@@ -720,15 +721,15 @@
 .leave-type-dropdown-trigger {
   width: 100%;
   justify-content: space-between !important;
-  padding: 6px 10px !important;
-  font-size: 13px !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
   font-family: 'Poppins', sans-serif !important;
-  border: 1px solid #ddd !important;
+  border: 1px solid #d7deec !important;
   border-radius: 4px !important;
   background-color: transparent !important;
   color: #1f2a3d !important;
-  height: 36px !important;
-  min-height: 36px !important;
+  height: 42px !important;
+  min-height: 42px !important;
   font-weight: 400 !important;
   line-height: normal !important;
   display: flex !important;
@@ -745,9 +746,9 @@
 
 /* Also ensure education table inputs inside modal are compact */
 .education-table input {
-  padding: 6px 10px !important;
-  height: 36px !important;
-  font-size: 13px !important;
+  padding: 10px 12px !important;
+  height: 42px !important;
+  font-size: 14px !important;
 }
 
 .education-table td,

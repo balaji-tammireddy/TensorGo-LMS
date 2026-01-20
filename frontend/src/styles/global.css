@@ -50,6 +50,7 @@ input[type="email"],
 input[type="password"],
 input[type="date"],
 input[type="number"],
+input[type="tel"],
 textarea,
 select {
   background: #f8f9fc;
@@ -58,7 +59,10 @@ select {
   padding: 10px 12px;
   font-size: 14px;
   color: #1f2a3d;
+  height: 42px;
+  line-height: 1.2;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  box-sizing: border-box;
 }
 
 input:disabled,
@@ -88,12 +92,6 @@ select:disabled {
   background-image: none !important;
   border: none !important;
   background-color: #f0f0f0 !important;
-}
-
-input[type="date"],
-select {
-  height: 42px;
-  line-height: 1.2;
 }
 
 select {
