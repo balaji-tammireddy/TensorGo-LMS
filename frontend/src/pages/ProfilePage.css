@@ -213,6 +213,16 @@
   box-sizing: border-box;
 }
 
+/* Disabled state for inputs, selects, and textareas */
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background-color: #f0f0f0 !important;
+  color: #666 !important;
+  cursor: not-allowed;
+  border-color: #e0e0e0 !important;
+}
+
 .profile-field-trigger {
   width: 100%;
   display: flex !important;
@@ -225,6 +235,14 @@
   background-color: #f8f9fc !important;
   color: #1f2a3d !important;
   height: 42px !important;
+}
+
+/* Disabled state for custom dropdown trigger */
+.profile-field-trigger:disabled {
+  background-color: #f0f0f0 !important;
+  color: #666 !important;
+  cursor: not-allowed;
+  border-color: #e0e0e0 !important;
 }
 
 .date-picker-input-field {
