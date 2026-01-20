@@ -17,6 +17,7 @@ interface DatePickerProps {
   allowManualEntry?: boolean;
   isEmployeeVariant?: boolean; // Toggle specific behavior for Add Employee
   displayFormat?: string;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
 }
 
 export const DatePicker: React.FC<DatePickerProps> = ({
@@ -30,7 +31,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   disabledDates,
   allowManualEntry = false,
   isEmployeeVariant = false,
-  displayFormat
+  displayFormat,
+  onBlur
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -283,6 +285,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onBlur={onBlur} // Pass onBlur to input
           placeholder={effectivePlaceholder}
           disabled={disabled}
           readOnly={!allowManualEntry}

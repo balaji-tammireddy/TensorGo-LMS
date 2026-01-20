@@ -427,6 +427,14 @@ const ProfilePage: React.FC = () => {
     setFormErrors(fieldErrors);
 
     if (missingFields.length > 0) {
+      // Check if Date of Birth is missing but specifically because of invalid input (caught by onBlur or manual check)
+      if (missingFields.includes('Date of Birth')) {
+        // If formErrors has dateOfBirth, it means it's invalid, not just empty
+        if (fieldErrors['dateOfBirth'] || formErrors.dateOfBirth) {
+          showWarning('Invalid Date of Birth');
+          return;
+        }
+      }
       showWarning('Please Fill All Mandatory Details');
       return;
     }
@@ -953,10 +961,63 @@ const ProfilePage: React.FC = () => {
                 <DatePicker
                   value={formData.personalInfo?.dateOfBirth || ''}
                   max={new Date().toISOString().split('T')[0]}
-                  onChange={(date) => setFormData({
-                    ...formData,
-                    personalInfo: { ...formData.personalInfo, dateOfBirth: date }
-                  })}
+                  onChange={(date) => {
+                    setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, dateOfBirth: date }
+                    });
+                    // Clear error on valid change
+                    setFormErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.dateOfBirth;
+                      return next;
+                    });
+                  }}
+                  onBlur={(e) => {
+                    const val = e.target.value;
+                    // If empty, let the required check handle it (or if it was previously filled, clear error)
+                    if (!val) {
+                      if (!formData.personalInfo?.dateOfBirth) {
+                        setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
+                      }
+                      return;
+                    }
+
+                    // Regex for dd-mm-yyyy
+                    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+                    if (!datePattern.test(val)) {
+                      setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
+                      return;
+                    }
+
+                    // Logical validation for parts
+                    const [, dayStr, monthStr, yearStr] = val.match(datePattern) || [];
+                    const day = parseInt(dayStr, 10);
+                    const month = parseInt(monthStr, 10);
+                    const year = parseInt(yearStr, 10);
+
+                    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > new Date().getFullYear()) {
+                      setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
+                      return;
+                    }
+
+                    // Check valid day for month
+                    const testDate = new Date(year, month - 1, day);
+                    if (testDate.getDate() !== day || testDate.getMonth() !== month - 1 || testDate.getFullYear() !== year) {
+                      setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
+                      return;
+                    }
+
+                    // If we reach here, date string is valid format.
+                    // But we should also check if onChange fired (formData updated).
+                    // If formData is empty but this looks valid, it might be that DatePicker failed to parse?
+                    // Usually if valid here, DatePicker would have parsed it.
+                    setFormErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.dateOfBirth;
+                      return next;
+                    });
+                  }}
                   disabled={!isEditMode}
                   placeholder="DD-MM-YYYY"
                   isEmployeeVariant={true}
