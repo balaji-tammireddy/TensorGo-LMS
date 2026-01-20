@@ -1223,7 +1223,6 @@ const ProfilePage: React.FC = () => {
               <div className={`form-group ${formErrors.designation ? 'has-error' : ''}`}>
                 <label>
                   Designation
-                  {isEditMode && <span className="required-indicator">*</span>}
                 </label>
                 <input
                   type="text"
@@ -1247,13 +1246,12 @@ const ProfilePage: React.FC = () => {
                       });
                     }
                   }}
-                  disabled={!isEditMode || (user?.role === 'employee')}
+                  disabled={true}
                 />
               </div>
               <div className={`form-group ${formErrors.department ? 'has-error' : ''}`}>
                 <label>
                   Department
-                  {isEditMode && <span className="required-indicator">*</span>}
                 </label>
                 <input
                   type="text"
@@ -1277,7 +1275,7 @@ const ProfilePage: React.FC = () => {
                       });
                     }
                   }}
-                  disabled={!isEditMode || (user?.role === 'employee')}
+                  disabled={true}
                 />
               </div>
               <div className={`form-group ${formErrors.dateOfJoining ? 'has-error' : ''}`}>

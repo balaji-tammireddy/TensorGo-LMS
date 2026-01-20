@@ -651,7 +651,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
               {/* Date selection for pending leaves (approval flow) */}
               {isMultiDay && leaveRequest.leaveDays && leaveRequest.leaveDays.length > 0 && pendingDays.length > 0 && !isEditMode && (
                 <div className="leave-detail-item leave-detail-item-full">
-                  <label>Select Date Range to Approve/Reject</label>
+                  <label>Select Date Range to Approve</label>
                   <div className="date-range-picker-container">
                     <div className="date-range-inputs">
                       <div className="date-range-input-group">
