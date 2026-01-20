@@ -214,19 +214,16 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   );
 
   if (userResult.rows.length === 0) {
-    // Don't reveal if email exists or not for security
-    logger.warn(`[AUTH] [REQUEST PASSWORD RESET] Password reset requested for non-existent email: ${normalizedEmail}`);
-    // Still return success to prevent email enumeration
-    return;
+    logger.warn(`[AUTH] [REQUEST PASSWORD RESET] Email not found: ${normalizedEmail}`);
+    throw new Error('Email not found');
   }
 
   const user = userResult.rows[0];
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] User found - ID: ${user.id}, Status: ${user.status}`);
 
   if (user.status !== 'active') {
-    logger.warn(`[AUTH] [REQUEST PASSWORD RESET] Password reset requested for inactive account: ${normalizedEmail}, Status: ${user.status}`);
-    // Still return success to prevent account enumeration
-    return;
+    logger.warn(`[AUTH] [REQUEST PASSWORD RESET] Account is not active: ${normalizedEmail}, Status: ${user.status}`);
+    throw new Error('Account is not active');
   }
 
   // Generate OTP

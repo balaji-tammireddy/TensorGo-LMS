@@ -114,7 +114,7 @@ const LoginPage: React.FC = () => {
     setForgotPasswordLoading(true);
     try {
       await forgotPassword({ email: forgotPasswordEmail.trim() });
-      showSuccess('OTP sent to your email (if registered).');
+      showSuccess('OTP sent to your email.');
       setForgotPasswordStep('otp');
     } catch (err: any) {
       const errorData = err.response?.data?.error;

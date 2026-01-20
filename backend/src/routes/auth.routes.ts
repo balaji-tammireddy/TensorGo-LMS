@@ -25,16 +25,10 @@ router.post(
   authController.changePassword
 );
 
-// Forgot password routes (with rate limiting)
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // 3 requests per 15 minutes
-  message: 'Too many password reset requests. Please try again later.'
-});
+// Forgot password routes
 
 router.post(
   '/forgot-password',
-  forgotPasswordLimiter,
   validateRequest(forgotPasswordSchema),
   authController.forgotPassword
 );

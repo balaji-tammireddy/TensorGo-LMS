@@ -180,13 +180,12 @@ export const forgotPassword = async (req: AuthRequest, res: Response) => {
     await authService.requestPasswordReset(email);
 
     logger.info(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Password reset request processed`);
-    // Always return success to prevent email enumeration
     res.json({
-      message: 'If the email exists, an OTP has been sent to your registered email address.'
+      message: 'OTP has been sent to your registered email address.'
     });
   } catch (error: any) {
     logger.error(`[CONTROLLER] [AUTH] [FORGOT PASSWORD] Password reset request failed:`, error);
-    res.status(500).json({
+    res.status(400).json({
       error: {
         code: 'FORGOT_PASSWORD_FAILED',
         message: error.message || 'Failed to send password reset OTP'
