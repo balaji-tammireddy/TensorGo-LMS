@@ -736,10 +736,10 @@ const LeaveApprovalPage: React.FC = () => {
                       </div>
                     </th>
                     <th>
-                      <div className="header-sort-wrapper">
-                        Leave Type
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <div className="header-sort-wrapper" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                            Leave Type
                             <Button
                               variant="ghost"
                               size="sm"
@@ -748,29 +748,30 @@ const LeaveApprovalPage: React.FC = () => {
                                 height: '20px',
                                 border: filter ? '1px solid #2563eb' : 'none',
                                 backgroundColor: filter ? '#eff6ff' : 'transparent',
-                                color: filter ? '#2563eb' : 'inherit'
+                                color: filter ? '#2563eb' : 'inherit',
+                                pointerEvents: 'none'
                               }}
                             >
                               <ChevronDown style={{ width: '12px', height: '12px' }} />
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => setFilter('')}>
-                              All Types
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setFilter('casual')}>
-                              Casual
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setFilter('sick')}>
-                              Sick
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setFilter('lop')}>
-                              LOP
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                          </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => setFilter('')}>
+                            All Types
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setFilter('casual')}>
+                            Casual
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setFilter('sick')}>
+                            Sick
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setFilter('lop')}>
+                            LOP
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </th>
                     <th>Days</th>
                     <th>Reason</th>
