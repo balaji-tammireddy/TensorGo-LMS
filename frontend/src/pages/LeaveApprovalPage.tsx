@@ -786,7 +786,11 @@ const LeaveApprovalPage: React.FC = () => {
                           <td>{leaveDateRange}</td>
                           <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                           <td>{request.noOfDays}</td>
-                          <td>{request.leaveReason}</td>
+                          <td>
+                            <div className="reason-cell">
+                              {request.leaveReason}
+                            </div>
+                          </td>
                           <td>
                             {request.displayStatus === 'pending' ? (
                               <span className="status-badge status-pending">Pending</span>

@@ -209,9 +209,6 @@
 .pending-requests-section .requests-table th:nth-child(7),
 .pending-requests-section .requests-table td:nth-child(7) {
   width: 20%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* 8. Status */
@@ -687,4 +684,45 @@
 
 .recent-filter-controls .date-picker-icon-container:hover {
   color: #333333;
+}
+
+/* Scrollable reason cell for long text */
+.reason-cell {
+  width: 100%;
+  max-width: 100%;
+  min-height: 35px;
+  max-height: 80px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  word-break: break-all;
+  white-space: pre-wrap;
+  padding: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fafafa;
+  box-sizing: border-box;
+  display: block;
+  text-align: left;
+}
+
+.reason-cell::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.reason-cell::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.reason-cell::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.reason-cell::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
