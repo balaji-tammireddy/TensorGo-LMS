@@ -1020,7 +1020,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                       onClick={handleRejectClick}
                       disabled={isLoading}
                     >
-                      <FaTimesCircle /> {leaveRequest.noOfDays === 1 ? 'Reject' : 'Reject All'}
+                      <FaTimesCircle /> {leaveRequest.noOfDays <= 1 ? 'Reject' : 'Reject All'}
                     </button>
                   ) : null}
                   <button
