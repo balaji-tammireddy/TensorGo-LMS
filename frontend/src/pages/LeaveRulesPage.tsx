@@ -217,8 +217,13 @@ const LeaveRulesPage: React.FC = () => {
                                         <input
                                             type="number"
                                             step="0.5"
+                                            min="0"
                                             value={policyEditForm.annual_credit}
-                                            onChange={(e) => setPolicyEditForm({ ...policyEditForm, annual_credit: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value);
+                                                if (val < 0) return;
+                                                setPolicyEditForm({ ...policyEditForm, annual_credit: e.target.value })
+                                            }}
                                         />
                                         <span className="lr-hint">
                                             {editingPolicy.leave_type_code === 'lop'
@@ -230,32 +235,52 @@ const LeaveRulesPage: React.FC = () => {
                                         <label>Carry Forward Limit (Year End)</label>
                                         <input
                                             type="number"
+                                            min="0"
                                             value={policyEditForm.carry_forward_limit}
-                                            onChange={(e) => setPolicyEditForm({ ...policyEditForm, carry_forward_limit: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value);
+                                                if (val < 0) return;
+                                                setPolicyEditForm({ ...policyEditForm, carry_forward_limit: e.target.value })
+                                            }}
                                         />
                                     </div>
                                     <div className="lr-input-group">
                                         <label>Max Monthly Limit</label>
                                         <input
                                             type="number"
+                                            min="0"
                                             value={policyEditForm.max_leave_per_month}
-                                            onChange={(e) => setPolicyEditForm({ ...policyEditForm, max_leave_per_month: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value);
+                                                if (val < 0) return;
+                                                setPolicyEditForm({ ...policyEditForm, max_leave_per_month: e.target.value })
+                                            }}
                                         />
                                     </div>
                                     <div className="lr-input-group">
                                         <label>3-Year Anniversary Bonus</label>
                                         <input
                                             type="number"
+                                            min="0"
                                             value={policyEditForm.anniversary_3_year_bonus}
-                                            onChange={(e) => setPolicyEditForm({ ...policyEditForm, anniversary_3_year_bonus: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value);
+                                                if (val < 0) return;
+                                                setPolicyEditForm({ ...policyEditForm, anniversary_3_year_bonus: e.target.value })
+                                            }}
                                         />
                                     </div>
                                     <div className="lr-input-group">
                                         <label>5-Year Anniversary Bonus</label>
                                         <input
                                             type="number"
+                                            min="0"
                                             value={policyEditForm.anniversary_5_year_bonus}
-                                            onChange={(e) => setPolicyEditForm({ ...policyEditForm, anniversary_5_year_bonus: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value);
+                                                if (val < 0) return;
+                                                setPolicyEditForm({ ...policyEditForm, anniversary_5_year_bonus: e.target.value })
+                                            }}
                                         />
                                     </div>
                                     <div className="lr-input-group">
