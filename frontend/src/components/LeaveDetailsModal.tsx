@@ -1068,7 +1068,11 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                 className="reject-reason-textarea"
                 placeholder="Enter rejection reason..."
                 value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+                onChange={(e) => {
+                  // Only allow letters, numbers, spaces, and basic punctuation
+                  const sanitized = e.target.value.replace(/[^a-zA-Z0-9\s.,!?\-']/g, '');
+                  setRejectReason(sanitized);
+                }}
                 rows={4}
                 autoFocus
                 disabled={isLoading}
