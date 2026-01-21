@@ -1686,66 +1686,29 @@ export const addLeavesToEmployee = async (
   }
 };
 
-export const getEmployeeLeaveBalances = async (employeeId: number): Promise<any> => {
+export const getEmployeeLeaveBalances = async (employeeId: number) => {
   logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] Employee ID: ${employeeId}`);
 
-  // 1. Get employee role
-  const empResult = await pool.query('SELECT role FROM users WHERE id = $1', [employeeId]);
-  if (empResult.rows.length === 0) {
-    throw new Error('Employee not found');
-  }
-  const role = empResult.rows[0].role;
-
-  // 2. Get basic balances
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [employeeId]
   );
 
-  let balancesRaw = { casual: 0, sick: 0, lop: 0 };
   if (result.rows.length === 0) {
     logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] No balance record found, returning zero balances`);
-    balancesRaw = { casual: 0, sick: 0, lop: 0 };
-  } else {
-    const balance = result.rows[0];
-    balancesRaw = {
-      casual: parseFloat(balance.casual_balance) || 0,
-      sick: parseFloat(balance.sick_balance) || 0,
-      lop: parseFloat(balance.lop_balance) || 0
-    };
+    // Return zero balances if not found
+    return { casual: 0, sick: 0, lop: 0 };
   }
 
-  // 3. Get policies for this role
-  const policyResult = await pool.query(`
-    SELECT 
-      lt.code as leave_type,
-      lpc.carry_forward_limit,
-      lpc.max_leave_per_month,
-      lpc.anniversary_3_year_bonus,
-      lpc.anniversary_5_year_bonus
-    FROM leave_policy_configurations lpc
-    JOIN leave_types lt ON lpc.leave_type_id = lt.id
-    WHERE lpc.role = $1 AND lt.is_active = true
-  `, [role]);
-
-  const policies: any = {};
-  policyResult.rows.forEach((row: any) => {
-    policies[row.leave_type] = {
-      carryForwardLimit: parseFloat(row.carry_forward_limit) || 0,
-      maxLeavePerMonth: parseFloat(row.max_leave_per_month) || 0,
-      anniversary3YearBonus: parseFloat(row.anniversary_3_year_bonus) || 0,
-      anniversary5YearBonus: parseFloat(row.anniversary_5_year_bonus) || 0
-    };
-  });
-
-  logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] Fetched role ${role} and policies for ${employeeId}`);
-
-  return {
-    ...balancesRaw,
-    role,
-    policies
+  const balance = result.rows[0];
+  const balances = {
+    casual: parseFloat(balance.casual_balance) || 0,
+    sick: parseFloat(balance.sick_balance) || 0,
+    lop: parseFloat(balance.lop_balance) || 0
   };
+  logger.info(`[EMPLOYEE] [GET LEAVE BALANCES] Balances retrieved - Casual: ${balances.casual}, Sick: ${balances.sick}, LOP: ${balances.lop}`);
+  return balances;
 };
 
 
