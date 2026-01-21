@@ -2298,7 +2298,11 @@ const EmployeeManagementPage: React.FC = () => {
                                       type="text"
                                       placeholder="Search by name or ID..."
                                       value={managerSearch}
-                                      onChange={(e) => setManagerSearch(e.target.value)}
+                                      onChange={(e) => {
+                                        // Only allow letters, numbers, and spaces
+                                        const sanitized = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+                                        setManagerSearch(sanitized);
+                                      }}
                                       autoFocus
                                       style={{
                                         width: '100%',

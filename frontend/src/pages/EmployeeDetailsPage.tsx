@@ -1130,7 +1130,11 @@ const EmployeeDetailsPage: React.FC = () => {
                         type="text"
                         placeholder="Search..."
                         value={managerSearch}
-                        onChange={e => setManagerSearch(e.target.value)}
+                        onChange={e => {
+                          // Only allow letters, numbers, and spaces
+                          const sanitized = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+                          setManagerSearch(sanitized);
+                        }}
                         style={{ width: '100%', padding: '8px' }}
                         onClick={e => e.stopPropagation()}
                       />
