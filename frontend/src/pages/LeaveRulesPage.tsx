@@ -360,7 +360,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <input
                                             placeholder="Name"
                                             value={newTypeForm.name}
-                                            onChange={e => setNewTypeForm({ ...newTypeForm, name: e.target.value })}
+                                            onChange={e => setNewTypeForm({ ...newTypeForm, name: e.target.value.replace(/[^a-zA-Z0-9\s._-]/g, '') })}
                                         />
                                     </div>
                                 </div>
@@ -421,7 +421,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <input
                                             placeholder="Display Name"
                                             value={editTypeForm.name}
-                                            onChange={e => setEditTypeForm({ ...editTypeForm, name: e.target.value })}
+                                            onChange={e => setEditTypeForm({ ...editTypeForm, name: e.target.value.replace(/[^a-zA-Z0-9\s._-]/g, '') })}
                                         />
                                     </div>
                                     <div className="lr-form-group">
