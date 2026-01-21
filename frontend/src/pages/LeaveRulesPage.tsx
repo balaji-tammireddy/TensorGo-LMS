@@ -98,7 +98,7 @@ const LeaveRulesPage: React.FC = () => {
     const renderPolicies = () => {
         const roles = ['employee', 'manager', 'hr', 'intern', 'on_notice'];
 
-        const currentRolePolicies: LeavePolicyConfig[] = policiesGrouped[selectedRole] || [];
+        const currentRolePolicies: LeavePolicyConfig[] = (policiesGrouped && policiesGrouped[selectedRole]) || [];
 
         return (
             <div className="lr-policies-section">
@@ -118,7 +118,7 @@ const LeaveRulesPage: React.FC = () => {
 
                 <div className="lr-policy-cards">
                     {currentRolePolicies.length === 0 ? (
-                        <p>No policies found for this role.</p>
+                        <p>No Rules found for this role.</p>
                     ) : (
                         currentRolePolicies.map((policy) => (
                             <div key={policy.id} className="lr-policy-card">
@@ -152,7 +152,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <span className="lr-hint">
                                             {policy.leave_type_code === 'lop'
                                                 ? 'Credited Annually At Year End (Additive).'
-                                                : `Monthly Equivalent: ${(parseFloat(policy.annual_credit) / 12).toFixed(2)}`}
+                                                : `Monthly Equivalent: ${policy.annual_credit ? (parseFloat(policy.annual_credit) / 12).toFixed(2) : '0.00'}`}
                                         </span>
                                     </div>
                                     <div className="lr-input-group">
@@ -223,7 +223,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <span className="lr-hint">
                                             {editingPolicy.leave_type_code === 'lop'
                                                 ? 'Credited Annually At Year End (Additive).'
-                                                : `Monthly Equivalent: ${(parseFloat(policyEditForm.annual_credit || '0') / 12).toFixed(2)}`}
+                                                : `Monthly Equivalent: ${policyEditForm.annual_credit ? (parseFloat(policyEditForm.annual_credit) / 12).toFixed(2) : '0.00'}`}
                                         </span>
                                     </div>
                                     <div className="lr-input-group">
@@ -342,7 +342,7 @@ const LeaveRulesPage: React.FC = () => {
 
                                 <div className="lr-role-options-label">Select Roles This Leave Type Applies To:</div>
                                 <div className="lr-role-options">
-                                    {['employee', 'manager', 'hr', 'intern'].map(role => (
+                                    {['employee', 'manager', 'hr', 'intern', 'on_notice'].map(role => (
                                         <label key={role} className="lr-role-checkbox">
                                             <input
                                                 type="checkbox"
@@ -468,7 +468,7 @@ const LeaveRulesPage: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {leaveTypes.map((type: LeaveType & { roles: string[] }) => (
+                    {(leaveTypes || []).map((type: LeaveType & { roles: string[] }) => (
                         <tr key={type.id} className={!type.is_active ? 'inactive' : ''}>
                             <td className="lr-name-col">
                                 {type.name}

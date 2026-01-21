@@ -76,6 +76,7 @@ export const updateLeaveType = async (req: Request, res: Response) => {
 export const getPolicies = async (req: Request, res: Response) => {
     try {
         const policies = await leaveRuleService.getAllPolicies();
+        logger.info(`[LEAVE RULE CONTROLLER] [GET POLICIES] Fetched ${policies.length} policies`);
 
         // Group by Role for easier frontend consumption
         const grouped: any = {};
@@ -84,6 +85,7 @@ export const getPolicies = async (req: Request, res: Response) => {
             grouped[p.role].push(p);
         });
 
+        logger.info(`[LEAVE RULE CONTROLLER] [GET POLICIES] Grouped roles: ${Object.keys(grouped).join(', ')}`);
         res.json(grouped);
     } catch (error: any) {
         logger.error('Error fetching policies:', error);
