@@ -132,18 +132,28 @@ export const updateLeaveType = async (
  * Get all policy configurations, joined with leave types
  */
 export const getAllPolicies = async (): Promise<LeavePolicyConfig[]> => {
-    logger.info(`[LEAVE RULE SERVICE] [GET POLICIES] Fetching all policies`);
-    const result = await pool.query(`
-    SELECT 
-      lpc.*,
-      lt.name as leave_type_name,
-      lt.code as leave_type_code
-    FROM leave_policy_configurations lpc
-    JOIN leave_types lt ON lpc.leave_type_id = lt.id
-    WHERE lt.is_active = true
-    ORDER BY lpc.role, lt.id
-  `);
-    return result.rows;
+    try {
+        logger.info(`[LEAVE RULE SERVICE] [GET POLICIES] Fetching all policies`);
+        const result = await pool.query(`
+        SELECT 
+          lpc.*,
+          lt.name as leave_type_name,
+          lt.code as leave_type_code
+        FROM leave_policy_configurations lpc
+        JOIN leave_types lt ON lpc.leave_type_id = lt.id
+        WHERE lt.is_active = true
+        ORDER BY lpc.role, lt.id
+      `);
+        logger.info(`[LEAVE RULE SERVICE] [GET POLICIES] Found ${result.rows.length} policies`);
+        return result.rows;
+    } catch (error: any) {
+        logger.error(`[LEAVE RULE SERVICE] [GET POLICIES] Error:`, {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        throw error;
+    }
 };
 
 /**
