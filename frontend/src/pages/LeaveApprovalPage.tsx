@@ -126,41 +126,48 @@ const LeaveApprovalPage: React.FC = () => {
     {
       onMutate: async ({ id }) => {
         setUpdatingRequestIds(prev => new Set(prev).add(id));
-        // Cancel outgoing refetches
-        await queryClient.cancelQueries(['pendingLeaves']);
-        await queryClient.cancelQueries(['approvedLeaves']);
-
-        // Snapshot for rollback
-        const previousPending = queryClient.getQueryData(['pendingLeaves']);
-        const previousApproved = queryClient.getQueryData(['approvedLeaves']);
-
-        // Optimistically remove from pending list
-        queryClient.setQueryData(['pendingLeaves'], (old: any) => {
-          if (!old?.requests) return old;
-          return {
-            ...old,
-            requests: old.requests.filter((r: any) => r.id !== id)
-          };
-        });
-
-        return { previousPending, previousApproved };
+        // We do NOT optimistically remove the request anymore to avoid state inconsistency
+        // while the modal is open. We just wait for invalidation.
       },
-      onSuccess: (_response, _variables) => {
-        // Invalidate in background (non-blocking)
+      onSuccess: async (_response, variables) => {
+        // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Leave Approved Successfully!');
-        setIsModalOpen(false);
-        setSelectedRequest(null);
+
+        // Check if it was a partial/specific day approval
+        if (variables.dayIds && variables.dayIds.length > 0) {
+          try {
+            // Fetch fresh data for the modal to show updated status
+            const updatedRequest = await leaveService.getLeaveRequest(variables.id);
+
+            // Update selectedRequest state to reflect changes without closing modal
+            setSelectedRequest((prev: any) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                currentStatus: updatedRequest.currentStatus,
+                leaveDays: updatedRequest.leaveDays,
+                approverName: updatedRequest.approverName,
+                approverRole: updatedRequest.approverRole,
+                rejectionReason: updatedRequest.rejectionReason
+              };
+            });
+            // Do NOT close the modal
+          } catch (error) {
+            console.error('Failed to refresh modal data:', error);
+            // Show error toast so user knows what happened
+            showError('Approval saved, but failed to refresh details. Please reopen.');
+            setIsModalOpen(false);
+            setSelectedRequest(null);
+          }
+        } else {
+          // Full approval - close the modal
+          setIsModalOpen(false);
+          setSelectedRequest(null);
+        }
       },
-      onError: (error: any, _, context) => {
-        // Rollback on error
-        if (context?.previousPending) {
-          queryClient.setQueryData(['pendingLeaves'], context.previousPending);
-        }
-        if (context?.previousApproved) {
-          queryClient.setQueryData(['approvedLeaves'], context.previousApproved);
-        }
+      onError: (error: any) => {
         showError(error.response?.data?.error?.message || 'Approval failed');
       },
       onSettled: (_, __, { id }) => {
@@ -400,14 +407,39 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending, previousApproved };
       },
-      onSuccess: () => {
+      onSuccess: async (_response, variables) => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
         showSuccess('Status updated!');
-        setIsModalOpen(false);
-        setSelectedRequest(null);
-        setIsEditMode(false);
+
+        // If status is partially_approved, keep modal open to show result
+        if (variables.status === 'partially_approved') {
+          try {
+            const updatedRequest = await leaveService.getLeaveRequest(variables.id);
+            setSelectedRequest((prev: any) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                currentStatus: updatedRequest.currentStatus,
+                leaveDays: updatedRequest.leaveDays,
+                approverName: updatedRequest.approverName,
+                approverRole: updatedRequest.approverRole,
+                rejectionReason: updatedRequest.rejectionReason
+              };
+            });
+            setIsEditMode(false); // Exit edit mode but keep modal open
+          } catch (error) {
+            console.error('Failed to refresh modal data:', error);
+            setIsModalOpen(false);
+            setSelectedRequest(null);
+            setIsEditMode(false);
+          }
+        } else {
+          setIsModalOpen(false);
+          setSelectedRequest(null);
+          setIsEditMode(false);
+        }
       },
       onError: (error: any, _, context) => {
         // Rollback on error
@@ -1002,7 +1034,7 @@ const LeaveApprovalPage: React.FC = () => {
         onApprove={handleModalApprove}
         onReject={handleModalReject}
         onUpdate={handleUpdateStatus}
-        isLoading={updateStatusMutation.isLoading}
+        isLoading={updateStatusMutation.isLoading || approveMutation.isLoading || rejectMutation.isLoading}
         isEditMode={isEditMode}
         userRole={user?.role}
         onEdit={() => {
