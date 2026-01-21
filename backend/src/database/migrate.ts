@@ -201,6 +201,18 @@ async function migrate() {
       }
     }
 
+    // Run leave rules seed data migration (016)
+    try {
+      const seedDataMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '016_ensure_seed_data.sql'),
+        'utf-8'
+      );
+      await pool.query(seedDataMigrationFile);
+      console.log('Leave rules seed data (016) completed');
+    } catch (seedError: any) {
+      console.warn('Seed data migration warning:', seedError.message);
+    }
+
     // Run leave rules update migration (008)
     try {
       const updateRulesMigrationFile = readFileSync(
