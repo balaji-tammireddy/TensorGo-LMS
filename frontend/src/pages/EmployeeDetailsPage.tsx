@@ -1120,7 +1120,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 <DropdownMenu onOpenChange={(open) => !open && setManagerSearch('')}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="leave-type-dropdown-trigger" disabled={!isEditMode}>
-                      <span>{employeeData.reportingManagerName ? `${employeeData.reportingManagerName} (${employeeData.reportingManagerId})` : 'Select Manager'}</span>
+                      <span>{employeeData.reportingManagerName ? employeeData.reportingManagerName : 'Select Manager'}</span>
                       <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                     </Button>
                   </DropdownMenuTrigger>

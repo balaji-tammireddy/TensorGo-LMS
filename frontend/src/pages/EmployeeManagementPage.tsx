@@ -2279,7 +2279,7 @@ const EmployeeManagementPage: React.FC = () => {
                                         const manager = managersData?.find((m: any) => m.id === newEmployee.reportingManagerId);
                                         const roleLabel = manager?.role ? getRoleLabel(manager.role) : '';
                                         // Only show role in selected text if it exists and isn't a placeholder
-                                        return `${newEmployee.reportingManagerName}${roleLabel && roleLabel !== '-' ? ` (${roleLabel})` : ''} (${manager?.empId || ''})`;
+                                        return `${newEmployee.reportingManagerName}${roleLabel && roleLabel !== '-' ? ` (${roleLabel})` : ''}`;
                                       })()
                                       : 'Select Reporting Manager'}
                                   </span>
