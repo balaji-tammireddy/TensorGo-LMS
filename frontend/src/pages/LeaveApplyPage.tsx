@@ -38,7 +38,7 @@ const LeaveApplyPage: React.FC = () => {
   const [existingDoctorNote, setExistingDoctorNote] = useState<string | null>(null);
   const doctorNoteInputRef = useRef<HTMLInputElement | null>(null);
   const [formData, setFormData] = useState({
-    leaveType: 'casual' as 'casual' | 'sick' | 'lop' | 'permission',
+    leaveType: 'casual' as string,
     startDate: '',
     startType: 'full' as 'full' | 'first_half' | 'second_half',
     endDate: '',
@@ -86,12 +86,14 @@ const LeaveApplyPage: React.FC = () => {
     return tenDaysFromStart;
   }, [formData.startDate, maxStartDate]);
 
-  // Set default leave type to LOP if user is on notice and current type is causal
+  // Removed: Set default leave type to LOP if user is on notice
+  /*
   useEffect(() => {
     if (user?.status === 'on_notice' && formData.leaveType === 'casual') {
       setFormData(prev => ({ ...prev, leaveType: 'lop' }));
     }
   }, [user?.status, formData.leaveType]);
+  */
 
   const sanitizeLettersOnly = (value: string) => {
     return value.replace(/[^a-zA-Z\s]/g, '');
@@ -1816,47 +1818,36 @@ const LeaveApplyPage: React.FC = () => {
                         height: 'auto'
                       }}
                     >
-                      <span>{formData.leaveType === 'casual' ? 'Casual' : formData.leaveType === 'sick' ? 'Sick' : formData.leaveType === 'lop' ? 'LOP' : 'Permission'}</span>
+                      <span>
+                        {balances?.policies?.[formData.leaveType]?.name ||
+                          formData.leaveType.charAt(0).toUpperCase() + formData.leaveType.slice(1)}
+                      </span>
                       <ChevronDown style={{ width: '14px', height: '14px', marginLeft: '8px' }} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="leave-type-dropdown-content">
-                    {user?.status !== 'on_notice' ? (
+                    {Object.entries(balances?.policies || {}).map(([code, policy]: [string, any], index, array) => {
+                      // Filter out casual for on_notice
+                      if (user?.status === 'on_notice' && code === 'casual') return null;
+
+                      return (
+                        <React.Fragment key={code}>
+                          <DropdownMenuItem onClick={() => handleLeaveTypeChange(code as any)}>
+                            {policy.name || code.charAt(0).toUpperCase() + code.slice(1)}
+                          </DropdownMenuItem>
+                          {index < array.length - 1 && <DropdownMenuSeparator />}
+                        </React.Fragment>
+                      );
+                    })}
+                    {/* Always include permission if not in policies */}
+                    {!(balances?.policies?.permission) && (
                       <>
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('casual')}
-                        >
-                          Casual
+                        {Object.keys(balances?.policies || {}).length > 0 && <DropdownMenuSeparator />}
+                        <DropdownMenuItem onClick={() => handleLeaveTypeChange('permission')}>
+                          Permission
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('sick')}
-                        >
-                          Sick
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() => handleLeaveTypeChange('sick')}
-                        >
-                          Sick
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
                       </>
                     )}
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('lop')}
-                    >
-                      LOP
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleLeaveTypeChange('permission')}
-                    >
-                      Permission
-                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

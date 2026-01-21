@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -66,6 +66,11 @@ const Sidebar: React.FC = memo(() => {
     // HR and Super Admin can access Holiday Management
     if (['hr', 'super_admin'].includes(user.role)) {
       routes.push({ path: '/holiday-management', icon: <FaCalendarAlt />, label: 'Holiday Management' });
+    }
+
+    // Leave Rules - For Super Admin only
+    if (user.role === 'super_admin') {
+      routes.push({ path: '/leave-rules', icon: <FaCog />, label: 'Leave Rules' });
     }
 
     // View Policies - Available to all

@@ -4,6 +4,19 @@ export interface LeaveBalance {
   casual: number;
   sick: number;
   lop: number;
+  policies?: Record<string, {
+    name: string;
+    maxLeavePerMonth: number;
+    carryForwardLimit: number;
+    anniversary3YearBonus: number;
+    anniversary5YearBonus: number;
+  }>;
+}
+
+export interface AppliedLeaveDay {
+  date: string;
+  type: string;
+  status: string;
 }
 
 export interface Holiday {
@@ -29,7 +42,7 @@ export interface LeaveRequest {
   canEdit?: boolean;
   canDelete?: boolean;
   timeForPermission?: { start: string; end: string } | null;
-  leaveDays?: Array<{ date: string; type: string; status: string }>;
+  leaveDays?: AppliedLeaveDay[];
   approvedDays?: number;
   rejectedDays?: number;
   pendingDays?: number;
@@ -55,11 +68,11 @@ export interface PendingLeaveRequest {
 }
 
 export interface ApplyLeaveData {
-  leaveType: 'casual' | 'sick' | 'lop' | 'permission';
+  leaveType: string;
   startDate: string;
-  startType: 'full' | 'half';
+  startType: 'full' | 'first_half' | 'second_half';
   endDate: string;
-  endType: 'full' | 'half';
+  endType: 'full' | 'first_half' | 'second_half';
   reason: string;
   timeForPermission?: { start?: string; end?: string };
   doctorNote?: string | File; // Can be File for upload or string for existing key/base64
@@ -290,5 +303,10 @@ export const deleteHoliday = async (holidayId: number) => {
 
 export const convertLeaveRequestLopToCasual = async (requestId: number) => {
   const response = await api.post(`/leave/request/${requestId}/convert-lop-to-casual`);
+  return response.data;
+};
+
+export const updateHoliday = async (id: number, holidayDate: string, holidayName: string) => {
+  const response = await api.put(`/leave/holidays/${id}`, { holidayDate, holidayName });
   return response.data;
 };

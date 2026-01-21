@@ -13,6 +13,7 @@ import {
 import { Button } from './ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as leaveService from '../services/leaveService';
+import * as employeeService from '../services/employeeService';
 import { Holiday } from '../services/leaveService';
 import './LeaveDetailsModal.css';
 
@@ -47,6 +48,7 @@ interface LeaveDetailsModalProps {
     leaveDays?: LeaveDay[];
     canEdit?: boolean;
     timeForPermission?: { start: string; end: string } | null;
+    employeeId?: number; // Add employee ID for fetching leave balances
   } | null;
   onClose: () => void;
   onApprove: (requestId: number, selectedDayIds?: number[]) => void;
@@ -56,6 +58,30 @@ interface LeaveDetailsModalProps {
   isLoading?: boolean;
   isEditMode?: boolean;
   userRole?: string;
+}
+
+interface EmployeeLeaveBalances {
+  casual: number;
+  sick: number;
+  lop: number;
+  policies?: {
+    casual?: {
+      carryForwardLimit: number;
+      anniversary3YearBonus: number;
+      anniversary5YearBonus: number;
+    };
+    sick?: {
+      carryForwardLimit: number;
+      anniversary3YearBonus: number;
+      anniversary5YearBonus: number;
+    };
+    lop?: {
+      carryForwardLimit: number;
+      anniversary3YearBonus: number;
+      anniversary5YearBonus: number;
+    };
+  };
+  role?: string;
 }
 
 const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
@@ -76,6 +102,8 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   const [rejectReason, setRejectReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [employeeBalances, setEmployeeBalances] = useState<EmployeeLeaveBalances | null>(null);
+  const [loadingBalances, setLoadingBalances] = useState(false);
 
   // Prevent body scrolling when modal is open
   useEffect(() => {
@@ -99,6 +127,7 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       setShowRejectDialog(false);
       setRejectReason('');
       setSelectedStatus('');
+      setEmployeeBalances(null);
     } else if (isOpen && leaveRequest) {
       // Fetch holidays if not already fetched
       if (holidays.length === 0) {
@@ -116,6 +145,22 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
       if (isEditMode) {
         // Set initial status when opening in edit mode
         setSelectedStatus(leaveRequest.currentStatus);
+      }
+
+      // Fetch employee leave balances if employee is on notice period and employeeId is available
+      if (leaveRequest.empStatus === 'on_notice' && leaveRequest.employeeId) {
+        const fetchEmployeeBalances = async () => {
+          setLoadingBalances(true);
+          try {
+            const balances = await employeeService.getEmployeeLeaveBalances(leaveRequest.employeeId!);
+            setEmployeeBalances(balances);
+          } catch (error) {
+            console.error('Failed to fetch employee balances:', error);
+          } finally {
+            setLoadingBalances(false);
+          }
+        };
+        fetchEmployeeBalances();
       }
     }
   }, [isOpen, leaveRequest, isEditMode, holidays.length]);
@@ -384,6 +429,107 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Leave Balance Information for On Notice Employees */}
+              {leaveRequest.empStatus === 'on_notice' && (
+                <div className="leave-detail-item leave-detail-item-full">
+                  <label>Leave Balance Information</label>
+                  {loadingBalances ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '24px',
+                      color: '#64748b',
+                      fontSize: '14px'
+                    }}>
+                      <span className="loading-spinner" style={{ marginRight: '8px' }}></span>
+                      Loading leave balance information...
+                    </div>
+                  ) : employeeBalances ? (
+                    <div className="leave-balance-info-container" style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '16px',
+                      marginTop: '8px',
+                      padding: '16px',
+                      backgroundColor: '#f8f9fc',
+                      borderRadius: '8px',
+                      border: '1px solid #e6e8f0'
+                    }}>
+                      {/* Sick Leave */}
+                      <div style={{
+                        padding: '12px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '6px',
+                        border: '1px solid #fef3c7'
+                      }}>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: '#d97706',
+                          marginBottom: '8px'
+                        }}>Sick Leave</div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 500 }}>Balance:</span> {employeeBalances.sick}
+                        </div>
+                        {employeeBalances.policies?.sick && (
+                          <>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 500 }}>Carry Forward:</span> {employeeBalances.policies.sick.carryForwardLimit}
+                            </div>
+                            {employeeBalances.policies.sick.anniversary3YearBonus > 0 && (
+                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: 500 }}>3-Year Bonus:</span> {employeeBalances.policies.sick.anniversary3YearBonus}
+                              </div>
+                            )}
+                            {employeeBalances.policies.sick.anniversary5YearBonus > 0 && (
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                <span style={{ fontWeight: 500 }}>5-Year Bonus:</span> {employeeBalances.policies.sick.anniversary5YearBonus}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* LOP */}
+                      <div style={{
+                        padding: '12px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '6px',
+                        border: '1px solid #fee2e2'
+                      }}>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: '#dc2626',
+                          marginBottom: '8px'
+                        }}>Loss of Pay</div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 500 }}>Balance:</span> {employeeBalances.lop}
+                        </div>
+                        {employeeBalances.policies?.lop && (
+                          <>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 500 }}>Carry Forward:</span> {employeeBalances.policies.lop.carryForwardLimit}
+                            </div>
+                            {employeeBalances.policies.lop.anniversary3YearBonus > 0 && (
+                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: 500 }}>3-Year Bonus:</span> {employeeBalances.policies.lop.anniversary3YearBonus}
+                              </div>
+                            )}
+                            {employeeBalances.policies.lop.anniversary5YearBonus > 0 && (
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                <span style={{ fontWeight: 500 }}>5-Year Bonus:</span> {employeeBalances.policies.lop.anniversary5YearBonus}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
               <div className="leave-detail-item">
                 <label>Applied Date</label>

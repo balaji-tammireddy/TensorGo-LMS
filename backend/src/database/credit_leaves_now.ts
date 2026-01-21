@@ -4,9 +4,9 @@ import { creditMonthlyLeaves } from '../services/leaveCredit.service';
 async function creditLeavesNow() {
   try {
     console.log('Starting leave credit for all active employees...');
-    
+
     const result = await creditMonthlyLeaves();
-    
+
     console.log(`\nLeave credit completed:`);
     console.log(`  - Employees credited: ${result.credited}`);
     console.log(`  - Errors: ${result.errors}`);

@@ -24,34 +24,66 @@ export interface LeaveBalance {
   lop: number;
 }
 
-export const getLeaveBalances = async (userId: number): Promise<LeaveBalance> => {
+export const getLeaveBalances = async (userId: number): Promise<any> => {
   logger.info(`[LEAVE] [GET LEAVE BALANCES] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [GET LEAVE BALANCES] User ID: ${userId}`);
+
+  // Get user role
+  const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+  const role = userResult.rows[0]?.role || 'employee';
 
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [userId]
   );
 
+  let balancesRaw = { casual: 0, sick: 0, lop: 0 };
+
   if (result.rows.length === 0) {
     logger.info(`[LEAVE] [GET LEAVE BALANCES] No balance record found, initializing with defaults`);
-    // Initialize balance if not exists (casual and sick start at 0, only LOP has default)
     await pool.query(
       'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
       [userId]
     );
-    logger.info(`[LEAVE] [GET LEAVE BALANCES] Balance initialized - Casual: 0, Sick: 0, LOP: 10`);
-    return { casual: 0, sick: 0, lop: 10 };
+    balancesRaw = { casual: 0, sick: 0, lop: 10 };
+  } else {
+    const balance = result.rows[0];
+    balancesRaw = {
+      casual: parseFloat(balance.casual_balance) || 0,
+      sick: parseFloat(balance.sick_balance) || 0,
+      lop: parseFloat(balance.lop_balance) || 0
+    };
   }
 
-  const balance = result.rows[0];
-  const balances = {
-    casual: parseFloat(balance.casual_balance) || 0,
-    sick: parseFloat(balance.sick_balance) || 0,
-    lop: parseFloat(balance.lop_balance) || 0
+  // Get policy configurations for the user's role
+  const policyResult = await pool.query(`
+    SELECT 
+      lt.code as leave_type,
+      lt.name as leave_type_name,
+      lpc.carry_forward_limit,
+      lpc.max_leave_per_month,
+      lpc.anniversary_3_year_bonus,
+      lpc.anniversary_5_year_bonus
+    FROM leave_policy_configurations lpc
+    JOIN leave_types lt ON lpc.leave_type_id = lt.id
+    WHERE lpc.role = $1 AND lt.is_active = true
+  `, [role]);
+
+  const policies: any = {};
+  policyResult.rows.forEach((row: any) => {
+    policies[row.leave_type] = {
+      name: row.leave_type_name,
+      carryForwardLimit: parseFloat(row.carry_forward_limit) || 0,
+      maxLeavePerMonth: parseFloat(row.max_leave_per_month) || 0,
+      anniversary3YearBonus: parseFloat(row.anniversary_3_year_bonus) || 0,
+      anniversary5YearBonus: parseFloat(row.anniversary_5_year_bonus) || 0
+    };
+  });
+
+  return {
+    ...balancesRaw,
+    policies
   };
-  logger.info(`[LEAVE] [GET LEAVE BALANCES] Balances retrieved - Casual: ${balances.casual}, Sick: ${balances.sick}, LOP: ${balances.lop}`);
-  return balances;
 };
 
 export const getHolidays = async (year?: number) => {
@@ -277,6 +309,11 @@ export const applyLeave = async (
     const userData = userResult.rows[0];
     const userRole = userData.employee_role;
 
+    // Validation: Super Admins cannot apply for leaves
+    if (userRole === 'super_admin') {
+      throw new Error('Super Admins do not apply for leaves and are excluded from the leave system.');
+    }
+
     // Validation: Cannot select weekends (Saturday = 6, Sunday = 0)
     // EXCEPTION: LOP leaves can start/end on weekends
     // EXCEPTION: For interns, Saturday is a working day
@@ -436,79 +473,55 @@ export const applyLeave = async (
       }
     }
 
-    // Validation: LOP leaves cannot exceed 5 days per month
-    if (leaveData.leaveType === 'lop') {
-      const monthCounts = new Map<string, number>();
+    // Validation: Check monthly limits dynamically based on policy
+    if (leaveData.leaveType === 'lop' || leaveData.leaveType === 'casual') {
+      // Fetch the policy configuration for this user's role and leave type
+      const policyResult = await pool.query(`
+        SELECT lpc.max_leave_per_month
+        FROM leave_policy_configurations lpc
+        JOIN leave_types lt ON lpc.leave_type_id = lt.id
+        WHERE lpc.role = $1 AND lt.code = $2
+      `, [userRole, leaveData.leaveType]);
 
-      // Group requested days by month
-      for (const day of leaveDays) {
-        const monthKey = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}`;
-        const dayValue = day.type === 'half' ? 0.5 : 1;
-        monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + dayValue);
-      }
+      const maxLeavePerMonth = policyResult.rows.length > 0
+        ? parseFloat(policyResult.rows[0].max_leave_per_month)
+        : (leaveData.leaveType === 'casual' ? 10 : 5); // Fallback if no policy found
 
-      // Check against database for each month involved
-      for (const [monthKey, newCount] of monthCounts.entries()) {
-        const [year, month] = monthKey.split('-');
+      // Only proceed with check if maxLeavePerMonth is defined and > 0
+      if (maxLeavePerMonth > 0) {
+        const monthCounts = new Map<string, number>();
 
-        // Count existing LOP days for this month (excluding rejected ones)
-        // We look for any leave_days of type 'lop' in this month
-        const existingLopResult = await pool.query(
-          `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
-           FROM leave_days ld
-           JOIN leave_requests lr ON ld.leave_request_id = lr.id
-           WHERE ld.employee_id = $1 
-             AND ld.leave_type = 'lop'
-             AND EXTRACT(YEAR FROM ld.leave_date) = $2
-             AND EXTRACT(MONTH FROM ld.leave_date) = $3
-             AND ld.day_status != 'rejected'
-             AND lr.current_status != 'rejected'`,
-          [userId, parseInt(year), parseInt(month)]
-        );
-
-        const existingCount = parseFloat(existingLopResult.rows[0].total_days) || 0;
-        const totalLopDays = existingCount + newCount;
-
-        if (totalLopDays > 5) {
-          throw new Error(`LOP request exceeds monthly limit of 5 days. You have already used/requested ${existingCount} LOP days in ${monthKey}, and this request adds ${newCount} days.`);
+        // Group requested days by month
+        for (const day of leaveDays) {
+          const monthKey = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}`;
+          const dayValue = day.type === 'half' ? 0.5 : 1;
+          monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + dayValue);
         }
-      }
-    }
 
-    // Validation: Casual leaves cannot exceed 10 days per month
-    if (leaveData.leaveType === 'casual') {
-      const monthCounts = new Map<string, number>();
+        // Check against database for each month involved
+        for (const [monthKey, newCount] of monthCounts.entries()) {
+          const [year, month] = monthKey.split('-');
 
-      // Group requested days by month
-      for (const day of leaveDays) {
-        const monthKey = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}`;
-        const dayValue = day.type === 'half' ? 0.5 : 1;
-        monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + dayValue);
-      }
+          // Count existing days for this leave type for this month (excluding rejected ones)
+          const existingResult = await pool.query(
+            `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+             FROM leave_days ld
+             JOIN leave_requests lr ON ld.leave_request_id = lr.id
+             WHERE ld.employee_id = $1 
+               AND ld.leave_type = $2
+               AND EXTRACT(YEAR FROM ld.leave_date) = $3
+               AND EXTRACT(MONTH FROM ld.leave_date) = $4
+               AND ld.day_status != 'rejected'
+               AND lr.current_status != 'rejected'`,
+            [userId, leaveData.leaveType, parseInt(year), parseInt(month)]
+          );
 
-      // Check against database for each month involved
-      for (const [monthKey, newCount] of monthCounts.entries()) {
-        const [year, month] = monthKey.split('-');
+          const existingCount = parseFloat(existingResult.rows[0].total_days) || 0;
+          const totalDays = existingCount + newCount;
 
-        // Count existing Casual days for this month (excluding rejected ones)
-        const existingCasualResult = await pool.query(
-          `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
-           FROM leave_days ld
-           JOIN leave_requests lr ON ld.leave_request_id = lr.id
-           WHERE ld.employee_id = $1 
-             AND ld.leave_type = 'casual'
-             AND EXTRACT(YEAR FROM ld.leave_date) = $2
-             AND EXTRACT(MONTH FROM ld.leave_date) = $3
-             AND ld.day_status != 'rejected'
-             AND lr.current_status != 'rejected'`,
-          [userId, parseInt(year), parseInt(month)]
-        );
-
-        const existingCount = parseFloat(existingCasualResult.rows[0].total_days) || 0;
-        const totalCasualDays = existingCount + newCount;
-
-        if (totalCasualDays > 10) {
-          throw new Error(`Casual leave request exceeds monthly limit of 10 days. You have already used/requested ${existingCount} casual days in ${monthKey}, and this request adds ${newCount} days.`);
+          if (totalDays > maxLeavePerMonth) {
+            throw new Error(`${leaveData.leaveType.toUpperCase()} leave request exceeds monthly limit of ${maxLeavePerMonth} days. You have already used/requested ${existingCount} days in ${monthKey}, and this request adds ${newCount} days.`);
+          }
         }
       }
     }
@@ -533,12 +546,14 @@ export const applyLeave = async (
     const userData = userResult.rows[0];
     */
 
-    // Check for 'On Notice' status restrictions
+    // Removed 'On Notice' status restrictions as per request
+    /*
     if (userData.status === 'on_notice') {
       if (leaveData.leaveType !== 'lop' && leaveData.leaveType !== 'permission' && leaveData.leaveType !== 'sick') {
         throw new Error('Employees on notice period can only apply for Sick, LOP or Permission.');
       }
     }
+    */
 
     const client = await pool.connect();
     let leaveRequestId: number;

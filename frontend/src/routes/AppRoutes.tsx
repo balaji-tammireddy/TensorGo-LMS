@@ -20,6 +20,7 @@ const ViewPoliciesPage = lazy(() => import('../pages/ViewPoliciesPage'));
 const AccessDeniedPage = lazy(() => import('../pages/AccessDeniedPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
+const LeaveRulesPage = lazy(() => import('../pages/LeaveRulesPage'));
 
 import * as policyService from '../services/policyService';
 
@@ -149,6 +150,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['super_admin']}>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leave-rules"
+          element={
+            <ProtectedRoute allowedRoles={['super_admin']}>
+              <LeaveRulesPage />
             </ProtectedRoute>
           }
         />

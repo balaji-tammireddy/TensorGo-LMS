@@ -187,6 +187,116 @@ async function migrate() {
       }
     }
 
+    // Run leave rules tables migration
+    try {
+      const leaveRulesMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '007_create_leave_rules_tables.sql'),
+        'utf-8'
+      );
+      await pool.query(leaveRulesMigrationFile);
+      console.log('Leave rules (types & policies) migration completed');
+    } catch (rulesError: any) {
+      if (!rulesError.message.includes('already exists') && !rulesError.message.includes('duplicate')) {
+        console.warn('Leave rules migration warning:', rulesError.message);
+      }
+    }
+
+    // Run leave rules update migration (008)
+    try {
+      const updateRulesMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '008_update_leave_rules_schema.sql'),
+        'utf-8'
+      );
+      await pool.query(updateRulesMigrationFile);
+      console.log('Leave rules schema update (008) completed');
+    } catch (updateError: any) {
+      if (!updateError.message.includes('already exists') && !updateError.message.includes('does not exist') && !updateError.message.includes('duplicate')) {
+        console.warn('Leave rules update migration warning:', updateError.message);
+      }
+    }
+
+    // Run LOP credit migration (009)
+    try {
+      const lopCreditMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '009_set_default_lop_credit.sql'),
+        'utf-8'
+      );
+      await pool.query(lopCreditMigrationFile);
+      console.log('LOP credit update (009) completed');
+    } catch (lopError: any) {
+      if (!lopError.message.includes('already exists') && !lopError.message.includes('duplicate')) {
+        console.warn('LOP credit migration warning:', lopError.message);
+      }
+    }
+
+    // Run LOP policies migration (010)
+    try {
+      const lopPoliciesMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '010_ensure_lop_policies.sql'),
+        'utf-8'
+      );
+      await pool.query(lopPoliciesMigrationFile);
+      console.log('LOP policies update (010) completed');
+    } catch (lopError: any) {
+      if (!lopError.message.includes('already exists') && !lopError.message.includes('duplicate')) {
+        console.warn('LOP policies migration warning:', lopError.message);
+      }
+    }
+
+    // Run all LOP policies migration (011)
+    try {
+      const allLopPoliciesMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '011_ensure_all_lop_policies.sql'),
+        'utf-8'
+      );
+      await pool.query(allLopPoliciesMigrationFile);
+      console.log('All LOP policies update (011) completed');
+    } catch (lopError: any) {
+      if (!lopError.message.includes('already exists') && !lopError.message.includes('duplicate')) {
+        console.warn('All LOP policies migration warning:', lopError.message);
+      }
+    }
+
+    // Run max monthly limit migration (012)
+    try {
+      const maxLimitMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '012_add_max_leave_per_month.sql'),
+        'utf-8'
+      );
+      await pool.query(maxLimitMigrationFile);
+      console.log('Max monthly limit migration (012) completed');
+    } catch (maxError: any) {
+      if (!maxError.message.includes('already exists') && !maxError.message.includes('duplicate')) {
+        console.warn('Max monthly limit migration warning:', maxError.message);
+      }
+    }
+
+    // Run effective from migration (013)
+    try {
+      const effectiveFromMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '013_add_effective_from_to_policies.sql'),
+        'utf-8'
+      );
+      await pool.query(effectiveFromMigrationFile);
+      console.log('Effective mapping migration (013) completed');
+    } catch (effectiveError: any) {
+      if (!effectiveError.message.includes('already exists') && !effectiveError.message.includes('duplicate')) {
+        console.warn('Effective mapping migration warning:', effectiveError.message);
+      }
+    }
+
+    // Run initial effective date setup migration (015)
+    try {
+      const initialEffectiveMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '015_set_initial_effective_date.sql'),
+        'utf-8'
+      );
+      await pool.query(initialEffectiveMigrationFile);
+      console.log('Initial effective date setup (015) completed');
+    } catch (initialError: any) {
+      console.warn('Initial effective date setup warning:', initialError.message);
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);
