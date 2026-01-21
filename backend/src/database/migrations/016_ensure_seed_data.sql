@@ -21,32 +21,57 @@ BEGIN
   SELECT id INTO permission_id FROM leave_types WHERE code = 'permission';
 
   -- Seed Default Policies for all major roles if they don't exist
-  -- Employee
+  -- Role: employee, manager, hr, intern, on_notice
+  
+  -- Casual Leave (12 annual, 8 carry forward)
   INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit, anniversary_3_year_bonus, anniversary_5_year_bonus)
   VALUES ('employee', casual_id, 12.0, 8, 3, 5) ON CONFLICT (role, leave_type_id) DO NOTHING;
-  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
-  VALUES ('employee', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
-  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
-  VALUES ('employee', lop_id, 10.0) ON CONFLICT (role, leave_type_id) DO NOTHING;
-  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
-  VALUES ('employee', permission_id, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
-
-  -- Manager
   INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit, anniversary_3_year_bonus, anniversary_5_year_bonus)
   VALUES ('manager', casual_id, 12.0, 8, 3, 5) ON CONFLICT (role, leave_type_id) DO NOTHING;
-  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
-  VALUES ('manager', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
-
-  -- HR
   INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit, anniversary_3_year_bonus, anniversary_5_year_bonus)
   VALUES ('hr', casual_id, 12.0, 8, 3, 5) ON CONFLICT (role, leave_type_id) DO NOTHING;
   INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
-  VALUES ('hr', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
-
-  -- Intern
-  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
   VALUES ('intern', casual_id, 6.0, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
   INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
+  VALUES ('on_notice', casual_id, 12.0, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+
+  -- Sick Leave (6 annual)
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
+  VALUES ('employee', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
+  VALUES ('manager', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
+  VALUES ('hr', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
   VALUES ('intern', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit, carry_forward_limit)
+  VALUES ('on_notice', sick_id, 6.0, 99) ON CONFLICT (role, leave_type_id) DO NOTHING;
+
+  -- Loss of Pay (10 annual default display)
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('employee', lop_id, 10.0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('manager', lop_id, 10.0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('hr', lop_id, 10.0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('intern', lop_id, 10.0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('on_notice', lop_id, 10.0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+
+  -- Permission (0 credit)
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('employee', permission_id, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('manager', permission_id, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('hr', permission_id, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('intern', permission_id, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+  INSERT INTO leave_policy_configurations (role, leave_type_id, annual_credit)
+  VALUES ('on_notice', permission_id, 0) ON CONFLICT (role, leave_type_id) DO NOTHING;
+
+  -- Force initial effective date for everything
+  UPDATE leave_policy_configurations SET effective_from = '2024-08-19' WHERE effective_from IS NULL;
 
 END $$;
