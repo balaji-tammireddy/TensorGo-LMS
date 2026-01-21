@@ -1002,10 +1002,10 @@ const EmployeeManagementPage: React.FC = () => {
                   </th>
                   <th>Name</th>
                   <th>
-                    <div className="header-sort-wrapper">
-                      Role
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <div className="header-sort-wrapper" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          Role
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1014,27 +1014,28 @@ const EmployeeManagementPage: React.FC = () => {
                               height: '20px',
                               border: roleFilter ? '1px solid #2563eb' : 'none',
                               backgroundColor: roleFilter ? '#eff6ff' : 'transparent',
-                              color: roleFilter ? '#2563eb' : 'inherit'
+                              color: roleFilter ? '#2563eb' : 'inherit',
+                              pointerEvents: 'none'
                             }}
                           >
                             <ChevronDown style={{ width: '12px', height: '12px' }} />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onSelect={() => setRoleFilter('')}>
-                            All Roles
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setRoleFilter('')}>
+                          All Roles
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {['super_admin', 'hr', 'manager', 'employee', 'intern'].map((role) => (
+                          <DropdownMenuItem key={role} onSelect={() => setRoleFilter(role)}>
+                            {role === 'super_admin' ? 'Super Admin' :
+                              role === 'hr' ? 'HR' :
+                                role.charAt(0).toUpperCase() + role.slice(1)}
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {['super_admin', 'hr', 'manager', 'employee', 'intern'].map((role) => (
-                            <DropdownMenuItem key={role} onSelect={() => setRoleFilter(role)}>
-                              {role === 'super_admin' ? 'Super Admin' :
-                                role === 'hr' ? 'HR' :
-                                  role.charAt(0).toUpperCase() + role.slice(1)}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </th>
                   <th className="sortable-header" onClick={() => handleSort('joiningDate')}>
                     <div className="header-sort-wrapper">
@@ -1047,10 +1048,10 @@ const EmployeeManagementPage: React.FC = () => {
                     </div>
                   </th>
                   <th>
-                    <div className="header-sort-wrapper">
-                      Status
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <div className="header-sort-wrapper" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          Status
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1059,27 +1060,28 @@ const EmployeeManagementPage: React.FC = () => {
                               height: '20px',
                               border: statusFilter ? '1px solid #2563eb' : 'none',
                               backgroundColor: statusFilter ? '#eff6ff' : 'transparent',
-                              color: statusFilter ? '#2563eb' : 'inherit'
+                              color: statusFilter ? '#2563eb' : 'inherit',
+                              pointerEvents: 'none'
                             }}
                           >
                             <ChevronDown style={{ width: '12px', height: '12px' }} />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onSelect={() => setStatusFilter('')}>
-                            All Status
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setStatusFilter('')}>
+                          All Status
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {['active', 'on_notice', 'inactive'].map((status) => (
+                          <DropdownMenuItem key={status} onSelect={() => setStatusFilter(status)}>
+                            {status === 'active' ? 'Active' :
+                              status === 'on_notice' ? 'On Notice' :
+                                'Inactive'}
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {['active', 'on_notice', 'inactive'].map((status) => (
-                            <DropdownMenuItem key={status} onSelect={() => setStatusFilter(status)}>
-                              {status === 'active' ? 'Active' :
-                                status === 'on_notice' ? 'On Notice' :
-                                  'Inactive'}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </th>
                   <th>Actions</th>
                 </tr>
