@@ -615,11 +615,22 @@ const LeaveApprovalPage: React.FC = () => {
         const valA = a[recentSortConfig.key] ? new Date(a[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
         const valB = b[recentSortConfig.key] ? new Date(b[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
 
+        // Primary sort by the selected column
+        let result = 0;
         if (recentSortConfig.direction === 'asc') {
-          return valA - valB;
+          result = valA - valB;
         } else {
-          return valB - valA;
+          result = valB - valA;
         }
+
+        // If primary sort values are equal, use secondary sort by start date (ascending)
+        if (result === 0) {
+          const startA = a.startDate ? new Date(a.startDate + 'T00:00:00').getTime() : 0;
+          const startB = b.startDate ? new Date(b.startDate + 'T00:00:00').getTime() : 0;
+          return startA - startB; // Ascending for secondary sort (earliest dates first)
+        }
+
+        return result;
       });
     return requests;
   }, [approvedData, recentSearch, recentFilterDate, recentSortConfig, todayStr]);
