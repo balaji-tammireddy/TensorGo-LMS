@@ -98,3 +98,14 @@ export const holidaySchema = z.object({
     holidayName: safeTextSchema.min(1, 'Holiday name is required').max(100, 'Holiday name cannot exceed 100 characters')
   })
 });
+
+export const updateHolidaySchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'Invalid holiday ID')
+  }),
+  body: z.object({
+    holidayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+    holidayName: safeTextSchema.min(1, 'Holiday name is required').max(100, 'Holiday name cannot exceed 100 characters')
+  })
+});
+
