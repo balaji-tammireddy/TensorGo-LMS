@@ -3684,7 +3684,7 @@ export const getApprovedLeaves = async (
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role,
               last_updater.first_name, last_updater.last_name, u.status, u.role
-     ORDER BY lr.applied_date DESC
+     ORDER BY lr.start_date ASC, lr.applied_date DESC
      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 
   params.push(limit, offset);

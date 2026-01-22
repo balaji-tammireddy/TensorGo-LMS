@@ -37,8 +37,8 @@ const LeaveApprovalPage: React.FC = () => {
   const [recentSearchInput, setRecentSearchInput] = useState('');
   const [recentSearch, setRecentSearch] = useState('');
   const [recentSortConfig, setRecentSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
-    key: 'appliedDate',
-    direction: 'desc'
+    key: 'startDate',
+    direction: 'asc'
   });
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -561,10 +561,45 @@ const LeaveApprovalPage: React.FC = () => {
       .sort((a: any, b: any) => {
         if (!recentSortConfig.key || !recentSortConfig.direction) return 0;
 
-        const valA = a[recentSortConfig.key] ? new Date(a[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
-        const valB = b[recentSortConfig.key] ? new Date(b[recentSortConfig.key] + 'T00:00:00').getTime() : 0;
+        const parseDate = (dateStr: any) => {
+          if (!dateStr) return 0;
+          if (typeof dateStr !== 'string') {
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? 0 : d.getTime();
+          }
 
-        // Primary sort by the selected column
+          // More robust matching for YYYY-MM-DD or DD-MM-YYYY
+          const match = dateStr.match(/^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})/);
+          if (match) {
+            const [, p1, p2, p3] = match;
+            let y, m, d;
+            if (p1.length === 4) { // YYYY-MM-DD
+              y = parseInt(p1, 10);
+              m = parseInt(p2, 10) - 1;
+              d = parseInt(p3, 10);
+            } else if (p3.length === 4) { // DD-MM-YYYY
+              y = parseInt(p3, 10);
+              m = parseInt(p2, 10) - 1;
+              d = parseInt(p1, 10);
+            } else {
+              // Fallback for 2-digit years if any
+              y = parseInt(p3, 10) + (parseInt(p3, 10) < 50 ? 2000 : 1900);
+              m = parseInt(p2, 10) - 1;
+              d = parseInt(p1, 10);
+            }
+            const dateObj = new Date(y, m, d);
+            return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
+          }
+
+          const fallbackDate = new Date(dateStr);
+          return isNaN(fallbackDate.getTime()) ? 0 : fallbackDate.getTime();
+        };
+
+        const key = recentSortConfig.key;
+        const valA = parseDate(a[key]);
+        const valB = parseDate(b[key]);
+
+        // Primary sort
         let result = 0;
         if (recentSortConfig.direction === 'asc') {
           result = valA - valB;
@@ -572,11 +607,9 @@ const LeaveApprovalPage: React.FC = () => {
           result = valB - valA;
         }
 
-        // If primary sort values are equal, use secondary sort by start date (ascending)
+        // If primary sort values are equal or both invalid, use secondary sort (ID descending for stability)
         if (result === 0) {
-          const startA = a.startDate ? new Date(a.startDate + 'T00:00:00').getTime() : 0;
-          const startB = b.startDate ? new Date(b.startDate + 'T00:00:00').getTime() : 0;
-          return startA - startB; // Ascending for secondary sort (earliest dates first)
+          return (b.id || 0) - (a.id || 0);
         }
 
         return result;

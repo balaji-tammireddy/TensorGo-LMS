@@ -50,14 +50,6 @@ const ViewPoliciesPage: React.FC = () => {
     // Confirmation Dialog State
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [policyToDelete, setPolicyToDelete] = useState<{ id: number | string, title: string } | null>(null);
-    const [hiddenPolicyIds, setHiddenPolicyIds] = useState<string[]>(() => {
-        try {
-            const saved = localStorage.getItem('hidden_policy_ids');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            return [];
-        }
-    });
 
     const canManage = user?.role === 'super_admin' || user?.role === 'hr';
 
@@ -72,75 +64,20 @@ const ViewPoliciesPage: React.FC = () => {
         return <FaFileAlt />;
     };
 
-    const defaultPolicies: PolicyDisplay[] = [
-        {
-            id: 'asset',
-            title: 'Asset Management Policy',
-            icon: <FaLaptop />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Asset Management Policy.pdf'
-        },
-        {
-            id: 'communication',
-            title: 'Communication Policy',
-            icon: <FaComments />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Communication Policy.pdf'
-        },
-        {
-            id: 'dress-code',
-            title: 'Dress Code Policy',
-            icon: <FaUserTie />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Dress Code Policy.pdf'
-        },
-        {
-            id: 'leave',
-            title: 'Leave Policy',
-            icon: <FaCalendarAlt />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/leave-policy.pdf'
-        },
-        {
-            id: 'quality',
-            title: 'Quality Management Policy',
-            icon: <FaCheckCircle />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Quality Management Policy.pdf'
-        },
-        {
-            id: 'work-hour',
-            title: 'Work Hour Policy',
-            icon: <FaBuilding />,
-            link: 'https://hr--lms.s3.us-east-va.io.cloud.ovh.us/policies/Work Hour Policy.pdf'
-        }
-    ];
-
     // Queries
-    const { data: policies, isLoading: loading } = useQuery(
+    const { data: displayPolicies, isLoading: loading } = useQuery(
         ['policies'],
         getPolicies,
         {
             staleTime: 5 * 60 * 1000,
             cacheTime: 5 * 60 * 1000,
             select: (data) => {
-                const fetchedPolicies = (data || []).map((p: any) => ({
+                return (data || []).map((p: any) => ({
                     id: p.id,
                     title: p.title,
                     icon: getIconForTitle(p.title),
                     link: p.public_url
                 }));
-
-                // Overlay fetched policies on top of defaults where titles match
-                // This prevents duplicates and makes defaults "editable" by replacing them
-                const merged = [...defaultPolicies];
-                fetchedPolicies.forEach(fetched => {
-                    const index = merged.findIndex(d =>
-                        d.title.toLowerCase().replace(/\s+/g, ' ').trim() ===
-                        fetched.title.toLowerCase().replace(/\s+/g, ' ').trim()
-                    );
-                    if (index !== -1) {
-                        merged[index] = fetched;
-                    } else {
-                        merged.push(fetched);
-                    }
-                });
-                return merged;
             },
             onError: (error) => {
                 console.error('Error fetching policies:', error);
@@ -150,24 +87,15 @@ const ViewPoliciesPage: React.FC = () => {
 
     // Mutations
     const createMutation = useMutation(
-        (data: { title: string; file?: File; existingUrl?: string; originalId?: string }) => createPolicy(data.title, data.file, data.existingUrl),
+        (data: { title: string; file?: File; existingUrl?: string }) => createPolicy(data.title, data.file, data.existingUrl),
         {
-            onSuccess: (_response, variables) => {
+            onSuccess: () => {
                 queryClient.invalidateQueries(['policies']);
                 showSuccess('Policy added successfully');
-
-                // If we were "editing" a default policy, hide the original one
-                if (variables.originalId) {
-                    const newHidden = [...hiddenPolicyIds, variables.originalId.toString()];
-                    setHiddenPolicyIds(newHidden);
-                    localStorage.setItem('hidden_policy_ids', JSON.stringify(newHidden));
-                }
+                closeAddModal();
             },
             onError: (error: any) => {
                 showError(error.response?.data?.error?.message || error.message || 'Failed to add policy');
-            },
-            onSettled: () => {
-                closeAddModal();
             }
         }
     );
@@ -220,7 +148,7 @@ const ViewPoliciesPage: React.FC = () => {
     const handleEditClick = (policyId: number | string) => {
         if (isProcessing) return;
 
-        const policy = displayPolicies.find(p => p.id === policyId);
+        const policy = displayPolicies?.find((p: any) => p.id === policyId);
         if (policy) {
             setEditPolicyTitle(policy.title);
         } else {
@@ -241,11 +169,10 @@ const ViewPoliciesPage: React.FC = () => {
         }
 
         // Duplicate Check for Edit
-        // If title changed, check if new title exists (excluding current policy)
-        const currentPolicy = displayPolicies.find(p => p.id === selectedPolicyId);
+        const currentPolicy = displayPolicies?.find((p: any) => p.id === selectedPolicyId);
         if (currentPolicy && currentPolicy.title.toLowerCase().trim() !== editPolicyTitle.toLowerCase().trim()) {
-            const isDuplicate = displayPolicies.some(
-                (policy) => policy.title.toLowerCase().trim() === editPolicyTitle.trim().toLowerCase()
+            const isDuplicate = displayPolicies?.some(
+                (policy: any) => policy.title.toLowerCase().trim() === editPolicyTitle.trim().toLowerCase()
             );
             if (isDuplicate) {
                 showError('A policy with this name already exists.');
@@ -253,32 +180,12 @@ const ViewPoliciesPage: React.FC = () => {
             }
         }
 
-        // Determine if it is a default policy (String ID)
-        if (typeof selectedPolicyId === 'string' && isNaN(Number(selectedPolicyId))) {
-            // "Editing" a default policy = Creating a new record in DB
-            const currentPolicy = displayPolicies.find(p => p.id === selectedPolicyId);
-
-            if (!editPolicyFile && (!currentPolicy || !currentPolicy.link)) {
-                showError('Please upload a file or ensure valid default policy.');
-                return;
-            }
-
-            // Create new policy record, using existing link if no new file provided
-            createMutation.mutate({
-                title: editPolicyTitle,
-                file: editPolicyFile || undefined,
-                existingUrl: !editPolicyFile ? currentPolicy?.link : undefined,
-                originalId: selectedPolicyId // Track original to hide it
-            });
-            setIsEditModalOpen(false);
-        } else {
-            // Normal DB Update
-            updateMutation.mutate({
-                id: selectedPolicyId,
-                title: editPolicyTitle,
-                file: editPolicyFile || undefined
-            });
-        }
+        // Normal DB Update
+        updateMutation.mutate({
+            id: selectedPolicyId,
+            title: editPolicyTitle,
+            file: editPolicyFile || undefined
+        });
     };
 
     const handleDeleteClick = (policyId: number | string, title: string) => {
@@ -290,19 +197,6 @@ const ViewPoliciesPage: React.FC = () => {
 
     const confirmDelete = () => {
         if (!policyToDelete) return;
-
-        // If it's a default policy (string ID), we hide it locally
-        if (typeof policyToDelete.id === 'string' && isNaN(Number(policyToDelete.id))) {
-            const newHidden = [...hiddenPolicyIds, policyToDelete.id];
-            setHiddenPolicyIds(newHidden);
-            localStorage.setItem('hidden_policy_ids', JSON.stringify(newHidden));
-            showSuccess('Policy removed from view');
-            setDeleteConfirmOpen(false);
-            setPolicyToDelete(null);
-            return;
-        }
-
-        // Normal delete for DB policies
         deleteMutation.mutate(policyToDelete.id);
     };
 
@@ -314,7 +208,6 @@ const ViewPoliciesPage: React.FC = () => {
     };
 
     const closeAddModal = () => {
-        if (createMutation.isLoading) return; // Prevent closing while uploading
         setIsAddModalOpen(false);
         setNewPolicyTitle('');
         setNewPolicyFile(null);
@@ -327,8 +220,8 @@ const ViewPoliciesPage: React.FC = () => {
             return;
         }
 
-        const isDuplicate = displayPolicies.some(
-            (policy) => policy.title.toLowerCase().trim() === newPolicyTitle.trim().toLowerCase()
+        const isDuplicate = displayPolicies?.some(
+            (policy: any) => policy.title.toLowerCase().trim() === newPolicyTitle.trim().toLowerCase()
         );
 
         if (isDuplicate) {
@@ -342,10 +235,6 @@ const ViewPoliciesPage: React.FC = () => {
         }
         createMutation.mutate({ title: newPolicyTitle, file: newPolicyFile });
     };
-
-    const displayPolicies = (policies || (loading ? [] : defaultPolicies)).filter(
-        p => !hiddenPolicyIds.includes(p.id.toString())
-    );
 
     return (
         <AppLayout>
