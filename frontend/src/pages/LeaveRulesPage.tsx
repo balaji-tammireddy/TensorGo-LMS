@@ -8,6 +8,14 @@ import { FaPlus, FaTrash, FaCog, FaList, FaEdit, FaTimes } from 'react-icons/fa'
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import { DatePicker } from '../components/ui/date-picker';
 import './LeaveRulesPage.css';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Button } from '../components/ui/button';
+import { ChevronDown } from 'lucide-react';
 
 const LeaveRulesPage: React.FC = () => {
     const queryClient = useQueryClient();
@@ -431,13 +439,46 @@ const LeaveRulesPage: React.FC = () => {
                                     <div className="lr-form-group">
                                         <div className="lr-status-toggle">
                                             <label>Status:</label>
-                                            <select
-                                                value={editTypeForm.is_active ? 'active' : 'inactive'}
-                                                onChange={e => setEditTypeForm({ ...editTypeForm, is_active: e.target.value === 'active' })}
-                                            >
-                                                <option value="active">Active</option>
-                                                <option value="inactive">Inactive</option>
-                                            </select>
+                                            <div style={{ width: 'fit-content' }}>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="justify-between font-normal"
+                                                            style={{
+                                                                minWidth: '100px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                height: '40px',
+                                                                padding: '0 12px',
+                                                                border: '1px solid #e2e8f0',
+                                                                borderRadius: '6px',
+                                                                backgroundColor: 'white',
+                                                                color: editTypeForm.is_active ? '#16a34a' : '#dc2626',
+                                                                fontSize: '14px'
+                                                            }}
+                                                        >
+                                                            <span>{editTypeForm.is_active ? 'Active' : 'Inactive'}</span>
+                                                            <ChevronDown style={{ width: '16px', height: '16px', opacity: 0.5, marginLeft: '8px', color: '#64748b' }} />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent style={{ width: 'var(--radix-dropdown-menu-trigger-width)', minWidth: '100px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', zIndex: 1000 }} align="start">
+                                                        <DropdownMenuItem
+                                                            style={{ fontSize: '14px', padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '4px', color: '#16a34a' }}
+                                                            onSelect={() => setEditTypeForm({ ...editTypeForm, is_active: true })}
+                                                        >
+                                                            Active
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            style={{ fontSize: '14px', padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', borderRadius: '4px', color: '#dc2626' }}
+                                                            onSelect={() => setEditTypeForm({ ...editTypeForm, is_active: false })}
+                                                        >
+                                                            Inactive
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
