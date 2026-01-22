@@ -181,7 +181,7 @@ const ProfilePage: React.FC = () => {
   const uploadPhotoMutation = useMutation(profileService.uploadProfilePhoto, {
     onSuccess: () => {
       queryClient.invalidateQueries('profile');
-      showSuccess('Photo updated!');
+      // Success message will be shown by the calling function
     },
     onError: (error: any) => {
       showError(error.response?.data?.error?.message || 'Upload failed');
@@ -191,7 +191,7 @@ const ProfilePage: React.FC = () => {
   const deletePhotoMutation = useMutation(profileService.deleteProfilePhoto, {
     onSuccess: () => {
       queryClient.invalidateQueries('profile');
-      showSuccess('Photo deleted!');
+      // Success message will be shown by the calling function
     },
     onError: (error: any) => {
       showError(error.response?.data?.error?.message || 'Delete failed');
@@ -522,8 +522,11 @@ const ProfilePage: React.FC = () => {
     }
 
     const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
-    if (!hasChanges && !pendingPhotoAction) {
+
+    // If only photo was changed (no form data changes), exit edit mode immediately
+    if (!hasChanges) {
       setIsEditMode(false);
+      showSuccess('Profile updated successfully!');
       return;
     }
 
