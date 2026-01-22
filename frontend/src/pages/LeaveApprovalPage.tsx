@@ -576,24 +576,29 @@ const LeaveApprovalPage: React.FC = () => {
             return isNaN(d.getTime()) ? 0 : d.getTime();
           }
 
-          // Handle "YYYY-MM-DD" or "DD-MM-YYYY" or anything with separators
+          // Handle "YYYY-MM-DD" or "DD-MM-YYYY" with optional time
           const parts = dateStr.match(/(\d+)/g);
           if (parts && parts.length >= 3) {
-            let y, m, d;
+            let y, m, d, h = 0, min = 0, s = 0, ms = 0;
             if (parts[0].length === 4) { // YYYY, MM, DD
               y = parseInt(parts[0], 10);
               m = parseInt(parts[1], 10) - 1;
               d = parseInt(parts[2], 10);
+              // Extract time if available
+              h = parseInt(parts[3] || '0', 10);
+              min = parseInt(parts[4] || '0', 10);
+              s = parseInt(parts[5] || '0', 10);
+              ms = parseInt(parts[6] || '0', 10);
             } else if (parts[2].length === 4) { // DD, MM, YYYY
               y = parseInt(parts[2], 10);
               m = parseInt(parts[1], 10) - 1;
               d = parseInt(parts[0], 10);
+              // Time components usually follow the year in common formats or aren't present in DD-MM-YYYY
             } else {
-              // Fallback
               const dateObj = new Date(dateStr);
               return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
             }
-            return new Date(y, m, d).getTime();
+            return new Date(y, m, d, h, min, s, ms).getTime();
           }
 
           const fallbackDate = new Date(dateStr);
