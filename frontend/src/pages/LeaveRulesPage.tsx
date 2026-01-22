@@ -542,7 +542,7 @@ const LeaveRulesPage: React.FC = () => {
         <AppLayout>
             <div className="leave-rules-page">
                 <div className="page-header">
-                    <h1 className="page-title">Leave Rules & Policies</h1>
+                    <h1 className="page-title">Leave Rules</h1>
                     <div className="lr-tabs">
                         <button
                             className={`lr-tab ${activeTab === 'policies' ? 'active' : ''}`}
