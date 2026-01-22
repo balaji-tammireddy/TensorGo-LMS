@@ -259,6 +259,21 @@
   box-sizing: border-box !important;
 }
 
+/* Disabled state for date picker input field */
+.date-picker-input-field:disabled {
+  background-color: #f0f0f0 !important;
+  color: #666 !important;
+  cursor: not-allowed;
+  border-color: #e0e0e0 !important;
+}
+
+/* Disabled state for date picker wrapper */
+.profile-page .date-picker-input-disabled {
+  background-color: #f0f0f0 !important;
+  border-color: #e0e0e0 !important;
+  opacity: 1 !important;
+}
+
 
 .checkbox-group {
   display: flex;
