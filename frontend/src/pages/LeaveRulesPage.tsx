@@ -136,13 +136,29 @@ const LeaveRulesPage: React.FC = () => {
                                         className="lr-policy-edit-btn"
                                         onClick={() => {
                                             setEditingPolicy(policy);
+                                            const today = new Date();
+                                            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                                            // Ensure date is in YYYY-MM-DD format for the DatePicker
+                                            let formattedEffectiveFrom = todayStr;
+                                            if (policy.effective_from) {
+                                                const d = new Date(policy.effective_from);
+                                                if (!isNaN(d.getTime())) {
+                                                    // Use local date parts to avoid UTC timezone shifts
+                                                    const year = d.getFullYear();
+                                                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                    const day = String(d.getDate()).padStart(2, '0');
+                                                    formattedEffectiveFrom = `${year}-${month}-${day}`;
+                                                }
+                                            }
+
                                             setPolicyEditForm({
                                                 annual_credit: policy.annual_credit,
                                                 carry_forward_limit: policy.carry_forward_limit,
                                                 max_leave_per_month: policy.max_leave_per_month,
                                                 anniversary_3_year_bonus: policy.anniversary_3_year_bonus,
                                                 anniversary_5_year_bonus: policy.anniversary_5_year_bonus,
-                                                effective_from: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
+                                                effective_from: formattedEffectiveFrom
                                             });
                                         }}
                                     >
@@ -314,6 +330,30 @@ const LeaveRulesPage: React.FC = () => {
                                     className="lr-save-btn"
                                     disabled={updatePolicyMutation.isLoading}
                                     onClick={() => {
+                                        // Helper to normalize numeric values for comparison
+                                        const toNum = (val: any) => val === '' || val === null || val === undefined ? 0 : parseFloat(val);
+
+                                        // Helper to normalize date values for comparison
+                                        const toDateStr = (dateVal: any) => {
+                                            if (!dateVal) return '';
+                                            const d = new Date(dateVal);
+                                            if (isNaN(d.getTime())) return String(dateVal);
+                                            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                        };
+
+                                        const hasChanges =
+                                            toNum(policyEditForm.annual_credit) !== toNum(editingPolicy.annual_credit) ||
+                                            toNum(policyEditForm.carry_forward_limit) !== toNum(editingPolicy.carry_forward_limit) ||
+                                            toNum(policyEditForm.max_leave_per_month) !== toNum(editingPolicy.max_leave_per_month) ||
+                                            toNum(policyEditForm.anniversary_3_year_bonus) !== toNum(editingPolicy.anniversary_3_year_bonus) ||
+                                            toNum(policyEditForm.anniversary_5_year_bonus) !== toNum(editingPolicy.anniversary_5_year_bonus) ||
+                                            (toDateStr(policyEditForm.effective_from) !== toDateStr(editingPolicy.effective_from));
+
+                                        if (!hasChanges) {
+                                            setEditingPolicy(null);
+                                            return;
+                                        }
+
                                         updatePolicyMutation.mutate({
                                             id: editingPolicy.id,
                                             updates: policyEditForm
