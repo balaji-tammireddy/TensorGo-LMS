@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { uploadToOVH, deleteFromOVH, getPublicUrlFromOVH, getSignedUrlFromOVH } from '../utils/storage';
+import { uploadToOVH, deleteFromOVH, extractKeyFromUrl, getPublicUrlFromOVH, getSignedUrlFromOVH } from '../utils/storage';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -75,24 +75,45 @@ export const createPolicy = [
         logger.info(`[CONTROLLER] [POLICY] [CREATE POLICY] Request received`);
         let localFilePath: string | null = null;
         try {
-            const { title } = req.body;
-            if (!req.file || !title) {
-                return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Title and file are required' } });
+            const { title, existingUrl } = req.body;
+
+            if (!title) {
+                return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Title is required' } });
             }
 
-            localFilePath = req.file.path;
-            const key = `policies/${req.file.originalname}`;
-            logger.info(`[CONTROLLER] [POLICY] [CREATE POLICY] Uploading file to OVH: ${key}`);
-
-            await uploadToOVH(localFilePath, key, req.file.mimetype);
-
-            // Clean up local file immediately after upload
-            if (fs.existsSync(localFilePath)) {
-                fs.unlinkSync(localFilePath);
-                localFilePath = null;
+            if (!req.file && !existingUrl) {
+                return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'File or existing URL is required' } });
             }
 
-            const signedUrl = await getSignedUrlFromOVH(key, 3600);
+            let key = '';
+            let signedUrl = '';
+
+            if (req.file) {
+                localFilePath = req.file.path;
+                key = `policies/${req.file.originalname}`;
+                logger.info(`[CONTROLLER] [POLICY] [CREATE POLICY] Uploading file to OVH: ${key}`);
+
+                await uploadToOVH(localFilePath, key, req.file.mimetype);
+
+                // Clean up local file immediately after upload
+                if (fs.existsSync(localFilePath)) {
+                    fs.unlinkSync(localFilePath);
+                    localFilePath = null;
+                }
+
+                signedUrl = await getSignedUrlFromOVH(key, 3600);
+            } else if (existingUrl) {
+                logger.info(`[CONTROLLER] [POLICY] [CREATE POLICY] Using existing URL: ${existingUrl}`);
+                key = extractKeyFromUrl(existingUrl);
+
+                if (!key) {
+                    return res.status(400).json({ error: { code: 'INVALID_URL', message: 'Could not extract key from existing URL' } });
+                }
+
+                // Get a fresh signed URL for the existing key
+                signedUrl = await getSignedUrlFromOVH(key, 3600);
+            }
+
             const result = await pool.query(
                 'INSERT INTO policies (title, s3_key, public_url) VALUES ($1, $2, $3) RETURNING *',
                 [title, key, signedUrl]

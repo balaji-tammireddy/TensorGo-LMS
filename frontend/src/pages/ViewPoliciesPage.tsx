@@ -150,14 +150,21 @@ const ViewPoliciesPage: React.FC = () => {
 
     // Mutations
     const createMutation = useMutation(
-        (data: { title: string; file: File }) => createPolicy(data.title, data.file),
+        (data: { title: string; file?: File; existingUrl?: string; originalId?: string }) => createPolicy(data.title, data.file, data.existingUrl),
         {
-            onSuccess: () => {
+            onSuccess: (_response, variables) => {
                 queryClient.invalidateQueries(['policies']);
                 showSuccess('Policy added successfully');
+
+                // If we were "editing" a default policy, hide the original one
+                if (variables.originalId) {
+                    const newHidden = [...hiddenPolicyIds, variables.originalId.toString()];
+                    setHiddenPolicyIds(newHidden);
+                    localStorage.setItem('hidden_policy_ids', JSON.stringify(newHidden));
+                }
             },
             onError: (error: any) => {
-                showError(error.message || 'Failed to add policy');
+                showError(error.response?.data?.error?.message || error.message || 'Failed to add policy');
             },
             onSettled: () => {
                 closeAddModal();
@@ -248,12 +255,21 @@ const ViewPoliciesPage: React.FC = () => {
 
         // Determine if it is a default policy (String ID)
         if (typeof selectedPolicyId === 'string' && isNaN(Number(selectedPolicyId))) {
-            // "Editing" a default policy = Creating a new one (optionally overriding it if name same)
-            if (!editPolicyFile) {
-                showError('Please upload a file to override the default policy.');
+            // "Editing" a default policy = Creating a new record in DB
+            const currentPolicy = displayPolicies.find(p => p.id === selectedPolicyId);
+
+            if (!editPolicyFile && (!currentPolicy || !currentPolicy.link)) {
+                showError('Please upload a file or ensure valid default policy.');
                 return;
             }
-            createMutation.mutate({ title: editPolicyTitle, file: editPolicyFile });
+
+            // Create new policy record, using existing link if no new file provided
+            createMutation.mutate({
+                title: editPolicyTitle,
+                file: editPolicyFile || undefined,
+                existingUrl: !editPolicyFile ? currentPolicy?.link : undefined,
+                originalId: selectedPolicyId // Track original to hide it
+            });
             setIsEditModalOpen(false);
         } else {
             // Normal DB Update
@@ -435,7 +451,7 @@ const ViewPoliciesPage: React.FC = () => {
                                         className="vp-input"
                                         value={newPolicyTitle}
                                         onChange={(e) => {
-                                            const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                                            const val = e.target.value;
                                             setNewPolicyTitle(val);
                                         }}
                                         required
@@ -506,7 +522,7 @@ const ViewPoliciesPage: React.FC = () => {
                                         className="vp-input"
                                         value={editPolicyTitle}
                                         onChange={(e) => {
-                                            const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                                            const val = e.target.value;
                                             setEditPolicyTitle(val);
                                         }}
                                         required

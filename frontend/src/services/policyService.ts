@@ -13,10 +13,11 @@ export const getPolicies = async (): Promise<PolicyData[]> => {
     return response.data;
 };
 
-export const createPolicy = async (title: string, file: File): Promise<PolicyData> => {
+export const createPolicy = async (title: string, file?: File, existingUrl?: string): Promise<PolicyData> => {
     const formData = new FormData();
     formData.append('title', title);
-    formData.append('file', file);
+    if (file) formData.append('file', file);
+    if (existingUrl) formData.append('existingUrl', existingUrl);
     const response = await api.post('/policies', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
