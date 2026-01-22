@@ -180,28 +180,28 @@ export const getEmployeeById = async (employeeId: number) => {
   if (user.pg_stream || user.pg_college || user.pg_year || user.pg_percentage) {
     education.push({
       level: 'PG',
-      group_stream: user.pg_stream,
-      college_university: user.pg_college,
+      groupStream: user.pg_stream,
+      collegeUniversity: user.pg_college,
       year: user.pg_year,
-      score_percentage: user.pg_percentage
+      scorePercentage: user.pg_percentage
     });
   }
   if (user.ug_stream || user.ug_college || user.ug_year || user.ug_percentage) {
     education.push({
       level: 'UG',
-      group_stream: user.ug_stream,
-      college_university: user.ug_college,
+      groupStream: user.ug_stream,
+      collegeUniversity: user.ug_college,
       year: user.ug_year,
-      score_percentage: user.ug_percentage
+      scorePercentage: user.ug_percentage
     });
   }
   if (user.twelveth_stream || user.twelveth_college || user.twelveth_year || user.twelveth_percentage) {
     education.push({
       level: '12th',
-      group_stream: user.twelveth_stream,
-      college_university: user.twelveth_college,
+      groupStream: user.twelveth_stream,
+      collegeUniversity: user.twelveth_college,
       year: user.twelveth_year,
-      score_percentage: user.twelveth_percentage
+      scorePercentage: user.twelveth_percentage
     });
   }
 
@@ -364,7 +364,14 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
       const gradYear = parseInt(edu.year, 10);
 
-      // Minimum 15 years gap between DOB and any graduation year
+      // Basic logic check for year
+      const currentYear = new Date().getFullYear();
+      if (gradYear < 1950 || gradYear > currentYear + 10) {
+        throw new Error(`Graduation Year for ${edu.level} appears illogical (${gradYear})`);
+      }
+
+      // Minimum 15 years gap between Date of Birth and any graduation year
+      const birthYear = new Date(employeeData.dateOfBirth).getFullYear();
       if (gradYear - birthYear < 15) {
         throw new Error(`Minimum 15 years gap required between Date of Birth and ${edu.level} Graduation Year`);
       }

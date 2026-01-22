@@ -111,7 +111,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   logger.info(`[PROFILE] [UPDATE PROFILE] Validating with User Role: '${userRole}'`);
 
   // Fetch current user data for validation and role-based restrictions
-  const currentValues = await pool.query('SELECT role, status, date_of_birth, date_of_joining, emp_id, email, designation, department FROM users WHERE id = $1', [userId]);
+  const currentValues = await pool.query('SELECT role, status, date_of_birth, date_of_joining, emp_id, email, designation, department, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [userId]);
   if (currentValues.rows.length === 0) {
     throw new Error('User not found');
   }
@@ -403,6 +403,9 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     const birthYear = dobValue ? new Date(dobValue).getFullYear() : null;
 
     const educationYears: Record<string, number> = {};
+    if (currentValues.rows[0].pg_year) educationYears['PG'] = parseInt(currentValues.rows[0].pg_year, 10);
+    if (currentValues.rows[0].ug_year) educationYears['UG'] = parseInt(currentValues.rows[0].ug_year, 10);
+    if (currentValues.rows[0].twelveth_year) educationYears['12th'] = parseInt(currentValues.rows[0].twelveth_year, 10);
 
     for (const edu of profileData.education) {
       if (edu.level) {
@@ -428,6 +431,12 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
           }
 
           const gradYear = parseInt(edu.year, 10);
+
+          // Basic logic check for year
+          const currentYear = new Date().getFullYear();
+          if (gradYear < 1950 || gradYear > currentYear + 10) {
+            throw new Error(`Graduation Year for ${edu.level} appears illogical (${gradYear})`);
+          }
 
           // Minimum 15 years gap between DOB and any graduation year
           if (birthYear && gradYear - birthYear < 15) {
