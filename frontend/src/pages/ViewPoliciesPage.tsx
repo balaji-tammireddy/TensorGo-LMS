@@ -42,6 +42,11 @@ const ViewPoliciesPage: React.FC = () => {
     const [newPolicyTitle, setNewPolicyTitle] = useState('');
     const [newPolicyFile, setNewPolicyFile] = useState<File | null>(null);
 
+    // Edit State
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editPolicyTitle, setEditPolicyTitle] = useState('');
+    const [editPolicyFile, setEditPolicyFile] = useState<File | null>(null);
+
     // Confirmation Dialog State
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [policyToDelete, setPolicyToDelete] = useState<{ id: number | string, title: string } | null>(null);
@@ -161,18 +166,18 @@ const ViewPoliciesPage: React.FC = () => {
     );
 
     const updateMutation = useMutation(
-        ({ id, file }: { id: number | string, file: File }) => updatePolicy(id, file),
+        ({ id, file, title }: { id: number | string, file?: File, title?: string }) => updatePolicy(id, file, title),
         {
             onSuccess: () => {
                 queryClient.invalidateQueries(['policies']);
                 showSuccess('Policy updated successfully');
+                setIsEditModalOpen(false);
+                setSelectedPolicyId(null);
+                setEditPolicyTitle('');
+                setEditPolicyFile(null);
             },
             onError: (error: any) => {
-                showError(error.message || 'Failed to update policy');
-            },
-            onSettled: () => {
-                setSelectedPolicyId(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
+                showError(error.response?.data?.error?.message || error.message || 'Failed to update policy');
             }
         }
     );
@@ -208,39 +213,55 @@ const ViewPoliciesPage: React.FC = () => {
     const handleEditClick = (policyId: number | string) => {
         if (isProcessing) return;
 
-        // No more blocking string IDs - we'll handle them in handleFileChange
-        setSelectedPolicyId(policyId);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-            fileInputRef.current.click();
+        const policy = displayPolicies.find(p => p.id === policyId);
+        if (policy) {
+            setEditPolicyTitle(policy.title);
+        } else {
+            setEditPolicyTitle('');
         }
+
+        setSelectedPolicyId(policyId);
+        setEditPolicyFile(null);
+        setIsEditModalOpen(true);
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file && selectedPolicyId) {
-            if (file.type !== 'application/pdf') {
-                showError('Only PDF files are allowed');
-                setSelectedPolicyId(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
+    const handleEditSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedPolicyId) return;
+        if (!editPolicyTitle.trim()) {
+            showError('Policy title is required');
+            return;
+        }
+
+        // Duplicate Check for Edit
+        // If title changed, check if new title exists (excluding current policy)
+        const currentPolicy = displayPolicies.find(p => p.id === selectedPolicyId);
+        if (currentPolicy && currentPolicy.title.toLowerCase().trim() !== editPolicyTitle.toLowerCase().trim()) {
+            const isDuplicate = displayPolicies.some(
+                (policy) => policy.title.toLowerCase().trim() === editPolicyTitle.trim().toLowerCase()
+            );
+            if (isDuplicate) {
+                showError('A policy with this name already exists.');
                 return;
             }
+        }
 
-            // SMART EDIT: If this is a default policy (string ID), we CREATE it in the DB
-            // using its title. Once created, our smart merging will replace the default.
-            if (typeof selectedPolicyId === 'string' && isNaN(Number(selectedPolicyId))) {
-                const defaultPolicy = defaultPolicies.find(p => p.id === selectedPolicyId);
-                if (defaultPolicy) {
-                    createMutation.mutate({ title: defaultPolicy.title, file });
-                    return;
-                }
+        // Determine if it is a default policy (String ID)
+        if (typeof selectedPolicyId === 'string' && isNaN(Number(selectedPolicyId))) {
+            // "Editing" a default policy = Creating a new one (optionally overriding it if name same)
+            if (!editPolicyFile) {
+                showError('Please upload a file to override the default policy.');
+                return;
             }
-
-            // Normal update for existing DB policies
-            updateMutation.mutate({ id: selectedPolicyId, file });
+            createMutation.mutate({ title: editPolicyTitle, file: editPolicyFile });
+            setIsEditModalOpen(false);
         } else {
-            // If cancelled or no file, reset selection
-            setSelectedPolicyId(null);
+            // Normal DB Update
+            updateMutation.mutate({
+                id: selectedPolicyId,
+                title: editPolicyTitle,
+                file: editPolicyFile || undefined
+            });
         }
     };
 
@@ -328,14 +349,6 @@ const ViewPoliciesPage: React.FC = () => {
                 </div>
 
                 {/* Hidden File Input for Edit */}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                    accept="application/pdf"
-                    onChange={handleFileChange}
-                />
-
                 {loading ? (
                     <div className="vp-loading">Loading policies...</div>
                 ) : (
@@ -464,6 +477,76 @@ const ViewPoliciesPage: React.FC = () => {
                                         disabled={createMutation.isLoading || !newPolicyTitle.trim() || !newPolicyFile}
                                     >
                                         {createMutation.isLoading ? 'Adding...' : 'Add Policy'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Policy Modal */}
+                {isEditModalOpen && (
+                    <div className="vp-modal-overlay">
+                        <div className="vp-modal">
+                            <div className="vp-modal-header">
+                                <h2 className="vp-modal-title">Edit Policy</h2>
+                                <button
+                                    className="vp-close-button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    disabled={isProcessing}
+                                >
+                                    <FaTimes />
+                                </button>
+                            </div>
+                            <form onSubmit={handleEditSubmit}>
+                                <div className="vp-form-group">
+                                    <label className="vp-label">Policy Title</label>
+                                    <input
+                                        type="text"
+                                        className="vp-input"
+                                        value={editPolicyTitle}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                                            setEditPolicyTitle(val);
+                                        }}
+                                        required
+                                        disabled={isProcessing}
+                                    />
+                                </div>
+                                <div className="vp-form-group">
+                                    <label className="vp-label">Update Policy Document </label>
+                                    <div className="vp-file-upload-container">
+                                        <input
+                                            type="file"
+                                            id="edit-policy-file-upload"
+                                            className="vp-file-input-hidden"
+                                            accept="application/pdf"
+                                            onChange={(e) => setEditPolicyFile(e.target.files?.[0] || null)}
+                                            disabled={isProcessing}
+                                        />
+                                        <label htmlFor="edit-policy-file-upload" className="vp-file-upload-label">
+                                            <FaCloudUploadAlt className="vp-upload-icon" />
+                                            <span className="vp-upload-text">
+                                                {editPolicyFile ? editPolicyFile.name : "Choose New PDF "}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="vp-modal-footer">
+                                    <button
+                                        type="button"
+                                        className="vp-cancel-button"
+                                        onClick={() => setIsEditModalOpen(false)}
+                                        disabled={isProcessing}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="vp-save-button"
+                                        disabled={isProcessing || !editPolicyTitle.trim()}
+                                    >
+                                        {updateMutation.isLoading || createMutation.isLoading ? 'Updating...' : 'Update Policy'}
                                     </button>
                                 </div>
                             </form>

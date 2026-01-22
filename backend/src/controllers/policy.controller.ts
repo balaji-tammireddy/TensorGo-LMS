@@ -132,45 +132,76 @@ export const updatePolicy = [
                 return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Default policies cannot be edited directly. Please upload a new policy.' } });
             }
 
-            if (!req.file) {
-                return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'No file uploaded' } });
+            const { title } = req.body;
+
+            if (!req.file && !title) {
+                return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Title or file is required for update' } });
             }
 
-            localFilePath = req.file.path;
+            // Fetch existing policies for validation
+            const policiesResult = await pool.query('SELECT * FROM policies WHERE id != $1', [policyId]);
+            if (title) {
+                const titleExists = policiesResult.rows.some((p: any) => p.title.toLowerCase().trim() === title.toLowerCase().trim());
+                if (titleExists) {
+                    if (req.file) {
+                        localFilePath = req.file.path;
+                        if (fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+                    }
+                    return res.status(400).json({ error: { code: 'DUPLICATE_TITLE', message: 'A policy with this name already exists' } });
+                }
+            }
 
-            // Fetch existing policy for old key
+            // Fetch policy to update
             const policyResult = await pool.query('SELECT * FROM policies WHERE id = $1', [policyId]);
             if (policyResult.rows.length === 0) {
-                if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+                if (req.file) {
+                    localFilePath = req.file.path;
+                    if (fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+                }
                 return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Policy not found' } });
             }
             const oldPolicy = policyResult.rows[0];
 
-            const key = `policies/${req.file.originalname}`;
-            logger.info(`[CONTROLLER] [POLICY] [UPDATE POLICY] Uploading new file to OVH: ${key}`);
+            let key = oldPolicy.s3_key;
+            let signedUrl = oldPolicy.public_url;
 
-            await uploadToOVH(localFilePath, key, req.file.mimetype);
+            if (req.file) {
+                localFilePath = req.file.path;
+                key = `policies/${req.file.originalname}`;
+                logger.info(`[CONTROLLER] [POLICY] [UPDATE POLICY] Uploading new file to OVH: ${key}`);
 
-            // Clean up local file
-            if (fs.existsSync(localFilePath)) {
-                fs.unlinkSync(localFilePath);
-                localFilePath = null;
-            }
+                await uploadToOVH(localFilePath, key, req.file.mimetype);
 
-            // Delete old file if different
-            if (oldPolicy.s3_key && oldPolicy.s3_key !== key) {
-                try {
-                    await deleteFromOVH(oldPolicy.s3_key);
-                } catch (delError) {
-                    logger.warn(`[CONTROLLER] [POLICY] [UPDATE POLICY] Failed to delete old file (non-critical):`, delError);
+                // Clean up local file
+                if (fs.existsSync(localFilePath)) {
+                    fs.unlinkSync(localFilePath);
+                    localFilePath = null;
                 }
+
+                // Delete old file if different and exists
+                if (oldPolicy.s3_key && oldPolicy.s3_key !== key) {
+                    try {
+                        await deleteFromOVH(oldPolicy.s3_key);
+                    } catch (delError) {
+                        logger.warn(`[CONTROLLER] [POLICY] [UPDATE POLICY] Failed to delete old file (non-critical):`, delError);
+                    }
+                }
+
+                // Get new signed URL
+                signedUrl = await getSignedUrlFromOVH(key, 3600);
             }
 
-            const signedUrl = await getSignedUrlFromOVH(key, 3600);
-            const updateResult = await pool.query(
-                'UPDATE policies SET s3_key = $1, public_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-                [key, signedUrl, policyId]
-            );
+            const updateQuery = `
+                UPDATE policies 
+                SET title = COALESCE($1, title), 
+                    s3_key = $2, 
+                    public_url = $3, 
+                    updated_at = CURRENT_TIMESTAMP 
+                WHERE id = $4 
+                RETURNING *
+            `;
+
+            const updateResult = await pool.query(updateQuery, [title || null, key, signedUrl, policyId]);
 
             logger.info(`[CONTROLLER] [POLICY] [UPDATE POLICY] Policy updated successfully`);
             res.json(updateResult.rows[0]);

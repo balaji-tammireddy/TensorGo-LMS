@@ -23,9 +23,10 @@ export const createPolicy = async (title: string, file: File): Promise<PolicyDat
     return response.data;
 };
 
-export const updatePolicy = async (id: number | string, file: File): Promise<PolicyData> => {
+export const updatePolicy = async (id: number | string, file?: File, title?: string): Promise<PolicyData> => {
     const formData = new FormData();
-    formData.append('file', file);
+    if (file) formData.append('file', file);
+    if (title) formData.append('title', title);
     const response = await api.put(`/policies/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
