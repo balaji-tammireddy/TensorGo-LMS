@@ -78,7 +78,7 @@ WHERE u.id = $1`,
       groupStream: edu.group_stream,
       collegeUniversity: edu.college_university,
       year: edu.year,
-      scorePercentage: edu.score_percentage ? parseFloat(edu.score_percentage) : null
+      scorePercentage: edu.score_percentage || null
     })),
     reportingManager:
       user.reporting_manager_name || user.reporting_manager_id
@@ -465,51 +465,43 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
       throw new Error('UG Graduation Year must be before PG Graduation Year');
     }
 
-    // Update education columns
+    // Update education columns atomically
     const fields: Record<string, string> = {
       'PG': 'pg',
       'UG': 'ug',
       '12th': 'twelveth'
     };
 
-    const setClauses: string[] = [];
+    const eduUpdates: string[] = [];
     const eduValues: any[] = [];
     let eduParamIndex = 1;
 
-    // Reset all to NULL first
-    for (const prefix of Object.values(fields)) {
-      setClauses.push(`${prefix}_stream = NULL`);
-      setClauses.push(`${prefix}_college = NULL`);
-      setClauses.push(`${prefix}_year = NULL`);
-      setClauses.push(`${prefix}_percentage = NULL`);
-    }
-    await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = $1`, [userId]);
-
-    const actualUpdates: string[] = [];
-    const actualValues: any[] = [];
-    let actualIndex = 1;
-
+    // Initialize all columns with NULL in the query
+    // Then override with values from profileData.education
+    const educationMap: Record<string, any> = {};
     for (const edu of profileData.education) {
-      const prefix = fields[edu.level];
-      if (prefix) {
-        actualUpdates.push(`${prefix}_stream = $${actualIndex++}`);
-        actualValues.push(edu.groupStream || null);
-        actualUpdates.push(`${prefix}_college = $${actualIndex++}`);
-        actualValues.push(edu.collegeUniversity || null);
-        actualUpdates.push(`${prefix}_year = $${actualIndex++}`);
-        actualValues.push(edu.year || null);
-        actualUpdates.push(`${prefix}_percentage = $${actualIndex++}`);
-        actualValues.push(edu.scorePercentage || null);
+      if (edu.level) {
+        educationMap[edu.level] = edu;
       }
     }
 
-    if (actualUpdates.length > 0) {
-      actualValues.push(userId);
-      await pool.query(
-        `UPDATE users SET ${actualUpdates.join(', ')} WHERE id = $${actualIndex}`,
-        actualValues
-      );
+    for (const [level, prefix] of Object.entries(fields)) {
+      const edu = educationMap[level];
+      eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
+      eduValues.push(edu?.groupStream || null);
+      eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
+      eduValues.push(edu?.collegeUniversity || null);
+      eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
+      eduValues.push(edu?.year || null);
+      eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);
+      eduValues.push(edu?.scorePercentage || null);
     }
+
+    eduValues.push(userId);
+    await pool.query(
+      `UPDATE users SET ${eduUpdates.join(', ')} WHERE id = $${eduParamIndex}`,
+      eduValues
+    );
   }
 
   logger.info(`[PROFILE] [UPDATE PROFILE] Profile update completed successfully - User ID: ${userId}`);

@@ -1373,7 +1373,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Update education columns if provided
+  // Update education columns atomically
   if (employeeData.education) {
     const fields: Record<string, string> = {
       'PG': 'pg',
@@ -1381,47 +1381,35 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       '12th': 'twelveth'
     };
 
-    const setClauses: string[] = [];
+    const eduUpdates: string[] = [];
     const eduValues: any[] = [];
     let eduParamIndex = 1;
 
-    // Initialize all to NULL to handle removals
-    for (const prefix of Object.values(fields)) {
-      setClauses.push(`${prefix}_stream = NULL`);
-      setClauses.push(`${prefix}_college = NULL`);
-      setClauses.push(`${prefix}_year = NULL`);
-      setClauses.push(`${prefix}_percentage = NULL`);
-    }
-
-    // Since we are updating multiple columns, it's easier to reset then update or do it in one query if all levels are present.
-    // The safest is to reset them if we want to support removal of levels.
-    await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = $1`, [employeeId]);
-
-    const actualUpdates: string[] = [];
-    const actualValues: any[] = [];
-    let actualIndex = 1;
-
+    // Use a map for easy lookup of provided education levels
+    const educationMap: Record<string, any> = {};
     for (const edu of employeeData.education) {
-      const prefix = fields[edu.level];
-      if (prefix) {
-        actualUpdates.push(`${prefix}_stream = $${actualIndex++}`);
-        actualValues.push(edu.groupStream || null);
-        actualUpdates.push(`${prefix}_college = $${actualIndex++}`);
-        actualValues.push(edu.collegeUniversity || null);
-        actualUpdates.push(`${prefix}_year = $${actualIndex++}`);
-        actualValues.push(edu.year || null);
-        actualUpdates.push(`${prefix}_percentage = $${actualIndex++}`);
-        actualValues.push(edu.scorePercentage || null);
+      if (edu.level) {
+        educationMap[edu.level] = edu;
       }
     }
 
-    if (actualUpdates.length > 0) {
-      actualValues.push(employeeId);
-      await pool.query(
-        `UPDATE users SET ${actualUpdates.join(', ')} WHERE id = $${actualIndex}`,
-        actualValues
-      );
+    for (const [level, prefix] of Object.entries(fields)) {
+      const edu = educationMap[level];
+      eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
+      eduValues.push(edu?.groupStream || null);
+      eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
+      eduValues.push(edu?.collegeUniversity || null);
+      eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
+      eduValues.push(edu?.year || null);
+      eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);
+      eduValues.push(edu?.scorePercentage || null);
     }
+
+    eduValues.push(employeeId);
+    await pool.query(
+      `UPDATE users SET ${eduUpdates.join(', ')} WHERE id = $${eduParamIndex}`,
+      eduValues
+    );
   }
 
   // Send email notification if HR or Super Admin updated employee details
