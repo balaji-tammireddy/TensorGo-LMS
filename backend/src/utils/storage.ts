@@ -35,13 +35,13 @@ export const uploadToOVH = async (
     if (!process.env.OVH_ACCESS_KEY || !process.env.OVH_SECRET_KEY || !BUCKET_NAME) {
       throw new Error('OVHcloud configuration is incomplete. Please check OVH_ACCESS_KEY, OVH_SECRET_KEY, and OVH_BUCKET_NAME environment variables.');
     }
-    
+
     logger.info(`[STORAGE] [UPLOAD] Uploading file to OVHcloud: ${key}`);
     logger.info(`[STORAGE] [UPLOAD] Bucket: ${BUCKET_NAME}, Endpoint: ${process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`}`);
-    
+
     // Read file from local filesystem
-    const fileContent = fs.readFileSync(filePath);
-    
+    const fileContent = await fs.promises.readFile(filePath);
+
     // Upload to PUBLIC bucket (ACL: public-read for direct access)
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
@@ -52,24 +52,24 @@ export const uploadToOVH = async (
     });
 
     await s3Client.send(command);
-    
+
     // Return only the key - signed URLs will be generated on-demand via getSignedUrlFromOVH()
     logger.info(`[STORAGE] [UPLOAD] File uploaded successfully. Key: ${key}`);
     return key;
   } catch (error: any) {
     logger.error(`[STORAGE] [UPLOAD] Error uploading file:`, error);
-    
+
     // Provide more detailed error messages
     if (error.name === 'AccessDenied' || error.message?.includes('Access Denied')) {
       logger.error(`[STORAGE] [UPLOAD] Access Denied - Check credentials and bucket permissions`);
       throw new Error(`Access Denied: Please verify OVHcloud credentials (OVH_ACCESS_KEY, OVH_SECRET_KEY) and bucket permissions. Error: ${error.message}`);
     }
-    
+
     if (error.name === 'NoSuchBucket' || error.message?.includes('NoSuchBucket')) {
       logger.error(`[STORAGE] [UPLOAD] Bucket not found: ${BUCKET_NAME}`);
       throw new Error(`Bucket not found: ${BUCKET_NAME}. Please verify OVH_BUCKET_NAME environment variable.`);
     }
-    
+
     throw new Error(`Failed to upload file to OVHcloud: ${error.message || error.toString()}`);
   }
 };
@@ -91,9 +91,9 @@ export const uploadBufferToOVH = async (
     if (!process.env.OVH_ACCESS_KEY || !process.env.OVH_SECRET_KEY || !BUCKET_NAME) {
       throw new Error('OVHcloud configuration is incomplete. Please check OVH_ACCESS_KEY, OVH_SECRET_KEY, and OVH_BUCKET_NAME environment variables.');
     }
-    
+
     logger.info(`[STORAGE] [UPLOAD BUFFER] Uploading buffer to OVHcloud: ${key}`);
-    
+
     // Upload to PUBLIC bucket (ACL: public-read for direct access)
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
@@ -104,24 +104,24 @@ export const uploadBufferToOVH = async (
     });
 
     await s3Client.send(command);
-    
+
     // Return only the key - signed URLs will be generated on-demand via getSignedUrlFromOVH()
     logger.info(`[STORAGE] [UPLOAD BUFFER] File uploaded successfully. Key: ${key}`);
     return key;
   } catch (error: any) {
     logger.error(`[STORAGE] [UPLOAD BUFFER] Error uploading file:`, error);
-    
+
     // Provide more detailed error messages
     if (error.name === 'AccessDenied' || error.message?.includes('Access Denied')) {
       logger.error(`[STORAGE] [UPLOAD BUFFER] Access Denied - Check credentials and bucket permissions`);
       throw new Error(`Access Denied: Please verify OVHcloud credentials (OVH_ACCESS_KEY, OVH_SECRET_KEY) and bucket permissions. Error: ${error.message}`);
     }
-    
+
     if (error.name === 'NoSuchBucket' || error.message?.includes('NoSuchBucket')) {
       logger.error(`[STORAGE] [UPLOAD BUFFER] Bucket not found: ${BUCKET_NAME}`);
       throw new Error(`Bucket not found: ${BUCKET_NAME}. Please verify OVH_BUCKET_NAME environment variable.`);
     }
-    
+
     throw new Error(`Failed to upload file to OVHcloud: ${error.message || error.toString()}`);
   }
 };
@@ -133,7 +133,7 @@ export const uploadBufferToOVH = async (
 export const deleteFromOVH = async (key: string): Promise<void> => {
   try {
     logger.info(`[STORAGE] [DELETE] Deleting file from OVHcloud: ${key}`);
-    
+
     const command = new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key
@@ -155,12 +155,12 @@ export const deleteFromOVH = async (key: string): Promise<void> => {
 export const getPublicUrlFromOVH = (key: string): string => {
   const endpoint = process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`;
   const region = process.env.OVH_REGION || 'gra';
-  
+
   // OVHcloud uses virtual-hosted style for public URLs
   // Format: https://{bucket}.s3.{region}.cloud.ovh.net/{key}
   // For us-east-va: https://{bucket}.s3.{region}.io.cloud.ovh.us/{key}
   let publicUrl: string;
-  
+
   if (region === 'us-east-va') {
     // Special format for us-east-va region
     publicUrl = `https://${BUCKET_NAME}.s3.${region}.io.cloud.ovh.us/${key}`;
@@ -168,7 +168,7 @@ export const getPublicUrlFromOVH = (key: string): string => {
     // Standard format for other regions
     publicUrl = `https://${BUCKET_NAME}.s3.${region}.cloud.ovh.net/${key}`;
   }
-  
+
   logger.info(`[STORAGE] [PUBLIC URL] Generated public URL: ${publicUrl}`);
   return publicUrl;
 };
@@ -186,7 +186,7 @@ export const getSignedUrlFromOVH = async (
 ): Promise<string> => {
   try {
     logger.info(`[STORAGE] [SIGNED URL] Generating signed URL for: ${key}, expires in: ${expiresIn}s`);
-    
+
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key
@@ -212,9 +212,9 @@ export const extractKeyFromUrl = (url: string): string => {
     if (process.env.OVH_PUBLIC_URL && url.startsWith(process.env.OVH_PUBLIC_URL)) {
       return url.replace(`${process.env.OVH_PUBLIC_URL}/`, '');
     }
-    
+
     const region = process.env.OVH_REGION || 'gra';
-    
+
     // Try virtual-hosted style first (current format)
     // Format: https://{bucket}.s3.{region}.io.cloud.ovh.us/{key} or https://{bucket}.s3.{region}.cloud.ovh.net/{key}
     if (region === 'us-east-va') {
@@ -230,16 +230,16 @@ export const extractKeyFromUrl = (url: string): string => {
         return match[1];
       }
     }
-    
+
     // Try path-style format (legacy)
     const endpoint = process.env.OVH_ENDPOINT || `https://s3.${process.env.OVH_REGION || 'gra'}.cloud.ovh.net`;
     const pathStylePattern = new RegExp(`${endpoint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/${BUCKET_NAME}/(.+)`);
     const match = url.match(pathStylePattern);
-    
+
     if (match && match[1]) {
       return match[1];
     }
-    
+
     // Fallback: try to extract from any URL format (get everything after last slash)
     const parts = url.split('/');
     // Remove empty parts and get the key (everything after bucket name)
@@ -248,7 +248,7 @@ export const extractKeyFromUrl = (url: string): string => {
     if (bucketIndex >= 0 && bucketIndex < keyParts.length - 1) {
       return keyParts.slice(bucketIndex + 1).join('/');
     }
-    
+
     // Last resort: return filename only
     return parts[parts.length - 1];
   } catch (error: any) {

@@ -112,6 +112,59 @@ const ProfilePage: React.FC = () => {
     return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
   };
 
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                reject(new Error('Canvas to Blob conversion failed'));
+              }
+            },
+            'image/jpeg',
+            0.8 // 80% quality
+          );
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const { data: profile, isLoading, error } = useQuery(
     'profile',
     profileService.getProfile,
@@ -505,48 +558,74 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    // Execute pending photo action first
+    // Exclude reportingManagerId from the payload - it cannot be updated via Profile page
+    const { reportingManagerId, ...submissionData } = formData;
+    const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
+
+    // Parallelize mutations
+    const mutationPromises = [];
+
     if (pendingPhotoAction) {
-      try {
-        if (pendingPhotoAction.type === 'upload' && pendingPhotoAction.file) {
-          await uploadPhotoMutation.mutateAsync(pendingPhotoAction.file);
-        } else if (pendingPhotoAction.type === 'delete') {
-          await deletePhotoMutation.mutateAsync();
-        }
-        setPendingPhotoAction(null);
-        setPendingPhotoPreview(null);
-      } catch (error) {
-        // Photo mutation error is already handled by the mutation's onError
-        return;
+      if (pendingPhotoAction.type === 'upload' && pendingPhotoAction.file) {
+        mutationPromises.push(uploadPhotoMutation.mutateAsync(pendingPhotoAction.file));
+      } else if (pendingPhotoAction.type === 'delete') {
+        mutationPromises.push(deletePhotoMutation.mutateAsync());
       }
     }
 
-    const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
+    if (hasChanges) {
+      mutationPromises.push(updateMutation.mutateAsync(submissionData));
+    }
 
-    // If only photo was changed (no form data changes), exit edit mode immediately
-    if (!hasChanges) {
+    // If nothing changed, just exit edit mode
+    if (mutationPromises.length === 0) {
       setIsEditMode(false);
-      showSuccess('Profile updated successfully!');
       return;
     }
 
-    // Exclude reportingManagerId from the payload - it cannot be updated via Profile page
-    const { reportingManagerId, ...submissionData } = formData;
-    updateMutation.mutate(submissionData);
+    try {
+      await Promise.all(mutationPromises);
+
+      // Clear pending photo actions
+      setPendingPhotoAction(null);
+      setPendingPhotoPreview(null);
+      setIsEditMode(false);
+
+      // Invalidate query to refresh all profile data including photo
+      queryClient.invalidateQueries('profile');
+
+      // If we only updated photo (no hasChanges), we need to show success here 
+      // because updateMutation.onSuccess won't trigger
+      if (!hasChanges) {
+        showSuccess('Profile updated successfully!');
+      }
+    } catch (error) {
+      // Errors are handled by individual mutation onError handlers
+      console.error('Error saving profile:', error);
+    }
   };
 
   const handleChangePhotoClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handlePhotoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Create a preview URL for the selected file
-    const previewUrl = URL.createObjectURL(file);
-    setPendingPhotoPreview(previewUrl);
-    setPendingPhotoAction({ type: 'upload', file });
+    try {
+      // Show immediate preview with original file for better UX
+      const previewUrl = URL.createObjectURL(file);
+      setPendingPhotoPreview(previewUrl);
+
+      // Compress image in background
+      const compressedFile = await compressImage(file);
+      setPendingPhotoAction({ type: 'upload', file: compressedFile });
+    } catch (error) {
+      console.error('Image compression failed:', error);
+      // Fallback to original file if compression fails
+      setPendingPhotoAction({ type: 'upload', file });
+    }
 
     // Reset the input so selecting the same file again will trigger change
     event.target.value = '';
@@ -584,26 +663,7 @@ const ProfilePage: React.FC = () => {
   };
 
 
-  const handleSameAsCurrentAddress = (checked: boolean) => {
-    setIsSameAddress(checked);
-    if (checked) {
-      setFormData((prev: any) => ({
-        ...prev,
-        address: {
-          ...prev.address,
-          currentAddress: prev.address?.permanentAddress
-        }
-      }));
-    } else {
-      setFormData((prev: any) => ({
-        ...prev,
-        address: {
-          ...prev.address,
-          currentAddress: ''
-        }
-      }));
-    }
-  };
+
 
   // Initial loading state (only for first-time page load)
   if (isLoading && !profile) {
