@@ -195,13 +195,15 @@
 }
 
 .day-type-badge {
-  font-size: 12px;
-  color: #5a6c7d;
+  font-size: 15px;
+  color: #203050;
   font-weight: 500;
-  margin-left: 4px;
-  padding: 2px 8px;
-  background: rgba(90, 108, 125, 0.1);
-  border-radius: 12px;
+  margin-left: 0px;
+  padding: 0px;
+  background: transparent;
+  border: none;
+  border-radius: 0px;
+  box-shadow: none;
 }
 
 /* Using global status badges */
