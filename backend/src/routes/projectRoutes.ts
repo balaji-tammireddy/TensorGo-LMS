@@ -25,6 +25,13 @@ router.put(
     projectController.updateProject
 );
 
+router.delete(
+    '/:id',
+    authenticateToken,
+    authorizeRole(['super_admin']),
+    projectController.deleteProject
+);
+
 // Modules
 router.post(
     '/:projectId/modules',
@@ -53,9 +60,21 @@ router.get(
     projectController.getTasks
 );
 
-// Activities (Placeholder for now, similar structure)
+// Activities
+router.post(
+    '/tasks/:taskId/activities',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.createActivity
+);
 
 // Access Control
+router.get(
+    '/access/:level/:id',
+    authenticateToken,
+    projectController.getAccessList
+);
+
 router.delete(
     '/access',
     authenticateToken,

@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Calendar, ClipboardList, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, AlertCircle } from 'lucide-react';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
 import AppLayout from '../../components/layout/AppLayout';
-import { projectService } from '../../services/projectService';
+import { projectService, Project } from '../../services/projectService';
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import EmptyState from '../../components/common/EmptyState';
+import { ProjectCard } from './components/ProjectCard';
 import './ProjectDashboard.css';
 
 export const ProjectDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { showSuccess, showError } = useToast();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ id: number, name: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Fetch projects
     const { data: projects, isLoading, refetch } = useQuery(
@@ -21,6 +28,7 @@ export const ProjectDashboard: React.FC = () => {
 
     // Helper to check if user can create (Admin/HR/Manager)
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
+    const isGlobalAdmin = ['super_admin', 'hr'].includes(user?.role || '');
 
     const getStatusClass = (status: string) => {
         if (status === 'active') return 'status-active';
@@ -28,14 +36,76 @@ export const ProjectDashboard: React.FC = () => {
         return 'status-other';
     };
 
+    const confirmDelete = async () => {
+        if (!deleteConfirm) return;
+
+        setIsDeleting(true);
+        const projectId = deleteConfirm.id;
+        const projectName = deleteConfirm.name;
+        setDeleteConfirm(null); // Close modal immediately
+        try {
+            await projectService.deleteProject(deleteConfirm.id);
+            showSuccess(`Project "${deleteConfirm.name}" deleted successfully`);
+            setDeleteConfirm(null);
+            refetch();
+        } catch (error: any) {
+            console.error('[PROJECT] Delete Error:', error);
+            showError(error.response?.data?.error || 'Failed to delete project');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const ProjectListSection = ({ title, projects, filterType, emptyMsg }: { title: string, projects: Project[], filterType: string, emptyMsg: string }) => {
+        const displayProjects = projects.slice(0, 4); // Show only top 4
+        const hasMore = projects.length > 4;
+
+        return (
+            <>
+                <div className="section-header-row">
+                    <h2 className="section-title">{title}</h2>
+                    {hasMore && (
+                        <button
+                            className="btn-view-all"
+                            onClick={() => navigate(`/project-management/list?filter=${filterType}`)}
+                        >
+                            View All &gt;
+                        </button>
+                    )}
+                </div>
+
+                {projects.length === 0 ? (
+                    <EmptyState
+                        title="No Projects"
+                        description={emptyMsg}
+                        icon={AlertCircle}
+                        size="small"
+                        className="dashboard-empty-state"
+                    />
+                ) : (
+                    <div className="projects-grid-preview">
+                        {displayProjects.map((project: Project) => (
+                            <ProjectCard
+                                key={project.id}
+                                project={project}
+                                navigate={navigate}
+                                getStatusClass={getStatusClass}
+                                onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
+                                canDelete={user?.role === 'super_admin'}
+                            />
+                        ))}
+                    </div>
+                )}
+            </>
+        );
+    };
+
     return (
         <AppLayout>
             <div className="project-dashboard">
                 {/* Header */}
                 <div className="dashboard-header">
-                    <div>
-                        <h1>Projects</h1>
-                    </div>
+                    <h1>Project Management</h1>
                     {canCreate && (
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
@@ -52,68 +122,55 @@ export const ProjectDashboard: React.FC = () => {
                     <div className="project-loading">Loading projects...</div>
                 )}
 
-                {/* Projects Grid */}
-                {!isLoading && projects && projects.length > 0 && (
-                    <div className="projects-grid">
-                        {projects.map(project => (
-                            <div
-                                key={project.id}
-                                className="project-card"
-                            >
-                                <span className={`status-badge ${getStatusClass(project.status)}`}>
-                                    {project.status.replace('_', ' ')}
-                                </span>
+                {/* Projects Content Split (50/50) */}
+                {!isLoading && (
+                    <div className="dashboard-content">
+                        {/* 1. UPPER SECTION: My Projects */}
+                        <div className="dashboard-section">
+                            {(() => {
+                                const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
+                                const myProjectsList = (projects || []).filter((p: Project) =>
+                                    isPMView ? p.is_pm : p.is_member
+                                );
 
-                                <div className="icon-wrapper">
-                                    <FolderKanban size={28} />
-                                </div>
-
-                                <h3 className="project-title">
-                                    {project.name}
-                                </h3>
-
-                                <p className="project-desc">
-                                    {project.description || 'No description provided.'}
-                                </p>
-
-                                <div className="project-dates">
-                                    <div className="date-row">
-                                        <Calendar size={14} />
-                                        <span>Started: {project.start_date ? new Date(project.start_date).toLocaleDateString() : '-'}</span>
-                                    </div>
-                                    <div className="date-row">
-                                        <Calendar size={14} />
-                                        <span>Ended: {project.end_date ? new Date(project.end_date).toLocaleDateString() : '-'}</span>
-                                    </div>
-                                </div>
-
-                                <div className="card-footer-actions">
-                                    <button
-                                        onClick={() => navigate(`/project-management/${project.id}`)}
-                                        className="btn-view-details"
-                                    >
-                                        View Details <ClipboardList size={14} />
-                                    </button>
-
-                                    {/* Delete button only for authorized users if needed, user requested it in UI */}
-                                    <button className="btn-delete-project">
-                                        Delete Project <FolderKanban size={14} style={{ transform: 'rotate(180deg)' }} />
-                                        {/* Using generic icon for now, Trash would be better but keeping imports minimal implies checking available icons */}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* New Refined Empty State */}
-                {!isLoading && (!projects || projects.length === 0) && (
-                    <div className="project-empty-state">
-                        <div className="empty-state-icon-wrapper">
-                            <ClipboardList size={32} strokeWidth={1.5} />
+                                return (
+                                    <ProjectListSection
+                                        title="My Projects"
+                                        projects={myProjectsList}
+                                        filterType="my-projects"
+                                        emptyMsg="No projects found in this section."
+                                    />
+                                );
+                            })()}
                         </div>
-                        <h3 className="empty-state-title">No Projects Found</h3>
-                        <p className="empty-state-desc">Get started by creating your first project.</p>
+
+                        {/* 2. LOWER SECTION: All Projects */}
+                        <div className="dashboard-section">
+                            {isGlobalAdmin ? (
+                                (() => {
+                                    const allOtherProjects = (projects || []).filter((p: Project) => !p.is_pm);
+                                    return (
+                                        <ProjectListSection
+                                            title="All Projects"
+                                            projects={allOtherProjects}
+                                            filterType="all"
+                                            emptyMsg="No global projects to display."
+                                        />
+                                    );
+                                })()
+                            ) : (
+                                <>
+                                    <h2 className="section-title">All Projects</h2>
+                                    <EmptyState
+                                        title="Access Restricted"
+                                        description="You are not authorized to view all projects."
+                                        icon={AlertCircle}
+                                        size="small"
+                                        className="dashboard-empty-state"
+                                    />
+                                </>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -122,6 +179,19 @@ export const ProjectDashboard: React.FC = () => {
                     onClose={() => setIsCreateModalOpen(false)}
                     type="project"
                     onSuccess={refetch}
+                />
+
+
+                <ConfirmationDialog
+                    isOpen={!!deleteConfirm}
+                    title="Delete Project?"
+                    message={`Are you sure you want to delete ${deleteConfirm?.name}?\nThis will permanently remove all associated modules, tasks, and activities. This action cannot be undone.`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    type="danger"
+                    onConfirm={confirmDelete}
+                    onCancel={() => setDeleteConfirm(null)}
+                    isLoading={isDeleting}
                 />
             </div>
         </AppLayout>

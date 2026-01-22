@@ -30,7 +30,7 @@ export const createProject = async (req: AuthRequest, res: Response) => {
         console.error('[PROJECT] Create Error:', error);
         logger.error('[PROJECT] Create Error:', error);
         if (error.message.includes('already exists')) {
-            return res.status(409).json({ error: error.message });
+            return res.status(409).json({ error: 'Project ID already exists' });
         }
         res.status(500).json({ error: error.message });
     }
@@ -71,7 +71,8 @@ export const getProjects = async (req: AuthRequest, res: Response) => {
 export const createModule = async (req: AuthRequest, res: Response) => {
     try {
         const { projectId } = req.params;
-        const { custom_id, name, description } = req.body;
+        const { custom_id, name, description, assignee_ids } = req.body;
+        const userId = req.user?.id;
 
         if (!custom_id || !name) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -82,7 +83,7 @@ export const createModule = async (req: AuthRequest, res: Response) => {
             custom_id,
             name,
             description
-        });
+        }, assignee_ids, userId);
 
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
@@ -109,7 +110,8 @@ export const getModules = async (req: AuthRequest, res: Response) => {
 export const createTask = async (req: AuthRequest, res: Response) => {
     try {
         const { moduleId } = req.params;
-        const { custom_id, name, description, due_date } = req.body;
+        const { custom_id, name, description, due_date, assignee_ids } = req.body;
+        const userId = req.user?.id;
 
         if (!custom_id || !name) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -121,11 +123,35 @@ export const createTask = async (req: AuthRequest, res: Response) => {
             name,
             description,
             due_date
-        });
+        }, assignee_ids, userId);
 
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
         logger.error('[TASK] Create Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const createActivity = async (req: AuthRequest, res: Response) => {
+    try {
+        const { taskId } = req.params;
+        const { custom_id, name, description, assignee_ids } = req.body;
+        const userId = req.user?.id;
+
+        if (!custom_id || !name) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const result = await ProjectService.createActivity({
+            task_id: parseInt(taskId),
+            custom_id,
+            name,
+            description
+        }, assignee_ids, userId);
+
+        res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+        logger.error('[ACTIVITY] Create Error:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -192,6 +218,41 @@ export const removeAccess = async (req: AuthRequest, res: Response) => {
         res.json({ success: true });
     } catch (error: any) {
         logger.error('[ACCESS] Revoke Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getAccessList = async (req: AuthRequest, res: Response) => {
+    try {
+        const { level, id } = req.params;
+        // level: 'project' | 'module' | 'task'
+        // id: ID of the scope
+
+        if (!['project', 'module', 'task'].includes(level)) {
+            return res.status(400).json({ error: 'Invalid level' });
+        }
+
+        const list = await ProjectService.getAccessList(level as any, parseInt(id));
+        res.json(list);
+    } catch (error: any) {
+        logger.error('[ACCESS] Get List Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const deleteProject = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const role = req.user?.role;
+
+        if (role !== 'super_admin') {
+            return res.status(403).json({ error: 'Permission denied: Super Admin only' });
+        }
+
+        const project = await ProjectService.deleteProject(parseInt(id));
+        res.json({ message: 'Project deleted successfully', project });
+    } catch (error: any) {
+        console.error('[PROJECT] Delete Error:', error);
         res.status(500).json({ error: error.message });
     }
 };

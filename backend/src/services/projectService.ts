@@ -69,19 +69,23 @@ export class ProjectService {
       }
 
       // 2. Insert Project
+      // AUTOMATION: Set start_date to NOW() automatically
+      const startDate = new Date();
+
       const insertRes = await client.query(
         `INSERT INTO projects (
-          custom_id, name, description, project_manager_id, start_date, end_date, created_by
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          custom_id, name, description, project_manager_id, start_date, end_date, created_by, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           data.custom_id,
           data.name,
           data.description || null,
           data.project_manager_id,
-          data.start_date || null,
+          startDate, // Automatic start date
           data.end_date || null,
-          data.created_by
+          data.created_by,
+          'active' // Default status is active
         ]
       );
       const project = insertRes.rows[0];
@@ -100,7 +104,20 @@ export class ProjectService {
     }
   }
 
-  static async updateProject(id: number, data: Partial<ProjectData>) {
+  static async updateProject(id: number, data: Partial<ProjectData> & { status?: string }) {
+    // AUTOMATION: Check for status change to set end_date
+    if (data.status) {
+      const currentRes = await pool.query('SELECT status FROM projects WHERE id = $1', [id]);
+      if (currentRes.rows.length > 0) {
+        const currentStatus = currentRes.rows[0].status;
+        // If changing from 'active' to anything else (completed, on_hold, etc.)
+        // And end_date isn't explicitly provided, set it to NOW
+        if (currentStatus === 'active' && data.status !== 'active' && !data.end_date) {
+          data.end_date = new Date().toISOString();
+        }
+      }
+    }
+
     // Build dynamic update query
     const updates: string[] = [];
     const values: any[] = [];
@@ -126,11 +143,7 @@ export class ProjectService {
       values.push(data.project_manager_id);
     }
 
-    // status update logic specific if passed
-    // The interface ProjectData doesn't seem to have status? Let's check type.
-    // Actually Controller passed "updates". 
-    // Let's assume passed object keys map to DB columns.
-    if ((data as any).status) { updates.push(`status = $${idx++}`); values.push((data as any).status); }
+    if (data.status) { updates.push(`status = $${idx++}`); values.push(data.status); }
 
     if (updates.length === 0) return null;
 
@@ -184,50 +197,115 @@ export class ProjectService {
 
   // --- 2. Hierarchy Creation (Module/Task/Activity) ---
 
-  static async createModule(data: ModuleData) {
-    return query(
-      `INSERT INTO project_modules (project_id, custom_id, name, description)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [data.project_id, data.custom_id, data.name, data.description]
-    );
-  }
-
-  static async createTask(data: TaskData) {
-    return query(
-      `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [data.module_id, data.custom_id, data.name, data.description, data.due_date]
-    );
-  }
-
-  static async createActivity(data: ActivityData) {
-    return query(
-      `INSERT INTO project_activities (task_id, custom_id, name, description)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [data.task_id, data.custom_id, data.name, data.description]
-    );
-  }
-
-  // --- 3. Access Control & Cascading Revocation ---
-
-  static async assignModuleAccess(moduleId: number, userIds: number[], grantedBy: number) {
+  static async createModule(data: ModuleData, assigneeIds?: number[], createdBy?: number) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      for (const userId of userIds) {
-        await client.query(
-          `INSERT INTO module_access (module_id, user_id, granted_by)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (module_id, user_id) DO NOTHING`,
-          [moduleId, userId, grantedBy]
-        );
+      const res = await client.query(
+        `INSERT INTO project_modules (project_id, custom_id, name, description)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+        [data.project_id, data.custom_id, data.name, data.description]
+      );
+      const module = res.rows[0];
+
+      // Assign access if provided
+      if (assigneeIds && assigneeIds.length > 0 && createdBy) {
+        await this.assignModuleAccess(module.id, assigneeIds, createdBy, client);
       }
+
       await client.query('COMMIT');
+      return module;
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
     } finally {
       client.release();
+    }
+  }
+
+  static async createTask(data: TaskData, assigneeIds?: number[], createdBy?: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query(
+        `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [data.module_id, data.custom_id, data.name, data.description, data.due_date]
+      );
+      const task = res.rows[0];
+
+      if (assigneeIds && assigneeIds.length > 0 && createdBy) {
+        await this.assignTaskAccess(task.id, assigneeIds, createdBy, client);
+      }
+
+      await client.query('COMMIT');
+      return task;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async createActivity(data: ActivityData, assigneeIds?: number[], createdBy?: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query(
+        `INSERT INTO project_activities (task_id, custom_id, name, description)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+        [data.task_id, data.custom_id, data.name, data.description]
+      );
+      const activity = res.rows[0];
+
+      if (assigneeIds && assigneeIds.length > 0 && createdBy) {
+        await this.assignActivityAccess(activity.id, assigneeIds, createdBy, client);
+      }
+
+      await client.query('COMMIT');
+      return activity;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  // --- 3. Access Control & Cascading Revocation ---
+
+  static async assignModuleAccess(moduleId: number, userIds: number[], grantedBy: number, clientOrPool: any = pool) {
+    // clientOrPool allows participating in existing transaction
+    for (const userId of userIds) {
+      await clientOrPool.query(
+        `INSERT INTO module_access (module_id, user_id, granted_by)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (module_id, user_id) DO NOTHING`,
+        [moduleId, userId, grantedBy]
+      );
+    }
+  }
+
+  static async assignTaskAccess(taskId: number, userIds: number[], grantedBy: number, clientOrPool: any = pool) {
+    for (const userId of userIds) {
+      await clientOrPool.query(
+        `INSERT INTO task_access (task_id, user_id, granted_by)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (task_id, user_id) DO NOTHING`,
+        [taskId, userId, grantedBy]
+      );
+    }
+  }
+
+  static async assignActivityAccess(activityId: number, userIds: number[], grantedBy: number, clientOrPool: any = pool) {
+    for (const userId of userIds) {
+      await clientOrPool.query(
+        `INSERT INTO activity_access (activity_id, user_id, granted_by)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (activity_id, user_id) DO NOTHING`,
+        [activityId, userId, grantedBy]
+      );
     }
   }
 
@@ -328,13 +406,26 @@ export class ProjectService {
   static async getProjectsForUser(userId: number, role: string) {
     // Global Viewers
     if (role === 'super_admin' || role === 'hr') {
-      return query(`SELECT * FROM projects ORDER BY created_at DESC`);
+      return query(
+        `SELECT p.*, 
+                u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name,
+                (p.project_manager_id = $1) as is_pm,
+                EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+         FROM projects p 
+         LEFT JOIN users u ON p.project_manager_id = u.id
+         ORDER BY p.created_at DESC`,
+        [userId]
+      );
     }
 
     // PM and Members: Show projects where they are manager OR member
-    // Note: PM is technically a member due to syncProjectTeam, but explicit check is safer
     return query(
-      `SELECT DISTINCT p.* FROM projects p
+      `SELECT DISTINCT p.*, 
+               u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name,
+               (p.project_manager_id = $1) as is_pm,
+               EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+       FROM projects p
+       LEFT JOIN users u ON p.project_manager_id = u.id
        LEFT JOIN project_members pm ON p.id = pm.project_id
        WHERE p.project_manager_id = $1 OR pm.user_id = $1
        ORDER BY p.created_at DESC`,
@@ -386,5 +477,132 @@ export class ProjectService {
        ORDER BY t.custom_id`,
       [moduleId, userId]
     );
+  }
+
+  // --- 5. Access List Getters (for Dropdowns) ---
+
+  static async getAccessList(level: 'project' | 'module' | 'task', id: number) {
+    if (level === 'project') {
+      const res = await query(
+        `SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+             FROM project_members pm
+             JOIN users u ON pm.user_id = u.id
+             WHERE pm.project_id = $1
+             UNION
+             SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+             FROM projects p
+             JOIN users u ON p.project_manager_id = u.id
+             WHERE p.id = $1`,
+        [id]
+      );
+      return res.rows;
+    } else if (level === 'module') {
+      // For Tasks: Show users who have access to this module
+      // Implicitly PM has access, but user said "show only users... having access"
+      // Let's return explicit module_access + PM
+      const res = await query(
+        `SELECT DISTINCT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+             FROM module_access ma
+             JOIN users u ON ma.user_id = u.id
+             WHERE ma.module_id = $1
+             UNION
+             SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+             FROM project_modules m
+             JOIN projects p ON m.project_id = p.id
+             JOIN users u ON p.project_manager_id = u.id
+             WHERE m.id = $1`,
+        [id]
+      );
+      return res.rows;
+    } else if (level === 'task') {
+      // For Activities: Show users who have access to this task
+      const res = await query(
+        `SELECT DISTINCT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+             FROM task_access ta
+             JOIN users u ON ta.user_id = u.id
+             WHERE ta.task_id = $1
+             UNION
+             SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+             FROM project_tasks t
+             JOIN project_modules m ON t.module_id = m.id
+             JOIN projects p ON m.project_id = p.id
+             JOIN users u ON p.project_manager_id = u.id
+             WHERE t.id = $1`,
+        [id]
+      );
+      return res.rows;
+    }
+    return [];
+  }
+  // --- 6. Project Deletion (Super Admin Only) ---
+  static async deleteProject(projectId: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Manual cascade for clean deletion (if DB doesn't have it)
+      // 1. Delete Activity Access
+      await client.query(`
+        DELETE FROM activity_access 
+        WHERE activity_id IN (
+          SELECT a.id FROM project_activities a
+          JOIN project_tasks t ON a.task_id = t.id
+          JOIN project_modules m ON t.module_id = m.id
+          WHERE m.project_id = $1
+        )`, [projectId]);
+
+      // 2. Delete Activities
+      await client.query(`
+        DELETE FROM project_activities 
+        WHERE task_id IN (
+          SELECT t.id FROM project_tasks t
+          JOIN project_modules m ON t.module_id = m.id
+          WHERE m.project_id = $1
+        )`, [projectId]);
+
+      // 3. Delete Task Access
+      await client.query(`
+        DELETE FROM task_access 
+        WHERE task_id IN (
+          SELECT t.id FROM project_tasks t
+          JOIN project_modules m ON t.module_id = m.id
+          WHERE m.project_id = $1
+        )`, [projectId]);
+
+      // 4. Delete Tasks
+      await client.query(`
+        DELETE FROM project_tasks 
+        WHERE module_id IN (
+          SELECT id FROM project_modules WHERE project_id = $1
+        )`, [projectId]);
+
+      // 5. Delete Module Access
+      await client.query(`
+        DELETE FROM module_access 
+        WHERE module_id IN (
+          SELECT id FROM project_modules WHERE project_id = $1
+        )`, [projectId]);
+
+      // 6. Delete Modules
+      await client.query(`DELETE FROM project_modules WHERE project_id = $1`, [projectId]);
+
+      // 7. Delete Project Members
+      await client.query(`DELETE FROM project_members WHERE project_id = $1`, [projectId]);
+
+      // 8. Delete Project
+      const deleteRes = await client.query(`DELETE FROM projects WHERE id = $1 RETURNING *`, [projectId]);
+
+      if (deleteRes.rows.length === 0) {
+        throw new Error('Project not found');
+      }
+
+      await client.query('COMMIT');
+      return deleteRes.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 }

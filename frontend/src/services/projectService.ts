@@ -10,6 +10,9 @@ export interface Project {
     start_date?: string;
     end_date?: string;
     created_at: string;
+    is_pm?: boolean;
+    is_member?: boolean;
+    manager_name?: string;
 }
 
 export interface ProjectModule {
@@ -57,6 +60,8 @@ export const projectService = {
         return response.data;
     },
 
+    deleteProject: (id: number) => api.delete(`/projects/${id}`),
+
     // Modules
     createModule: async (projectId: number, data: any) => {
         const response = await api.post(`/projects/${projectId}/modules`, data);
@@ -80,10 +85,9 @@ export const projectService = {
     },
 
     // Access
-    revokeAccess: async (level: 'project' | 'module' | 'task', id: number, userId: number) => {
-        const response = await api.delete('/projects/access', {
-            data: { level, id, userId }
-        });
-        return response.data;
-    }
+    deleteAccess: (level: string, id: number, userId: number) =>
+        api.delete('/project-management/access', { data: { level, id, userId } }),
+
+    getAccessList: (level: string, id: number) =>
+        api.get<any[]>(`/project-management/access/${level}/${id}`).then(res => res.data),
 };

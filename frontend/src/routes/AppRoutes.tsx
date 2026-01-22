@@ -22,6 +22,7 @@ const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const LeaveRulesPage = lazy(() => import('../pages/LeaveRulesPage'));
 const ProjectDashboard = lazy(() => import('../pages/ProjectManagement/ProjectDashboard').then(m => ({ default: m.ProjectDashboard })));
+const ProjectListPage = lazy(() => import('../pages/ProjectManagement/ProjectListPage').then(m => ({ default: m.ProjectListPage })));
 const ProjectWorkspace = lazy(() => import('../pages/ProjectManagement/ProjectWorkspace').then(m => ({ default: m.ProjectWorkspace })));
 
 import * as policyService from '../services/policyService';
@@ -168,6 +169,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <ProjectDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project-management/list"
+          element={
+            <ProtectedRoute>
+              <ProjectListPage />
             </ProtectedRoute>
           }
         />

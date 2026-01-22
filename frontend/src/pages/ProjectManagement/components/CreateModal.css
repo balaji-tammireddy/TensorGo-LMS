@@ -117,9 +117,10 @@
 }
 
 .form-textarea {
-  height: 120px;
+  min-height: 150px;
+  height: 150px;
   resize: none;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .char-counter {

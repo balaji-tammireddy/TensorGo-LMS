@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
-import { Plus, ChevronLeft, Edit, Layers, CheckSquare, ClipboardList, FileText, Folder, ChevronDown } from 'lucide-react';
+import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
 import { CreateModal } from './components/CreateModal';
@@ -25,7 +25,7 @@ export const ProjectWorkspace: React.FC = () => {
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
     // Modal State
-    const [createType, setCreateType] = useState<'module' | 'task' | 'activity' | null>(null);
+    const [createType, setCreateType] = useState<'project' | 'module' | 'task' | 'activity' | null>(null);
     const [createParentId, setCreateParentId] = useState<number | null>(null);
     const [isEdit, setIsEdit] = useState(false);
 
@@ -47,22 +47,33 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     // Activities placeholder
-    const { data: activities } = useQuery(
+    const { data: _activities } = useQuery(
         ['activities', selectedTaskId],
         () => { return []; },
         { enabled: !!selectedTaskId }
     );
 
-    // Permissions
-    const canEdit = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
+    // Permissions Logic
+    const isPM = project?.is_pm || project?.project_manager_id === user?.id;
+    const isMember = project?.is_member;
+    const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hr';
+
+    // 1. Project-level: Super Admin or PM can edit/delete/status
+    const canManageProject = isSuperAdmin || isPM;
+
+    // 2. Child-level (Modules/Tasks/Activities): Only PM or Team Member with elevated role
+    // Prompt: "they [super admin] dont have any authority in modules/tasks/activities unless they are team members"
+    const canManageChildren = isPM || (isMember && ['super_admin', 'hr', 'manager'].includes(user?.role || ''));
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
+        if (!canManageChildren) return;
         setCreateType(type);
         setCreateParentId(parentId);
         setIsEdit(false);
     };
 
     const handleEditProject = () => {
+        if (!canManageProject) return;
         setCreateType('project');
         setIsEdit(true);
     };
@@ -72,7 +83,7 @@ export const ProjectWorkspace: React.FC = () => {
         if (createType === 'task') refetchTasks();
     };
 
-    const canManageStatus = (user?.role === 'super_admin' || user?.role === 'manager');
+    const canManageStatus = canManageProject;
 
     // Optimistic Update Mutation
     const updateStatusMutation = useMutation(
@@ -89,7 +100,7 @@ export const ProjectWorkspace: React.FC = () => {
                 }
                 return { previousProjects };
             },
-            onError: (err, newStatus, context: any) => {
+            onError: (err, _newStatus, context: any) => {
                 if (context?.previousProjects) {
                     queryClient.setQueryData('projects', context.previousProjects);
                 }
@@ -187,7 +198,7 @@ export const ProjectWorkspace: React.FC = () => {
                     </div>
                     <div className="ws-header-right">
                         <StatusDropdown currentStatus={project?.status} />
-                        {canEdit && (
+                        {canManageProject && (
                             <button className="btn-edit-project" onClick={handleEditProject}>
                                 <Edit size={14} /> Edit Project
                             </button>
@@ -204,7 +215,7 @@ export const ProjectWorkspace: React.FC = () => {
                             <div className="ws-col-title">
                                 <Layers size={18} /> MODULES
                             </div>
-                            {canEdit && (
+                            {canManageChildren && (
                                 <button
                                     onClick={() => handleCreate('module', projectId)}
                                     className="btn-col-add"
@@ -243,7 +254,7 @@ export const ProjectWorkspace: React.FC = () => {
                             <div className="ws-col-title">
                                 <ClipboardList size={18} /> TASKS
                             </div>
-                            {selectedModuleId && canEdit && (
+                            {selectedModuleId && canManageChildren && (
                                 <button
                                     onClick={() => handleCreate('task', selectedModuleId)}
                                     className="btn-col-add"
@@ -289,7 +300,7 @@ export const ProjectWorkspace: React.FC = () => {
                             <div className="ws-col-title">
                                 <Layers size={18} /> ACTIVITY
                             </div>
-                            {selectedTaskId && canEdit && (
+                            {selectedTaskId && canManageChildren && (
                                 <button className="btn-col-add">
                                     <Plus size={14} /> Add Activity
                                 </button>

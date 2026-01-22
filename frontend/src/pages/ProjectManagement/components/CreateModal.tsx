@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, Search, UserX } from 'lucide-react';
+import { X, ChevronDown, Search, UserX, CheckSquare } from 'lucide-react';
 import EmptyState from '../../../components/common/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -40,11 +40,16 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         name: '',
         description: '',
         project_manager_id: '',
-        due_date: ''
+        due_date: '',
+        assignee_ids: [] as number[]
     });
     const [loading, setLoading] = useState(false);
     const [managers, setManagers] = useState<any[]>([]);
     const [managerSearch, setManagerSearch] = useState('');
+
+    // Multi-select state
+    const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
+    const [loadingCandidates, setLoadingCandidates] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -55,43 +60,55 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 name: initialData.name || '',
                 description: initialData.description || '',
                 project_manager_id: initialData.project_manager_id ? String(initialData.project_manager_id) : '',
-                due_date: initialData.due_date || ''
+                due_date: initialData.due_date || '',
+                assignee_ids: [] // Editing access list not supported here yet, or handled separately
             });
-            // If editing, maybe fetch specific manager if not in list? 
-            // The list fetch logic below is for Create. 
         } else {
-            // Reset form data on open for Create
             setFormData({
                 custom_id: '',
                 name: '',
                 description: '',
                 project_manager_id: '',
-                due_date: ''
+                due_date: '',
+                assignee_ids: []
             });
         }
         setManagerSearch('');
 
+        // Fetch Managers for Project Creation
         if (type === 'project' && user) {
             if (user.role === 'super_admin') {
-                // Fetch all employees and filter
                 employeeService.getEmployees(1, 1000).then(res => {
                     const eligibleManagers = res.employees.filter((emp: any) =>
                         ['super_admin', 'hr', 'manager'].includes(emp.role) &&
-                        emp.status !== 'on_notice' &&
-                        emp.status !== 'resigned' &&
-                        emp.status !== 'terminated' &&
-                        emp.status !== 'inactive'
+                        !['on_notice', 'resigned', 'terminated', 'inactive'].includes(emp.status)
                     );
                     setManagers(eligibleManagers);
                 }).catch(() => { });
             } else if (['hr', 'manager'].includes(user.role)) {
-                // Auto-assign self logic only for create usually
                 if (!isEdit) {
                     setFormData(prev => ({ ...prev, project_manager_id: String(user.id) }));
                 }
             }
         }
-    }, [isOpen, type, user, isEdit, initialData]);
+
+        // Fetch Assignee Candidates for Module/Task/Activity
+        if (['module', 'task', 'activity'].includes(type) && parentId && !isEdit) {
+            setLoadingCandidates(true);
+            let fetchLevel = '';
+            // For Module creation, we need Project Members -> fetchLevel = 'project'
+            if (type === 'module') fetchLevel = 'project';
+            // For Task creation, we need Module Access List -> fetchLevel = 'module'
+            if (type === 'task') fetchLevel = 'module';
+            // For Activity creation, we need Task Access List -> fetchLevel = 'task'
+            if (type === 'activity') fetchLevel = 'task';
+
+            projectService.getAccessList(fetchLevel, parentId)
+                .then(setAssigneeCandidates)
+                .catch(console.error)
+                .finally(() => setLoadingCandidates(false));
+        }
+    }, [isOpen, type, user, isEdit, initialData, parentId]);
 
     if (!isOpen) return null;
 
@@ -255,6 +272,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                             <label className="form-label">Description</label>
                             <textarea
                                 className="form-textarea"
+                                rows={5}
                                 value={formData.description}
                                 onChange={e => {
                                     if (e.target.value.length <= DESC_LIMIT) {
@@ -368,6 +386,62 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                     value={formData.due_date}
                                     onChange={e => setFormData({ ...formData, due_date: e.target.value })}
                                 />
+                            </div>
+                        )}
+
+                        {/* Access Assignment (For Module, Task, Activity) */}
+                        {['module', 'task', 'activity'].includes(type) && !isEdit && (
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Assign Access <span className="text-muted">(Optional - PM has access by default)</span>
+                                </label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button type="button" className="custom-select-trigger">
+                                            <span className="selected-val">
+                                                {formData.assignee_ids.length > 0
+                                                    ? `${formData.assignee_ids.length} User${formData.assignee_ids.length > 1 ? 's' : ''} Selected`
+                                                    : 'Select Users'}
+                                            </span>
+                                            <ChevronDown size={16} className="text-gray-400" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="manager-dropdown-content" align="start">
+                                        <div className="dropdown-items-scroll">
+                                            {loadingCandidates ? (
+                                                <div className="p-3 text-sm text-gray-500">Loading users...</div>
+                                            ) : assigneeCandidates.length === 0 ? (
+                                                <div className="p-3 text-sm text-gray-500">No users found with access to parent scope.</div>
+                                            ) : (
+                                                assigneeCandidates.map(user => (
+                                                    <DropdownMenuItem
+                                                        key={user.id}
+                                                        onSelect={(e) => e.preventDefault()}
+                                                        onClick={() => {
+                                                            const ids = formData.assignee_ids.includes(user.id)
+                                                                ? formData.assignee_ids.filter(id => id !== user.id)
+                                                                : [...formData.assignee_ids, user.id];
+                                                            setFormData({ ...formData, assignee_ids: ids });
+                                                        }}
+                                                        className="manager-item"
+                                                    >
+                                                        <div className="flex items-center gap-2 w-full">
+                                                            <div className={`checkbox-custom ${formData.assignee_ids.includes(user.id) ? 'checked' : ''}`}>
+                                                                {formData.assignee_ids.includes(user.id) && <CheckSquare size={12} color="white" />}
+                                                            </div>
+                                                            <div className="manager-info">
+                                                                <span className="manager-name">
+                                                                    {toTitleCase(user.name)} <span className="manager-id">({user.empId})</span>
+                                                                </span>
+                                                                <span className={`role-badge ${user.role}`}>{getRoleLabel(user.role)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </DropdownMenuItem>
+                                                ))
+                                            )}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         )}
                     </div>

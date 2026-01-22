@@ -76,8 +76,8 @@ const Sidebar: React.FC = memo(() => {
     // View Policies - Available to all
     routes.push({ path: '/view-policies', icon: <FaBook />, label: 'View Policies' });
 
-    // Project Management - For Manager, HR, Super Admin
-    if (['manager', 'hr', 'super_admin'].includes(user.role)) {
+    // Project Management - For all roles (employees/interns see their assigned projects)
+    if (['manager', 'hr', 'super_admin', 'employee', 'intern'].includes(user.role)) {
       routes.push({ path: '/project-management', icon: <FaBriefcase />, label: 'Projects' });
     }
 
