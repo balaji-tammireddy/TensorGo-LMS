@@ -2771,72 +2771,70 @@ export const approveLeaveDays = async (
 
   // Send email notifications based on approver role - ONE EMAIL with TO/CC
   if (leave.employee_email) {
-    try {
-      // Build CC list based on approver role
-      const ccEmails: string[] = [];
+    // Build CC list based on approver role
+    const ccEmails: string[] = [];
 
-      if (approverRole === 'hr') {
-        // HR approves → Employee (TO), Manager (CC)
-        if (leave.manager_email && leave.manager_email !== leave.employee_email) {
-          ccEmails.push(leave.manager_email);
-        }
-        logger.info(`[EMAIL] HR days approval - sending email to employee (TO) with manager (CC)`);
-      } else if (approverRole === 'super_admin') {
-        // Super Admin approves → Employee (TO), Manager and HR (CC)
-        if (leave.manager_email && leave.manager_email !== leave.employee_email) {
-          ccEmails.push(leave.manager_email);
-        }
-        if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
-          ccEmails.push(leave.hr_email);
-        }
-        logger.info(`[EMAIL] Super Admin days approval - sending email to employee (TO) with manager and HR (CC)`);
-      } else {
-        // Manager approves → Employee (TO) only
-        logger.info(`[EMAIL] Manager days approval - sending email to employee (TO)`);
+    if (approverRole === 'hr') {
+      // HR approves → Employee (TO), Manager (CC)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+        ccEmails.push(leave.manager_email);
       }
+      logger.info(`[EMAIL] HR days approval - sending email to employee (TO) with manager (CC)`);
+    } else if (approverRole === 'super_admin') {
+      // Super Admin approves → Employee (TO), Manager and HR (CC)
+      if (leave.manager_email && leave.manager_email !== leave.employee_email) {
+        ccEmails.push(leave.manager_email);
+      }
+      if (leave.hr_email && leave.hr_email !== leave.employee_email && leave.hr_email !== leave.manager_email) {
+        ccEmails.push(leave.hr_email);
+      }
+      logger.info(`[EMAIL] Super Admin days approval - sending email to employee (TO) with manager and HR (CC)`);
+    } else {
+      // Manager approves → Employee (TO) only
+      logger.info(`[EMAIL] Manager days approval - sending email to employee (TO)`);
+    }
 
-      let approvedStartDate: string | undefined;
-      let approvedEndDate: string | undefined;
+    let approvedStartDate: string | undefined;
+    let approvedEndDate: string | undefined;
 
-      if (emailStatus === 'partially_approved') {
-        const approvedDaysResult = await pool.query(
-          `SELECT leave_date FROM leave_days 
+    if (emailStatus === 'partially_approved') {
+      const approvedDaysResult = await pool.query(
+        `SELECT leave_date FROM leave_days 
            WHERE leave_request_id = $1 AND day_status = 'approved' 
            ORDER BY leave_date ASC`,
-          [leaveRequestId]
-        );
+        [leaveRequestId]
+      );
 
-        if (approvedDaysResult.rows.length > 0) {
-          approvedStartDate = formatDate(approvedDaysResult.rows[0].leave_date);
-          approvedEndDate = formatDate(approvedDaysResult.rows[approvedDaysResult.rows.length - 1].leave_date);
-        }
+      if (approvedDaysResult.rows.length > 0) {
+        approvedStartDate = formatDate(approvedDaysResult.rows[0].leave_date);
+        approvedEndDate = formatDate(approvedDaysResult.rows[approvedDaysResult.rows.length - 1].leave_date);
       }
-
-      await sendLeaveStatusEmail(leave.employee_email, {
-        employeeName: leave.employee_name || 'Employee',
-        employeeEmpId: leave.employee_emp_id || '',
-        recipientName: leave.employee_name || 'Employee',
-        recipientRole: 'employee' as const,
-        leaveType: leave.leave_type,
-        startDate: leave.start_date,
-        startType: leave.start_type,
-        endDate: leave.end_date,
-        endType: leave.end_type,
-        noOfDays: parseFloat(leave.no_of_days),
-        reason: leave.reason,
-        approverName: leave.approver_name || 'Approver',
-        approverEmpId: leave.approver_emp_id || '',
-        approverRole: approverRole,
-        comment: comment || null,
-        status: emailStatus,
-        approvedStartDate,
-        approvedEndDate
-      }, ccEmails.length > 0 ? ccEmails : undefined);
-
-      logger.info(`[EMAIL] ✅ Days approval email sent to employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
-    } catch (err: any) {
-      logger.error(`[EMAIL] ❌ Error sending days approval email:`, err);
     }
+
+    sendLeaveStatusEmail(leave.employee_email, {
+      employeeName: leave.employee_name || 'Employee',
+      employeeEmpId: leave.employee_emp_id || '',
+      recipientName: leave.employee_name || 'Employee',
+      recipientRole: 'employee' as const,
+      leaveType: leave.leave_type,
+      startDate: leave.start_date,
+      startType: leave.start_type,
+      endDate: leave.end_date,
+      endType: leave.end_type,
+      noOfDays: parseFloat(leave.no_of_days),
+      reason: leave.reason,
+      approverName: leave.approver_name || 'Approver',
+      approverEmpId: leave.approver_emp_id || '',
+      approverRole: approverRole,
+      comment: comment || null,
+      status: emailStatus,
+      approvedStartDate,
+      approvedEndDate
+    }, ccEmails.length > 0 ? ccEmails : undefined).catch((err: any) => {
+      logger.error(`[EMAIL] ❌ Error sending days approval email:`, err);
+    });
+
+    logger.info(`[EMAIL] ✅ Days approval email queued for employee: ${leave.employee_email}${ccEmails.length > 0 ? ` with CC: ${ccEmails.join(', ')}` : ''}`);
   }
 
   logger.info(`[EMAIL] ========== EMAIL NOTIFICATION COMPLETED FOR LEAVE DAYS APPROVAL ==========`);
