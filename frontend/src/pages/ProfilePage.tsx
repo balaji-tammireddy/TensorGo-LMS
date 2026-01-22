@@ -39,6 +39,8 @@ const ProfilePage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
+  const [pendingPhotoAction, setPendingPhotoAction] = useState<{ type: 'upload' | 'delete', file?: File } | null>(null);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
 
   const sanitizeName = (value: string) => {
     const sanitized = value.replace(/[^a-zA-Z\s]/g, '').slice(0, 25);
@@ -156,6 +158,15 @@ const ProfilePage: React.FC = () => {
     }
   }, [profile]);
 
+  // Cleanup pending photo preview URL on unmount
+  React.useEffect(() => {
+    return () => {
+      if (pendingPhotoPreview) {
+        URL.revokeObjectURL(pendingPhotoPreview);
+      }
+    };
+  }, [pendingPhotoPreview]);
+
   const updateMutation = useMutation(profileService.updateProfile, {
     onSuccess: (data) => {
       queryClient.invalidateQueries('profile');
@@ -236,7 +247,7 @@ const ProfilePage: React.FC = () => {
     }
   }, [profile]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isEditMode || !initialFormData) return;
 
     const missingFields: string[] = [];
@@ -494,8 +505,24 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
+    // Execute pending photo action first
+    if (pendingPhotoAction) {
+      try {
+        if (pendingPhotoAction.type === 'upload' && pendingPhotoAction.file) {
+          await uploadPhotoMutation.mutateAsync(pendingPhotoAction.file);
+        } else if (pendingPhotoAction.type === 'delete') {
+          await deletePhotoMutation.mutateAsync();
+        }
+        setPendingPhotoAction(null);
+        setPendingPhotoPreview(null);
+      } catch (error) {
+        // Photo mutation error is already handled by the mutation's onError
+        return;
+      }
+    }
+
     const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
-    if (!hasChanges) {
+    if (!hasChanges && !pendingPhotoAction) {
       setIsEditMode(false);
       return;
     }
@@ -512,7 +539,12 @@ const ProfilePage: React.FC = () => {
   const handlePhotoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    uploadPhotoMutation.mutate(file);
+
+    // Create a preview URL for the selected file
+    const previewUrl = URL.createObjectURL(file);
+    setPendingPhotoPreview(previewUrl);
+    setPendingPhotoAction({ type: 'upload', file });
+
     // Reset the input so selecting the same file again will trigger change
     event.target.value = '';
   };
@@ -522,7 +554,8 @@ const ProfilePage: React.FC = () => {
   };
 
   const confirmDeletePhoto = () => {
-    deletePhotoMutation.mutate();
+    setPendingPhotoAction({ type: 'delete' });
+    setPendingPhotoPreview(null);
     setDeletePhotoConfirmOpen(false);
   };
   const handleCancelEdit = () => {
@@ -534,6 +567,13 @@ const ProfilePage: React.FC = () => {
       const same =
         !!addr.currentAddress && addr.currentAddress === addr.permanentAddress;
       setIsSameAddress(same);
+    }
+
+    // Clear pending photo actions
+    setPendingPhotoAction(null);
+    if (pendingPhotoPreview) {
+      URL.revokeObjectURL(pendingPhotoPreview);
+      setPendingPhotoPreview(null);
     }
 
     setIsEditMode(false);
@@ -684,8 +724,16 @@ const ProfilePage: React.FC = () => {
           </div>
 
           <div className="profile-picture-section">
-            <div className="profile-picture" onClick={() => photoSignedUrl && setShowImagePopup(true)} style={{ cursor: photoSignedUrl ? 'pointer' : 'default' }}>
-              {photoSignedUrl ? (
+            <div className="profile-picture" onClick={() => (pendingPhotoPreview || photoSignedUrl) && setShowImagePopup(true)} style={{ cursor: (pendingPhotoPreview || photoSignedUrl) ? 'pointer' : 'default' }}>
+              {pendingPhotoAction?.type === 'delete' ? (
+                <div className="profile-placeholder">👤</div>
+              ) : pendingPhotoPreview ? (
+                <img
+                  src={pendingPhotoPreview}
+                  alt="Profile Preview"
+                  style={{ opacity: 0.8 }}
+                />
+              ) : photoSignedUrl ? (
                 <img
                   src={photoSignedUrl}
                   alt="Profile"
@@ -723,9 +771,9 @@ const ProfilePage: React.FC = () => {
                     onClick={handleChangePhotoClick}
                     disabled={uploadPhotoMutation.isLoading}
                   >
-                    {photoSignedUrl ? 'Change Photo' : 'Upload Photo'}
+                    {pendingPhotoPreview ? 'Change Photo' : (photoSignedUrl || pendingPhotoAction?.type === 'delete') ? 'Change Photo' : 'Upload Photo'}
                   </button>
-                  {photoSignedUrl && (
+                  {(photoSignedUrl || pendingPhotoPreview) && pendingPhotoAction?.type !== 'delete' && (
                     <button
                       className="delete-photo-button"
                       onClick={handleDeletePhoto}
