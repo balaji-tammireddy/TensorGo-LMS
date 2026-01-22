@@ -289,6 +289,16 @@ const ViewPoliciesPage: React.FC = () => {
             showError('Policy title is required');
             return;
         }
+
+        const isDuplicate = displayPolicies.some(
+            (policy) => policy.title.toLowerCase().trim() === newPolicyTitle.trim().toLowerCase()
+        );
+
+        if (isDuplicate) {
+            showError('A policy with this name already exists.');
+            return;
+        }
+
         if (!newPolicyFile) {
             showError('Please select a PDF file');
             return;
