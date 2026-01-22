@@ -391,7 +391,7 @@ const LeaveRulesPage: React.FC = () => {
                                                     setNewTypeForm({ ...newTypeForm, roles });
                                                 }}
                                             />
-                                            {role === 'hr' ? 'HR' : role.charAt(0).toUpperCase() + role.slice(1)}
+                                            {role === 'hr' ? 'HR' : role === 'on_notice' ? 'On Notice' : role.charAt(0).toUpperCase() + role.slice(1)}
                                         </label>
                                     ))}
                                 </div>
@@ -485,7 +485,7 @@ const LeaveRulesPage: React.FC = () => {
 
                                 <div className="lr-role-options-label">Select Roles This Leave Type Applies To:</div>
                                 <div className="lr-role-options">
-                                    {['employee', 'manager', 'hr', 'intern'].map(role => (
+                                    {['employee', 'manager', 'hr', 'intern', 'on_notice'].map(role => (
                                         <label key={role} className="lr-role-checkbox">
                                             <input
                                                 type="checkbox"
@@ -497,7 +497,7 @@ const LeaveRulesPage: React.FC = () => {
                                                     setEditTypeForm({ ...editTypeForm, roles });
                                                 }}
                                             />
-                                            {role === 'hr' ? 'HR' : role.charAt(0).toUpperCase() + role.slice(1)}
+                                            {role === 'hr' ? 'HR' : role === 'on_notice' ? 'On Notice' : role.charAt(0).toUpperCase() + role.slice(1)}
                                         </label>
                                     ))}
                                 </div>
