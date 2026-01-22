@@ -356,7 +356,7 @@ const LeaveRulesPage: React.FC = () => {
                             <div className="lr-create-form">
                                 <div className="lr-form-row">
                                     <div className="lr-form-group">
-                                        <label>Display Name</label>
+                                        <label>Display Name <span style={{ color: 'red' }}>*</span></label>
                                         <input
                                             placeholder="Name"
                                             value={newTypeForm.name}
@@ -365,7 +365,7 @@ const LeaveRulesPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="lr-role-options-label">Select Roles This Leave Type Applies To:</div>
+                                <div className="lr-role-options-label">Select Roles This Leave Type Applies To: <span style={{ color: 'red' }}>*</span></div>
                                 <div className="lr-role-options">
                                     {['employee', 'manager', 'hr', 'intern', 'on_notice'].map(role => (
                                         <label key={role} className="lr-role-checkbox">
