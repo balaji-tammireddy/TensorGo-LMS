@@ -13,7 +13,7 @@ const LeaveRulesPage: React.FC = () => {
     const queryClient = useQueryClient();
     const { showSuccess, showError } = useToast();
     const [activeTab, setActiveTab] = useState<'policies' | 'types'>('policies');
-    const [selectedRole, setSelectedRole] = useState<string>('employee');
+    const [selectedRole, setSelectedRole] = useState<string>('hr');
 
     // -- Fetch Data --
     const { data: leaveTypes = [] } = useQuery('leaveRulesTypes', leaveRuleService.getLeaveTypes);
@@ -96,7 +96,7 @@ const LeaveRulesPage: React.FC = () => {
     // -- Render Helpers --
 
     const renderPolicies = () => {
-        const roles = ['employee', 'manager', 'hr', 'intern', 'on_notice'];
+        const roles = ['hr', 'manager', 'employee', 'intern', 'on_notice'];
 
         const currentRolePolicies: LeavePolicyConfig[] = (policiesGrouped && policiesGrouped[selectedRole]) || [];
 
