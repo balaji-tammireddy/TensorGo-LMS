@@ -235,6 +235,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <label>Carry Forward Limit (Year End)</label>
                                         <input
                                             type="number"
+                                            step="0.5"
                                             min="0"
                                             value={policyEditForm.carry_forward_limit}
                                             onChange={(e) => {
@@ -248,6 +249,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <label>Max Monthly Limit</label>
                                         <input
                                             type="number"
+                                            step="0.5"
                                             min="0"
                                             value={policyEditForm.max_leave_per_month}
                                             onChange={(e) => {
@@ -261,6 +263,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <label>3-Year Anniversary Bonus</label>
                                         <input
                                             type="number"
+                                            step="0.5"
                                             min="0"
                                             value={policyEditForm.anniversary_3_year_bonus}
                                             onChange={(e) => {
@@ -274,6 +277,7 @@ const LeaveRulesPage: React.FC = () => {
                                         <label>5-Year Anniversary Bonus</label>
                                         <input
                                             type="number"
+                                            step="0.5"
                                             min="0"
                                             value={policyEditForm.anniversary_5_year_bonus}
                                             onChange={(e) => {
