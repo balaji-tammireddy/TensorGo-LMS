@@ -3642,6 +3642,7 @@ export const getApprovedLeaves = async (
         lr.super_admin_approval_comment,
         lr.last_updated_by,
         lr.last_updated_by_role,
+        lr.updated_at,
         last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name,
         COALESCE(SUM(CASE WHEN ld.day_status = 'approved' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS approved_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'rejected' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS rejected_days,
@@ -3682,9 +3683,9 @@ export const getApprovedLeaves = async (
 
   query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-              lr.last_updated_by, lr.last_updated_by_role,
+              lr.last_updated_by, lr.last_updated_by_role, lr.updated_at,
               last_updater.first_name, last_updater.last_name, u.status, u.role
-     ORDER BY lr.start_date ASC, lr.applied_date DESC
+     ORDER BY lr.applied_date DESC, lr.updated_at DESC
      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 
   params.push(limit, offset);
@@ -3836,6 +3837,7 @@ export const getApprovedLeaves = async (
       } : undefined,
       noOfDays,
       leaveStatus: displayStatus,
+      updatedAt: row.updated_at,
       rejectionReason,
       approverName,
       approverRole,

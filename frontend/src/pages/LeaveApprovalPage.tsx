@@ -37,8 +37,8 @@ const LeaveApprovalPage: React.FC = () => {
   const [recentSearchInput, setRecentSearchInput] = useState('');
   const [recentSearch, setRecentSearch] = useState('');
   const [recentSortConfig, setRecentSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
-    key: 'startDate',
-    direction: 'asc'
+    key: 'appliedDate',
+    direction: 'desc'
   });
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -561,6 +561,14 @@ const LeaveApprovalPage: React.FC = () => {
       .sort((a: any, b: any) => {
         if (!recentSortConfig.key || !recentSortConfig.direction) return 0;
 
+        const getProp = (obj: any, key: string) => {
+          if (obj[key] !== undefined) return obj[key];
+          // Try snake_case if key is camelCase
+          const snakeKey = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+          if (obj[snakeKey] !== undefined) return obj[snakeKey];
+          return undefined;
+        };
+
         const parseDate = (dateStr: any) => {
           if (!dateStr) return 0;
           if (typeof dateStr !== 'string') {
@@ -568,27 +576,24 @@ const LeaveApprovalPage: React.FC = () => {
             return isNaN(d.getTime()) ? 0 : d.getTime();
           }
 
-          // More robust matching for YYYY-MM-DD or DD-MM-YYYY
-          const match = dateStr.match(/^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})/);
-          if (match) {
-            const [, p1, p2, p3] = match;
+          // Handle "YYYY-MM-DD" or "DD-MM-YYYY" or anything with separators
+          const parts = dateStr.match(/(\d+)/g);
+          if (parts && parts.length >= 3) {
             let y, m, d;
-            if (p1.length === 4) { // YYYY-MM-DD
-              y = parseInt(p1, 10);
-              m = parseInt(p2, 10) - 1;
-              d = parseInt(p3, 10);
-            } else if (p3.length === 4) { // DD-MM-YYYY
-              y = parseInt(p3, 10);
-              m = parseInt(p2, 10) - 1;
-              d = parseInt(p1, 10);
+            if (parts[0].length === 4) { // YYYY, MM, DD
+              y = parseInt(parts[0], 10);
+              m = parseInt(parts[1], 10) - 1;
+              d = parseInt(parts[2], 10);
+            } else if (parts[2].length === 4) { // DD, MM, YYYY
+              y = parseInt(parts[2], 10);
+              m = parseInt(parts[1], 10) - 1;
+              d = parseInt(parts[0], 10);
             } else {
-              // Fallback for 2-digit years if any
-              y = parseInt(p3, 10) + (parseInt(p3, 10) < 50 ? 2000 : 1900);
-              m = parseInt(p2, 10) - 1;
-              d = parseInt(p1, 10);
+              // Fallback
+              const dateObj = new Date(dateStr);
+              return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
             }
-            const dateObj = new Date(y, m, d);
-            return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
+            return new Date(y, m, d).getTime();
           }
 
           const fallbackDate = new Date(dateStr);
@@ -596,8 +601,8 @@ const LeaveApprovalPage: React.FC = () => {
         };
 
         const key = recentSortConfig.key;
-        const valA = parseDate(a[key]);
-        const valB = parseDate(b[key]);
+        const valA = parseDate(getProp(a, key));
+        const valB = parseDate(getProp(b, key));
 
         // Primary sort
         let result = 0;
@@ -607,8 +612,19 @@ const LeaveApprovalPage: React.FC = () => {
           result = valB - valA;
         }
 
-        // If primary sort values are equal or both invalid, use secondary sort (ID descending for stability)
+        // If primary sort values are equal or both invalid, use secondary sort (Applied Date Descending then Latest Approval/Update)
         if (result === 0) {
+          if (key !== 'appliedDate') {
+            const appliedA = parseDate(getProp(a, 'appliedDate'));
+            const appliedB = parseDate(getProp(b, 'appliedDate'));
+            if (appliedA !== appliedB) return appliedB - appliedA; // appliedDate DESC
+          }
+
+          // Latest Approval/Update tie-breaker
+          const updateA = parseDate(getProp(a, 'updatedAt'));
+          const updateB = parseDate(getProp(b, 'updatedAt'));
+          if (updateA !== updateB) return updateB - updateA; // updatedAt DESC
+
           return (b.id || 0) - (a.id || 0);
         }
 
