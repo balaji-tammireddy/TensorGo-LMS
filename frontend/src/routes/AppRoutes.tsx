@@ -21,6 +21,8 @@ const AccessDeniedPage = lazy(() => import('../pages/AccessDeniedPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const LeaveRulesPage = lazy(() => import('../pages/LeaveRulesPage'));
+const ProjectDashboard = lazy(() => import('../pages/ProjectManagement/ProjectDashboard').then(m => ({ default: m.ProjectDashboard })));
+const ProjectWorkspace = lazy(() => import('../pages/ProjectManagement/ProjectWorkspace').then(m => ({ default: m.ProjectWorkspace })));
 
 import * as policyService from '../services/policyService';
 
@@ -158,6 +160,22 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['super_admin']}>
               <LeaveRulesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project-management"
+          element={
+            <ProtectedRoute>
+              <ProjectDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project-management/:id"
+          element={
+            <ProtectedRoute>
+              <ProjectWorkspace />
             </ProtectedRoute>
           }
         />

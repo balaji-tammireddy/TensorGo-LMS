@@ -7,16 +7,18 @@ interface EmptyStateProps {
     description: string;
     icon?: LucideIcon;
     size?: 'default' | 'small';
+    className?: string;
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({
     title,
     description,
     icon: Icon = ClipboardX, // Default icon
-    size = 'default'
+    size = 'default',
+    className = ''
 }) => {
     return (
-        <div className={`empty-state-container ${size === 'small' ? 'empty-state-small' : ''}`}>
+        <div className={`empty-state-container ${size === 'small' ? 'empty-state-small' : ''} ${className}`}>
             <div className="empty-state-icon-wrapper">
                 <Icon size={size === 'small' ? 24 : 32} strokeWidth={1.5} />
             </div>

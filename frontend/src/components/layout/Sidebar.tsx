@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog, FaBriefcase } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -76,6 +76,11 @@ const Sidebar: React.FC = memo(() => {
     // View Policies - Available to all
     routes.push({ path: '/view-policies', icon: <FaBook />, label: 'View Policies' });
 
+    // Project Management - For Manager, HR, Super Admin
+    if (['manager', 'hr', 'super_admin'].includes(user.role)) {
+      routes.push({ path: '/project-management', icon: <FaBriefcase />, label: 'Projects' });
+    }
+
     // Profile is always available
     routes.push({ path: '/profile', icon: <FaUser />, label: 'Profile' });
 
@@ -99,7 +104,7 @@ const Sidebar: React.FC = memo(() => {
         {availableRoutes.map((route) => (
           <div
             key={route.path}
-            className={`nav-item ${location.pathname === route.path ? 'active' : ''}`}
+            className={`nav-item ${location.pathname === route.path || (route.path === '/project-management' && location.pathname.startsWith('/project-management/')) ? 'active' : ''}`}
             onClick={() => navigate(route.path)}
             title={route.label}
           >

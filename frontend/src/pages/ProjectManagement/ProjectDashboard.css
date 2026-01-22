@@ -1,0 +1,321 @@
+/* Project Dashboard Styles - Matching ViewPoliciesPage Glassmorphism + New Empty State */
+
+.project-dashboard {
+    padding: 30px;
+    font-family: 'Poppins', sans-serif;
+    animation: vp-fadeIn 0.5s ease-out;
+    /* Removed max-width and margin auto to use full space */
+}
+
+@keyframes vp-fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    padding: 0 10px;
+}
+
+.dashboard-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    padding-left: 15px;
+    border-left: 5px solid #2563EB;
+    /* Thick blue bar */
+    line-height: 1.2;
+}
+
+.dashboard-header p {
+    color: #6b7280;
+    font-size: 16px;
+    margin-top: 8px;
+    padding-left: 20px;
+    /* Align with text start */
+}
+
+.btn-create {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #3c6ff2 0%, #2951c8 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s;
+    box-shadow: 0 4px 10px rgba(60, 111, 242, 0.22);
+}
+
+.btn-create:hover {
+    background: linear-gradient(135deg, #2951c8 0%, #1e3d8f 100%);
+    box-shadow: 0 8px 18px rgba(60, 111, 242, 0.28);
+}
+
+/* Glassmorphism Grid */
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+    .projects-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.project-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    padding: 30px 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s ease;
+    min-height: 420px;
+    overflow: hidden;
+}
+
+.project-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+.project-card:hover::after {
+    opacity: 1;
+}
+
+.icon-wrapper {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: #EBF5FF;
+    color: #3B82F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    transition: transform 0.3s ease;
+}
+
+.project-card:hover .icon-wrapper {
+    transform: scale(1.05);
+}
+
+.project-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.project-desc {
+    color: #6B7280;
+    font-size: 15px;
+    margin-bottom: 24px;
+    min-height: 24px;
+}
+
+/* Status Badge - Top Right */
+.status-badge {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.status-active {
+    background-color: #ECFDF5;
+    color: #10B981;
+    border: 1px solid #D1FAE5;
+}
+
+.status-completed {
+    background-color: #F3F4F6;
+    color: #374151;
+    border: 1px solid #E5E7EB;
+}
+
+.status-other {
+    background-color: #FFFBEB;
+    color: #B45309;
+    border: 1px solid #FDE68A;
+}
+
+/* Dates Section */
+.project-dates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.date-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #9CA3AF;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Buttons */
+.card-footer-actions {
+    margin-top: auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.btn-view-details {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    color: #3B82F6;
+    border: 1px solid #3B82F6;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-view-details:hover {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-delete-project {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    color: #EF4444;
+    border: 1px solid #EF4444;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-delete-project:hover {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* ID Badge Removed as per new design implication or styled differently? */
+/* user didn't show it in screenshot, hiding it */
+.project-id-badge {
+    display: none;
+}
+
+/* Loading State */
+.project-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    backdrop-filter: blur(5px);
+    color: #6b7280;
+    font-size: 18px;
+    border: 1px dashed #d1d5db;
+}
+
+/* New Empty State - Matching Reference Image */
+.project-empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    background-color: #F8FAFC;
+    border: 1px dashed #E2E8F0;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.empty-state-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    background-color: #E2E8F0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+    margin-bottom: 16px;
+}
+
+.empty-state-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 8px;
+}
+
+.empty-state-desc {
+    font-size: 0.875rem;
+    color: #64748B;
+}

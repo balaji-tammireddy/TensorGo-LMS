@@ -310,6 +310,44 @@ async function migrate() {
       console.warn('Seed data migration warning:', seedError.message);
     }
 
+    // Run project management module migration (017)
+    try {
+      const projectsMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '017_project_management_module.sql'),
+        'utf-8'
+      );
+      await pool.query(projectsMigrationFile);
+      console.log('Project management module (017) migration completed');
+    } catch (projectsError: any) {
+      if (!projectsError.message.includes('already exists') && !projectsError.message.includes('duplicate')) {
+        console.warn('Project management migration warning:', projectsError.message);
+      }
+    }
+
+    // Run fix projects schema migration (018)
+    try {
+      const fixProjectsMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '018_fix_projects_schema.sql'),
+        'utf-8'
+      );
+      await pool.query(fixProjectsMigrationFile);
+      console.log('Fix projects schema (018) migration completed');
+    } catch (fixError: any) {
+      console.warn('Fix projects schema warning:', fixError.message);
+    }
+
+    // Run recreate projects tables migration (019)
+    try {
+      const recreateProjectsMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '019_recreate_project_tables.sql'),
+        'utf-8'
+      );
+      await pool.query(recreateProjectsMigrationFile);
+      console.log('Recreate projects tables (019) migration completed');
+    } catch (recreateError: any) {
+      console.warn('Recreate projects tables warning:', recreateError.message);
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);
