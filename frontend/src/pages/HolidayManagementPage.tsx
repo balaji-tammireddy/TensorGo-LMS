@@ -143,6 +143,21 @@ const HolidayManagementPage: React.FC = () => {
         today.setHours(0, 0, 0, 0);
 
         if (isEditMode && editHolidayId) {
+            const originalHoliday = holidaysData.find((h: any) => h.id === editHolidayId);
+
+            if (originalHoliday) {
+                const isNameSame = originalHoliday.name === formData.holidayName.trim();
+                const isDateSame = originalHoliday.date === formData.holidayDate;
+
+                if (isNameSame && isDateSame) {
+                    setIsEditMode(false);
+                    setEditHolidayId(null);
+                    setFormData({ holidayDate: '', holidayName: '' });
+                    setResetKey(prev => prev + 1);
+                    return;
+                }
+            }
+
             updateMutation.mutate({
                 id: editHolidayId,
                 holidayDate: formData.holidayDate,
