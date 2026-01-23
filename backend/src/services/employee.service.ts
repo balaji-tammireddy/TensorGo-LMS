@@ -4,6 +4,8 @@ import { logger } from '../utils/logger';
 import { formatDateLocal } from '../utils/dateCalculator';
 import * as emailTemplates from '../utils/emailTemplates';
 import { calculateAllLeaveCredits } from '../utils/leaveCredit';
+import { toTitleCase } from '../utils/stringUtils';
+
 
 export const getEmployees = async (
   page: number = 1,
@@ -548,20 +550,20 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       employeeData.email,
       passwordHash,
       role,
-      employeeData.firstName,
-      employeeData.middleName || null,
-      employeeData.lastName || null,
+      toTitleCase(employeeData.firstName),
+      toTitleCase(employeeData.middleName),
+      toTitleCase(employeeData.lastName),
       employeeData.contactNumber || null,
       employeeData.altContact || null,
       employeeData.dateOfBirth || null,
       employeeData.gender || null,
       employeeData.bloodGroup || null,
       employeeData.maritalStatus || null,
-      employeeData.emergencyContactName || null,
+      toTitleCase(employeeData.emergencyContactName),
       employeeData.emergencyContactNo || null,
-      employeeData.emergencyContactRelation || null,
-      employeeData.designation || null,
-      employeeData.department || null,
+      toTitleCase(employeeData.emergencyContactRelation),
+      toTitleCase(employeeData.designation),
+      toTitleCase(employeeData.department),
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
       (() => {
@@ -577,10 +579,10 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
         }
         return pan;
       })(),
-      employeeData.currentAddress || null,
-      employeeData.permanentAddress || null,
+      toTitleCase(employeeData.currentAddress),
+      toTitleCase(employeeData.permanentAddress),
       reportingManagerId,
-      reportingManagerName,
+      toTitleCase(reportingManagerName),
       employeeData.status || 'active'
     ]
   );
@@ -625,9 +627,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       const prefix = fields[edu.level];
       if (prefix) {
         setClauses.push(`${prefix}_stream = $${eduParamIndex++}`);
-        eduValues.push(edu.groupStream || null);
+        eduValues.push(toTitleCase(edu.groupStream));
         setClauses.push(`${prefix}_college = $${eduParamIndex++}`);
-        eduValues.push(edu.collegeUniversity || null);
+        eduValues.push(toTitleCase(edu.collegeUniversity));
         setClauses.push(`${prefix}_year = $${eduParamIndex++}`);
         eduValues.push(edu.year || null);
         setClauses.push(`${prefix}_percentage = $${eduParamIndex++}`);
@@ -1175,6 +1177,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     updates.push(`${dbKey} = $${paramCount}`);
     processedKeys.add(dbKey);
 
+    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'designation', 'department', 'current_address', 'permanent_address', 'reporting_manager_name'];
+
     if (dbKey === 'pan_number' && typeof value === 'string') {
       const pan = value.trim().toUpperCase();
       if (pan && pan.length !== 10) {
@@ -1187,6 +1191,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
       }
       values.push(pan || null);
+    } else if (textFields.includes(dbKey) && typeof value === 'string') {
+      // Apply title case to text fields
+      values.push(toTitleCase(value));
     } else {
       // Treat empty strings as null for optional fields (except required ones)
       const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
@@ -1396,9 +1403,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     for (const [level, prefix] of Object.entries(fields)) {
       const edu = educationMap[level];
       eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
-      eduValues.push(edu?.groupStream || null);
+      eduValues.push(toTitleCase(edu?.groupStream));
       eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
-      eduValues.push(edu?.collegeUniversity || null);
+      eduValues.push(toTitleCase(edu?.collegeUniversity));
       eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
       eduValues.push(edu?.year || null);
       eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);
