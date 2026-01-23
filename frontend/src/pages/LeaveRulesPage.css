@@ -445,6 +445,10 @@
     padding: 4px 10px;
     border-radius: 20px;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
 }
 
 .status-pill.active {

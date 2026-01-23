@@ -1134,13 +1134,16 @@
 
 /* Status Badges */
 .status-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
   text-transform: capitalize;
   white-space: nowrap;
+  min-width: 100px;
 }
 
 .status-applied {

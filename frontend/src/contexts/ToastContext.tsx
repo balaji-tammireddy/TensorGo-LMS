@@ -41,13 +41,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const id = Math.random().toString(36).substring(7);
       const newToast: Toast = { id, message, type, duration };
 
-      setToasts((prev) => {
-        // Prevent multiple identical toasts - remove the old one if it exists
-        const filtered = prev.filter(t => t.message !== message || t.type !== type);
-        // Limit total number of active toasts to 3
-        const limited = filtered.length >= 3 ? filtered.slice(1) : filtered;
-        return [...limited, newToast];
-      });
+      setToasts([newToast]);
 
       setTimeout(() => {
         removeToast(id);

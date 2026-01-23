@@ -164,9 +164,10 @@ tr:hover {
   border-radius: 20px;
   font-size: 11px;
   font-weight: 700;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 130px;
-  text-align: center;
   text-transform: capitalize;
   letter-spacing: 0.05em;
   color: #fff;

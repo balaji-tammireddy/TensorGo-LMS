@@ -21,6 +21,8 @@ const HolidayManagementPage: React.FC = () => {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [selectedHoliday, setSelectedHoliday] = useState<{ id: number; name: string } | null>(null);
     const [resetKey, setResetKey] = useState(0);
+    const dateInputRef = React.useRef<HTMLInputElement>(null);
+    const nameInputRef = React.useRef<HTMLInputElement>(null);
 
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -128,13 +130,15 @@ const HolidayManagementPage: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.holidayName.trim()) {
-            showError('Holiday Name is required');
+        if (!formData.holidayDate) {
+            showError('Holiday Date is required');
+            dateInputRef.current?.focus();
             return;
         }
 
-        if (!formData.holidayDate) {
-            showError('Holiday Date is required');
+        if (!formData.holidayName.trim()) {
+            showError('Holiday Name is required');
+            nameInputRef.current?.focus();
             return;
         }
 
@@ -224,6 +228,7 @@ const HolidayManagementPage: React.FC = () => {
                                 <label>Holiday Date <span className="required-indicator">*</span></label>
                                 <DatePicker
                                     key={resetKey}
+                                    ref={dateInputRef}
                                     value={formData.holidayDate}
                                     onChange={handleDateChange}
                                     placeholder="DD - MM - YYYY"
@@ -235,6 +240,7 @@ const HolidayManagementPage: React.FC = () => {
                             <div className="hm-form-group hm-form-group-name">
                                 <label>Holiday Name <span className="required-indicator">*</span></label>
                                 <input
+                                    ref={nameInputRef}
                                     type="text"
                                     value={formData.holidayName}
                                     onChange={(e) => {
@@ -335,7 +341,7 @@ const HolidayManagementPage: React.FC = () => {
                                                     <td>{holiday.name}</td>
                                                     <td>{dayName}</td>
                                                     <td>
-                                                        <div className="actions-wrapper" style={{ display: 'flex', gap: '8px' }}>
+                                                        <div className="actions-wrapper" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
                                                             <button
                                                                 className="action-btn edit-btn"
                                                                 onClick={() => !isPast && handleEdit(holiday)}

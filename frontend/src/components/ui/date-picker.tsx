@@ -18,9 +18,10 @@ interface DatePickerProps {
   isEmployeeVariant?: boolean; // Toggle specific behavior for Add Employee
   displayFormat?: string;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  id?: string;
 }
 
-export const DatePicker: React.FC<DatePickerProps> = ({
+export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(({
   value,
   onChange,
   min,
@@ -32,8 +33,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   allowManualEntry = false,
   isEmployeeVariant = false,
   displayFormat,
-  onBlur
-}) => {
+  onBlur,
+  id
+}, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
@@ -281,6 +283,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
       >
         <input
+          ref={ref}
+          id={id}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
@@ -325,7 +329,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       )}
     </div>
   );
-};
+});
 
 const CalendarIcon = () => (
   <svg
