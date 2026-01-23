@@ -326,8 +326,13 @@ const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
   };
 
   const formatDateSafe = (dateStr: string) => {
+    if (!dateStr) return '';
     try {
-      const date = new Date(dateStr + 'T12:00:00');
+      // If it already has a time or is in a complex format, try to parse directly
+      const hasTime = dateStr.includes('T') || dateStr.includes(' ');
+      const date = new Date(hasTime ? dateStr : `${dateStr}T12:00:00`);
+
+      if (isNaN(date.getTime())) return dateStr;
       return format(date, 'dd-MM-yyyy');
     } catch {
       return dateStr;

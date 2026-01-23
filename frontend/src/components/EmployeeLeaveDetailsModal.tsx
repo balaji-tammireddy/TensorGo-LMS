@@ -31,6 +31,7 @@ interface EmployeeLeaveDetailsModalProps {
     empStatus?: string | null;
     canEdit?: boolean;
     canDelete?: boolean;
+    timeForPermission?: { start: string; end: string } | null;
   } | null;
   onClose: () => void;
   onEdit?: () => void;
@@ -77,8 +78,12 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
   };
 
   const formatDateSafe = (dateStr: string) => {
+    if (!dateStr) return '';
     try {
-      const date = new Date(dateStr + 'T12:00:00');
+      const hasTime = dateStr.includes('T') || dateStr.includes(' ');
+      const date = new Date(hasTime ? dateStr : `${dateStr}T12:00:00`);
+
+      if (isNaN(date.getTime())) return dateStr;
       return format(date, 'dd-MM-yyyy');
     } catch {
       return dateStr;
@@ -125,30 +130,57 @@ const EmployeeLeaveDetailsModal: React.FC<EmployeeLeaveDetailsModalProps> = ({
               <div className="leave-detail-value">{getLeaveTypeLabel(leaveRequest.leaveType)}</div>
             </div>
 
-            <div className="leave-detail-item">
-              <label>Start Date</label>
-              <div className="leave-detail-value">
-                {formatDateSafe(leaveRequest.startDate)}
-                {leaveRequest.startType && leaveRequest.startType !== 'full' && (
-                  <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.startType)})</span>
-                )}
-              </div>
-            </div>
+            {leaveRequest.leaveType === 'permission' ? (
+              <>
+                <div className="leave-detail-item">
+                  <label>Date</label>
+                  <div className="leave-detail-value">
+                    {formatDateSafe(leaveRequest.startDate)}
+                  </div>
+                </div>
+                <div className="leave-detail-item">
+                  <label>Start Time</label>
+                  <div className="leave-detail-value">
+                    <span className="day-type-badge">{leaveRequest.timeForPermission?.start}</span>
+                  </div>
+                </div>
+                <div className="leave-detail-item">
+                  <label>End Time</label>
+                  <div className="leave-detail-value">
+                    <span className="day-type-badge">{leaveRequest.timeForPermission?.end}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="leave-detail-item">
+                  <label>Start Date</label>
+                  <div className="leave-detail-value">
+                    {formatDateSafe(leaveRequest.startDate)}
+                    {leaveRequest.startType && leaveRequest.startType !== 'full' && (
+                      <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.startType)})</span>
+                    )}
+                  </div>
+                </div>
 
-            <div className="leave-detail-item">
-              <label>End Date</label>
-              <div className="leave-detail-value">
-                {formatDateSafe(leaveRequest.endDate)}
-                {leaveRequest.endType && leaveRequest.endType !== 'full' && (
-                  <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.endType)})</span>
-                )}
-              </div>
-            </div>
+                <div className="leave-detail-item">
+                  <label>End Date</label>
+                  <div className="leave-detail-value">
+                    {formatDateSafe(leaveRequest.endDate)}
+                    {leaveRequest.endType && leaveRequest.endType !== 'full' && (
+                      <span className="day-type-badge"> ({getDayTypeLabel(leaveRequest.endType)})</span>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
-            <div className="leave-detail-item">
-              <label>Number of Days</label>
-              <div className="leave-detail-value">{leaveRequest.noOfDays}</div>
-            </div>
+            {leaveRequest.leaveType !== 'permission' && (
+              <div className="leave-detail-item">
+                <label>Number of Days</label>
+                <div className="leave-detail-value">{leaveRequest.noOfDays}</div>
+              </div>
+            )}
 
             <div className="leave-detail-item">
               <label>Current Status</label>

@@ -212,11 +212,28 @@ const LeaveApprovalPage: React.FC = () => {
     }
   );
 
-  const handleEditClick = (request: any) => {
-    // Find the original request from pendingRequests (not expanded)
-    const originalRequest = (pendingData?.requests || []).find((r: any) => r.id === request.id);
-    if (originalRequest) {
-      setSelectedRequest(originalRequest);
+  const handleEditClick = async (request: any) => {
+    try {
+      // Fetch full details to ensure we have everything, including timeForPermission
+      const detailRequest = await leaveService.getLeaveRequest(request.id);
+
+      // Find the original request from pendingRequests to get other list-level data
+      const originalRequest = (pendingData?.requests || []).find((r: any) => r.id === request.id);
+
+      if (originalRequest) {
+        setSelectedRequest({
+          ...originalRequest,
+          ...detailRequest,
+          // Prioritize detailRequest fields if they exist
+          timeForPermission: detailRequest.timeForPermission || originalRequest.timeForPermission || null,
+          leaveReason: detailRequest.reason || originalRequest.leaveReason || originalRequest.reason
+        });
+        setIsModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to load pending request details:', error);
+      // Fallback to just using the list item if detail fetch fails
+      setSelectedRequest(request);
       setIsModalOpen(true);
     }
   };
@@ -261,6 +278,7 @@ const LeaveApprovalPage: React.FC = () => {
           approverName: fullRequest.approverName || request.approverName || null,
           approverRole: fullRequest.approverRole || request.approverRole || null,
           empStatus: fullRequest.empStatus || request.empStatus || null,
+          timeForPermission: fullRequest.timeForPermission || request.timeForPermission || null,
           leaveDays: fullRequest.leaveDays || [],
           canEdit: (() => {
             const lastUpdatedBy = fullRequest.lastUpdatedByRole;
@@ -330,6 +348,7 @@ const LeaveApprovalPage: React.FC = () => {
         approverName: fullRequest.approverName || request.approverName || null,
         approverRole: fullRequest.approverRole || request.approverRole || null,
         empStatus: fullRequest.empStatus || request.empStatus || null,
+        timeForPermission: fullRequest.timeForPermission || request.timeForPermission || null,
         leaveDays: fullRequest.leaveDays || []
       });
       // Only set edit mode for HR and Super Admin
@@ -458,7 +477,7 @@ const LeaveApprovalPage: React.FC = () => {
       }
       const str = value.toString();
       if (!str || str.toLowerCase() === 'invalid date') return '';
-      const hasTime = str.includes('T');
+      const hasTime = str.includes('T') || str.includes(' ');
       const d = new Date(hasTime ? str : `${str}T12:00:00`);
       if (isNaN(d.getTime())) return '';
       return format(d, 'dd-MM-yyyy');
@@ -816,9 +835,13 @@ const LeaveApprovalPage: React.FC = () => {
                   ) : (
                     groupedPendingRequests.map((request: any) => {
                       const isUpdating = updatingRequestIds.has(request.id);
-                      const leaveDateRange = request.leaveDays && request.leaveDays.length > 0
-                        ? `${formatDateSafe(request.startDate)} to ${formatDateSafe(request.endDate)}`
-                        : formatDateSafe(request.startDate);
+                      const leaveDateRange = (() => {
+                        const start = formatDateSafe(request.startDate);
+                        const end = formatDateSafe(request.endDate);
+                        const isSameDay = start === end;
+
+                        return isSameDay ? start : `${start} to ${end}`;
+                      })();
                       return (
                         <tr
                           key={request.id}
@@ -992,10 +1015,21 @@ const LeaveApprovalPage: React.FC = () => {
                           </td>
                           <td>{formatDateSafe(request.appliedDate)}</td>
                           <td>
-                            {request.leaveDate && request.leaveDate.includes(' to ')
-                              ? request.leaveDate.split(' to ').map((d: string) => formatDateSafe(d)).join(' to ')
-                              : formatDateSafe(request.leaveDate || request.startDate) + (request.startDate !== request.endDate && !request.leaveDate ? ` to ${formatDateSafe(request.endDate)}` : '')
-                            }
+                            {(() => {
+                              const start = formatDateSafe(request.startDate);
+                              const end = formatDateSafe(request.endDate);
+                              const isSameDay = start === end;
+
+                              if (request.leaveDate && request.leaveDate.includes(' to ')) {
+                                // Double check if it's the same day even if leaveDate has ' to '
+                                const parts = request.leaveDate.split(' to ');
+                                const p1 = formatDateSafe(parts[0]);
+                                const p2 = formatDateSafe(parts[1]);
+                                return p1 === p2 ? p1 : `${p1} to ${p2}`;
+                              }
+
+                              return isSameDay ? start : `${start} to ${end}`;
+                            })()}
                           </td>
                           <td>{request.leaveType === 'lop' ? 'LOP' : request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)}</td>
                           <td>{request.noOfDays}</td>

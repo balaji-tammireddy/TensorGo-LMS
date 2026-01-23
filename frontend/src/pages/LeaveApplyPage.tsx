@@ -1487,6 +1487,7 @@ const LeaveApplyPage: React.FC = () => {
         doctorNote: request.doctorNote || null,
         leaveDays: request.leaveDays || [],
         empStatus: request.empStatus || null,
+        timeForPermission: request.timeForPermission || null,
         canEdit: request.canEdit,
         canDelete: request.canDelete
       });
