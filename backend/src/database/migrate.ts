@@ -69,13 +69,15 @@ async function migrate() {
       CHECK (status IN ('active', 'inactive', 'on_leave', 'terminated', 'resigned', 'on_notice'));
     `);
 
-    // Allow 'intern' in users role check (idempotent)
+    // Allow 'intern' in users user_role check (idempotent)
     await pool.query(`
       ALTER TABLE users
       DROP CONSTRAINT IF EXISTS users_role_check;
       ALTER TABLE users
-      ADD CONSTRAINT users_role_check
-      CHECK (role IN ('employee', 'manager', 'hr', 'super_admin', 'intern'));
+      DROP CONSTRAINT IF EXISTS users_user_role_check;
+      ALTER TABLE users
+      ADD CONSTRAINT users_user_role_check
+      CHECK (user_role IN ('employee', 'manager', 'hr', 'super_admin', 'intern'));
     `);
 
     // Leave rules insertion disabled - rules cannot be changed until explicitly enabled
@@ -305,7 +307,7 @@ async function migrate() {
         'utf-8'
       );
       await pool.query(seedDataMigrationFile);
-    console.log('Leave rules seed data (016) completed');
+      console.log('Leave rules seed data (016) completed');
     } catch (seedError: any) {
       console.warn('Seed data migration warning:', seedError.message);
     }
@@ -320,7 +322,7 @@ async function migrate() {
       console.log('Balance constraints migration (017) completed');
     } catch (constraintError: any) {
       if (!constraintError.message.includes('already exists') && !constraintError.message.includes('duplicate')) {
-         console.warn('Balance constraint migration warning:', constraintError.message);
+        console.warn('Balance constraint migration warning:', constraintError.message);
       }
     }
 
@@ -330,7 +332,7 @@ async function migrate() {
       const colCheck = await pool.query(
         "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='user_role'"
       );
-      
+
       if (colCheck.rows.length === 0) {
         const renameRoleMigrationFile = readFileSync(
           join(__dirname, 'migrations', '018_rename_role_column.sql'),
@@ -342,7 +344,7 @@ async function migrate() {
         console.log('Rename role column migration (018) skipped (user_role column already exists)');
       }
     } catch (renameError: any) {
-       console.warn('Rename role column migration warning:', renameError.message);
+      console.warn('Rename role column migration warning:', renameError.message);
     }
 
     console.log('Default data inserted');

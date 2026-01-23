@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   must_change_password BOOLEAN DEFAULT true,
-  role VARCHAR(20) NOT NULL CHECK (role IN ('employee', 'manager', 'hr', 'super_admin')),
+  user_role VARCHAR(20) NOT NULL CHECK (user_role IN ('employee', 'manager', 'hr', 'super_admin')),
   first_name VARCHAR(100) NOT NULL,
   middle_name VARCHAR(100),
   last_name VARCHAR(100),
@@ -53,7 +53,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS reporting_manager_name VARCHAR(100);
 
 CREATE INDEX IF NOT EXISTS idx_users_emp_id ON users(emp_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_user_role ON users(user_role);
 CREATE INDEX IF NOT EXISTS idx_users_reporting_manager ON users(reporting_manager_id);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
