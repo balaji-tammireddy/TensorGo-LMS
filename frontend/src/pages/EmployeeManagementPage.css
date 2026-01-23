@@ -27,7 +27,7 @@
 }
 
 .search-box input {
-  
+
   border: 1px solid #d7deec;
   border-radius: 4px;
   font-size: 14px;
@@ -169,7 +169,7 @@
   font-size: 14px;
   font-weight: 600;
   color: #333;
-  text-align: center;
+  text-align: left;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -177,14 +177,14 @@
 
 .employees-table thead th:last-child,
 .employees-table tbody td:last-child {
-  text-align: center;
+  text-align: left;
 }
 
 .employees-table tbody td {
   border-bottom: 1px solid #ddd;
   padding: 12px;
   color: #333;
-  text-align: center;
+  text-align: left;
   vertical-align: middle;
 }
 
@@ -223,7 +223,7 @@
 /* Using global action-btn styles */
 
 .no-results-row {
-  text-align: center;
+  text-align: left;
   padding: 16px 0;
   color: #777;
   font-size: 12px;
@@ -434,14 +434,14 @@
   border: 1px solid #e0e0e0;
   padding: 10px 12px;
   vertical-align: middle;
-  text-align: center;
+  text-align: left;
 }
 
 .education-table thead th {
   background-color: #ffffff;
   font-size: 12px;
   font-weight: 700;
-  text-align: center;
+  text-align: left;
   color: #333;
   color: #333;
   border-bottom: 2px solid #eee;
@@ -493,7 +493,7 @@
 
 .education-table td:nth-child(4) input,
 .education-table td:nth-child(5) input {
-  text-align: center;
+  text-align: left;
 }
 
 .employee-modal-footer {
@@ -698,7 +698,7 @@
 .header-sort-wrapper {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
 }
 

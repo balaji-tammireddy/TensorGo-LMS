@@ -318,14 +318,14 @@
 .education-table td {
   border: 1px solid #e0e0e0;
   padding: 6px 8px;
-  text-align: center;
+  text-align: left;
 }
 
 .education-table thead th {
   background-color: #f8f9fa;
   font-size: 11px;
   font-weight: 600;
-  text-align: center;
+  text-align: left;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -347,13 +347,13 @@
 .education-table th:nth-child(5),
 .education-table td:nth-child(5) {
   width: 12%;
-  text-align: center;
+  text-align: left;
 }
 
 /* Center text inside Graduation Year and Score % inputs */
 .education-table td:nth-child(4) input,
 .education-table td:nth-child(5) input {
-  text-align: center;
+  text-align: left;
 }
 
 .education-level-col {
@@ -362,7 +362,7 @@
 
 .education-level-cell {
   width: 60px;
-  text-align: center;
+  text-align: left;
   background-color: #f7f7f7;
   font-weight: 500;
 }

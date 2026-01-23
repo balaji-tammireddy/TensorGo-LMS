@@ -752,7 +752,7 @@ const LeaveApprovalPage: React.FC = () => {
                     <th>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <div className="header-sort-wrapper" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          <div className="header-sort-wrapper" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '4px' }}>
                             Leave Type
                             <Button
                               variant="ghost"

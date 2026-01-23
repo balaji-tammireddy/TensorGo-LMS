@@ -264,7 +264,7 @@
 
 .hm-loading-message,
 .hm-no-holidays-message {
-    text-align: center;
+    text-align: left;
     padding: 40px 20px;
     color: #666;
     font-size: 14px;
@@ -303,7 +303,7 @@
 .hm-table th,
 .hm-table td {
     padding: 12px;
-    text-align: center;
+    text-align: left;
     border-bottom: 1px solid #ddd;
     font-size: 13px;
 }
@@ -326,7 +326,7 @@
 
 .hm-table th:last-child,
 .hm-table td:last-child {
-    text-align: center;
+    text-align: left;
     width: 100px;
 }
 
@@ -405,7 +405,7 @@
 .header-sort-wrapper {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 8px;
 }
 
