@@ -281,24 +281,24 @@ export const applyLeave = async (
 
     // Fetch user role and reporting manager info
     const userResult = await pool.query(
-      `SELECT u.role as employee_role, u.status,
+      `SELECT u.user_role as employee_role, u.status,
               COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
               u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
               u.emp_id as employee_emp_id, 
               COALESCE(rm.email, sa.sa_email) as manager_email, 
               COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as manager_name,
-              COALESCE(rm.role, 'super_admin') as manager_role, 
+              COALESCE(rm.user_role, 'super_admin') as manager_role, 
               rm.reporting_manager_id as hr_id, 
               hr.email as hr_email,
               hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name, 
-              hr.role as hr_role
+              hr.user_role as hr_role
       FROM users u
       LEFT JOIN users rm ON u.reporting_manager_id = rm.id
       LEFT JOIN users hr ON rm.reporting_manager_id = hr.id
       LEFT JOIN LATERAL (
         SELECT id as sa_id, email as sa_email, first_name || ' ' || COALESCE(last_name, '') as sa_full_name
         FROM users 
-        WHERE role = 'super_admin'
+        WHERE user_role = 'super_admin'
         ORDER BY id ASC
         LIMIT 1
       ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
@@ -579,7 +579,14 @@ export const applyLeave = async (
 
       if (leaveData.leaveType !== 'permission') {
         const balanceColumn = leaveData.leaveType === 'casual' ? 'casual_balance' : leaveData.leaveType === 'sick' ? 'sick_balance' : 'lop_balance';
-        await client.query(`UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
+        try {
+          await client.query(`UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
+        } catch (err: any) {
+          if (err.code === '23514' || (err.message && err.message.includes('check_'))) {
+            throw new Error(`Insufficient ${leaveData.leaveType} leave balance`);
+          }
+          throw err;
+        }
       }
 
       await client.query('COMMIT');
@@ -845,7 +852,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
              lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
              lr.last_updated_by, lr.last_updated_by_role,
              u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-             u.status AS emp_status, u.role AS emp_role,
+             u.status AS emp_status, u.user_role AS emp_role,
              last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
       FROM leave_requests lr
       JOIN users u ON u.id = lr.employee_id
@@ -872,7 +879,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
             lr.last_updated_by, lr.last_updated_by_role,
             u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-            u.status AS emp_status, u.role AS emp_role,
+            u.status AS emp_status, u.user_role AS emp_role,
             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
      FROM leave_requests lr
      JOIN users u ON u.id = lr.employee_id
@@ -984,7 +991,7 @@ export const updateLeaveRequest = async (
   logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}, Leave Type: ${leaveData.leaveType}, Start: ${leaveData.startDate}, End: ${leaveData.endDate}`);
   // Verify the request and authorization
   const checkResult = await pool.query(
-    'SELECT lr.current_status, lr.employee_id, lr.leave_type, lr.no_of_days, u.role as employee_role FROM leave_requests lr JOIN users u ON lr.employee_id = u.id WHERE lr.id = $1',
+    'SELECT lr.current_status, lr.employee_id, lr.leave_type, lr.no_of_days, u.user_role as employee_role FROM leave_requests lr JOIN users u ON lr.employee_id = u.id WHERE lr.id = $1',
     [requestId]
   );
 
@@ -1031,7 +1038,7 @@ export const updateLeaveRequest = async (
          u.reporting_manager_id = $2    -- I am Direct Manager (L1)
          OR l1.reporting_manager_id = $2   -- I am Manager's Manager (L2)
        ) 
-       AND LOWER(u.role) IN ('intern', 'employee', 'manager')`,
+       AND LOWER(u.user_role) IN ('intern', 'employee', 'manager')`,
       [checkResult.rows[0].employee_id, userId]
     );
     if (permissionCheck.rows.length === 0) {
@@ -1368,7 +1375,14 @@ export const updateLeaveRequest = async (
     // 2. Deduct new balance (if not permission)
     if (leaveData.leaveType !== 'permission') {
       const newBalanceColumn = leaveData.leaveType === 'casual' ? 'casual_balance' : leaveData.leaveType === 'sick' ? 'sick_balance' : 'lop_balance';
-      await client.query(`UPDATE leave_balances SET ${newBalanceColumn} = ${newBalanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
+      try {
+        await client.query(`UPDATE leave_balances SET ${newBalanceColumn} = ${newBalanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
+      } catch (err: any) {
+        if (err.code === '23514' || (err.message && err.message.includes('check_'))) {
+          throw new Error(`Insufficient ${leaveData.leaveType} leave balance`);
+        }
+        throw err;
+      }
     }
 
     // Format dates as YYYY-MM-DD for database
@@ -1590,7 +1604,7 @@ export const getPendingLeaveRequests = async (
   // Build query based on role
   // Removed DISTINCT as lr.id is primary key and joins are 1:1, improving query execution time
   let query = `
-    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status, u.role as emp_role,
+    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status, u.user_role as emp_role,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
@@ -1817,7 +1831,7 @@ export const approveLeave = async (
     `SELECT 
       lr.*, 
       u.reporting_manager_id, 
-      u.role as employee_role,
+      u.user_role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
@@ -2003,7 +2017,7 @@ export const rejectLeave = async (
     `SELECT 
       lr.*, 
       u.reporting_manager_id, 
-      u.role as employee_role,
+      u.user_role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
@@ -2305,7 +2319,7 @@ export const approveLeaveDay = async (
     `SELECT 
       lr.*, 
       u.reporting_manager_id, 
-      u.role as employee_role,
+      u.user_role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
@@ -2529,7 +2543,7 @@ export const approveLeaveDays = async (
     `SELECT 
       lr.*, 
       u.reporting_manager_id, 
-      u.role as employee_role,
+      u.user_role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
@@ -2860,7 +2874,7 @@ export const rejectLeaveDay = async (
     `SELECT 
       lr.*, 
       u.reporting_manager_id, 
-      u.role as employee_role,
+      u.user_role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
@@ -3125,7 +3139,7 @@ export const rejectLeaveDays = async (
     `SELECT 
       lr.*, 
       u.reporting_manager_id, 
-      u.role as employee_role,
+      u.user_role as employee_role,
       u.email as employee_email,
       u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
       u.emp_id as employee_emp_id,
@@ -3331,7 +3345,7 @@ export const updateLeaveStatus = async (
     await client.query('BEGIN');
 
     const leaveResult = await client.query(
-      `SELECT lr.*, u.role as employee_role, u.email as employee_email,
+      `SELECT lr.*, u.user_role as employee_role, u.email as employee_email,
               u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
               approver.first_name || ' ' || COALESCE(approver.last_name, '') as approver_name,
               lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date
@@ -3628,7 +3642,7 @@ export const getApprovedLeaves = async (
         u.emp_id,
         u.first_name || ' ' || COALESCE(u.last_name, '') AS emp_name,
         u.status AS emp_status,
-        u.role AS emp_role,
+        u.user_role AS emp_role,
         lr.applied_date,
         lr.start_date,
         lr.end_date,
@@ -3672,7 +3686,7 @@ export const getApprovedLeaves = async (
     query += ` AND lr.employee_id != $${params.length + 1} AND (
        u.reporting_manager_id = $${params.length + 1}
        OR l1.reporting_manager_id = $${params.length + 1}
-     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
+     ) AND LOWER(u.user_role) IN ('intern', 'employee', 'manager')`;
     params.push(approverId);
   }
   // MANAGER: Direct Reports
@@ -3684,7 +3698,7 @@ export const getApprovedLeaves = async (
   query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role, lr.updated_at,
-              last_updater.first_name, last_updater.last_name, u.status, u.role
+              last_updater.first_name, last_updater.last_name, u.status, u.user_role as role
      ORDER BY lr.applied_date DESC, lr.updated_at DESC
      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 
@@ -3715,7 +3729,7 @@ export const getApprovedLeaves = async (
     countQuery += ` AND lr.employee_id != $${countParams.length + 1} AND (
        u.reporting_manager_id = $${countParams.length + 1}
        OR l1.reporting_manager_id = $${countParams.length + 1}
-     ) AND LOWER(u.role) IN ('intern', 'employee', 'manager')`;
+     ) AND LOWER(u.user_role) IN ('intern', 'employee', 'manager')`;
     countParams.push(approverId);
   }
   // MANAGER: Direct Reports
@@ -3983,7 +3997,7 @@ export const convertLeaveRequestLopToCasual = async (requestId: number, adminUse
     // 9. Send notification email - Fire and forget
     (async () => {
       try {
-        const adminResult = await pool.query('SELECT first_name, emp_id, role FROM users WHERE id = $1', [adminUserId]);
+        const adminResult = await pool.query('SELECT first_name, emp_id, user_role as role FROM users WHERE id = $1', [adminUserId]);
         const admin = adminResult.rows[0];
 
         await sendLopToCasualConversionEmail(request.email, {

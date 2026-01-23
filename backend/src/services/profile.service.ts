@@ -112,7 +112,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   logger.info(`[PROFILE] [UPDATE PROFILE] Validating with User Role: '${userRole}'`);
 
   // Fetch current user data for validation and role-based restrictions
-  const currentValues = await pool.query('SELECT role, status, date_of_birth, date_of_joining, emp_id, email, designation, department, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [userId]);
+  const currentValues = await pool.query('SELECT user_role as role, status, date_of_birth, date_of_joining, emp_id, email, designation, department, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [userId]);
   if (currentValues.rows.length === 0) {
     throw new Error('User not found');
   }
@@ -374,7 +374,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   // Only Super Admin or HR should be able to update reporting manager (via /employees/:id API, not here)
   if (profileData.reportingManagerId !== undefined && (userRole === 'super_admin' || userRole === 'hr')) {
     if (profileData.reportingManagerId) {
-      const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [profileData.reportingManagerId]);
+      const managerResult = await pool.query('SELECT user_role as role, status FROM users WHERE id = $1', [profileData.reportingManagerId]);
       if (managerResult.rows.length > 0) {
         const { status: managerStatus, role: managerRole } = managerResult.rows[0];
         const targetRole = currentValues.rows[0].role;
@@ -561,9 +561,9 @@ export const getReportingManagers = async (search?: string, employeeRole?: strin
   }
 
   let query = `
-SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name, role
+SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name, user_role as role
 FROM users
-WHERE role = ANY($1) AND status IN ('active', 'on_leave')
+WHERE user_role = ANY($1) AND status IN ('active', 'on_leave')
 `;
   const params: any[] = [targetRoles];
   let paramIndex = 2;

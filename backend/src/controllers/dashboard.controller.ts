@@ -11,10 +11,10 @@ export const getStats = async (req: AuthRequest, res: Response) => {
         // or just showing all "active" employees in the broader sense.
         // Usually dashboards show current workforce.
         const query = `
-      SELECT role, COUNT(*) as count
+      SELECT user_role as role, COUNT(*) as count
       FROM users
       WHERE status IN ('active', 'on_leave', 'on_notice')
-      GROUP BY role
+      GROUP BY user_role
     `;
 
         const result = await pool.query(query);
@@ -55,7 +55,7 @@ export const getHierarchy = async (req: AuthRequest, res: Response) => {
       SELECT 
         id, 
         first_name || ' ' || COALESCE(last_name, '') as name,
-        role,
+        user_role as role,
         designation,
         reporting_manager_id,
         profile_photo_url,
@@ -63,7 +63,7 @@ export const getHierarchy = async (req: AuthRequest, res: Response) => {
         emp_id
       FROM users
       WHERE status IN ('active', 'on_leave', 'on_notice')
-      ORDER BY role = 'super_admin' DESC, first_name ASC
+      ORDER BY user_role = 'super_admin' DESC, first_name ASC
     `;
 
         const result = await pool.query(query);

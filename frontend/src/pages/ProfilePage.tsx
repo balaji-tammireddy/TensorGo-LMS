@@ -792,7 +792,12 @@ const ProfilePage: React.FC = () => {
                   <button
                     className="save-button"
                     onClick={handleSave}
-                    disabled={updateMutation.isLoading || uploadPhotoMutation.isLoading || deletePhotoMutation.isLoading}
+                    disabled={
+                      updateMutation.isLoading ||
+                      uploadPhotoMutation.isLoading ||
+                      deletePhotoMutation.isLoading ||
+                      (JSON.stringify(formData) === JSON.stringify(initialFormData) && !pendingPhotoAction)
+                    }
                   >
                     {updateMutation.isLoading ? (
                       <>

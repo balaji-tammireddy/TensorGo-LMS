@@ -21,7 +21,7 @@ export const getEmployees = async (
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
-           designation as position, date_of_joining as joining_date, status, role,
+           designation as position, date_of_joining as joining_date, status, user_role as role,
            profile_photo_url as profile_photo_key
     FROM users
     WHERE 1=1
@@ -52,7 +52,7 @@ export const getEmployees = async (
   }
 
   if (role) {
-    query += ` AND role = $${params.length + 1}`;
+    query += ` AND user_role = $${params.length + 1}`;
     params.push(role);
   }
 
@@ -62,7 +62,24 @@ export const getEmployees = async (
     params.push(joiningDate);
   }
 
-  query += ` ORDER BY emp_id ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  if (search) {
+    logger.info(`[EMPLOYEE] [GET EMPLOYEES] Applying search sort preference for: ${search}`);
+    // Prioritize results starting with the search term
+    const prefixParamIdx = params.length + 1;
+    params.push(`${search}%`);
+
+    query += ` ORDER BY 
+      CASE 
+        WHEN first_name ILIKE $${prefixParamIdx} THEN 0 
+        WHEN emp_id ILIKE $${prefixParamIdx} THEN 1
+        ELSE 2 
+      END, 
+      emp_id ASC`;
+  } else {
+    query += ` ORDER BY emp_id ASC`;
+  }
+
+  query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
   const result = await pool.query(query, params);
@@ -87,7 +104,7 @@ export const getEmployees = async (
   }
 
   if (role) {
-    countQuery += ` AND role = $${countParams.length + 1}`;
+    countQuery += ` AND user_role = $${countParams.length + 1}`;
     countParams.push(role);
   }
 
@@ -149,7 +166,7 @@ export const getEmployeeById = async (employeeId: number) => {
   logger.info(`[EMPLOYEE] [GET EMPLOYEE BY ID] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [GET EMPLOYEE BY ID] Employee ID: ${employeeId}`);
   const result = await pool.query(
-    `SELECT u.*, 
+    `SELECT u.*, u.user_role as role,
             COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
             COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
             COALESCE(sc.subordinate_count, 0) as subordinate_count
@@ -158,10 +175,10 @@ export const getEmployeeById = async (employeeId: number) => {
      LEFT JOIN LATERAL (
        SELECT id as sa_id, first_name || ' ' || COALESCE(last_name, '') as sa_full_name
        FROM users 
-       WHERE role = 'super_admin'
+       WHERE user_role = 'super_admin'
        ORDER BY id ASC
        LIMIT 1
-     ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
+     ) sa ON u.reporting_manager_id IS NULL AND u.user_role != 'super_admin'
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::integer as subordinate_count 
        FROM users sub 
@@ -217,6 +234,17 @@ export const getEmployeeById = async (employeeId: number) => {
 
 export const createEmployee = async (employeeData: any, requesterRole?: string, requesterId?: number) => {
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
+
+  // Remove leading zeros from empId if it's a numeric ID
+  if (employeeData.empId) {
+    const empIdStr = employeeData.empId.toString().trim();
+    // If it's purely numeric, convert to integer and back to remove leading zeros
+    if (/^\d+$/.test(empIdStr)) {
+      employeeData.empId = parseInt(empIdStr, 10).toString();
+    }
+    // Otherwise keep the original value (for alphanumeric IDs like "SA 0001")
+  }
+
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}, Requester: ${requesterRole || 'none'}`);
 
   // Only super_admin can create another super_admin
@@ -426,7 +454,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     throw new Error('Employee ID is required');
   }
 
-  const empId = employeeData.empId.trim().toUpperCase();
+  // employeeData.empId has already been cleaned of leading zeros at the top of this function
+  // Now just apply trim and uppercase normalization
+  const empId = employeeData.empId.toString().trim().toUpperCase();
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Normalized Employee ID: ${empId}`);
 
   // Validate employee ID length (max 20 characters)
@@ -498,9 +528,19 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     throw new Error('Contact Number and Emergency Contact Number cannot be the same');
   }
 
+  // Determine default password based on joining year (e.g. tensorgo@2026)
+  let defaultPassword = 'tensorgo@2023';
+  if (employeeData.dateOfJoining) {
+    const startYear = new Date(employeeData.dateOfJoining).getFullYear();
+    if (!isNaN(startYear)) {
+      defaultPassword = `tensorgo@${startYear}`;
+    }
+  }
+  const finalPassword = employeeData.password || defaultPassword;
+
   // Default password for newly created employees (if none explicitly provided)
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Hashing password`);
-  const passwordHash = await hashPassword(employeeData.password || 'tensorgo@2023');
+  const passwordHash = await hashPassword(finalPassword);
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Password hashed successfully`);
 
   // Super admin should not have a reporting manager
@@ -510,7 +550,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   // Validate reporting manager status and hierarchy
   if (reportingManagerId) {
-    const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [reportingManagerId]);
+    const managerResult = await pool.query('SELECT user_role as role, status FROM users WHERE id = $1', [reportingManagerId]);
     if (managerResult.rows.length > 0) {
       const { status: managerStatus, role: managerRole } = managerResult.rows[0];
 
@@ -537,7 +577,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Inserting employee into database`);
   const result = await pool.query(
     `INSERT INTO users (
-      emp_id, email, password_hash, role, first_name, middle_name, last_name,
+      emp_id, email, password_hash, user_role, first_name, middle_name, last_name,
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
@@ -651,7 +691,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
     const loginUrl = 'http://51.15.227.10:3000/login';
-    const temporaryPassword = employeeData.password || 'tensorgo@2023';
+    const temporaryPassword = finalPassword;
 
     await emailTemplates.sendNewEmployeeCredentialsEmail(employeeData.email, {
       employeeName: `${employeeData.firstName} ${employeeData.middleName || ''} ${employeeData.lastName || ''}`.trim(),
@@ -673,6 +713,17 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
 export const updateEmployee = async (employeeId: number, employeeData: any, requesterRole?: string, requesterId?: number) => {
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
+
+  // Remove leading zeros from empId if it's a numeric ID
+  if (employeeData.empId) {
+    const empIdStr = employeeData.empId.toString().trim();
+    // If it's purely numeric, convert to integer and back to remove leading zeros
+    if (/^\d+$/.test(empIdStr)) {
+      employeeData.empId = parseInt(empIdStr, 10).toString();
+    }
+    // Otherwise keep the original value (for alphanumeric IDs like "SA 0001")
+  }
+
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${employeeId}, Requester Role: ${requesterRole || 'none'}, Requester ID: ${requesterId || 'none'}`);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Fields to update: ${Object.keys(employeeData).join(', ')}`);
 
@@ -953,7 +1004,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Validate reporting manager status and hierarchy if it's being updated
   if (employeeData.reportingManagerId) {
-    const managerResult = await pool.query('SELECT role, status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
+    const managerResult = await pool.query('SELECT user_role as role, status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
     if (managerResult.rows.length > 0) {
       const { status: managerStatus, role: managerRole } = managerResult.rows[0];
       const targetRole = employeeData.role || employeeRole;
@@ -981,7 +1032,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     if (isRoleBeingUpdated) {
       Object.keys(employeeData).forEach(key => {
         const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-        if (dbKey !== 'role') {
+        if (dbKey !== 'role' && dbKey !== 'user_role') {
           delete employeeData[key];
         }
       });
@@ -1015,7 +1066,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // HR and Super Admin can update role
   if (requesterRole === 'hr' || requesterRole === 'super_admin') {
-    allowedFields.push('role');
+    allowedFields.push('user_role');
   }
 
   // Only super_admin can update email, date_of_joining and emp_id
@@ -1069,7 +1120,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if emp_id is being updated and validate uniqueness
   if (employeeData.empId && requesterRole === 'super_admin') {
-    const empId = employeeData.empId.trim().toUpperCase();
+    // employeeData.empId has already been cleaned of leading zeros earlier
+    // Just apply uppercase normalization
+    const empId = employeeData.empId.toString().trim().toUpperCase();
     const empIdCheck = await pool.query(
       'SELECT id FROM users WHERE emp_id = $1 AND id != $2',
       [empId, employeeId]
@@ -1145,7 +1198,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     status: 'status',
     reportingManagerId: 'reporting_manager_id',
     reportingManagerName: 'reporting_manager_name',
-    empId: 'emp_id'
+    empId: 'emp_id',
+    role: 'user_role'
   };
 
   const processedKeys = new Set();
@@ -1169,7 +1223,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
 
     // Only super_admin can set/change someone to super_admin role
-    if (dbKey === 'role' && value === 'super_admin' && requesterRole !== 'super_admin') {
+    if (dbKey === 'user_role' && value === 'super_admin' && requesterRole !== 'super_admin') {
       logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to set super_admin role`);
       throw new Error('Only Super Admin can assign the Super Admin role');
     }
@@ -1231,7 +1285,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Found ${subordinatesResult.rows.length} subordinates. Finding Super Admin for reassignment.`);
       // Find Super Admin
       const superAdminResult = await pool.query(
-        'SELECT id, emp_id, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE role = \'super_admin\' ORDER BY id ASC LIMIT 1'
+        'SELECT id, emp_id, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE user_role = \'super_admin\' ORDER BY id ASC LIMIT 1'
       );
 
       if (superAdminResult.rows.length > 0) {
@@ -1462,7 +1516,7 @@ export const deleteEmployee = async (employeeId: number) => {
 
   // Check if employee exists
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Checking if employee exists`);
-  const result = await pool.query('SELECT id, role, first_name, last_name FROM users WHERE id = $1', [employeeId]);
+  const result = await pool.query('SELECT id, user_role as role, first_name, last_name FROM users WHERE id = $1', [employeeId]);
   if (result.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [DELETE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -1554,8 +1608,8 @@ export const addLeavesToEmployee = async (
 
   // Check roles for permission
   const [requesterResult, targetResult] = await Promise.all([
-    pool.query('SELECT role FROM users WHERE id = $1', [updatedBy]),
-    pool.query('SELECT role FROM users WHERE id = $1', [employeeId])
+    pool.query('SELECT user_role as role FROM users WHERE id = $1', [updatedBy]),
+    pool.query('SELECT user_role as role FROM users WHERE id = $1', [employeeId])
   ]);
 
   if (requesterResult.rows.length === 0) {

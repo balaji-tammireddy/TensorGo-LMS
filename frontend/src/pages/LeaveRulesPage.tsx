@@ -237,7 +237,7 @@ const LeaveRulesPage: React.FC = () => {
                     <div className="lr-modal-overlay">
                         <div className="lr-modal-container">
                             <div className="lr-modal-header">
-                                <h3>Edit Rules: {editingPolicy.leave_type_name} ({selectedRole.toUpperCase()})</h3>
+                                <h3>Edit Rules: {editingPolicy.leave_type_name} ({selectedRole === 'on_notice' ? 'On Notice' : selectedRole === 'hr' ? 'HR' : selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)})</h3>
                                 <button className="lr-modal-close" onClick={() => setEditingPolicy(null)}><FaTimes /></button>
                             </div>
                             <div className="lr-modal-body">
@@ -371,13 +371,25 @@ const LeaveRulesPage: React.FC = () => {
                                 <button
                                     className="lr-cancel-btn"
                                     onClick={() => {
+                                        // Format the original effective_from date properly
+                                        let formattedEffectiveFrom = '';
+                                        if (editingPolicy.effective_from) {
+                                            const d = new Date(editingPolicy.effective_from);
+                                            if (!isNaN(d.getTime())) {
+                                                const year = d.getFullYear();
+                                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                const day = String(d.getDate()).padStart(2, '0');
+                                                formattedEffectiveFrom = `${year}-${month}-${day}`;
+                                            }
+                                        }
+
                                         setPolicyEditForm({
                                             annual_credit: editingPolicy.annual_credit,
                                             carry_forward_limit: editingPolicy.carry_forward_limit,
                                             max_leave_per_month: editingPolicy.max_leave_per_month,
                                             anniversary_3_year_bonus: editingPolicy.anniversary_3_year_bonus,
                                             anniversary_5_year_bonus: editingPolicy.anniversary_5_year_bonus,
-                                            effective_from: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
+                                            effective_from: formattedEffectiveFrom
                                         });
                                     }}
                                 >

@@ -305,47 +305,44 @@ async function migrate() {
         'utf-8'
       );
       await pool.query(seedDataMigrationFile);
-      console.log('Leave rules seed data (016) completed');
+    console.log('Leave rules seed data (016) completed');
     } catch (seedError: any) {
       console.warn('Seed data migration warning:', seedError.message);
     }
 
-    // Run project management module migration (017)
+    // Run negative balance constraints migration (017)
     try {
-      const projectsMigrationFile = readFileSync(
-        join(__dirname, 'migrations', '017_project_management_module.sql'),
+      const balanceConstraintMigrationFile = readFileSync(
+        join(__dirname, 'migrations', '017_add_balance_constraints.sql'),
         'utf-8'
       );
-      await pool.query(projectsMigrationFile);
-      console.log('Project management module (017) migration completed');
-    } catch (projectsError: any) {
-      if (!projectsError.message.includes('already exists') && !projectsError.message.includes('duplicate')) {
-        console.warn('Project management migration warning:', projectsError.message);
+      await pool.query(balanceConstraintMigrationFile);
+      console.log('Balance constraints migration (017) completed');
+    } catch (constraintError: any) {
+      if (!constraintError.message.includes('already exists') && !constraintError.message.includes('duplicate')) {
+         console.warn('Balance constraint migration warning:', constraintError.message);
       }
     }
 
-    // Run fix projects schema migration (018)
+    // Run rename role column migration (018)
     try {
-      const fixProjectsMigrationFile = readFileSync(
-        join(__dirname, 'migrations', '018_fix_projects_schema.sql'),
-        'utf-8'
+      // Check if user_role column already exists to avoid error
+      const colCheck = await pool.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='user_role'"
       );
-      await pool.query(fixProjectsMigrationFile);
-      console.log('Fix projects schema (018) migration completed');
-    } catch (fixError: any) {
-      console.warn('Fix projects schema warning:', fixError.message);
-    }
-
-    // Run recreate projects tables migration (019)
-    try {
-      const recreateProjectsMigrationFile = readFileSync(
-        join(__dirname, 'migrations', '019_recreate_project_tables.sql'),
-        'utf-8'
-      );
-      await pool.query(recreateProjectsMigrationFile);
-      console.log('Recreate projects tables (019) migration completed');
-    } catch (recreateError: any) {
-      console.warn('Recreate projects tables warning:', recreateError.message);
+      
+      if (colCheck.rows.length === 0) {
+        const renameRoleMigrationFile = readFileSync(
+          join(__dirname, 'migrations', '018_rename_role_column.sql'),
+          'utf-8'
+        );
+        await pool.query(renameRoleMigrationFile);
+        console.log('Rename role column migration (018) completed');
+      } else {
+        console.log('Rename role column migration (018) skipped (user_role column already exists)');
+      }
+    } catch (renameError: any) {
+       console.warn('Rename role column migration warning:', renameError.message);
     }
 
     console.log('Default data inserted');

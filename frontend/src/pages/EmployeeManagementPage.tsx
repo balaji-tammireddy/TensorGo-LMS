@@ -303,6 +303,12 @@ const EmployeeManagementPage: React.FC = () => {
 
   const sortedEmployees = React.useMemo(() => {
     if (!employeesData?.employees) return [];
+
+    // If we are searching and using default sort, use backend's relevance sort
+    if (appliedSearch && sortConfig.key === 'empId' && sortConfig.direction === 'asc') {
+      return employeesData.employees;
+    }
+
     return [...employeesData.employees].sort((a, b) => {
       if (sortConfig.key === 'empId') {
         const aId = parseInt(a.empId) || 0;
@@ -747,8 +753,12 @@ const EmployeeManagementPage: React.FC = () => {
       return acc;
     }, {});
 
+    // Remove leading zeros from empId while saving
+    const formattedEmpId = newEmployee.empId ? newEmployee.empId.toString().replace(/^0+/, '') : '';
+
     const payload = {
       ...sanitizedNewEmployee,
+      empId: formattedEmpId || newEmployee.empId, // If it becomes empty (like '000'), fallback to original
       role: newEmployee.role || 'employee'
     };
 

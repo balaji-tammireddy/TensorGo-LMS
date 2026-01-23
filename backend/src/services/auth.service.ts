@@ -27,7 +27,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
   logger.info(`[AUTH] [LOGIN] Normalized email: ${normalizedEmail}`);
 
   const result = await pool.query(
-    'SELECT id, emp_id, email, password_hash, role, first_name, last_name, status, must_change_password, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
+    'SELECT id, emp_id, email, password_hash, user_role as role, first_name, last_name, status, must_change_password, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
     [normalizedEmail]
   );
 
@@ -88,7 +88,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
 
 export const validateUser = async (userId: number) => {
   const result = await pool.query(
-    'SELECT id, emp_id, email, role, first_name, last_name, status, must_change_password, token_version FROM users WHERE id = $1',
+    'SELECT id, emp_id, email, user_role as role, first_name, last_name, status, must_change_password, token_version FROM users WHERE id = $1',
     [userId]
   );
 
