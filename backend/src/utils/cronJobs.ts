@@ -41,7 +41,7 @@ const sendDailyPendingLeaveReminders = async () => {
       try {
         // Get manager role
         const managerRoleResult = await pool.query(
-          'SELECT role FROM users WHERE id = $1',
+          'SELECT user_role as role FROM users WHERE id = $1',
           [manager.manager_id]
         );
         const managerRole = managerRoleResult.rows[0]?.role || '';
@@ -223,7 +223,7 @@ const checkAndSendHolidayListReminder = async () => {
 
     // 2. Get all Super Admins for CC
     const adminResult = await pool.query(
-      `SELECT email FROM users WHERE role = 'super_admin' AND status NOT IN ('inactive', 'resigned')`
+      `SELECT email FROM users WHERE user_role = 'super_admin' AND status NOT IN ('inactive', 'resigned')`
     );
 
     // Filter out admins who might also be HR to avoid duplicate/confusion (optional, but safe)
@@ -305,7 +305,7 @@ const autoApprovePastPendingLeaves = async () => {
       if (pastRequests.length > 0) {
         // Get a Super Admin ID to use as the system approver
         const superAdminResult = await client.query(
-          "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
+          "SELECT id FROM users WHERE user_role = 'super_admin' LIMIT 1"
         );
         const superAdminId = superAdminResult.rows[0]?.id;
 

@@ -13,7 +13,7 @@ export const getStats = async (req: AuthRequest, res: Response) => {
         const query = `
       SELECT user_role as role, COUNT(*) as count
       FROM users
-      WHERE user_status IN ('active', 'on_leave', 'on_notice')
+      WHERE status IN ('active', 'on_leave', 'on_notice')
       GROUP BY user_role
     `;
 
@@ -59,10 +59,10 @@ export const getHierarchy = async (req: AuthRequest, res: Response) => {
         designation,
         reporting_manager_id,
         profile_photo_url,
-        user_status as status,
+        status as status,
         emp_id
       FROM users
-      WHERE user_status IN ('active', 'on_leave', 'on_notice')
+      WHERE status IN ('active', 'on_leave', 'on_notice')
       ORDER BY user_role = 'super_admin' DESC, first_name ASC
     `;
 

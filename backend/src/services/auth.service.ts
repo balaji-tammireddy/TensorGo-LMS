@@ -27,7 +27,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
   logger.info(`[AUTH] [LOGIN] Normalized email: ${normalizedEmail}`);
 
   const result = await pool.query(
-    'SELECT id, emp_id, email, password_hash, user_role as role, first_name, last_name, user_status as status, must_change_password, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
+    'SELECT id, emp_id, email, password_hash, user_role as role, first_name, last_name, status as status, must_change_password, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
     [normalizedEmail]
   );
 
@@ -88,7 +88,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
 
 export const validateUser = async (userId: number) => {
   const result = await pool.query(
-    'SELECT id, emp_id, email, user_role as role, first_name, last_name, user_status as status, must_change_password, token_version FROM users WHERE id = $1',
+    'SELECT id, emp_id, email, user_role as role, first_name, last_name, status as status, must_change_password, token_version FROM users WHERE id = $1',
     [userId]
   );
 
@@ -209,7 +209,7 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
 
   // Check if user exists and is active
   const userResult = await pool.query(
-    'SELECT id, email, first_name, last_name, user_status as status FROM users WHERE LOWER(TRIM(email)) = $1',
+    'SELECT id, email, first_name, last_name, status as status FROM users WHERE LOWER(TRIM(email)) = $1',
     [normalizedEmail]
   );
 
@@ -277,14 +277,14 @@ export const verifyPasswordResetOTP = async (email: string, otp: string): Promis
   // Find valid OTP
   logger.info(`[AUTH][VERIFY OTP] Searching for valid OTP`);
   const result = await pool.query(
-    `SELECT pr.id, pr.user_id, pr.expires_at, pr.is_used, u.user_status as status
+    `SELECT pr.id, pr.user_id, pr.expires_at, pr.is_used, u.status as status
      FROM password_reset_otps pr
      JOIN users u ON pr.user_id = u.id
      WHERE LOWER(TRIM(pr.email)) = $1 
        AND pr.otp = $2 
        AND pr.is_used = false
        AND pr.expires_at > NOW()
-       AND u.user_status = 'active'
+       AND u.status = 'active'
      ORDER BY pr.created_at DESC
      LIMIT 1`,
     [normalizedEmail, otp]
@@ -315,14 +315,14 @@ export const resetPasswordWithOTP = async (
   // Verify OTP
   logger.info(`[AUTH][RESET PASSWORD WITH OTP] Verifying OTP`);
   const otpResult = await pool.query(
-    `SELECT pr.id, pr.user_id, pr.expires_at, pr.is_used, u.user_status as status
+    `SELECT pr.id, pr.user_id, pr.expires_at, pr.is_used, u.status as status
      FROM password_reset_otps pr
      JOIN users u ON pr.user_id = u.id
      WHERE LOWER(TRIM(pr.email)) = $1 
        AND pr.otp = $2 
        AND pr.is_used = false
        AND pr.expires_at > NOW()
-       AND u.user_status = 'active'
+       AND u.status = 'active'
      ORDER BY pr.created_at DESC
      LIMIT 1`,
     [normalizedEmail, otp]

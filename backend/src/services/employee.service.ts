@@ -21,7 +21,7 @@ export const getEmployees = async (
   const offset = (page - 1) * limit;
   let query = `
     SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
-           designation as position, date_of_joining as joining_date, user_status as status, user_role as role,
+           designation as position, date_of_joining as joining_date, status as status, user_role as role,
            profile_photo_url as profile_photo_key
     FROM users
     WHERE 1=1
@@ -44,9 +44,9 @@ export const getEmployees = async (
   if (status) {
     if (status === 'inactive') {
       // Treat "inactive" as any non-active AND non-on-notice status
-      query += ` AND user_status NOT IN ('active', 'on_notice')`;
+      query += ` AND status NOT IN ('active', 'on_notice')`;
     } else {
-      query += ` AND user_status = $${params.length + 1}`;
+      query += ` AND status = $${params.length + 1}`;
       params.push(status);
     }
   }
@@ -96,9 +96,9 @@ export const getEmployees = async (
 
   if (status) {
     if (status === 'inactive') {
-      countQuery += ` AND user_status NOT IN ('active', 'on_notice')`;
+      countQuery += ` AND status NOT IN ('active', 'on_notice')`;
     } else {
-      countQuery += ` AND user_status = $${countParams.length + 1}`;
+      countQuery += ` AND status = $${countParams.length + 1}`;
       countParams.push(status);
     }
   }
@@ -166,7 +166,7 @@ export const getEmployeeById = async (employeeId: number) => {
   logger.info(`[EMPLOYEE] [GET EMPLOYEE BY ID] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [GET EMPLOYEE BY ID] Employee ID: ${employeeId}`);
   const result = await pool.query(
-    `SELECT u.*, u.user_role as role, u.user_status as status,
+    `SELECT u.*, u.user_role as role, u.status as status,
             COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
             COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
             COALESCE(sc.subordinate_count, 0) as subordinate_count
@@ -550,7 +550,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   // Validate reporting manager status and hierarchy
   if (reportingManagerId) {
-    const managerResult = await pool.query('SELECT user_role as role, user_status as status FROM users WHERE id = $1', [reportingManagerId]);
+    const managerResult = await pool.query('SELECT user_role as role, status as status FROM users WHERE id = $1', [reportingManagerId]);
     if (managerResult.rows.length > 0) {
       const { status: managerStatus, role: managerRole } = managerResult.rows[0];
 
@@ -581,7 +581,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, reporting_manager_name, user_status
+      current_address, permanent_address, reporting_manager_id, reporting_manager_name, status
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
     ) RETURNING id`,
@@ -849,7 +849,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query('SELECT id, user_role as role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -1004,7 +1004,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Validate reporting manager status and hierarchy if it's being updated
   if (employeeData.reportingManagerId) {
-    const managerResult = await pool.query('SELECT user_role as role, user_status as status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
+    const managerResult = await pool.query('SELECT user_role as role, status as status FROM users WHERE id = $1', [employeeData.reportingManagerId]);
     if (managerResult.rows.length > 0) {
       const { status: managerStatus, role: managerRole } = managerResult.rows[0];
       const targetRole = employeeData.role || employeeRole;
@@ -1195,7 +1195,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     panNumber: 'pan_number',
     currentAddress: 'current_address',
     permanentAddress: 'permanent_address',
-    status: 'user_status',
+    status: 'status',
     reportingManagerId: 'reporting_manager_id',
     reportingManagerName: 'reporting_manager_name',
     empId: 'emp_id',

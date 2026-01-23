@@ -5,7 +5,7 @@ async function checkHRUser() {
   try {
     // Check if HR user exists
     const result = await pool.query(
-      `SELECT id, emp_id, email, user_role as role, first_name, last_name, user_status as status, password_hash 
+      `SELECT id, emp_id, email, user_role as role, first_name, last_name, status as status, password_hash 
        FROM users 
        WHERE email = 'hr@tensorgo.com' OR user_role = 'hr'`,
       []

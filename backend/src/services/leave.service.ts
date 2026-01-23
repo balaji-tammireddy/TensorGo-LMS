@@ -29,7 +29,7 @@ export const getLeaveBalances = async (userId: number): Promise<any> => {
   logger.info(`[LEAVE] [GET LEAVE BALANCES] User ID: ${userId}`);
 
   // Get user role
-  const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+  const userResult = await pool.query('SELECT user_role as role FROM users WHERE id = $1', [userId]);
   const role = userResult.rows[0]?.role || 'employee';
 
   const result = await pool.query(
@@ -281,7 +281,7 @@ export const applyLeave = async (
 
     // Fetch user role and reporting manager info
     const userResult = await pool.query(
-      `SELECT u.user_role as employee_role, u.user_status as status,
+      `SELECT u.user_role as employee_role, u.status as status,
               COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
               u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
               u.emp_id as employee_emp_id, 
@@ -852,7 +852,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
              lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
              lr.last_updated_by, lr.last_updated_by_role,
              u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-             u.user_status AS emp_status, u.user_role AS emp_role,
+             u.status AS emp_status, u.user_role AS emp_role,
              last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
       FROM leave_requests lr
       JOIN users u ON u.id = lr.employee_id
@@ -879,7 +879,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
             lr.last_updated_by, lr.last_updated_by_role,
             u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
-            u.user_status AS emp_status, u.user_role AS emp_role,
+            u.status AS emp_status, u.user_role AS emp_role,
             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
      FROM leave_requests lr
      JOIN users u ON u.id = lr.employee_id
@@ -1604,7 +1604,7 @@ export const getPendingLeaveRequests = async (
   // Build query based on role
   // Removed DISTINCT as lr.id is primary key and joins are 1:1, improving query execution time
   let query = `
-    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.user_status as emp_status, u.user_role as emp_role,
+    SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status, u.user_role as emp_role,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
@@ -3641,7 +3641,7 @@ export const getApprovedLeaves = async (
         lr.id,
         u.emp_id,
         u.first_name || ' ' || COALESCE(u.last_name, '') AS emp_name,
-        u.user_status AS emp_status,
+        u.status AS emp_status,
         u.user_role AS emp_role,
         lr.applied_date,
         lr.start_date,
@@ -3698,7 +3698,7 @@ export const getApprovedLeaves = async (
   query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role, lr.updated_at,
-              last_updater.first_name, last_updater.last_name, u.user_status as status, u.user_role as role
+              last_updater.first_name, last_updater.last_name, u.status, u.user_role
      ORDER BY lr.applied_date DESC, lr.updated_at DESC
      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 

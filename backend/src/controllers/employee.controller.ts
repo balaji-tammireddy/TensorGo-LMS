@@ -224,7 +224,7 @@ export const addLeavesToEmployee = [
       // HR cannot add leaves to themselves or super_admin users
       if (req.user?.role === 'hr') {
         // Check if employee exists and get their role
-        const employeeCheckResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [employeeId]);
+        const employeeCheckResult = await pool.query('SELECT id, user_role as role FROM users WHERE id = $1', [employeeId]);
         if (employeeCheckResult.rows.length === 0) {
           return res.status(404).json({
             error: {
