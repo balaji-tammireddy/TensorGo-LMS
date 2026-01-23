@@ -10,7 +10,7 @@ export const getProfile = async (userId: number) => {
   const result = await pool.query(
     `SELECT u.*,
 COALESCE(rm.id, sa.sa_id) as reporting_manager_id,
-COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
+COALESCE(rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
 COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id
 FROM users u
 LEFT JOIN users rm ON u.reporting_manager_id = rm.id
@@ -82,10 +82,10 @@ WHERE u.id = $1`,
       scorePercentage: edu.score_percentage || null
     })),
     reportingManager:
-      user.reporting_manager_name || user.reporting_manager_id
+      user.reporting_manager_id
         ? {
           id: user.reporting_manager_id || null,
-          name: user.reporting_manager_name || user.reporting_manager_full_name,
+          name: user.reporting_manager_full_name,
           empId: user.reporting_manager_emp_id || null
         }
         : null,

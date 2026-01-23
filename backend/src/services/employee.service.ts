@@ -546,7 +546,6 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   // Super admin should not have a reporting manager
   const role = employeeData.role || 'employee';
   const reportingManagerId = role === 'super_admin' ? null : (employeeData.reportingManagerId || null);
-  const reportingManagerName = role === 'super_admin' ? null : (employeeData.reportingManagerName || null);
 
   // Validate reporting manager status and hierarchy
   if (reportingManagerId) {
@@ -581,9 +580,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, reporting_manager_name, status
+      current_address, permanent_address, reporting_manager_id, status
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
     ) RETURNING id`,
     [
       empId,
@@ -622,7 +621,6 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.currentAddress),
       toTitleCase(employeeData.permanentAddress),
       reportingManagerId,
-      toTitleCase(reportingManagerName),
       employeeData.status || 'active'
     ]
   );
@@ -849,7 +847,13 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
   // Check if employee exists and get their current state
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Checking if employee exists`);
-  const employeeCheck = await pool.query('SELECT id, user_role as role, status, first_name, last_name, date_of_birth, date_of_joining, reporting_manager_id, reporting_manager_name, email, emp_id, pg_year, ug_year, twelveth_year FROM users WHERE id = $1', [employeeId]);
+  const employeeCheck = await pool.query(`
+    SELECT u.id, u.user_role as role, u.status, u.first_name, u.last_name, u.date_of_birth, u.date_of_joining, 
+           u.reporting_manager_id, m.first_name || ' ' || COALESCE(m.last_name, '') as reporting_manager_name, 
+           u.email, u.emp_id, u.pg_year, u.ug_year, u.twelveth_year 
+    FROM users u 
+    LEFT JOIN users m ON u.reporting_manager_id = m.id 
+    WHERE u.id = $1`, [employeeId]);
   if (employeeCheck.rows.length === 0) {
     logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee not found - Employee ID: ${employeeId}`);
     throw new Error('Employee not found');
@@ -951,8 +955,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const isRoleBeingUpdated = fieldsBeingUpdated.includes('role');
 
   // Reporting manager required if role is being set and is not 'super_admin'
-  if (employeeData.role && employeeData.role !== 'super_admin' && !employeeData.reportingManagerId && !employeeData.reportingManagerName) {
-    if (!dbReportingManagerId && !dbReportingManagerName) {
+  if (employeeData.role && employeeData.role !== 'super_admin' && !employeeData.reportingManagerId) {
+    if (!dbReportingManagerId) {
       throw new Error('Reporting Manager is required');
     }
   }
@@ -1061,7 +1065,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation',
     'designation', 'department',
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
-    'reporting_manager_id', 'reporting_manager_name', 'status'
+    'reporting_manager_id', 'status'
   ];
 
   // HR and Super Admin can update role
@@ -1197,7 +1201,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     permanentAddress: 'permanent_address',
     status: 'status',
     reportingManagerId: 'reporting_manager_id',
-    reportingManagerName: 'reporting_manager_name',
     empId: 'emp_id',
     role: 'user_role'
   };
@@ -1231,7 +1234,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     updates.push(`${dbKey} = $${paramCount}`);
     processedKeys.add(dbKey);
 
-    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'designation', 'department', 'current_address', 'permanent_address', 'reporting_manager_name'];
+    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'designation', 'department', 'current_address', 'permanent_address'];
 
     if (dbKey === 'pan_number' && typeof value === 'string') {
       const pan = value.trim().toUpperCase();
@@ -1296,8 +1299,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         // Update subordinates
         await pool.query(
-          'UPDATE users SET reporting_manager_id = $1, reporting_manager_name = $2 WHERE reporting_manager_id = $3',
-          [managerId, managerName, employeeId]
+          'UPDATE users SET reporting_manager_id = $1 WHERE reporting_manager_id = $2',
+          [managerId, employeeId]
         );
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassigned ${subordinatesResult.rows.length} subordinates to ${managerName} (${managerEmpId})`);
 
@@ -1334,7 +1337,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   if (isManagerChanged) {
     try {
       const empResult = await pool.query(
-        `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.reporting_manager_name, m.emp_id as manager_emp_id 
+        `SELECT u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name, 
+                m.first_name || ' ' || COALESCE(m.last_name, '') as reporting_manager_name, 
+                m.emp_id as manager_emp_id 
          FROM users u 
          LEFT JOIN users m ON u.reporting_manager_id = m.id 
          WHERE u.id = $1`,

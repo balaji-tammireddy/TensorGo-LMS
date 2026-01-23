@@ -286,7 +286,7 @@ export const applyLeave = async (
               u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
               u.emp_id as employee_emp_id, 
               COALESCE(rm.email, sa.sa_email) as manager_email, 
-              COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as manager_name,
+              COALESCE(rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as manager_name,
               COALESCE(rm.user_role, 'super_admin') as manager_role, 
               rm.reporting_manager_id as hr_id, 
               hr.email as hr_email,

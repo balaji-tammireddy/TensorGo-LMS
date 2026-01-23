@@ -379,6 +379,26 @@ async function migrate() {
       console.warn('Revert status column migration warning:', revertError.message);
     }
 
+    // Run remove manager name column migration (021)
+    try {
+      const colCheck = await pool.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='reporting_manager_name'"
+      );
+
+      if (colCheck.rows.length > 0) {
+        const removeColumnFile = readFileSync(
+          join(__dirname, 'migrations', '021_remove_manager_name_column.sql'),
+          'utf-8'
+        );
+        await pool.query(removeColumnFile);
+        console.log('Remove manager name column migration (021) completed');
+      } else {
+        console.log('Remove manager name column migration (021) skipped (column already removed)');
+      }
+    } catch (removeError: any) {
+      console.warn('Remove manager name column migration warning:', removeError.message);
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);
