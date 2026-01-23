@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
     FaLaptop,
     FaComments,
@@ -34,7 +34,6 @@ const ViewPoliciesPage: React.FC = () => {
     const { user } = useAuth();
     const { showSuccess, showError } = useToast();
     const queryClient = useQueryClient();
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // State
     const [selectedPolicyId, setSelectedPolicyId] = useState<number | string | null>(null);
@@ -45,6 +44,7 @@ const ViewPoliciesPage: React.FC = () => {
     // Edit State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editPolicyTitle, setEditPolicyTitle] = useState('');
+    const [originalPolicyTitle, setOriginalPolicyTitle] = useState('');
     const [editPolicyFile, setEditPolicyFile] = useState<File | null>(null);
 
     // Confirmation Dialog State
@@ -105,7 +105,7 @@ const ViewPoliciesPage: React.FC = () => {
         {
             onSuccess: () => {
                 queryClient.invalidateQueries(['policies']);
-                showSuccess('Policy updated successfully');
+                showSuccess('Policy updated');
                 setIsEditModalOpen(false);
                 setSelectedPolicyId(null);
                 setEditPolicyTitle('');
@@ -151,8 +151,10 @@ const ViewPoliciesPage: React.FC = () => {
         const policy = displayPolicies?.find((p: any) => p.id === policyId);
         if (policy) {
             setEditPolicyTitle(policy.title);
+            setOriginalPolicyTitle(policy.title);
         } else {
             setEditPolicyTitle('');
+            setOriginalPolicyTitle('');
         }
 
         setSelectedPolicyId(policyId);
@@ -258,7 +260,7 @@ const ViewPoliciesPage: React.FC = () => {
                     <div className="vp-loading">Loading policies...</div>
                 ) : (
                     <div className="vp-grid">
-                        {displayPolicies.map((policy: PolicyDisplay) => (
+                        {displayPolicies?.map((policy: PolicyDisplay) => (
                             <div key={policy.id} className="vp-card">
                                 {canManage && (
                                     <button
@@ -449,7 +451,7 @@ const ViewPoliciesPage: React.FC = () => {
                                     <button
                                         type="submit"
                                         className="vp-save-button"
-                                        disabled={isProcessing || !editPolicyTitle.trim()}
+                                        disabled={isProcessing || !editPolicyTitle.trim() || (editPolicyTitle.trim() === originalPolicyTitle.trim() && !editPolicyFile)}
                                     >
                                         {updateMutation.isLoading || createMutation.isLoading ? 'Updating...' : 'Update Policy'}
                                     </button>

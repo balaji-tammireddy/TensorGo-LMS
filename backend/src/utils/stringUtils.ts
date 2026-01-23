@@ -11,7 +11,5 @@ export const toTitleCase = (str: string | null | undefined): string | null => {
 
     return trimmed
         .toLowerCase()
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+        .replace(/(?:^|\s|[,./#-])\w/g, (match) => match.toUpperCase());
 };

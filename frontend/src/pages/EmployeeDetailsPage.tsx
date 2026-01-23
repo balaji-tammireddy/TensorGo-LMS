@@ -67,6 +67,10 @@ const sanitizeLettersOnly = (value: string) => {
   return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
 };
 
+const sanitizeAddress = (value: string) => {
+  return value.toLowerCase().replace(/(?:^|\s|[,./#-])\w/g, (match) => match.toUpperCase());
+};
+
 const baseEducationLevels = ['PG', 'UG', '12th'];
 
 const getRoleLabel = (role: string) => {
@@ -964,7 +968,23 @@ const EmployeeDetailsPage: React.FC = () => {
               <textarea
                 rows={3}
                 value={employeeData.permanentAddress}
-                onChange={(e) => setEmployeeData((prev: any) => ({ ...prev, permanentAddress: e.target.value, currentAddress: isSameAddress ? e.target.value : prev.currentAddress }))}
+                onChange={(e) => {
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const value = sanitizeAddress(e.target.value);
+                  setEmployeeData((prev: any) => ({
+                    ...prev,
+                    permanentAddress: value,
+                    currentAddress: isSameAddress ? value : prev.currentAddress
+                  }));
+
+                  // Restore cursor position
+                  setTimeout(() => {
+                    if (input) {
+                      input.setSelectionRange(cursorPosition, cursorPosition);
+                    }
+                  }, 0);
+                }}
                 onBlur={() => {
                   if (!employeeData.permanentAddress || employeeData.permanentAddress.trim() === '') {
                     setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
@@ -984,7 +1004,19 @@ const EmployeeDetailsPage: React.FC = () => {
               <textarea
                 rows={3}
                 value={employeeData.currentAddress}
-                onChange={(e) => setEmployeeData({ ...employeeData, currentAddress: e.target.value })}
+                onChange={(e) => {
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const value = sanitizeAddress(e.target.value);
+                  setEmployeeData({ ...employeeData, currentAddress: value });
+
+                  // Restore cursor position
+                  setTimeout(() => {
+                    if (input) {
+                      input.setSelectionRange(cursorPosition, cursorPosition);
+                    }
+                  }, 0);
+                }}
                 onBlur={() => {
                   if (!employeeData.currentAddress || employeeData.currentAddress.trim() === '') {
                     setFormErrors((prev) => ({ ...prev, currentAddress: true }));

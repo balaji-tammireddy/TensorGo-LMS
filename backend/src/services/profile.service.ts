@@ -2,6 +2,7 @@ import { pool } from '../database/db';
 import { logger } from '../utils/logger';
 import { getSignedUrlFromOVH } from '../utils/storage';
 import { formatDateLocal } from '../utils/dateCalculator';
+import { toTitleCase } from '../utils/stringUtils';
 
 export const getProfile = async (userId: number) => {
   logger.info(`[PROFILE] [GET PROFILE] ========== FUNCTION CALLED ==========`);
@@ -243,7 +244,12 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
 
       if (value !== undefined) {
         // Treat empty strings as null
-        const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+        let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        // Apply title case to text fields
+        if (typeof finalValue === 'string' && allowedPersonalFields.includes(dbKey)) {
+          finalValue = toTitleCase(finalValue);
+        }
 
         // Check for required fields
         if (requiredPersonalInfo.includes(key) && finalValue === null) {
@@ -291,7 +297,12 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
       }
 
       if (value !== undefined) {
-        const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+        let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        // Apply title case to text fields (designation, department)
+        if (typeof finalValue === 'string') {
+          finalValue = toTitleCase(finalValue);
+        }
 
         if (requiredEmploymentInfo.includes(key) && finalValue === null) {
           throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
@@ -341,7 +352,12 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     for (const [key, value] of Object.entries(profileData.address)) {
       const dbKey = fieldMap[key] || key;
       if (value !== undefined) {
-        const finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+        let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
+
+        // Apply title case to address
+        if (typeof finalValue === 'string') {
+          finalValue = toTitleCase(finalValue);
+        }
 
         if (requiredAddress.includes(key) && finalValue === null) {
           throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);

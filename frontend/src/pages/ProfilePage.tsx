@@ -112,6 +112,10 @@ const ProfilePage: React.FC = () => {
     return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
   };
 
+  const sanitizeAddress = (value: string) => {
+    return value.toLowerCase().replace(/(?:^|\s|[,./#-])\w/g, (match) => match.toUpperCase());
+  };
+
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1580,7 +1584,9 @@ const ProfilePage: React.FC = () => {
               <textarea
                 value={formData.address?.permanentAddress || ''}
                 onChange={(e) => {
-                  const value = e.target.value;
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const value = sanitizeAddress(e.target.value);
                   setFormData((prev: any) => ({
                     ...prev,
                     address: {
@@ -1589,6 +1595,13 @@ const ProfilePage: React.FC = () => {
                       currentAddress: isSameAddress ? value : prev.address?.currentAddress
                     }
                   }));
+
+                  // Restore cursor position
+                  setTimeout(() => {
+                    if (input) {
+                      input.setSelectionRange(cursorPosition, cursorPosition);
+                    }
+                  }, 0);
                 }}
                 onBlur={() => {
                   if (!formData.address?.permanentAddress || formData.address.permanentAddress.trim() === '') {
@@ -1613,11 +1626,20 @@ const ProfilePage: React.FC = () => {
               <textarea
                 value={formData.address?.currentAddress || ''}
                 onChange={(e) => {
-                  const value = e.target.value;
+                  const input = e.target;
+                  const cursorPosition = input.selectionStart || 0;
+                  const value = sanitizeAddress(e.target.value);
                   setFormData((prev: any) => ({
                     ...prev,
                     address: { ...prev.address, currentAddress: value }
                   }));
+
+                  // Restore cursor position
+                  setTimeout(() => {
+                    if (input) {
+                      input.setSelectionRange(cursorPosition, cursorPosition);
+                    }
+                  }, 0);
                 }}
                 onBlur={() => {
                   if (!formData.address?.currentAddress || formData.address.currentAddress.trim() === '') {

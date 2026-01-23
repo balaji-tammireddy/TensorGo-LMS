@@ -98,6 +98,10 @@ const sanitizeLettersOnly = (value: string) => {
   return sanitized.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
 };
 
+const sanitizeAddress = (value: string) => {
+  return value.toLowerCase().replace(/(?:^|\s|[,./#-])\w/g, (match) => match.toUpperCase());
+};
+
 const baseEducationLevels = ['PG', 'UG', '12th'];
 
 const getRoleLabel = (role: string) => {
@@ -1978,15 +1982,25 @@ const EmployeeManagementPage: React.FC = () => {
                         <textarea
                           rows={3}
                           value={newEmployee.permanentAddress}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const input = e.target;
+                            const cursorPosition = input.selectionStart || 0;
+                            const value = sanitizeAddress(e.target.value);
                             setNewEmployee((prev: any) => ({
                               ...prev,
-                              permanentAddress: e.target.value,
+                              permanentAddress: value,
                               currentAddress: isSameAddress
-                                ? e.target.value
+                                ? value
                                 : prev.currentAddress
-                            }))
-                          }
+                            }));
+
+                            // Restore cursor position
+                            setTimeout(() => {
+                              if (input) {
+                                input.setSelectionRange(cursorPosition, cursorPosition);
+                              }
+                            }, 0);
+                          }}
                           onBlur={() => {
                             if (!newEmployee.permanentAddress || newEmployee.permanentAddress.trim() === '') {
                               setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
@@ -2008,12 +2022,22 @@ const EmployeeManagementPage: React.FC = () => {
                         <textarea
                           rows={3}
                           value={newEmployee.currentAddress}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const input = e.target;
+                            const cursorPosition = input.selectionStart || 0;
+                            const value = sanitizeAddress(e.target.value);
                             setNewEmployee({
                               ...newEmployee,
-                              currentAddress: e.target.value
-                            })
-                          }
+                              currentAddress: value
+                            });
+
+                            // Restore cursor position
+                            setTimeout(() => {
+                              if (input) {
+                                input.setSelectionRange(cursorPosition, cursorPosition);
+                              }
+                            }, 0);
+                          }}
                           onBlur={() => {
                             if (!newEmployee.currentAddress || newEmployee.currentAddress.trim() === '') {
                               setFormErrors((prev) => ({ ...prev, currentAddress: true }));

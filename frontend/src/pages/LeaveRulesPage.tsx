@@ -101,6 +101,12 @@ const LeaveRulesPage: React.FC = () => {
     const [editingPolicy, setEditingPolicy] = useState<LeavePolicyConfig | null>(null);
     const [policyEditForm, setPolicyEditForm] = useState<Partial<LeavePolicyConfig>>({});
 
+    const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (['e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+        }
+    };
+
     // -- Render Helpers --
 
     const renderPolicies = () => {
@@ -243,6 +249,7 @@ const LeaveRulesPage: React.FC = () => {
                                             step="0.5"
                                             min="0"
                                             value={policyEditForm.annual_credit}
+                                            onKeyDown={handleNumberKeyDown}
                                             onChange={(e) => {
                                                 const val = parseFloat(e.target.value);
                                                 if (val < 0) return;
@@ -262,6 +269,7 @@ const LeaveRulesPage: React.FC = () => {
                                             step="0.5"
                                             min="0"
                                             value={policyEditForm.carry_forward_limit}
+                                            onKeyDown={handleNumberKeyDown}
                                             onChange={(e) => {
                                                 const val = parseFloat(e.target.value);
                                                 if (val < 0) return;
@@ -276,6 +284,7 @@ const LeaveRulesPage: React.FC = () => {
                                             step="0.5"
                                             min="0"
                                             value={policyEditForm.max_leave_per_month}
+                                            onKeyDown={handleNumberKeyDown}
                                             onChange={(e) => {
                                                 const val = parseFloat(e.target.value);
                                                 if (val < 0) return;
@@ -290,6 +299,7 @@ const LeaveRulesPage: React.FC = () => {
                                             step="0.5"
                                             min="0"
                                             value={policyEditForm.anniversary_3_year_bonus}
+                                            onKeyDown={handleNumberKeyDown}
                                             onChange={(e) => {
                                                 const val = parseFloat(e.target.value);
                                                 if (val < 0) return;
@@ -304,6 +314,7 @@ const LeaveRulesPage: React.FC = () => {
                                             step="0.5"
                                             min="0"
                                             value={policyEditForm.anniversary_5_year_bonus}
+                                            onKeyDown={handleNumberKeyDown}
                                             onChange={(e) => {
                                                 const val = parseFloat(e.target.value);
                                                 if (val < 0) return;
@@ -328,12 +339,8 @@ const LeaveRulesPage: React.FC = () => {
                             <div className="lr-modal-footer">
                                 <button
                                     className="lr-save-btn"
-                                    disabled={updatePolicyMutation.isLoading}
-                                    onClick={() => {
-                                        // Helper to normalize numeric values for comparison
+                                    disabled={updatePolicyMutation.isLoading || (() => {
                                         const toNum = (val: any) => val === '' || val === null || val === undefined ? 0 : parseFloat(val);
-
-                                        // Helper to normalize date values for comparison
                                         const toDateStr = (dateVal: any) => {
                                             if (!dateVal) return '';
                                             const d = new Date(dateVal);
@@ -341,19 +348,16 @@ const LeaveRulesPage: React.FC = () => {
                                             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                                         };
 
-                                        const hasChanges =
+                                        return !(
                                             toNum(policyEditForm.annual_credit) !== toNum(editingPolicy.annual_credit) ||
                                             toNum(policyEditForm.carry_forward_limit) !== toNum(editingPolicy.carry_forward_limit) ||
                                             toNum(policyEditForm.max_leave_per_month) !== toNum(editingPolicy.max_leave_per_month) ||
                                             toNum(policyEditForm.anniversary_3_year_bonus) !== toNum(editingPolicy.anniversary_3_year_bonus) ||
                                             toNum(policyEditForm.anniversary_5_year_bonus) !== toNum(editingPolicy.anniversary_5_year_bonus) ||
-                                            (toDateStr(policyEditForm.effective_from) !== toDateStr(editingPolicy.effective_from));
-
-                                        if (!hasChanges) {
-                                            setEditingPolicy(null);
-                                            return;
-                                        }
-
+                                            (toDateStr(policyEditForm.effective_from) !== toDateStr(editingPolicy.effective_from))
+                                        );
+                                    })()}
+                                    onClick={() => {
                                         updatePolicyMutation.mutate({
                                             id: editingPolicy.id,
                                             updates: policyEditForm
@@ -546,7 +550,12 @@ const LeaveRulesPage: React.FC = () => {
                         <div className="lr-modal-footer">
                             <button
                                 className="lr-save-btn"
-                                disabled={updateTypeMutation.isLoading}
+                                disabled={updateTypeMutation.isLoading || (
+                                    editTypeForm.name === editingType.name &&
+                                    editTypeForm.description === (editingType.description || '') &&
+                                    editTypeForm.is_active === editingType.is_active &&
+                                    JSON.stringify([...(editTypeForm.roles || [])].sort()) === JSON.stringify([...(editingType.roles || [])].sort())
+                                )}
                                 onClick={() => updateTypeMutation.mutate({ id: editingType.id, ...editTypeForm })}
                             >
                                 {updateTypeMutation.isLoading ? 'Updating...' : 'Update'}
