@@ -1658,7 +1658,7 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {user?.role !== 'super_admin' && (
+          {user?.role !== 'super_admin' && user?.role !== 'hr' && (
             <div className="profile-section">
               <h2>Education Information</h2>
               <table className="education-table">
