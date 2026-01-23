@@ -356,24 +356,27 @@ async function migrate() {
       console.warn('Rename role column migration warning:', renameError.message);
     }
 
-    // Run rename status column migration (019)
+
+
+    // Run revert status column migration (020)
     try {
       const colCheck = await pool.query(
-        "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='user_status'"
+        "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='status'"
       );
 
+      // If 'status' does NOT exist (meaning it's currently 'user_status'), revert it
       if (colCheck.rows.length === 0) {
-        const renameStatusMigrationFile = readFileSync(
-          join(__dirname, 'migrations', '019_rename_status_column.sql'),
+        const revertStatusMigrationFile = readFileSync(
+          join(__dirname, 'migrations', '020_revert_status_column.sql'),
           'utf-8'
         );
-        await pool.query(renameStatusMigrationFile);
-        console.log('Rename status column migration (019) completed');
+        await pool.query(revertStatusMigrationFile);
+        console.log('Revert status column migration (020) completed');
       } else {
-        console.log('Rename status column migration (019) skipped (user_status column already exists)');
+        console.log('Revert status column migration (020) skipped (status column already exists)');
       }
-    } catch (renameError: any) {
-      console.warn('Rename status column migration warning:', renameError.message);
+    } catch (revertError: any) {
+      console.warn('Revert status column migration warning:', revertError.message);
     }
 
     console.log('Default data inserted');
