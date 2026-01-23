@@ -131,7 +131,7 @@ export const getHolidays = async (year?: number) => {
   }
 };
 
-export const createHoliday = async (holidayDate: string, holidayName: string) => {
+export const createHoliday = async (holidayDate: string, holidayName: string, requesterId: number) => {
   logger.info(`[LEAVE] [CREATE HOLIDAY] ========== FUNCTION CALLED ==========`);
 
   try {
@@ -151,10 +151,10 @@ export const createHoliday = async (holidayDate: string, holidayName: string) =>
     }
 
     const result = await pool.query(
-      `INSERT INTO holidays (holiday_date, holiday_name, is_active)
-       VALUES ($1, $2, true)
+      `INSERT INTO holidays (holiday_date, holiday_name, is_active, created_at, updated_at, created_by, updated_by)
+       VALUES ($1, $2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $3, $3)
        RETURNING id, holiday_date, holiday_name, is_active, created_at`,
-      [holidayDate, trimmedName]
+      [holidayDate, trimmedName, requesterId]
     );
 
     logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${result.rows[0].id}`);
@@ -563,17 +563,17 @@ export const applyLeave = async (
       // Store RAW types in DB to preserve UI state (first_half vs second_half)
       // Constraint has been updated to allow these values.
       const leaveRequestResult = await client.query(
-        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null]
+        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
       );
       leaveRequestId = leaveRequestResult.rows[0].id;
 
       for (const leaveDay of leaveDays) {
         const leaveDayDateStr = `${leaveDay.date.getFullYear()}-${String(leaveDay.date.getMonth() + 1).padStart(2, '0')}-${String(leaveDay.date.getDate()).padStart(2, '0')}`;
         await client.query(
-          `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)`,
-          [leaveRequestId, leaveDayDateStr, leaveDay.type, leaveData.leaveType, userId]
+          `INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id, created_by, updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [leaveRequestId, leaveDayDateStr, leaveDay.type, leaveData.leaveType, userId, userId, userId]
         );
       }
 
@@ -3414,8 +3414,8 @@ export const updateLeaveStatus = async (
     // 2. Perform updates to leave_days
     for (const update of dayUpdates) {
       await client.query(
-        'UPDATE leave_days SET day_status = $1 WHERE id = $2',
-        [update.status, update.id]
+        'UPDATE leave_days SET day_status = $1, updated_at = CURRENT_TIMESTAMP, updated_by = $3 WHERE id = $2',
+        [update.status, update.id, approverId]
       );
     }
 
@@ -3481,7 +3481,9 @@ export const updateLeaveStatus = async (
              manager_approval_comment = NULL,
              hr_approval_comment = NULL,
              last_updated_by = $4,
-             last_updated_by_role = 'super_admin'
+             last_updated_by_role = 'super_admin',
+             updated_at = CURRENT_TIMESTAMP,
+             updated_by = $4
          WHERE id = $5`,
         [finalRequestStatus,
           finalRequestStatus === 'rejected' ? 'rejected' : 'approved',
@@ -3498,7 +3500,9 @@ export const updateLeaveStatus = async (
              hr_approved_by = $4,
              manager_approval_comment = NULL,
              last_updated_by = $4,
-             last_updated_by_role = 'hr'
+             last_updated_by_role = 'hr',
+             updated_at = CURRENT_TIMESTAMP,
+             updated_by = $4
          WHERE id = $5`,
         [finalRequestStatus,
           finalRequestStatus === 'rejected' ? 'rejected' : 'approved',

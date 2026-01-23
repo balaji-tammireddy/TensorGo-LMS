@@ -1,8 +1,9 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import * as leaveRuleService from '../services/leaveRule.service';
 import { logger } from '../utils/logger';
 
-export const getLeaveTypes = async (req: Request, res: Response) => {
+export const getLeaveTypes = async (req: AuthRequest, res: Response) => {
     try {
         const types = await leaveRuleService.getLeaveTypes();
         res.json(types);
@@ -12,7 +13,7 @@ export const getLeaveTypes = async (req: Request, res: Response) => {
     }
 };
 
-export const createLeaveType = async (req: Request, res: Response) => {
+export const createLeaveType = async (req: AuthRequest, res: Response) => {
     try {
         const { code, name, description, roles } = req.body;
 
@@ -24,10 +25,10 @@ export const createLeaveType = async (req: Request, res: Response) => {
         // Use name as code if code is missing
         const finalCode = code || name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
-        const newType = await leaveRuleService.createLeaveType(finalCode, name, description);
+        const newType = await leaveRuleService.createLeaveType(finalCode, name, description, req.user!.id);
 
         // Also init default configs
-        await leaveRuleService.createDefaultConfigsForNewType(newType.id, roles);
+        await leaveRuleService.createDefaultConfigsForNewType(newType.id, roles, req.user!.id);
 
         res.status(201).json(newType);
     } catch (error: any) {
@@ -39,7 +40,7 @@ export const createLeaveType = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteLeaveType = async (req: Request, res: Response) => {
+export const deleteLeaveType = async (req: AuthRequest, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         await leaveRuleService.deleteLeaveType(id);
@@ -50,7 +51,7 @@ export const deleteLeaveType = async (req: Request, res: Response) => {
     }
 };
 
-export const updateLeaveType = async (req: Request, res: Response) => {
+export const updateLeaveType = async (req: AuthRequest, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const { name, description, is_active, roles } = req.body;
@@ -64,7 +65,7 @@ export const updateLeaveType = async (req: Request, res: Response) => {
             description,
             is_active,
             roles
-        });
+        }, req.user!.id);
 
         res.json(updated);
     } catch (error: any) {
@@ -73,7 +74,7 @@ export const updateLeaveType = async (req: Request, res: Response) => {
     }
 };
 
-export const getPolicies = async (req: Request, res: Response) => {
+export const getPolicies = async (req: AuthRequest, res: Response) => {
     try {
         const policies = await leaveRuleService.getAllPolicies();
         logger.info(`[LEAVE RULE CONTROLLER] [GET POLICIES] Fetched ${policies.length} policies`);
@@ -93,13 +94,13 @@ export const getPolicies = async (req: Request, res: Response) => {
     }
 };
 
-export const updatePolicy = async (req: Request, res: Response) => {
+export const updatePolicy = async (req: AuthRequest, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const updates = req.body;
         logger.info(`[UPDATE POLICY] ID: ${id}, Updates: ${JSON.stringify(updates)}`);
 
-        const updated = await leaveRuleService.updatePolicy(id, updates);
+        const updated = await leaveRuleService.updatePolicy(id, updates, req.user!.id);
         res.json(updated);
     } catch (error: any) {
         logger.error('[UPDATE POLICY] Error updating policy:', {

@@ -1,13 +1,13 @@
 
 import { pool } from '../database/db';
 
-async function checkUsersCols() {
+async function checkUsersAuditCols() {
     try {
         const res = await pool.query(`
       SELECT column_name, data_type 
       FROM information_schema.columns 
       WHERE table_name = 'users'
-      ORDER BY ordinal_position
+      AND column_name IN ('created_at', 'updated_at', 'created_by', 'updated_by')
     `);
         console.table(res.rows);
     } catch (e) {
@@ -16,4 +16,4 @@ async function checkUsersCols() {
         process.exit(0);
     }
 }
-checkUsersCols();
+checkUsersAuditCols();

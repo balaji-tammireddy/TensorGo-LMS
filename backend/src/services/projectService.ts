@@ -105,8 +105,8 @@ export class ProjectService {
 
       const insertRes = await client.query(
         `INSERT INTO projects (
-          custom_id, name, description, project_manager_id, start_date, end_date, created_by, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          custom_id, name, description, project_manager_id, start_date, end_date, created_by, updated_by, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8)
          RETURNING *`,
         [
           customId,
@@ -135,7 +135,7 @@ export class ProjectService {
     }
   }
 
-  static async updateProject(id: number, data: Partial<ProjectData> & { status?: string }) {
+  static async updateProject(id: number, data: Partial<ProjectData> & { status?: string }, requesterId?: number) {
     // AUTOMATION: Check for status change to set end_date
     if (data.status) {
       const currentRes = await pool.query('SELECT status FROM projects WHERE id = $1', [id]);
@@ -177,6 +177,12 @@ export class ProjectService {
     if (data.status) { updates.push(`status = $${idx++}`); values.push(data.status); }
 
     if (updates.length === 0) return null;
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    if (requesterId) {
+      updates.push(`updated_by = $${idx++}`);
+      values.push(requesterId);
+    }
 
     values.push(id);
 
@@ -256,9 +262,9 @@ export class ProjectService {
       const customId = await this.generateNextCustomId('project_modules', 'MOD', 'project_id', data.project_id, client);
 
       const res = await client.query(
-        `INSERT INTO project_modules (project_id, custom_id, name, description)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-        [data.project_id, customId, data.name, data.description || null]
+        `INSERT INTO project_modules (project_id, custom_id, name, description, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
+        [data.project_id, customId, data.name, data.description || null, createdBy]
       );
       const module = res.rows[0];
 
@@ -290,7 +296,11 @@ export class ProjectService {
       if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
 
-      if (updates.length > 0) {
+      if (updates.length > 0 || userId) {
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        updates.push(`updated_by = $${idx++}`);
+        values.push(userId);
+
         values.push(id);
         await client.query(`UPDATE project_modules SET ${updates.join(', ')} WHERE id = $${idx}`, values);
       }
@@ -384,9 +394,9 @@ export class ProjectService {
       const customId = await this.generateNextCustomId('project_tasks', 'TSK', 'module_id', data.module_id, client);
 
       const res = await client.query(
-        `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date)
-             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [data.module_id, customId, data.name, data.description || null, data.due_date || null]
+        `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
+        [data.module_id, customId, data.name, data.description || null, data.due_date || null, createdBy]
       );
       const task = res.rows[0];
 
@@ -409,9 +419,9 @@ export class ProjectService {
         const activityCustomId = `${customId}-0${i + 1}`; // e.g. TSK-001-01
 
         const actRes = await client.query(
-          `INSERT INTO project_activities (task_id, custom_id, name, description)
-           VALUES ($1, $2, $3, $4) RETURNING id`,
-          [task.id, activityCustomId, name, null]
+          `INSERT INTO project_activities (task_id, custom_id, name, description, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $5) RETURNING id`,
+          [task.id, activityCustomId, name, null, createdBy || pmId]
         );
         const activityId = actRes.rows[0].id;
 
@@ -436,9 +446,9 @@ export class ProjectService {
     try {
       await client.query('BEGIN');
       const res = await client.query(
-        `INSERT INTO project_activities (task_id, custom_id, name, description)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-        [data.task_id, data.custom_id, data.name, data.description || null]
+        `INSERT INTO project_activities (task_id, custom_id, name, description, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
+        [data.task_id, data.custom_id, data.name, data.description || null, createdBy]
       );
       const activity = res.rows[0];
 
@@ -495,7 +505,12 @@ export class ProjectService {
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
       if (data.due_date !== undefined) { updates.push(`due_date = $${idx++}`); values.push(data.due_date); }
 
-      if (updates.length > 0) {
+
+      if (updates.length > 0 || userId) {
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        updates.push(`updated_by = $${idx++}`);
+        values.push(userId);
+
         values.push(id);
         await client.query(`UPDATE project_tasks SET ${updates.join(', ')} WHERE id = $${idx}`, values);
       }
@@ -551,7 +566,11 @@ export class ProjectService {
       if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
 
-      if (updates.length > 0) {
+      if (updates.length > 0 || userId) {
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        updates.push(`updated_by = $${idx++}`);
+        values.push(userId);
+
         values.push(id);
         await client.query(`UPDATE project_activities SET ${updates.join(', ')} WHERE id = $${idx}`, values);
       }

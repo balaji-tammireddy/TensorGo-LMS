@@ -980,7 +980,7 @@ export const createHoliday = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const holiday = await leaveService.createHoliday(holidayDate, holidayName);
+    const holiday = await leaveService.createHoliday(holidayDate, holidayName, req.user!.id);
 
     logger.info(`[CONTROLLER] [LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${holiday.id}`);
 

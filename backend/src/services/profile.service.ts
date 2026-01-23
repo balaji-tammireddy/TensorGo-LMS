@@ -105,7 +105,7 @@ WHERE u.id = $1`,
   };
 };
 
-export const updateProfile = async (userId: number, profileData: any, requesterRole: string) => {
+export const updateProfile = async (userId: number, profileData: any, requesterRole: string, requesterId: number) => {
   logger.info(`[PROFILE] [UPDATE PROFILE] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [UPDATE PROFILE] User ID: ${userId}, Role: ${requesterRole}`);
   logger.info(`[PROFILE] [UPDATE PROFILE] Sections to update: ${Object.keys(profileData).join(', ')}`);
@@ -410,7 +410,8 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   if (updates.length > 0) {
     logger.info(`[PROFILE] [UPDATE PROFILE] Updating ${updates.length} fields in database`);
     values.push(userId);
-    const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
+    const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP, updated_by = $${paramCount} WHERE id = $${paramCount + 1}`;
+    values.splice(values.length - 1, 0, requesterId);
     await pool.query(query, values);
     logger.info(`[PROFILE] [UPDATE PROFILE] Database update completed successfully`);
   } else {
@@ -530,25 +531,25 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   return { message: 'Profile updated successfully' };
 };
 
-export const updateProfilePhoto = async (userId: number, photoUrl: string) => {
+export const updateProfilePhoto = async (userId: number, photoUrl: string, requesterId: number) => {
   logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] User ID: ${userId}, Photo URL: ${photoUrl}`);
 
   await pool.query(
-    'UPDATE users SET profile_photo_url = $1 WHERE id = $2',
-    [photoUrl, userId]
+    'UPDATE users SET profile_photo_url = $1, updated_at = CURRENT_TIMESTAMP, updated_by = $2 WHERE id = $3',
+    [photoUrl, requesterId, userId]
   );
   logger.info(`[PROFILE] [UPDATE PROFILE PHOTO] Profile photo updated successfully - User ID: ${userId}`);
   return { photoUrl, message: 'Profile photo updated successfully' };
 };
 
-export const deleteProfilePhoto = async (userId: number) => {
+export const deleteProfilePhoto = async (userId: number, requesterId: number) => {
   logger.info(`[PROFILE] [DELETE PROFILE PHOTO] ========== FUNCTION CALLED ==========`);
   logger.info(`[PROFILE] [DELETE PROFILE PHOTO] User ID: ${userId}`);
 
   await pool.query(
-    'UPDATE users SET profile_photo_url = NULL WHERE id = $1',
-    [userId]
+    'UPDATE users SET profile_photo_url = NULL, updated_at = CURRENT_TIMESTAMP, updated_by = $1 WHERE id = $2',
+    [requesterId, userId]
   );
   logger.info(`[PROFILE] [DELETE PROFILE PHOTO] Profile photo deleted successfully - User ID: ${userId}`);
   return { message: 'Profile photo deleted successfully' };

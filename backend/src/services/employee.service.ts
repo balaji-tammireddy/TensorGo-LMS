@@ -592,9 +592,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, status, created_by
+      current_address, permanent_address, reporting_manager_id, status, created_by, updated_by
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
     ) RETURNING id`,
     [
       empId,
@@ -634,6 +634,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.permanentAddress),
       reportingManagerId,
       employeeData.status || 'active',
+      requesterId || null,
       requesterId || null
     ]
   );

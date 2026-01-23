@@ -65,7 +65,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [PROFILE] [UPDATE PROFILE] User ID: ${req.user!.id}, Sections: ${Object.keys(req.body).join(', ')}`);
 
   try {
-    const result = await profileService.updateProfile(req.user!.id, req.body, req.user!.role);
+    const result = await profileService.updateProfile(req.user!.id, req.body, req.user!.role, req.user!.id);
     logger.info(`[CONTROLLER] [PROFILE] [UPDATE PROFILE] Profile updated successfully - User ID: ${req.user!.id}`);
     res.json(result);
   } catch (error: any) {
@@ -118,7 +118,7 @@ export const uploadPhoto = [
       }
 
       // Store only the key in database (not URL)
-      const result = await profileService.updateProfilePhoto(req.user!.id, photoKey);
+      const result = await profileService.updateProfilePhoto(req.user!.id, photoKey, req.user!.id);
       logger.info(`[CONTROLLER] [PROFILE] [UPLOAD PHOTO] Photo uploaded successfully - User ID: ${req.user!.id}, Photo Key: ${photoKey}`);
       res.json(result);
     } catch (error: any) {
@@ -153,7 +153,7 @@ export const deletePhoto = async (req: AuthRequest, res: Response) => {
     const currentPhotoKey = (profile as any).profilePhotoKey || profile.profilePhotoUrl;
 
     // Delete from database
-    const result = await profileService.deleteProfilePhoto(req.user!.id);
+    const result = await profileService.deleteProfilePhoto(req.user!.id, req.user!.id);
 
     // Delete from OVHcloud if using cloud storage (key starts with 'profile-photos/')
     if (currentPhotoKey && currentPhotoKey.startsWith('profile-photos/')) {

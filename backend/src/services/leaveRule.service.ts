@@ -41,16 +41,16 @@ export const getLeaveTypes = async (): Promise<(LeaveType & { roles: string[] })
 /**
  * Create a new leave type
  */
-export const createLeaveType = async (code: string, name: string, description: string): Promise<LeaveType> => {
+export const createLeaveType = async (code: string, name: string, description: string, requesterId: number): Promise<LeaveType> => {
     logger.info(`[LEAVE RULE SERVICE] [CREATE TYPE] creating ${name} (${code})`);
 
     const safeCode = code.toLowerCase().replace(/[^a-z0-9_]/g, '');
 
     const result = await pool.query(
-        `INSERT INTO leave_types (code, name, description, is_active)
-     VALUES ($1, $2, $3, true)
+        `INSERT INTO leave_types (code, name, description, is_active, created_by, updated_by)
+     VALUES ($1, $2, $3, true, $4, $4)
      RETURNING *`,
-        [safeCode, name, description]
+        [safeCode, name, description, requesterId]
     );
 
     return result.rows[0];
@@ -81,7 +81,8 @@ export const deleteLeaveType = async (id: number): Promise<void> => {
  */
 export const updateLeaveType = async (
     id: number,
-    data: { name: string; description: string; is_active: boolean; roles: string[] }
+    data: { name: string; description: string; is_active: boolean; roles: string[] },
+    requesterId: number
 ): Promise<LeaveType> => {
     logger.info(`[LEAVE RULE SERVICE] [UPDATE TYPE] Updating leave type ${id}`);
 
@@ -91,10 +92,10 @@ export const updateLeaveType = async (
 
         const result = await client.query(
             `UPDATE leave_types 
-             SET name = $1, description = $2, is_active = $3
-             WHERE id = $4
+             SET name = $1, description = $2, is_active = $3, updated_at = CURRENT_TIMESTAMP, updated_by = $4
+             WHERE id = $5
              RETURNING *`,
-            [data.name, data.description, data.is_active, id]
+            [data.name, data.description, data.is_active, requesterId, id]
         );
 
         if (result.rows.length === 0) {
@@ -111,10 +112,10 @@ export const updateLeaveType = async (
 
         for (const role of data.roles) {
             await client.query(
-                `INSERT INTO leave_policy_configurations (role, leave_type_id)
-                 VALUES ($1, $2)
+                `INSERT INTO leave_policy_configurations (role, leave_type_id, created_by, updated_by)
+                 VALUES ($1, $2, $3, $3)
                  ON CONFLICT (role, leave_type_id) DO NOTHING`,
-                [role, id]
+                [role, id, requesterId]
             );
         }
 
@@ -161,7 +162,8 @@ export const getAllPolicies = async (): Promise<LeavePolicyConfig[]> => {
  */
 export const updatePolicy = async (
     id: number,
-    updates: Partial<LeavePolicyConfig>
+    updates: Partial<LeavePolicyConfig>,
+    requesterId: number
 ): Promise<LeavePolicyConfig> => {
     logger.info(`[LEAVE RULE SERVICE] [UPDATE POLICY] Updating policy ${id}`);
 
@@ -200,6 +202,9 @@ export const updatePolicy = async (
     }
 
     values.push(id);
+
+    fields.push(`updated_by = $${idx++}`);
+    values.push(requesterId);
 
     const query = `
     UPDATE leave_policy_configurations
@@ -251,14 +256,14 @@ export const getConfigForRoleAndType = async (role: string, typeCode: string) =>
 /**
  * Create default configs for a new Leave Type
  */
-export const createDefaultConfigsForNewType = async (leaveTypeId: number, roles?: string[]) => {
+export const createDefaultConfigsForNewType = async (leaveTypeId: number, roles: string[] | undefined, requesterId: number) => {
     const targetRoles = roles && roles.length > 0 ? roles : ['employee', 'manager', 'hr', 'intern'];
     for (const role of targetRoles) {
         await pool.query(
-            `INSERT INTO leave_policy_configurations (role, leave_type_id)
-       VALUES ($1, $2)
+            `INSERT INTO leave_policy_configurations (role, leave_type_id, created_by, updated_by)
+       VALUES ($1, $2, $3, $3)
        ON CONFLICT (role, leave_type_id) DO NOTHING`,
-            [role, leaveTypeId]
+            [role, leaveTypeId, requesterId]
         );
     }
 };

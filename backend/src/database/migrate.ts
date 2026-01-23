@@ -399,6 +399,18 @@ async function migrate() {
       console.warn('Remove manager name column migration warning:', removeError.message);
     }
 
+    // Run audit columns migration (022)
+    try {
+      const auditColumnFile = readFileSync(
+        join(__dirname, 'migrations', '022_add_audit_columns.sql'),
+        'utf-8'
+      );
+      await pool.query(auditColumnFile);
+      console.log('Audit columns migration (022) completed');
+    } catch (auditError: any) {
+      console.warn('Audit columns migration warning:', auditError.message);
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);

@@ -115,8 +115,8 @@ export const createPolicy = [
             }
 
             const result = await pool.query(
-                'INSERT INTO policies (title, s3_key, public_url) VALUES ($1, $2, $3) RETURNING *',
-                [title, key, signedUrl]
+                'INSERT INTO policies (title, s3_key, public_url, created_by, updated_by) VALUES ($1, $2, $3, $4, $4) RETURNING *',
+                [title, key, signedUrl, req.user!.id]
             );
 
             logger.info(`[CONTROLLER] [POLICY] [CREATE POLICY] Policy created successfully`);
@@ -217,12 +217,13 @@ export const updatePolicy = [
                 SET title = COALESCE($1, title), 
                     s3_key = $2, 
                     public_url = $3, 
-                    updated_at = CURRENT_TIMESTAMP 
+                    updated_at = CURRENT_TIMESTAMP,
+                    updated_by = $5
                 WHERE id = $4 
                 RETURNING *
             `;
 
-            const updateResult = await pool.query(updateQuery, [title || null, key, signedUrl, policyId]);
+            const updateResult = await pool.query(updateQuery, [title || null, key, signedUrl, policyId, req.user!.id]);
 
             logger.info(`[CONTROLLER] [POLICY] [UPDATE POLICY] Policy updated successfully`);
             res.json(updateResult.rows[0]);
