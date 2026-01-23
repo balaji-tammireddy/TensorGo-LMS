@@ -308,6 +308,12 @@ const EmployeeManagementPage: React.FC = () => {
         const aDate = new Date(a.joiningDate + 'T00:00:00').getTime();
         const bDate = new Date(b.joiningDate + 'T00:00:00').getTime();
         return sortConfig.direction === 'asc' ? aDate - bDate : bDate - aDate;
+      } else if (sortConfig.key === 'name') {
+        const aName = a.name?.toLowerCase() || '';
+        const bName = b.name?.toLowerCase() || '';
+        if (aName < bName) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aName > bName) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
       }
       return 0;
     });
@@ -939,7 +945,16 @@ const EmployeeManagementPage: React.FC = () => {
                       )}
                     </div>
                   </th>
-                  <th>Name</th>
+                  <th className="sortable-header" onClick={() => handleSort('name')}>
+                    <div className="header-sort-wrapper">
+                      Name
+                      {sortConfig.key === 'name' ? (
+                        sortConfig.direction === 'asc' ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+                      ) : (
+                        <FaSort className="sort-icon" />
+                      )}
+                    </div>
+                  </th>
                   <th>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
