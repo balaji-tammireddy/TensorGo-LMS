@@ -136,4 +136,11 @@ router.delete(
     projectController.removeAccess
 );
 
+router.post(
+    '/access/toggle',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.toggleAccess
+);
+
 export default router;

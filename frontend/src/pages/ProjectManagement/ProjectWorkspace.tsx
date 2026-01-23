@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
+import * as employeeService from '../../services/employeeService';
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -22,6 +23,8 @@ export const ProjectWorkspace: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const queryClient = useQueryClient();
+
+    const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then(res => res.employees));
 
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -77,6 +80,7 @@ export const ProjectWorkspace: React.FC = () => {
     // 2. Module/Task/Activity Creation: ONLY PM can create these
     const canCreateModule = isPM;
     const canAddTask = isPM;
+    const canAddActivity = isPM;
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type
@@ -110,6 +114,10 @@ export const ProjectWorkspace: React.FC = () => {
         setDeleteModal({ isOpen: true, type: 'task', id: taskId });
     };
 
+    const handleDeleteActivity = async (activityId: number) => {
+        setDeleteModal({ isOpen: true, type: 'activity', id: activityId });
+    };
+
     const confirmDelete = async () => {
         if (!deleteModal.id || !deleteModal.type) return;
 
@@ -119,7 +127,7 @@ export const ProjectWorkspace: React.FC = () => {
         try {
             if (type === 'module') {
                 // Optimistic Update
-                queryClient.setQueryData(['modules', projectId], (old: any) =>
+                queryClient.setQueryData(['modules', projectId], (old: any[] | undefined) =>
                     old ? old.filter((m: any) => m.id !== id) : []
                 );
                 if (selectedModuleId === id) {
@@ -131,7 +139,7 @@ export const ProjectWorkspace: React.FC = () => {
                 refetchModules();
             } else if (type === 'task') {
                 // Optimistic Update
-                queryClient.setQueryData(['tasks', selectedModuleId], (old: any) =>
+                queryClient.setQueryData(['tasks', selectedModuleId], (old: any[] | undefined) =>
                     old ? old.filter((t: any) => t.id !== id) : []
                 );
                 if (selectedTaskId === id) {
@@ -142,7 +150,7 @@ export const ProjectWorkspace: React.FC = () => {
                 refetchTasks();
             } else if (type === 'activity') {
                 // Optimistic Update
-                queryClient.setQueryData(['activities', selectedTaskId], (old: any) =>
+                queryClient.setQueryData(['activities', selectedTaskId], (old: any[] | undefined) =>
                     old ? old.filter((a: any) => a.id !== id) : []
                 );
 
@@ -158,64 +166,64 @@ export const ProjectWorkspace: React.FC = () => {
     };
 
     const assignModuleUserMutation = useMutation(
-        ({ moduleId, userId }: { moduleId: number, userId: number }) => {
-            const module = modules?.find(m => m.id === moduleId);
-            const currentIds = module?.assigned_users?.map(u => u.id) || [];
-            const isAssigned = currentIds.includes(userId) || currentIds.some((id: any) => id == userId);
-            const newIds = isAssigned
-                ? currentIds.filter(id => id !== userId) // Remove
-                : [...currentIds, userId]; // Add
-
-            return projectService.updateModule(moduleId, {
-                assigneeIds: Array.from(new Set(newIds))
-            });
+        ({ moduleId, userId, action }: { moduleId: number, userId: number, action: 'add' | 'remove' }) => {
+            return projectService.toggleAccess('module', moduleId, userId, action);
         },
         {
-            onMutate: async ({ moduleId, userId }) => {
+            onMutate: async ({ moduleId, userId, action }) => {
                 await queryClient.cancelQueries(['modules', projectId]);
                 const previousModules = queryClient.getQueryData<any[]>(['modules', projectId]);
 
-                if (previousModules) {
-                    queryClient.setQueryData(['modules', projectId], previousModules.map(m => {
-                        if (m.id !== moduleId) return m;
-                        const currentIds = m.assigned_users?.map((u: any) => u.id) || [];
-                        const isAssigned = currentIds.includes(userId) || currentIds.some((id: any) => id == userId);
+                queryClient.setQueryData(['modules', projectId], ((old: any[] | undefined): any[] => {
+                    if (!old) return [];
+                    return old.map(m => {
+                        if (String(m.id) !== String(moduleId)) return m;
+                        const targetId = String(userId);
+                        const isAssigned = action === 'remove'; // Use explicit action
 
                         let newAssignedUsers = m.assigned_users || [];
                         if (isAssigned) {
-                            newAssignedUsers = newAssignedUsers.filter((u: any) => u.id !== userId);
+                            newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
 
                             // CASCADE REVOCATION (Optimistic)
-                            // 1. Remove from all tasks in this module
-                            const cachedTasks = queryClient.getQueryData<any[]>(['tasks', moduleId]);
-                            if (cachedTasks) {
-                                queryClient.setQueryData(['tasks', moduleId], cachedTasks.map(t => ({
-                                    ...t,
-                                    assigned_users: (t.assigned_users || []).filter((u: any) => u.id !== userId)
-                                })));
+                            queryClient.setQueryData(['tasks', moduleId], ((oldTasks: any[] | undefined): any[] => {
+                                if (!oldTasks) return [];
+                                return oldTasks.map(t => {
+                                    const updatedAssigned = (t.assigned_users || []).filter((u: any) => String(u.id) !== targetId);
 
-                                // 2. Remove from all activities of those tasks
-                                cachedTasks.forEach(t => {
-                                    const cachedActivities = queryClient.getQueryData<any[]>(['activities', t.id]);
-                                    if (cachedActivities) {
-                                        queryClient.setQueryData(['activities', t.id], cachedActivities.map(a => ({
+                                    // Cascade to activities
+                                    queryClient.setQueryData(['activities', t.id], ((oldActs: any[] | undefined): any[] => {
+                                        if (!oldActs) return [];
+                                        return oldActs.map(a => ({
                                             ...a,
-                                            assigned_users: (a.assigned_users || []).filter((u: any) => u.id !== userId)
-                                        })));
-                                    }
+                                            assigned_users: (a.assigned_users || []).filter((u: any) => String(u.id) !== targetId)
+                                        }));
+                                    }) as any);
+
+                                    return { ...t, assigned_users: updatedAssigned };
                                 });
-                            }
+                            }) as any);
 
                         } else {
-                            const candidate = projectMembers?.find((u: any) => u.id === userId);
+                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
+                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
                             if (candidate) {
                                 newAssignedUsers = [...newAssignedUsers, candidate];
                             }
                         }
                         return { ...m, assigned_users: newAssignedUsers };
-                    }));
-                }
+                    });
+                }) as any);
+
                 return { previousModules };
+            },
+            onSuccess: (data, { moduleId }) => {
+                if (data.updatedUsers) {
+                    queryClient.setQueryData(['modules', projectId], ((old: any[] | undefined) => {
+                        if (!old) return [];
+                        return old.map(m => String(m.id) === String(moduleId) ? { ...m, assigned_users: data.updatedUsers } : m);
+                    }) as any);
+                }
             },
             onError: (_err, _newTodo, context: any) => {
                 if (context?.previousModules) {
@@ -223,62 +231,60 @@ export const ProjectWorkspace: React.FC = () => {
                 }
             },
             onSettled: () => {
-                queryClient.invalidateQueries(['modules', projectId]);
+                // Remove immediate invalidation to prevent snap-back deselection
+                // queryClient.invalidateQueries(['modules', projectId]);
             }
         }
     );
 
     const assignTaskUserMutation = useMutation(
-        ({ taskId, userId }: { taskId: number, userId: number }) => {
-            const task = tasks?.find(t => t.id === taskId);
-            const currentIds = task?.assigned_users?.map(u => u.id) || [];
-            const isAssigned = currentIds.includes(userId) || currentIds.some((id: any) => id == userId);
-            const newIds = isAssigned
-                ? currentIds.filter(id => id !== userId) // Remove
-                : [...currentIds, userId]; // Add
-
-            return projectService.updateTask(taskId, {
-                assigneeIds: Array.from(new Set(newIds))
-            });
+        ({ taskId, userId, action }: { taskId: number, userId: number, action: 'add' | 'remove' }) => {
+            return projectService.toggleAccess('task', taskId, userId, action);
         },
         {
-            onMutate: async ({ taskId, userId }) => {
+            onMutate: async ({ taskId, userId, action }) => {
                 await queryClient.cancelQueries(['tasks', selectedModuleId]);
                 const previousTasks = queryClient.getQueryData<any[]>(['tasks', selectedModuleId]);
 
-                if (previousTasks) {
-                    queryClient.setQueryData(['tasks', selectedModuleId], previousTasks.map(t => {
-                        if (t.id !== taskId) return t;
-                        const currentIds = t.assigned_users?.map((u: any) => u.id) || [];
-                        const isAssigned = currentIds.includes(userId) || currentIds.some((id: any) => id == userId);
+                queryClient.setQueryData(['tasks', selectedModuleId], ((old: any[] | undefined): any[] => {
+                    if (!old) return [];
+                    return old.map(t => {
+                        if (String(t.id) !== String(taskId)) return t;
+                        const targetId = String(userId);
+                        const isAssigned = action === 'remove';
 
                         let newAssignedUsers = t.assigned_users || [];
                         if (isAssigned) {
-                            newAssignedUsers = newAssignedUsers.filter((u: any) => u.id !== userId);
+                            newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
 
                             // CASCADE REVOCATION (Optimistic)
-                            // Remove from all activities in this task
-                            const cachedActivities = queryClient.getQueryData<any[]>(['activities', taskId]);
-                            if (cachedActivities) {
-                                queryClient.setQueryData(['activities', taskId], cachedActivities.map(a => ({
+                            queryClient.setQueryData(['activities', taskId], ((oldActs: any[] | undefined): any[] => {
+                                if (!oldActs) return [];
+                                return oldActs.map(a => ({
                                     ...a,
-                                    assigned_users: (a.assigned_users || []).filter((u: any) => u.id !== userId)
-                                })));
-                            }
+                                    assigned_users: (a.assigned_users || []).filter((u: any) => String(u.id) !== targetId)
+                                }));
+                            }) as any);
 
                         } else {
-                            // We need to find the user object.
-                            // We can search in projectMembers (superset) or the availableUsers logic (more complex to replicate here).
-                            // projectMembers is safe enough for display purposes usually.
-                            const candidate = projectMembers?.find((u: any) => u.id === userId);
+                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
+                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
                             if (candidate) {
                                 newAssignedUsers = [...newAssignedUsers, candidate];
                             }
                         }
                         return { ...t, assigned_users: newAssignedUsers };
-                    }));
-                }
+                    });
+                }) as any);
                 return { previousTasks };
+            },
+            onSuccess: (data, { taskId }) => {
+                if (data.updatedUsers) {
+                    queryClient.setQueryData(['tasks', selectedModuleId], ((old: any[] | undefined) => {
+                        if (!old) return [];
+                        return old.map(t => String(t.id) === String(taskId) ? { ...t, assigned_users: data.updatedUsers } : t);
+                    }) as any);
+                }
             },
             onError: (_err, _newTodo, context: any) => {
                 if (context?.previousTasks) {
@@ -286,53 +292,49 @@ export const ProjectWorkspace: React.FC = () => {
                 }
             },
             onSettled: () => {
-                queryClient.invalidateQueries(['tasks', selectedModuleId]);
-                // accessing logic might propagate, so maybe refresh modules too?
-                // For now just tasks is enough for the immediate feedback.
-                // Keeping refetchModules from original?
-                // Original had: { onSuccess: () => { refetchTasks(); refetchModules(); } }
-                queryClient.invalidateQueries(['modules', projectId]);
+                // queryClient.invalidateQueries(['tasks', selectedModuleId]);
             }
         }
     );
 
     const assignActivityUserMutation = useMutation(
-        ({ activityId, userId }: { activityId: number, userId: number }) => {
-            const activity = activities?.find(a => a.id === activityId);
-            const currentIds = activity?.assigned_users?.map(u => u.id) || [];
-            const isAssigned = currentIds.includes(userId) || currentIds.some((id: any) => id == userId);
-            const newIds = isAssigned
-                ? currentIds.filter(id => id !== userId) // Remove
-                : [...currentIds, userId]; // Add
-
-            return projectService.updateActivity(activityId, {
-                assigneeIds: Array.from(new Set(newIds))
-            });
+        ({ activityId, userId, action }: { activityId: number, userId: number, action: 'add' | 'remove' }) => {
+            return projectService.toggleAccess('activity', activityId, userId, action);
         },
         {
-            onMutate: async ({ activityId, userId }) => {
+            onMutate: async ({ activityId, userId, action }) => {
                 await queryClient.cancelQueries(['activities', selectedTaskId]);
                 const previousActivities = queryClient.getQueryData<any[]>(['activities', selectedTaskId]);
 
-                if (previousActivities) {
-                    queryClient.setQueryData(['activities', selectedTaskId], previousActivities.map(a => {
-                        if (a.id !== activityId) return a;
-                        const currentIds = a.assigned_users?.map((u: any) => u.id) || [];
-                        const isAssigned = currentIds.includes(userId) || currentIds.some((id: any) => id == userId);
+                queryClient.setQueryData(['activities', selectedTaskId], ((old: any[] | undefined): any[] => {
+                    if (!old) return [];
+                    return old.map(a => {
+                        if (String(a.id) !== String(activityId)) return a;
+                        const targetId = String(userId);
+                        const isAssigned = action === 'remove';
 
                         let newAssignedUsers = a.assigned_users || [];
                         if (isAssigned) {
-                            newAssignedUsers = newAssignedUsers.filter((u: any) => u.id !== userId);
+                            newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
                         } else {
-                            const candidate = projectMembers?.find((u: any) => u.id === userId);
+                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
+                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
                             if (candidate) {
                                 newAssignedUsers = [...newAssignedUsers, candidate];
                             }
                         }
                         return { ...a, assigned_users: newAssignedUsers };
-                    }));
-                }
+                    });
+                }) as any);
                 return { previousActivities };
+            },
+            onSuccess: (data, { activityId }) => {
+                if (data.updatedUsers) {
+                    queryClient.setQueryData(['activities', selectedTaskId], ((old: any[] | undefined) => {
+                        if (!old) return [];
+                        return old.map(a => String(a.id) === String(activityId) ? { ...a, assigned_users: data.updatedUsers } : a);
+                    }) as any);
+                }
             },
             onError: (_err, _newTodo, context: any) => {
                 if (context?.previousActivities) {
@@ -340,7 +342,7 @@ export const ProjectWorkspace: React.FC = () => {
                 }
             },
             onSettled: () => {
-                queryClient.invalidateQueries(['activities', selectedTaskId]);
+                // queryClient.invalidateQueries(['activities', selectedTaskId]);
             }
         }
     );
@@ -462,7 +464,11 @@ export const ProjectWorkspace: React.FC = () => {
                                 {project?.name || 'Loading...'}
                                 <span className="ws-project-id">ID: {project?.custom_id}</span>
                             </h1>
-                            <p className="ws-project-desc">{project?.description}</p>
+                            <p className="ws-project-desc" title={project?.description}>
+                                {project?.description && project.description.length > 30
+                                    ? project.description.slice(0, 30) + '...'
+                                    : project?.description}
+                            </p>
                         </div>
                     </div>
                     <div className="ws-header-right">
@@ -512,19 +518,22 @@ export const ProjectWorkspace: React.FC = () => {
                                     // Pass ALL project members as candidates (no filter)
                                     // Pass ALL project members + current assignees to ensure everyone is listed
                                     availableUsers={(() => {
-                                        const candidates = projectMembers || [];
+                                        const candidates = allEmployees || [];
                                         const current = module.assigned_users || [];
                                         // Merge and unique by ID
                                         const uniqueMap = new Map();
-                                        [...candidates, ...current].forEach(u => uniqueMap.set(u.id, u));
+                                        [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => u.id !== project?.project_manager_id) // Exclude PM
+                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
                                             .map((pm: any) => ({
                                                 ...pm,
                                                 initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                             }));
                                     })()}
-                                    onAssignUser={(userId) => assignModuleUserMutation.mutate({ moduleId: module.id, userId })}
+                                    onAssignUser={(userId) => {
+                                        const isAssigned = (module.assigned_users || []).some((u: any) => String(u.id) === String(userId));
+                                        assignModuleUserMutation.mutate({ moduleId: module.id, userId, action: isAssigned ? 'remove' : 'add' });
+                                    }}
                                 />
                             ))}
                             {modules?.length === 0 && (
@@ -588,22 +597,24 @@ export const ProjectWorkspace: React.FC = () => {
                                         onDelete={() => handleDeleteTask(task.id)}
                                         isPM={isPM}
                                         isCompact={true}
-                                        // Pass ALL module assignees as candidates (no filter)
+                                        // Pass ALL module assignees as candidates
                                         // Pass ALL module assignees + current task assignees
                                         availableUsers={(() => {
-                                            const moduleMembers = (projects?.find(p => p.id === projectId)?.is_pm ?
-                                                modules?.find(m => m.id === selectedModuleId)?.assigned_users : []) || [];
+                                            const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
                                             const current = task.assigned_users || [];
                                             const uniqueMap = new Map();
-                                            [...moduleMembers, ...current].forEach(u => uniqueMap.set(u.id, u));
+                                            [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             return Array.from(uniqueMap.values())
-                                                .filter((u: any) => u.id !== project?.project_manager_id) // Exclude PM
+                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
                                                 .map((pm: any) => ({
                                                     ...pm,
                                                     initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                                 }));
                                         })()}
-                                        onAssignUser={(userId) => assignTaskUserMutation.mutate({ taskId: task.id, userId })}
+                                        onAssignUser={(userId) => {
+                                            const isAssigned = (task.assigned_users || []).some((u: any) => String(u.id) === String(userId));
+                                            assignTaskUserMutation.mutate({ taskId: task.id, userId, action: isAssigned ? 'remove' : 'add' });
+                                        }}
                                     />
                                 ))
                             )}
@@ -616,6 +627,14 @@ export const ProjectWorkspace: React.FC = () => {
                             <div className="ws-col-title">
                                 <Layers size={18} /> ACTIVITY
                             </div>
+                            {selectedTaskId && canAddActivity && (
+                                <button
+                                    onClick={() => handleCreate('activity', selectedTaskId)}
+                                    className="btn-col-add"
+                                >
+                                    <Plus size={14} /> Add Activity
+                                </button>
+                            )}
                         </div>
                         <div className="ws-column-body compact-column-body">
                             {!selectedTaskId ? (
@@ -633,18 +652,19 @@ export const ProjectWorkspace: React.FC = () => {
                                     <p className="dashed-desc">
                                         {(isPM || isSuperAdmin) ? "No activities found for this task." : "You haven't been assigned to any activities in this task."}
                                     </p>
+
                                 </div>
                             ) : (
                                 activities?.map(activity => {
-                                    const selectedTask = tasks?.find(t => t.id === selectedTaskId);
+                                    const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
                                     // Pass ALL task members + current activity assignees
                                     const availableUsers = (() => {
                                         const taskMembers = selectedTask?.assigned_users || [];
                                         const current = activity.assigned_users || [];
                                         const uniqueMap = new Map();
-                                        [...taskMembers, ...current].forEach(u => uniqueMap.set(u.id, u));
+                                        [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => u.id !== project?.project_manager_id) // Exclude PM
+                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
                                             .map((pm: any) => ({
                                                 ...pm,
                                                 initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -660,7 +680,12 @@ export const ProjectWorkspace: React.FC = () => {
                                             description={activity.description}
                                             assignedUsers={activity.assigned_users || []}
                                             onClick={() => { }}
-                                            onAssignUser={(userId) => assignActivityUserMutation.mutate({ activityId: activity.id, userId })}
+                                            onEdit={() => handleEdit('activity', activity)}
+                                            onDelete={() => handleDeleteActivity(activity.id)}
+                                            onAssignUser={(userId) => {
+                                                const isAssigned = (activity.assigned_users || []).some((u: any) => String(u.id) === String(userId));
+                                                assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add' });
+                                            }}
                                             availableUsers={availableUsers}
                                             isPM={isPM}
                                             isCompact={true}

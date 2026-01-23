@@ -44,7 +44,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
 
             <div className="card-body">
                 <p className="project-desc" title={project.description}>
-                    {project.description || 'No description provided.'}
+                    {(project.description || '').length > 30
+                        ? (project.description || '').slice(0, 30) + '...'
+                        : (project.description || 'No description provided.')}
                 </p>
             </div>
 

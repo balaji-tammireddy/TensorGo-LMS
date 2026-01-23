@@ -6,6 +6,36 @@
     flex-direction: column;
     background-color: #F9FAFB;
     font-family: 'Poppins', sans-serif;
+    /* Prevent page scroll if children are wide */
+    overflow-x: hidden;
+}
+
+/* ... (rest of file) ... */
+
+/* Columns */
+.ws-columns-wrapper {
+    display: flex;
+    gap: 24px;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    /* Force hidden overflow for columns wrapper */
+}
+
+.ws-column {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #E5E7EB;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    /* Responsive sizing - Strict Fluidity */
+    flex: 1 1 0;
+    /* Grow, Shrink, Basis 0 -> forces equal width */
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* Header */
@@ -141,23 +171,27 @@
     background-color: #2563EB;
 }
 
-/* Columns */
-.ws-columns-wrapper {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    height: 100%;
-    overflow: hidden;
-}
+/* Old columns removed */
 
-.ws-column {
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #E5E7EB;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+    .workspace-container {
+        padding: 16px;
+        /* Reduce padding */
+    }
+
+    .ws-columns-wrapper {
+        gap: 12px;
+        /* Reduce gap */
+    }
+
+    .ws-header {
+        margin-bottom: 20px;
+    }
+
+    .ws-project-title {
+        font-size: 20px;
+    }
 }
 
 .ws-column-header {
@@ -252,6 +286,7 @@
     margin: 0;
     max-width: 200px;
 }
+
 /* Compact Activity Column */
 .compact-column-body {
     gap: 10px !important;

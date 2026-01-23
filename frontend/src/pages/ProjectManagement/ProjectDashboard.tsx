@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, AlertCircle } from 'lucide-react';
+import { Plus, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService, Project } from '../../services/projectService';
@@ -19,6 +19,16 @@ export const ProjectDashboard: React.FC = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number, name: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // State for accordion sections
+    const [openSection, setOpenSection] = useState<string | null>('my-projects');
+
+    const handleToggleSection = (section: string) => {
+        // Enforce one section always open (optimal space usage)
+        if (openSection !== section) {
+            setOpenSection(section);
+        }
+    };
 
     // Fetch projects
     const { data: projects, isLoading, refetch } = useQuery(
@@ -54,47 +64,77 @@ export const ProjectDashboard: React.FC = () => {
         }
     };
 
-    const ProjectListSection = ({ title, projects, filterType, emptyMsg }: { title: string, projects: Project[], filterType: string, emptyMsg: string }) => {
+    const ProjectListSection = ({
+        title,
+        projects,
+        filterType,
+        emptyMsg,
+        sectionId,
+        isOpen,
+        onToggle
+    }: {
+        title: string,
+        projects: Project[],
+        filterType: string,
+        emptyMsg: string,
+        sectionId: string,
+        isOpen: boolean,
+        onToggle: () => void
+    }) => {
         const displayProjects = projects.slice(0, 4); // Show only top 4
         const hasMore = projects.length > 4;
 
         return (
-            <>
-                <div className="section-header-row">
-                    <h2 className="section-title">{title}</h2>
-                    {hasMore && (
+            <div className={`section-container ${isOpen ? 'open' : ''}`}>
+                <div
+                    className="section-header-row clickable"
+                    onClick={onToggle}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        <h2 className="section-title" style={{ margin: 0 }}>{title}</h2>
+                    </div>
+                    {hasMore && isOpen && (
                         <button
                             className="btn-view-all"
-                            onClick={() => navigate(`/project-management/list?filter=${filterType}`)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/project-management/list?filter=${filterType}`);
+                            }}
                         >
                             View All &gt;
                         </button>
                     )}
                 </div>
 
-                {projects.length === 0 ? (
-                    <EmptyState
-                        title="No Projects"
-                        description={emptyMsg}
-                        icon={AlertCircle}
-                        size="small"
-                        className="dashboard-empty-state"
-                    />
-                ) : (
-                    <div className="projects-grid-preview">
-                        {displayProjects.map((project: Project) => (
-                            <ProjectCard
-                                key={project.id}
-                                project={project}
-                                navigate={navigate}
-                                getStatusClass={getStatusClass}
-                                onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                canDelete={user?.role === 'super_admin'}
+                {isOpen && (
+                    <div className="section-content">
+                        {projects.length === 0 ? (
+                            <EmptyState
+                                title="No Projects"
+                                description={emptyMsg}
+                                icon={AlertCircle}
+                                size="small"
+                                className="dashboard-empty-state"
                             />
-                        ))}
+                        ) : (
+                            <div className="projects-grid-preview">
+                                {displayProjects.map((project: Project) => (
+                                    <ProjectCard
+                                        key={project.id}
+                                        project={project}
+                                        navigate={navigate}
+                                        getStatusClass={getStatusClass}
+                                        onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
+                                        canDelete={user?.role === 'super_admin'}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
-            </>
+            </div>
         );
     };
 
@@ -120,11 +160,11 @@ export const ProjectDashboard: React.FC = () => {
                     <div className="project-loading">Loading projects...</div>
                 )}
 
-                {/* Projects Content Split (50/50) */}
+                {/* Projects Content Split */}
                 {!isLoading && (
                     <div className="dashboard-content">
-                        {/* 1. UPPER SECTION: My Projects */}
-                        <div className="dashboard-section">
+                        {/* 1. SECTION: My Projects */}
+                        <div className={`dashboard-section ${openSection !== 'my-projects' ? 'collapsed' : ''}`}>
                             {(() => {
                                 const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
                                 const myProjectsList = (projects || []).filter((p: Project) =>
@@ -137,13 +177,16 @@ export const ProjectDashboard: React.FC = () => {
                                         projects={myProjectsList}
                                         filterType="my-projects"
                                         emptyMsg="No projects found in this section."
+                                        sectionId="my-projects"
+                                        isOpen={openSection === 'my-projects'}
+                                        onToggle={() => handleToggleSection('my-projects')}
                                     />
                                 );
                             })()}
                         </div>
 
-                        {/* 2. LOWER SECTION: All Projects */}
-                        <div className="dashboard-section">
+                        {/* 2. SECTION: All Projects */}
+                        <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
                             {isGlobalAdmin ? (
                                 (() => {
                                     const allOtherProjects = projects || [];
@@ -153,22 +196,35 @@ export const ProjectDashboard: React.FC = () => {
                                             projects={allOtherProjects}
                                             filterType="all"
                                             emptyMsg="No global projects to display."
+                                            sectionId="all-projects"
+                                            isOpen={openSection === 'all-projects'}
+                                            onToggle={() => handleToggleSection('all-projects')}
                                         />
                                     );
                                 })()
                             ) : (
-                                <>
-                                    <div className="section-header-row">
-                                        <h2 className="section-title">All Projects</h2>
+                                <div className="section-container">
+                                    <div
+                                        className="section-header-row clickable"
+                                        onClick={() => handleToggleSection('all-projects')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            {openSection === 'all-projects' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                            <h2 className="section-title" style={{ margin: 0 }}>All Projects</h2>
+                                        </div>
                                     </div>
-                                    <EmptyState
-                                        title="Access Restricted"
-                                        description="You are not authorized to view all projects."
-                                        icon={AlertCircle}
-                                        size="small"
-                                        className="dashboard-empty-state"
-                                    />
-                                </>
+
+                                    {openSection === 'all-projects' && (
+                                        <EmptyState
+                                            title="Access Restricted"
+                                            description="You are not authorized to view all projects."
+                                            icon={AlertCircle}
+                                            size="small"
+                                            className="dashboard-empty-state"
+                                        />
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>

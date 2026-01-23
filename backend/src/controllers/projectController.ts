@@ -305,6 +305,34 @@ export const removeAccess = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const toggleAccess = async (req: AuthRequest, res: Response) => {
+    try {
+        const { level, targetId, userId, action } = req.body;
+        const requestedBy = req.user?.id;
+
+        console.log(`[ACCESS] TOGGLE REQUEST: level=${level}, targetId=${targetId}, userId=${userId}, action=${action}, requestedBy=${requestedBy}`);
+
+        if (!level || !targetId || !userId || !action || !requestedBy) {
+            console.warn('[ACCESS] Toggle Missing Params:', req.body);
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+
+        if (!['module', 'task', 'activity'].includes(level)) {
+            return res.status(400).json({ error: 'Invalid level' });
+        }
+
+        if (!['add', 'remove'].includes(action)) {
+            return res.status(400).json({ error: 'Invalid action' });
+        }
+
+        const result = await ProjectService.toggleAccess(level, targetId, userId, action, requestedBy);
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[ACCESS] Toggle Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const getAccessList = async (req: AuthRequest, res: Response) => {
     try {
         const { level, id } = req.params;

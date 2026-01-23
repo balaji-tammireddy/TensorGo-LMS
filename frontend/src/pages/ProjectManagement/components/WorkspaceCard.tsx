@@ -95,7 +95,11 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             </div>
 
             <div className="ws-card-body">
-                {description ? <p className="ws-card-desc">{description}</p> : null}
+                {description ? (
+                    <p className="ws-card-desc" title={description}>
+                        {description.length > 30 ? description.slice(0, 30) + '...' : description}
+                    </p>
+                ) : null}
             </div>
 
             <div className="ws-card-divider" />
@@ -117,13 +121,13 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                         <span className="ws-no-assignees">No users assigned</span>
                     )}
                 </div>
-                {isPM && (onAddAssignee || (availableUsers.length > 0 && onAssignUser)) && (
+                {isPM && (onAddAssignee || onAssignUser) && (
                     <div className="ws-footer-actions-container" ref={dropdownRef}>
                         <button
                             className={`ws-add-assignee-btn ${isDropdownOpen ? 'active' : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (availableUsers.length > 0 && onAssignUser) {
+                                if (onAssignUser) {
                                     setIsDropdownOpen(!isDropdownOpen);
                                 } else if (onAddAssignee) {
                                     onAddAssignee();
@@ -134,35 +138,39 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                             {isDropdownOpen ? <X size={14} /> : <Plus size={14} />}
                         </button>
 
-                        {isDropdownOpen && availableUsers.length > 0 && (
+                        {isDropdownOpen && (
                             <div className="ws-assign-dropdown" onClick={(e) => e.stopPropagation()}>
                                 <div className="ws-dropdown-header">
                                     <span>Manage Access</span>
                                 </div>
                                 <div className="ws-dropdown-list">
-                                    {availableUsers.map(user => {
-                                        const isAssigned = assignedUsers.some(u => u.id === user.id);
-                                        return (
-                                            <div
-                                                key={user.id}
-                                                className={`ws-dropdown-item ${isAssigned ? 'assigned' : ''}`}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    onAssignUser?.(user.id);
-                                                    setIsDropdownOpen(false);
-                                                }}
-                                            >
-                                                <div className="ws-item-avatar">{user.initials}</div>
-                                                <span className="ws-item-name">{user.name}</span>
-                                                {isAssigned ? (
-                                                    <UserMinus size={14} className="ws-item-icon remove" />
-                                                ) : (
-                                                    <UserPlus size={14} className="ws-item-icon add" />
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                    {availableUsers.length === 0 ? (
+                                        <div className="ws-dropdown-empty">No users available</div>
+                                    ) : (
+                                        availableUsers.map(user => {
+                                            const isAssigned = assignedUsers.some(u => String(u.id) === String(user.id));
+                                            return (
+                                                <div
+                                                    key={user.id}
+                                                    className={`ws-dropdown-item ${isAssigned ? 'assigned' : ''}`}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        onAssignUser?.(user.id);
+                                                        // setIsDropdownOpen(false); // Removed to keep open for multiple
+                                                    }}
+                                                >
+                                                    <div className="ws-item-avatar">{user.initials}</div>
+                                                    <span className="ws-item-name">{user.name}</span>
+                                                    {isAssigned ? (
+                                                        <UserMinus size={14} className="ws-item-icon remove" />
+                                                    ) : (
+                                                        <UserPlus size={14} className="ws-item-icon add" />
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
                         )}

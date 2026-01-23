@@ -63,7 +63,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 description: initialData.description || '',
                 project_manager_id: initialData.project_manager_id ? String(initialData.project_manager_id) : '',
                 due_date: initialData.due_date || '',
-                assignee_ids: [] // Editing access list not supported here yet, or handled separately
+                assignee_ids: initialData.assigned_users ? initialData.assigned_users.map((u: any) => u.id) : []
             });
         } else {
             setFormData({
@@ -183,6 +183,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             } else if (type === 'activity' && (parentId || initialData?.id)) {
                 if (isEdit && initialData?.id) {
                     await projectService.updateActivity(initialData.id, {
+                        ...payload,
                         assigneeIds: payload.assignee_ids
                     });
                 } else {
@@ -204,12 +205,12 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     };
 
     const getTitle = () => {
-        if (type === 'activity') return 'Assign Activity Access';
         if (isEdit) return `Edit ${toTitleCase(type)}`;
         switch (type) {
             case 'project': return 'Create New Project';
             case 'module': return 'Add Module';
             case 'task': return 'Add Task';
+            case 'activity': return 'Add Activity';
             default: return 'Create';
         }
     };
@@ -398,87 +399,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
 
                         {/* Access Assignment (For Module, Task, Activity) */}
-                        {['module', 'task', 'activity'].includes(type) && !isEdit && (
-                            <div className="form-group">
-                                <label className="form-label">
-                                    Assign Access
-                                </label>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button type="button" className="custom-select-trigger">
-                                            <span className="selected-val">
-                                                {formData.assignee_ids.length > 0
-                                                    ? `${formData.assignee_ids.length} User${formData.assignee_ids.length > 1 ? 's' : ''} Selected`
-                                                    : 'Select Users'}
-                                            </span>
-                                            <ChevronDown size={16} className="text-gray-400" />
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="manager-dropdown-content" align="start">
-                                        <div className="dropdown-items-scroll">
-                                            {loadingCandidates ? (
-                                                <div className="p-3 text-sm text-gray-500">Loading users...</div>
-                                            ) : assigneeCandidates.length === 0 ? (
-                                                <div className="p-3 text-sm text-gray-500">No users found with access to parent scope.</div>
-                                            ) : (
-                                                <>
-                                                    {/* Select All / Clear All */}
-                                                    <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const allSelected = formData.assignee_ids.length === assigneeCandidates.length;
-                                                                setFormData({
-                                                                    ...formData,
-                                                                    assignee_ids: allSelected ? [] : assigneeCandidates.map(u => u.id)
-                                                                });
-                                                            }}
-                                                            style={{
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                color: '#3b82f6',
-                                                                fontSize: '13px',
-                                                                fontWeight: '500',
-                                                                cursor: 'pointer',
-                                                                padding: '4px 0'
-                                                            }}
-                                                        >
-                                                            {formData.assignee_ids.length === assigneeCandidates.length ? 'Clear All' : 'Select All'}
-                                                        </button>
-                                                    </div>
-                                                    {assigneeCandidates.map(user => (
-                                                        <DropdownMenuItem
-                                                            key={user.id}
-                                                            onSelect={(e) => e.preventDefault()}
-                                                            onClick={() => {
-                                                                const ids = formData.assignee_ids.includes(user.id)
-                                                                    ? formData.assignee_ids.filter(id => id !== user.id)
-                                                                    : [...formData.assignee_ids, user.id];
-                                                                setFormData({ ...formData, assignee_ids: ids });
-                                                            }}
-                                                            className="manager-item"
-                                                        >
-                                                            <div className="flex items-center gap-2 w-full">
-                                                                <div className={`checkbox-custom ${formData.assignee_ids.includes(user.id) ? 'checked' : ''}`}>
-                                                                    {formData.assignee_ids.includes(user.id) && <CheckSquare size={12} color="white" />}
-                                                                </div>
-                                                                <div className="manager-info">
-                                                                    <span className="manager-name">
-                                                                        {toTitleCase(user.name)} <span className="manager-id">({user.empId})</span>
-                                                                    </span>
-                                                                    <span className={`role-badge ${user.role}`}>{getRoleLabel(user.role)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                    }
-                                                </>
-                                            )}
-                                        </div>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        )}
+
                     </div>
 
                     <div className="modal-footer">

@@ -27,7 +27,7 @@ export interface TaskData {
 
 export interface ActivityData {
   task_id: number;
-  custom_id: string;
+  custom_id?: string;
   name: string;
   description?: string;
 }
@@ -193,12 +193,13 @@ export class ProjectService {
 
     const project = res.rows[0];
 
-    // If manager changed, re-sync team
+    // If manager changed, re-sync team AND reset resource access
     if (data.project_manager_id) {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
         await this.syncProjectTeam(project.id, data.project_manager_id, client);
+        await this.resetProjectResourcesToNewManager(project.id, data.project_manager_id, client);
         await client.query('COMMIT');
       } catch (e) {
         await client.query('ROLLBACK');
@@ -231,6 +232,64 @@ export class ProjectService {
         [projectId, userId]
       );
     }
+  }
+
+  // NEW: Reset all resource access when PM changes
+  static async resetProjectResourcesToNewManager(projectId: number, newManagerId: number, client: any) {
+    console.log(`[ProjectService] Resetting resources for Project ${projectId} to New Manager ${newManagerId}`);
+
+    // 1. Clear existing access for this project
+    // Modules
+    await client.query(`
+      DELETE FROM module_access 
+      WHERE module_id IN (SELECT id FROM project_modules WHERE project_id = $1)
+    `, [projectId]);
+
+    // Tasks
+    await client.query(`
+      DELETE FROM task_access 
+      WHERE task_id IN (
+        SELECT t.id FROM project_tasks t 
+        JOIN project_modules m ON t.module_id = m.id 
+        WHERE m.project_id = $1
+      )
+    `, [projectId]);
+
+    // Activities
+    await client.query(`
+      DELETE FROM activity_access 
+      WHERE activity_id IN (
+        SELECT a.id FROM project_activities a 
+        JOIN project_tasks t ON a.task_id = t.id 
+        JOIN project_modules m ON t.module_id = m.id 
+        WHERE m.project_id = $1
+      )
+    `, [projectId]);
+
+    // 2. Assign New Manager to ALL modules
+    await client.query(`
+      INSERT INTO module_access (module_id, user_id, granted_by)
+      SELECT id, $2, $2 FROM project_modules WHERE project_id = $1
+    `, [projectId, newManagerId]);
+
+    // 3. Assign New Manager to ALL tasks
+    await client.query(`
+      INSERT INTO task_access (task_id, user_id, granted_by)
+      SELECT t.id, $2, $2 
+      FROM project_tasks t
+      JOIN project_modules m ON t.module_id = m.id
+      WHERE m.project_id = $1
+    `, [projectId, newManagerId]);
+
+    // 4. Assign New Manager to ALL activities
+    await client.query(`
+      INSERT INTO activity_access (activity_id, user_id, granted_by)
+      SELECT a.id, $2, $2 
+      FROM project_activities a
+      JOIN project_tasks t ON a.task_id = t.id
+      JOIN project_modules m ON t.module_id = m.id
+      WHERE m.project_id = $1
+    `, [projectId, newManagerId]);
   }
 
   protected static async getReportingSubtree(managerId: number, client: any): Promise<number[]> {
@@ -298,18 +357,26 @@ export class ProjectService {
 
       if (updates.length > 0 || userId) {
         updates.push(`updated_at = CURRENT_TIMESTAMP`);
-        updates.push(`updated_by = $${idx++}`);
-        values.push(userId);
+        if (userId) {
+          updates.push(`updated_by = $${idx++}`);
+          values.push(userId);
+        }
 
         values.push(id);
         await client.query(`UPDATE project_modules SET ${updates.join(', ')} WHERE id = $${idx}`, values);
       }
 
       if (data.assigneeIds !== undefined) {
+        const incomingIds = data.assigneeIds.map(id => String(id));
+        console.log(`[ProjectService] updateModule: id=${id}, incomingIds=${JSON.stringify(incomingIds)}`);
+
         // 1. Get current users to identify who is being removed
         const currentRes = await client.query('SELECT user_id FROM module_access WHERE module_id = $1', [id]);
-        const currentUserIds = currentRes.rows.map(r => r.user_id);
-        const removedUserIds = currentUserIds.filter(uid => !data.assigneeIds!.includes(uid));
+        const currentUserIds = currentRes.rows.map(r => String(r.user_id));
+        console.log(`[ProjectService] updateModule: currentUserIds=${JSON.stringify(currentUserIds)}`);
+
+        const removedUserIds = currentUserIds.filter(uid => !incomingIds.includes(uid));
+        console.log(`[ProjectService] updateModule: Removed user IDs=${JSON.stringify(removedUserIds)}`);
 
         // 2. Clear old module access
         await client.query('DELETE FROM module_access WHERE module_id = $1', [id]);
@@ -404,33 +471,6 @@ export class ProjectService {
         await this.assignTaskAccess(task.id, assigneeIds, createdBy, client);
       }
 
-      // Auto-create 4 default activities
-      const projectRes = await client.query(`
-        SELECT p.project_manager_id 
-        FROM project_modules m
-        JOIN projects p ON m.project_id = p.id
-        WHERE m.id = $1
-      `, [data.module_id]);
-      const pmId = projectRes.rows[0]?.project_manager_id;
-
-      const defaultActivities = ['Development', 'Testing', 'Review', 'Bugs'];
-      for (let i = 0; i < defaultActivities.length; i++) {
-        const name = defaultActivities[i];
-        const activityCustomId = `${customId}-0${i + 1}`; // e.g. TSK-001-01
-
-        const actRes = await client.query(
-          `INSERT INTO project_activities (task_id, custom_id, name, description, created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $5) RETURNING id`,
-          [task.id, activityCustomId, name, null, createdBy || pmId]
-        );
-        const activityId = actRes.rows[0].id;
-
-        // Assign PM access to activity
-        if (pmId) {
-          await this.assignActivityAccess(activityId, [pmId], createdBy || pmId, client);
-        }
-      }
-
       await client.query('COMMIT');
       return task;
     } catch (e) {
@@ -445,10 +485,19 @@ export class ProjectService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // 1. Get Parent Task's Custom ID to use as prefix
+      const taskRes = await client.query('SELECT custom_id FROM project_tasks WHERE id = $1', [data.task_id]);
+      if (taskRes.rows.length === 0) throw new Error('Parent task not found');
+      const taskCustomId = taskRes.rows[0].custom_id;
+
+      // 2. Generate Custom ID (e.g. TSK-001-01)
+      const customId = data.custom_id || await this.generateNextCustomId('project_activities', taskCustomId, 'task_id', data.task_id, client);
+
       const res = await client.query(
         `INSERT INTO project_activities (task_id, custom_id, name, description, created_by, updated_by)
              VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
-        [data.task_id, data.custom_id, data.name, data.description || null, createdBy]
+        [data.task_id, customId, data.name, data.description || null, createdBy]
       );
       const activity = res.rows[0];
 
@@ -508,18 +557,26 @@ export class ProjectService {
 
       if (updates.length > 0 || userId) {
         updates.push(`updated_at = CURRENT_TIMESTAMP`);
-        updates.push(`updated_by = $${idx++}`);
-        values.push(userId);
+        if (userId) {
+          updates.push(`updated_by = $${idx++}`);
+          values.push(userId);
+        }
 
         values.push(id);
         await client.query(`UPDATE project_tasks SET ${updates.join(', ')} WHERE id = $${idx}`, values);
       }
 
       if (data.assigneeIds !== undefined) {
+        const incomingIds = data.assigneeIds.map(id => String(id));
+        console.log(`[ProjectService] updateTask: id=${id}, incomingIds=${JSON.stringify(incomingIds)}`);
+
         // 1. Get current users to identify who is being removed
         const currentRes = await client.query('SELECT user_id FROM task_access WHERE task_id = $1', [id]);
-        const currentUserIds = currentRes.rows.map(r => r.user_id);
-        const removedUserIds = currentUserIds.filter(uid => !data.assigneeIds!.includes(uid));
+        const currentUserIds = currentRes.rows.map(r => String(r.user_id));
+        console.log(`[ProjectService] updateTask: currentUserIds=${JSON.stringify(currentUserIds)}`);
+
+        const removedUserIds = currentUserIds.filter(uid => !incomingIds.includes(uid));
+        console.log(`[ProjectService] updateTask: Removed user IDs=${JSON.stringify(removedUserIds)}`);
 
         // 2. Clear old task access
         await client.query('DELETE FROM task_access WHERE task_id = $1', [id]);
@@ -568,14 +625,17 @@ export class ProjectService {
 
       if (updates.length > 0 || userId) {
         updates.push(`updated_at = CURRENT_TIMESTAMP`);
-        updates.push(`updated_by = $${idx++}`);
-        values.push(userId);
+        if (userId) {
+          updates.push(`updated_by = $${idx++}`);
+          values.push(userId);
+        }
 
         values.push(id);
         await client.query(`UPDATE project_activities SET ${updates.join(', ')} WHERE id = $${idx}`, values);
       }
 
       if (data.assigneeIds !== undefined) {
+        console.log(`[ProjectService] updateActivity: assigneeIds=${JSON.stringify(data.assigneeIds)}`);
         // Clear old activity access
         await client.query('DELETE FROM activity_access WHERE activity_id = $1', [id]);
 
@@ -993,7 +1053,7 @@ export class ProjectService {
       const res = await query(
         `SELECT id, emp_id as "empId", 
                 COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') as name, 
-                role,
+                user_role as role,
                 COALESCE(email, '') as email,
                 COALESCE(designation, 'N/A') as designation,
                 COALESCE(department, 'N/A') as department
@@ -1018,7 +1078,7 @@ export class ProjectService {
 
       // 3. Return users who have module access AND are subordinates
       const res = await query(
-        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.role
+        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.user_role as role
              FROM module_access ma
              JOIN users u ON ma.user_id = u.id
              WHERE ma.module_id = $1 AND ma.user_id = ANY($2)`,
@@ -1042,7 +1102,7 @@ export class ProjectService {
 
       // 3. Return users who have task access AND are subordinates
       const res = await query(
-        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.role
+        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.user_role as role
              FROM task_access ta
              JOIN users u ON ta.user_id = u.id
              WHERE ta.task_id = $1 AND ta.user_id = ANY($2)`,
@@ -1051,6 +1111,113 @@ export class ProjectService {
       return res.rows;
     }
     return [];
+  }
+
+  static async toggleAccess(level: 'module' | 'task' | 'activity', targetId: number, userId: number, action: 'add' | 'remove', requestedBy: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      console.log(`[ACCESS_TRACE] Start: level=${level}, targetId=${targetId}, userId=${userId}, action=${action}`);
+
+      const table = `${level}_access`;
+      const idColumn = `${level}_id`;
+
+      // Explicitly cast to numbers just in case
+      const tId = Number(targetId);
+      const uId = Number(userId);
+
+      if (action === 'add') {
+        console.log(`[ACCESS_TRACE] Adding ${uId} to ${table} for ${idColumn}=${tId}`);
+        const result = await client.query(
+          `INSERT INTO ${table} (${idColumn}, user_id, granted_by)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (${idColumn}, user_id) DO NOTHING`,
+          [tId, uId, requestedBy]
+        );
+        console.log(`[ACCESS_TRACE] Add result:`, result.rowCount);
+      } else {
+        // Remove
+        console.log(`[ACCESS_TRACE] Removing ${uId} from ${table} for ${idColumn}=${tId}`);
+        const result = await client.query(
+          `DELETE FROM ${table} WHERE ${idColumn} = $1 AND user_id = $2`,
+          [tId, uId]
+        );
+        console.log(`[ACCESS_TRACE] Remove result:`, result.rowCount);
+
+        // Cascading Revocation
+        if (level === 'module') {
+          // Remove from all tasks in this module
+          await client.query(
+            `DELETE FROM task_access 
+             WHERE user_id = $1 AND task_id IN (SELECT id FROM project_tasks WHERE module_id = $2)`,
+            [userId, targetId]
+          );
+          // Remove from all activities in this module
+          await client.query(
+            `DELETE FROM activity_access 
+             WHERE user_id = $1 AND activity_id IN (
+                SELECT a.id FROM project_activities a
+                JOIN project_tasks t ON a.task_id = t.id
+                WHERE t.module_id = $2
+             )`,
+            [userId, targetId]
+          );
+        } else if (level === 'task') {
+          // Remove from all activities in this task
+          await client.query(
+            `DELETE FROM activity_access 
+             WHERE user_id = $1 AND activity_id IN (SELECT id FROM project_activities WHERE task_id = $2)`,
+            [userId, targetId]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      console.log(`[ACCESS_TRACE] Committed.`);
+
+      // Fetch Updated List to return to frontend
+      let updatedUsers = [];
+      if (level === 'module') {
+        const res = await client.query(`
+          SELECT u.id, 
+                 COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials
+          FROM module_access ma 
+          JOIN users u ON ma.user_id = u.id 
+          WHERE ma.module_id = $1
+          ORDER BY name`, [tId]);
+        updatedUsers = res.rows;
+      } else if (level === 'task') {
+        const res = await client.query(`
+          SELECT u.id, 
+                 COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials
+          FROM task_access ta 
+          JOIN users u ON ta.user_id = u.id 
+          WHERE ta.task_id = $1
+          ORDER BY name`, [tId]);
+        updatedUsers = res.rows;
+      } else if (level === 'activity') {
+        const res = await client.query(`
+          SELECT u.id, 
+                 COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials
+          FROM activity_access aa 
+          JOIN users u ON aa.user_id = u.id 
+          WHERE aa.activity_id = $1
+          ORDER BY name`, [tId]);
+        updatedUsers = res.rows;
+      }
+
+      console.log(`[ACCESS_TRACE] Returning ${updatedUsers.length} users:`, updatedUsers.map(u => u.id));
+      return { success: true, updatedUsers };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   // --- 6. Permission Helpers ---

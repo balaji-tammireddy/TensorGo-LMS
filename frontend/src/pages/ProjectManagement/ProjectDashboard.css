@@ -24,24 +24,30 @@
 }
 
 /* Header Section */
+/* Header Section */
 .dashboard-header {
-    background-color: white;
-    padding: 16px 30px;
+    background-color: transparent;
+    /* Removed white background */
+    padding: 20px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: none;
+    /* Removed border */
     flex-shrink: 0;
     animation: vp-fadeIn 0.4s ease-out;
 }
 
 .dashboard-header h1 {
-    font-size: 20px;
+    font-size: 24px;
+    /* Increased size to match reference */
     font-weight: 700;
     color: #1a202c;
     margin: 0;
     padding-left: 12px;
-    border-left: 4px solid #2563EB;
+    border-left: 5px solid #2563EB;
+    /* Thicker bar */
+    line-height: 1.2;
 }
 
 .btn-create {
@@ -94,11 +100,22 @@
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     border: 1px solid #e2e8f0;
-    transition: box-shadow 0.3s ease;
+    transition: all 0.3s ease;
+}
+
+.dashboard-section.collapsed {
+    flex: 0 0 auto;
+    min-height: auto;
+    height: auto;
+    overflow: visible;
 }
 
 .dashboard-section:hover {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+.dashboard-section.collapsed .section-header-row {
+    margin-bottom: 0;
 }
 
 .section-header-row {
@@ -109,16 +126,14 @@
 }
 
 .section-title {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     color: #1e293b;
-    padding-left: 12px;
-    border-left: 4px solid #3b82f6;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 8px;
-    line-height: 1;
+    line-height: 1.2;
     margin-bottom: 0;
 }
 
@@ -625,4 +640,57 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Accordion Content Styles */
+.section-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.section-container.open {
+    /* Ensure it takes remaining space */
+    flex: 1;
+}
+
+.section-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    /* Vertical Center */
+    min-height: 0;
+    overflow: hidden;
+    /* Handle inner scroll */
+    padding-bottom: 20px;
+}
+
+/* Update grid preview to center horizontally if content is smaller than width */
+/* Update grid preview to center horizontally if content is smaller than width */
+.projects-grid-preview {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    margin-top: 10px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+
+    /* Horizontal Center Logic - CHANGED to Left Align as per request */
+    margin-left: 0;
+    margin-right: 0;
+    justify-content: flex-start;
+    /* Start from left */
+}
+
+/* If you want to center the CARDS themselves when they don't fill the width: */
+.projects-grid-preview::after {
+    content: '';
+    flex: 0 0 20px;
+    /* Right padding */
 }
