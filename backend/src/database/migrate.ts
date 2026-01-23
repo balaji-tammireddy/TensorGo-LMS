@@ -61,12 +61,21 @@ async function migrate() {
     `);
 
     // Allow 'on_notice' in users status check (idempotent)
+    const statusColRes = await pool.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='user_status'"
+    );
+    const hasUserStatus = statusColRes.rows.length > 0;
+    const statusCol = hasUserStatus ? 'user_status' : 'status';
+    const statusConstraint = hasUserStatus ? 'users_user_status_check' : 'users_status_check';
+
     await pool.query(`
       ALTER TABLE users
       DROP CONSTRAINT IF EXISTS users_status_check;
       ALTER TABLE users
-      ADD CONSTRAINT users_status_check
-      CHECK (status IN ('active', 'inactive', 'on_leave', 'terminated', 'resigned', 'on_notice'));
+      DROP CONSTRAINT IF EXISTS users_user_status_check;
+      ALTER TABLE users
+      ADD CONSTRAINT ${statusConstraint}
+      CHECK (${statusCol} IN ('active', 'inactive', 'on_leave', 'terminated', 'resigned', 'on_notice'));
     `);
 
     // Allow 'intern' in users user_role check (idempotent)
@@ -345,6 +354,26 @@ async function migrate() {
       }
     } catch (renameError: any) {
       console.warn('Rename role column migration warning:', renameError.message);
+    }
+
+    // Run rename status column migration (019)
+    try {
+      const colCheck = await pool.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='user_status'"
+      );
+
+      if (colCheck.rows.length === 0) {
+        const renameStatusMigrationFile = readFileSync(
+          join(__dirname, 'migrations', '019_rename_status_column.sql'),
+          'utf-8'
+        );
+        await pool.query(renameStatusMigrationFile);
+        console.log('Rename status column migration (019) completed');
+      } else {
+        console.log('Rename status column migration (019) skipped (user_status column already exists)');
+      }
+    } catch (renameError: any) {
+      console.warn('Rename status column migration warning:', renameError.message);
     }
 
     console.log('Default data inserted');

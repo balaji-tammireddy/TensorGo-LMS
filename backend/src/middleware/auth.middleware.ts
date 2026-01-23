@@ -53,7 +53,7 @@ export const authenticateToken = async (
     try {
       logger.info(`[AUTH] Step 3: Querying DB for userId: ${userId}`);
       result = await pool.query(
-        'SELECT id, emp_id, email, user_role as role, first_name, last_name, status, token_version FROM users WHERE id = $1',
+        'SELECT id, emp_id, email, user_role as role, first_name, last_name, user_status as status, token_version FROM users WHERE id = $1',
         [userId]
       );
       logger.info(`[AUTH] Step 4: DB Query success, rows: ${result.rows.length}`);

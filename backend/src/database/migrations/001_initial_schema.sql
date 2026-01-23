@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_users_emp_id ON users(emp_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_user_role ON users(user_role);
 CREATE INDEX IF NOT EXISTS idx_users_reporting_manager ON users(reporting_manager_id);
-CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+-- CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 -- Leave requests table
 CREATE TABLE IF NOT EXISTS leave_requests (
