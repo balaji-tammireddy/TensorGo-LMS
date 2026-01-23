@@ -947,7 +947,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         : 'deactivating the user';
 
       logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Action BLOCKED for user ${employeeId} due to existing active subordinates. Reason: ${reason}`);
-      throw new Error(`Cannot proceed with ${reason}. Please remove the users reporting to ${name} and try again.`);
+      throw new Error(`Remove subordinates of ${name} to ${isDowngrade ? 'downgrade' : 'deactivate'}.`);
     }
   }
 
