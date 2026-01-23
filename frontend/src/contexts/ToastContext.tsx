@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { FaCheckCircle, FaInfoCircle, FaExclamationCircle, FaTimes } from 'react-icons/fa';
+import { useLocation } from 'react-router-dom';
 import './ToastContext.css';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -17,6 +18,7 @@ interface ToastContextType {
   showError: (message: string, duration?: number) => void;
   showInfo: (message: string, duration?: number) => void;
   showWarning: (message: string, duration?: number) => void;
+  clearToasts: () => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -31,10 +33,20 @@ export const useToast = () => {
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const location = useLocation();
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const clearToasts = useCallback(() => {
+    setToasts([]);
+  }, []);
+
+  // Clear toasts when navigating to a new page
+  useEffect(() => {
+    clearToasts();
+  }, [location.pathname, clearToasts]);
 
   const showToast = useCallback(
     (message: string, type: ToastType = 'info', duration: number = 6000) => {
@@ -51,22 +63,22 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const showSuccess = useCallback(
-    (message: string, duration?: number) => showToast(message, 'success', duration || 10000),
+    (message: string, duration?: number) => showToast(message, 'success', duration || 6000),
     [showToast]
   );
 
   const showError = useCallback(
-    (message: string, duration?: number) => showToast(message, 'error', duration || 15000),
+    (message: string, duration?: number) => showToast(message, 'error', duration || 6000),
     [showToast]
   );
 
   const showInfo = useCallback(
-    (message: string, duration?: number) => showToast(message, 'info', duration || 10000),
+    (message: string, duration?: number) => showToast(message, 'info', duration || 6000),
     [showToast]
   );
 
   const showWarning = useCallback(
-    (message: string, duration?: number) => showToast(message, 'warning', duration || 15000),
+    (message: string, duration?: number) => showToast(message, 'warning', duration || 6000),
     [showToast]
   );
 
@@ -84,7 +96,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <ToastContext.Provider value={{ showToast, showSuccess, showError, showInfo, showWarning }}>
+    <ToastContext.Provider value={{ showToast, showSuccess, showError, showInfo, showWarning, clearToasts }}>
       {children}
       <div className="toast-container">
         {toasts.map((toast) => (
