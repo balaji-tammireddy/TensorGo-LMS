@@ -11,8 +11,8 @@ export const createProject = async (req: AuthRequest, res: Response) => {
         const { custom_id, name, description, project_manager_id, start_date, end_date } = req.body;
 
         // Basic validation
-        if (!custom_id || !name || !project_manager_id) {
-            return res.status(400).json({ error: 'Missing required fields: custom_id, name, project_manager_id' });
+        if (!name || !project_manager_id) {
+            return res.status(400).json({ error: 'Missing required fields: name, project_manager_id' });
         }
 
         const project = await ProjectService.createProject({
@@ -73,9 +73,15 @@ export const createModule = async (req: AuthRequest, res: Response) => {
         const { projectId } = req.params;
         const { custom_id, name, description, assignee_ids } = req.body;
         const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        if (!custom_id || !name) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        if (!name) {
+            return res.status(400).json({ error: 'Missing required fields: name' });
+        }
+
+        const canManage = await ProjectService.canUserManageProject(userId, req.user?.role || '', parseInt(projectId));
+        if (!canManage) {
+            return res.status(403).json({ error: 'Access denied: Only the Project Manager can add modules' });
         }
 
         const result = await ProjectService.createModule({
@@ -85,7 +91,7 @@ export const createModule = async (req: AuthRequest, res: Response) => {
             description
         }, assignee_ids, userId);
 
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(result);
     } catch (error: any) {
         logger.error('[MODULE] Create Error:', error);
         res.status(500).json({ error: error.message });
@@ -107,14 +113,45 @@ export const getModules = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const updateModule = async (req: AuthRequest, res: Response) => {
+    try {
+        const { moduleId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const result = await ProjectService.updateModule(parseInt(moduleId), req.body, userId);
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[MODULE] Update Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const deleteModule = async (req: AuthRequest, res: Response) => {
+    try {
+        const { moduleId } = req.params;
+        const result = await ProjectService.deleteModule(parseInt(moduleId));
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[MODULE] Delete Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const createTask = async (req: AuthRequest, res: Response) => {
     try {
         const { moduleId } = req.params;
         const { custom_id, name, description, due_date, assignee_ids } = req.body;
         const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        if (!custom_id || !name) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        if (!name) {
+            return res.status(400).json({ error: 'Missing required fields: name' });
+        }
+
+        const canManage = await ProjectService.canUserManageModule(userId, req.user?.role || '', parseInt(moduleId));
+        if (!canManage) {
+            return res.status(403).json({ error: 'Access denied: Only the Project Manager can add tasks' });
         }
 
         const result = await ProjectService.createTask({
@@ -125,7 +162,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
             due_date
         }, assignee_ids, userId);
 
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(result);
     } catch (error: any) {
         logger.error('[TASK] Create Error:', error);
         res.status(500).json({ error: error.message });
@@ -137,9 +174,15 @@ export const createActivity = async (req: AuthRequest, res: Response) => {
         const { taskId } = req.params;
         const { custom_id, name, description, assignee_ids } = req.body;
         const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        if (!custom_id || !name) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        if (!name) {
+            return res.status(400).json({ error: 'Missing required fields: name' });
+        }
+
+        const canManage = await ProjectService.canUserManageTask(userId, req.user?.role || '', parseInt(taskId));
+        if (!canManage) {
+            return res.status(403).json({ error: 'Access denied: Only the Project Manager can add activities' });
         }
 
         const result = await ProjectService.createActivity({
@@ -149,9 +192,37 @@ export const createActivity = async (req: AuthRequest, res: Response) => {
             description
         }, assignee_ids, userId);
 
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(result);
     } catch (error: any) {
         logger.error('[ACTIVITY] Create Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateActivity = async (req: AuthRequest, res: Response) => {
+    try {
+        const { activityId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const result = await ProjectService.updateActivity(parseInt(activityId), req.body, userId);
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[ACTIVITY] Update Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateTask = async (req: AuthRequest, res: Response) => {
+    try {
+        const { taskId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const result = await ProjectService.updateTask(parseInt(taskId), req.body, userId);
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[TASK] Update Error:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -171,8 +242,20 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// ... Activities implementation would follow similar pattern ...
-// For brevity implementing core paths first
+export const getActivities = async (req: AuthRequest, res: Response) => {
+    try {
+        const { taskId } = req.params;
+        const userId = req.user?.id;
+        const role = req.user?.role;
+        if (!userId || !role) return res.status(401).json({ error: 'Unauthorized' });
+
+        const result = await ProjectService.getActivitiesForTask(parseInt(taskId), userId, role);
+        res.json(result.rows);
+    } catch (error: any) {
+        logger.error('[ACTIVITY] Get Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
 
 export const syncTeam = async (req: AuthRequest, res: Response) => {
     try {
@@ -232,10 +315,34 @@ export const getAccessList = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ error: 'Invalid level' });
         }
 
+
         const list = await ProjectService.getAccessList(level as any, parseInt(id));
+        console.log(`[ACCESS] Returning ${level} access list for ID ${id}:`, list.length, 'users');
         res.json(list);
     } catch (error: any) {
         logger.error('[ACCESS] Get List Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const deleteTask = async (req: AuthRequest, res: Response) => {
+    try {
+        const { taskId } = req.params;
+        const result = await ProjectService.deleteTask(parseInt(taskId));
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[TASK] Delete Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const deleteActivity = async (req: AuthRequest, res: Response) => {
+    try {
+        const { activityId } = req.params;
+        const result = await ProjectService.deleteActivity(parseInt(activityId));
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[ACTIVITY] Delete Error:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -256,3 +363,4 @@ export const deleteProject = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+

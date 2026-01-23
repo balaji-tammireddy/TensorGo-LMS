@@ -208,47 +208,10 @@
     background-color: #FFFFFF;
 }
 
-/* Cards */
-.ws-card {
-    border: 1px solid #E5E7EB;
-    border-radius: 8px;
-    padding: 16px;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: white;
-}
-
-.ws-card:hover {
-    border-color: #BFDBFE;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
-
-.ws-card.selected {
-    border: 2px solid #60A5FA;
-    /* Blue border for selected */
-    background-color: #F8FAFC;
-}
-
-.ws-card-title {
-    margin: 0 0 8px 0;
-    font-size: 15px;
-    font-weight: 600;
-    color: #111827;
-}
-
-.ws-card-desc {
-    margin: 0 0 16px 0;
-    font-size: 13px;
-    color: #6B7280;
-    line-height: 1.4;
-}
-
-.ws-card-footer {
-    font-size: 11px;
-    color: #9CA3AF;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* Cards in Columns */
+.ws-column-body .ws-card {
+    margin-bottom: 0px;
+    /* Spacing handled by gap in .ws-column-body */
 }
 
 /* Empty States */
@@ -288,4 +251,9 @@
     color: #9CA3AF;
     margin: 0;
     max-width: 200px;
+}
+/* Compact Activity Column */
+.compact-column-body {
+    gap: 10px !important;
+    padding: 12px !important;
 }

@@ -40,8 +40,6 @@ export const ProjectDashboard: React.FC = () => {
         if (!deleteConfirm) return;
 
         setIsDeleting(true);
-        const projectId = deleteConfirm.id;
-        const projectName = deleteConfirm.name;
         setDeleteConfirm(null); // Close modal immediately
         try {
             await projectService.deleteProject(deleteConfirm.id);
@@ -130,7 +128,7 @@ export const ProjectDashboard: React.FC = () => {
                             {(() => {
                                 const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
                                 const myProjectsList = (projects || []).filter((p: Project) =>
-                                    isPMView ? p.is_pm : p.is_member
+                                    isPMView ? (p.is_pm || p.is_member) : p.is_member
                                 );
 
                                 return (
@@ -148,7 +146,7 @@ export const ProjectDashboard: React.FC = () => {
                         <div className="dashboard-section">
                             {isGlobalAdmin ? (
                                 (() => {
-                                    const allOtherProjects = (projects || []).filter((p: Project) => !p.is_pm);
+                                    const allOtherProjects = projects || [];
                                     return (
                                         <ProjectListSection
                                             title="All Projects"
@@ -160,7 +158,9 @@ export const ProjectDashboard: React.FC = () => {
                                 })()
                             ) : (
                                 <>
-                                    <h2 className="section-title">All Projects</h2>
+                                    <div className="section-header-row">
+                                        <h2 className="section-title">All Projects</h2>
+                                    </div>
                                     <EmptyState
                                         title="Access Restricted"
                                         description="You are not authorized to view all projects."

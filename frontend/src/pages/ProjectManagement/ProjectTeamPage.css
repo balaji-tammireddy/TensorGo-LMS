@@ -1,0 +1,206 @@
+.team-page-container {
+    padding: 24px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #f3f4f6;
+    /* Global background */
+}
+
+.team-page-header {
+    margin-bottom: 24px;
+}
+
+.btn-back {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.btn-back:hover {
+    color: #374151;
+}
+
+.team-page-title-group h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px 0;
+}
+
+.team-project-name {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.team-page-body {
+    flex: 1;
+    overflow-y: auto;
+    /* Clean scrollbar */
+}
+
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    padding-bottom: 24px;
+}
+
+.team-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.2s;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.team-card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-color: #d1d5db;
+    transform: translateY(-2px);
+}
+
+.team-card.pm-card {
+    border: 1px solid #6366f1;
+    background: #eef2ff;
+}
+
+.team-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.team-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 20px;
+    box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
+}
+
+.team-info {
+    flex: 1;
+}
+
+.team-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.team-pm-badge {
+    font-size: 10px;
+    background: #4f46e5;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.team-role-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Reusing badge colors from modal but ensuring they work here */
+.team-role-badge.super_admin {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.team-role-badge.hr {
+    background: #fce7f3;
+    color: #9d174d;
+}
+
+.team-role-badge.manager {
+    background: #c7d2fe;
+    color: #3730a3;
+}
+
+/* Slightly darker/richer for page */
+.team-role-badge.employee {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.team-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* More spacing */
+    padding-top: 16px;
+    border-top: 1px solid #f3f4f6;
+}
+
+.team-card.pm-card .team-card-details {
+    border-top-color: #e0e7ff;
+}
+
+.team-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4b5563;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.detail-icon {
+    color: #9ca3af;
+}
+
+.email {
+    color: #2563eb;
+    text-decoration: none;
+    /* In case we make it a link later */
+}
+
+.team-page-loading,
+.team-page-error,
+.team-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 50vh;
+    color: #6b7280;
+    gap: 16px;
+}
+
+.btn-back-error {
+    padding: 8px 16px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}

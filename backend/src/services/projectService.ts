@@ -33,6 +33,34 @@ export interface ActivityData {
 }
 
 export class ProjectService {
+  private static async generateNextCustomId(table: string, prefix: string, parentColumn?: string, parentId?: number, client: any = pool): Promise<string> {
+    let queryStr = `SELECT custom_id FROM ${table}`;
+    const params: any[] = [];
+
+    if (parentColumn && parentId !== undefined) {
+      queryStr += ` WHERE ${parentColumn} = $1`;
+      params.push(parentId);
+    }
+
+    queryStr += ` ORDER BY id DESC LIMIT 1`;
+
+    const res = await client.query(queryStr, params);
+    if (res.rows.length === 0) {
+      console.log(`[ProjectService] ID Generation: No previous records for ${prefix}. Starting at 001.`);
+      return `${prefix}-001`;
+    }
+
+    const lastId = res.rows[0].custom_id;
+    const match = lastId.match(/(\d+)$/);
+    console.log(`[ProjectService] ID Generation: Last ID=${lastId}, Match=${match ? match[1] : 'null'}`);
+
+    if (!match) return `${prefix}-001`;
+
+    const nextNum = parseInt(match[1]) + 1;
+    const nextId = `${prefix}-${nextNum.toString().padStart(3, '0')}`;
+    console.log(`[ProjectService] ID Generation: Generated ${nextId}`);
+    return nextId;
+  }
 
   // --- 1. Project Creation & Team Gen ---
 
@@ -59,13 +87,16 @@ export class ProjectService {
         throw new Error('Cannot assign a user on notice as Project Manager');
       }
 
-      // Check for duplicate Custom ID
+      // Generate Custom ID automatically
+      const customId = await this.generateNextCustomId('projects', 'PRO', undefined, undefined, client);
+
+      // Check for duplicate Custom ID (Optional now but safe)
       const existingProject = await client.query(
         `SELECT id FROM projects WHERE custom_id = $1`,
-        [data.custom_id]
+        [customId]
       );
       if (existingProject.rows.length > 0) {
-        throw new Error(`Project with ID ${data.custom_id} already exists`);
+        // Fallback or retry if needed, but sequential should be fine
       }
 
       // 2. Insert Project
@@ -78,7 +109,7 @@ export class ProjectService {
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
-          data.custom_id,
+          customId,
           data.name,
           data.description || null,
           data.project_manager_id,
@@ -153,7 +184,25 @@ export class ProjectService {
       `UPDATE projects SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
       values
     );
-    return res.rows[0];
+
+    const project = res.rows[0];
+
+    // If manager changed, re-sync team
+    if (data.project_manager_id) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await this.syncProjectTeam(project.id, data.project_manager_id, client);
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
+    }
+
+    return project;
   }
 
   // Recursive "Tree" Algorithm
@@ -161,11 +210,13 @@ export class ProjectService {
     // 1. Find all reports recursively
     const teamIds = await this.getReportingSubtree(managerId, clientOrPool);
 
-    // Add the manager themselves to the team if not already
+    // Add the manager themselves to the team
     const allMemberIds = new Set([managerId, ...teamIds]);
 
-    // 2. Insert into project_members
-    // We use ON CONFLICT DO NOTHING to avoid duplicates if re-syncing
+    // 2. Overwrite project_members
+    // First remove old members to handle manager changes
+    await clientOrPool.query('DELETE FROM project_members WHERE project_id = $1', [projectId]);
+
     for (const userId of allMemberIds) {
       await clientOrPool.query(
         `INSERT INTO project_members (project_id, user_id)
@@ -176,7 +227,7 @@ export class ProjectService {
     }
   }
 
-  private static async getReportingSubtree(managerId: number, client: any): Promise<number[]> {
+  protected static async getReportingSubtree(managerId: number, client: any): Promise<number[]> {
     // Find direct reports
     const res = await client.query(
       `SELECT id FROM users WHERE reporting_manager_id = $1`,
@@ -201,10 +252,13 @@ export class ProjectService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Generate Custom ID automatically
+      const customId = await this.generateNextCustomId('project_modules', 'MOD', 'project_id', data.project_id, client);
+
       const res = await client.query(
         `INSERT INTO project_modules (project_id, custom_id, name, description)
              VALUES ($1, $2, $3, $4) RETURNING *`,
-        [data.project_id, data.custom_id, data.name, data.description]
+        [data.project_id, customId, data.name, data.description || null]
       );
       const module = res.rows[0];
 
@@ -223,19 +277,148 @@ export class ProjectService {
     }
   }
 
+  static async updateModule(id: number, data: Partial<ModuleData> & { assigneeIds?: number[] }, userId: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
+      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
+
+      if (updates.length > 0) {
+        values.push(id);
+        await client.query(`UPDATE project_modules SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+      }
+
+      if (data.assigneeIds !== undefined) {
+        // 1. Get current users to identify who is being removed
+        const currentRes = await client.query('SELECT user_id FROM module_access WHERE module_id = $1', [id]);
+        const currentUserIds = currentRes.rows.map(r => r.user_id);
+        const removedUserIds = currentUserIds.filter(uid => !data.assigneeIds!.includes(uid));
+
+        // 2. Clear old module access
+        await client.query('DELETE FROM module_access WHERE module_id = $1', [id]);
+
+        // 3. Re-assign new module access
+        if (data.assigneeIds.length > 0) {
+          await this.assignModuleAccess(id, data.assigneeIds, userId, client);
+        }
+
+        // 4. Cascade Revocation for removed users
+        if (removedUserIds.length > 0) {
+          // Task Access
+          await client.query(
+            `DELETE FROM task_access 
+             WHERE user_id = ANY($1) AND task_id IN (SELECT id FROM project_tasks WHERE module_id = $2)`,
+            [removedUserIds, id]
+          );
+
+          // Activity Access
+          await client.query(
+            `DELETE FROM activity_access 
+             WHERE user_id = ANY($1) AND activity_id IN (
+                SELECT a.id FROM project_activities a
+                JOIN project_tasks t ON a.task_id = t.id
+                WHERE t.module_id = $2
+             )`,
+            [removedUserIds, id]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      const res = await query('SELECT * FROM project_modules WHERE id = $1', [id]);
+      return res.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async deleteModule(id: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const tasks = await client.query('SELECT id FROM project_tasks WHERE module_id = $1', [id]);
+      const taskIds = tasks.rows.map(r => r.id);
+
+      if (taskIds.length > 0) {
+        const activities = await client.query('SELECT id FROM project_activities WHERE task_id = ANY($1)', [taskIds]);
+        const activityIds = activities.rows.map(r => r.id);
+
+        if (activityIds.length > 0) {
+          await client.query('DELETE FROM project_entries WHERE activity_id = ANY($1)', [activityIds]);
+          await client.query('DELETE FROM activity_access WHERE activity_id = ANY($1)', [activityIds]);
+          await client.query('DELETE FROM project_activities WHERE id = ANY($1)', [activityIds]);
+        }
+
+        await client.query('DELETE FROM task_access WHERE task_id = ANY($1)', [taskIds]);
+        await client.query('DELETE FROM project_tasks WHERE id = ANY($1)', [taskIds]);
+      }
+
+      await client.query('DELETE FROM module_access WHERE module_id = $1', [id]);
+      await client.query('DELETE FROM project_modules WHERE id = $1', [id]);
+
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
   static async createTask(data: TaskData, assigneeIds?: number[], createdBy?: number) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Generate Custom ID automatically
+      const customId = await this.generateNextCustomId('project_tasks', 'TSK', 'module_id', data.module_id, client);
+
       const res = await client.query(
         `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date)
              VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [data.module_id, data.custom_id, data.name, data.description, data.due_date]
+        [data.module_id, customId, data.name, data.description || null, data.due_date || null]
       );
       const task = res.rows[0];
 
       if (assigneeIds && assigneeIds.length > 0 && createdBy) {
         await this.assignTaskAccess(task.id, assigneeIds, createdBy, client);
+      }
+
+      // Auto-create 4 default activities
+      const projectRes = await client.query(`
+        SELECT p.project_manager_id 
+        FROM project_modules m
+        JOIN projects p ON m.project_id = p.id
+        WHERE m.id = $1
+      `, [data.module_id]);
+      const pmId = projectRes.rows[0]?.project_manager_id;
+
+      const defaultActivities = ['Development', 'Testing', 'Review', 'Bugs'];
+      for (let i = 0; i < defaultActivities.length; i++) {
+        const name = defaultActivities[i];
+        const activityCustomId = `${customId}-0${i + 1}`; // e.g. TSK-001-01
+
+        const actRes = await client.query(
+          `INSERT INTO project_activities (task_id, custom_id, name, description)
+           VALUES ($1, $2, $3, $4) RETURNING id`,
+          [task.id, activityCustomId, name, null]
+        );
+        const activityId = actRes.rows[0].id;
+
+        // Assign PM access to activity
+        if (pmId) {
+          await this.assignActivityAccess(activityId, [pmId], createdBy || pmId, client);
+        }
       }
 
       await client.query('COMMIT');
@@ -255,7 +438,7 @@ export class ProjectService {
       const res = await client.query(
         `INSERT INTO project_activities (task_id, custom_id, name, description)
              VALUES ($1, $2, $3, $4) RETURNING *`,
-        [data.task_id, data.custom_id, data.name, data.description]
+        [data.task_id, data.custom_id, data.name, data.description || null]
       );
       const activity = res.rows[0];
 
@@ -295,6 +478,101 @@ export class ProjectService {
                ON CONFLICT (task_id, user_id) DO NOTHING`,
         [taskId, userId, grantedBy]
       );
+    }
+  }
+
+  static async updateTask(id: number, data: Partial<TaskData> & { assigneeIds?: number[] }, userId: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
+      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
+      if (data.due_date !== undefined) { updates.push(`due_date = $${idx++}`); values.push(data.due_date); }
+
+      if (updates.length > 0) {
+        values.push(id);
+        await client.query(`UPDATE project_tasks SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+      }
+
+      if (data.assigneeIds !== undefined) {
+        // 1. Get current users to identify who is being removed
+        const currentRes = await client.query('SELECT user_id FROM task_access WHERE task_id = $1', [id]);
+        const currentUserIds = currentRes.rows.map(r => r.user_id);
+        const removedUserIds = currentUserIds.filter(uid => !data.assigneeIds!.includes(uid));
+
+        // 2. Clear old task access
+        await client.query('DELETE FROM task_access WHERE task_id = $1', [id]);
+
+        // 3. Re-assign new task access
+        if (data.assigneeIds.length > 0) {
+          await this.assignTaskAccess(id, data.assigneeIds, userId, client);
+        }
+
+        // 4. Cascade Revocation for removed users: Activities
+        if (removedUserIds.length > 0) {
+          await client.query(
+            `DELETE FROM activity_access 
+             WHERE user_id = ANY($1) AND activity_id IN (
+                SELECT a.id FROM project_activities a
+                WHERE a.task_id = $2
+             )`,
+            [removedUserIds, id]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      const res = await query('SELECT * FROM project_tasks WHERE id = $1', [id]);
+      return res.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async updateActivity(id: number, data: Partial<ActivityData> & { assigneeIds?: number[] }, userId: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
+      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
+
+      if (updates.length > 0) {
+        values.push(id);
+        await client.query(`UPDATE project_activities SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+      }
+
+      if (data.assigneeIds !== undefined) {
+        // Clear old activity access
+        await client.query('DELETE FROM activity_access WHERE activity_id = $1', [id]);
+
+        // Re-assign new activity access
+        if (data.assigneeIds.length > 0) {
+          await this.assignActivityAccess(id, data.assigneeIds, userId, client);
+        }
+      }
+
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
     }
   }
 
@@ -408,7 +686,7 @@ export class ProjectService {
     if (role === 'super_admin' || role === 'hr') {
       return query(
         `SELECT p.*, 
-                u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name,
+                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
                 (p.project_manager_id = $1) as is_pm,
                 EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
          FROM projects p 
@@ -418,36 +696,102 @@ export class ProjectService {
       );
     }
 
-    // PM and Members: Show projects where they are manager OR member
-    return query(
+    // PM and Members: Show projects where they are manager OR member OR have nested access (Module/Task/Activity)
+    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing complex visibility query`);
+    const res = await query(
       `SELECT DISTINCT p.*, 
-               u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name,
+               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
                (p.project_manager_id = $1) as is_pm,
                EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
        FROM projects p
        LEFT JOIN users u ON p.project_manager_id = u.id
        LEFT JOIN project_members pm ON p.id = pm.project_id
-       WHERE p.project_manager_id = $1 OR pm.user_id = $1
+       WHERE 
+          p.project_manager_id = $1 
+          OR pm.user_id = $1
+          OR EXISTS (
+            SELECT 1 FROM project_modules m 
+            JOIN module_access ma ON m.id = ma.module_id 
+            WHERE m.project_id = p.id AND ma.user_id = $1
+          )
+          OR EXISTS (
+            SELECT 1 FROM project_modules m 
+            JOIN project_tasks t ON m.id = t.module_id
+            JOIN task_access ta ON t.id = ta.task_id
+            WHERE m.project_id = p.id AND ta.user_id = $1
+          )
+          OR EXISTS (
+            SELECT 1 FROM project_modules m 
+            JOIN project_tasks t ON m.id = t.module_id
+            JOIN project_activities a ON t.id = a.task_id
+            JOIN activity_access aa ON a.id = aa.activity_id
+            WHERE m.project_id = p.id AND aa.user_id = $1
+          )
        ORDER BY p.created_at DESC`,
       [userId]
     );
+    console.log(`[ProjectService] getProjectsForUser: Found ${res.rows.length} projects`);
+    return res;
   }
 
   static async getModulesForProject(projectId: number, userId: number, role: string) {
-    // Global Viewers or Project Manager can see all
-    const isGlobal = role === 'super_admin' || role === 'hr';
-
-    // Check if user is PM of this specific project
+    // 1. Check if user is PM of this specific project
     const projectCheck = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
     const isPM = projectCheck.rows[0]?.project_manager_id === userId;
+    const isGlobal = role === 'super_admin' || role === 'hr';
 
-    if (isGlobal || isPM) {
-      return query(`SELECT * FROM project_modules WHERE project_id = $1 ORDER BY custom_id`, [projectId]);
+    if (isPM || isGlobal) {
+      return query(`
+        SELECT m.*, 
+               (SELECT json_agg(u_agg) FROM (
+                  SELECT u.id, 
+                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+                  FROM module_access ma 
+                  JOIN users u ON ma.user_id = u.id 
+                  JOIN project_modules pm2 ON ma.module_id = pm2.id
+                  JOIN projects p2 ON pm2.project_id = p2.id
+                  WHERE ma.module_id = m.id
+                  UNION
+                  SELECT u3.id, 
+                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         0 as sort_order
+                  FROM projects p3
+                  JOIN users u3 ON p3.project_manager_id = u3.id
+                  WHERE p3.id = m.project_id
+                  ORDER BY sort_order, name
+                ) u_agg) as assigned_users
+        FROM project_modules m 
+        WHERE m.project_id = $1 
+        ORDER BY m.custom_id`, [projectId]);
     }
 
     // Regular Members: Only see what is in module_access
     return query(
-      `SELECT m.* FROM project_modules m
+      `SELECT m.*, 
+              (SELECT json_agg(u_agg) FROM (
+                  SELECT u.id, 
+                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+                  FROM module_access ma2
+                  JOIN users u ON ma2.user_id = u.id 
+                  JOIN project_modules pm2 ON ma2.module_id = pm2.id
+                  JOIN projects p2 ON pm2.project_id = p2.id
+                  WHERE ma2.module_id = m.id
+                  UNION
+                  SELECT u3.id, 
+                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         0 as sort_order
+                  FROM projects p3
+                  JOIN users u3 ON p3.project_manager_id = u3.id
+                  WHERE p3.id = m.project_id
+                  ORDER BY sort_order, name
+                ) u_agg) as assigned_users
+       FROM project_modules m
        JOIN module_access ma ON m.id = ma.module_id
        WHERE m.project_id = $1 AND ma.user_id = $2
        ORDER BY m.custom_id`,
@@ -456,22 +800,75 @@ export class ProjectService {
   }
 
   static async getTasksForModule(moduleId: number, userId: number, role: string) {
-    // We need to check if user is PM of the *parent project*
-    // 1. Get Project ID from module
-    const moduleRes = await query(`SELECT project_id FROM project_modules WHERE id = $1`, [moduleId]);
+    // 1. Get Project Manager of the parent project
+    const moduleRes = await query(`
+      SELECT p.project_manager_id 
+      FROM project_modules m
+      JOIN projects p ON m.project_id = p.id
+      WHERE m.id = $1`, [moduleId]);
     if (moduleRes.rows.length === 0) return { rows: [] };
-    const projectId = moduleRes.rows[0].project_id;
-
-    const projectCheck = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
-    const isPM = projectCheck.rows[0]?.project_manager_id === userId;
+    const isPM = moduleRes.rows[0].project_manager_id === userId;
     const isGlobal = role === 'super_admin' || role === 'hr';
 
-    if (isGlobal || isPM) {
-      return query(`SELECT * FROM project_tasks WHERE module_id = $1 ORDER BY custom_id`, [moduleId]);
+    if (isPM || isGlobal) {
+      return query(
+        `SELECT t.*, 
+                EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2) as is_assigned,
+                (SELECT json_agg(u_agg) FROM (
+                  SELECT u.id, 
+                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+                  FROM task_access ta2
+                  JOIN users u ON ta2.user_id = u.id 
+                  JOIN project_tasks pt2 ON ta2.task_id = pt2.id
+                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
+                  JOIN projects p2 ON pm2.project_id = p2.id
+                  WHERE ta2.task_id = t.id
+                  UNION
+                  SELECT u3.id, 
+                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         0 as sort_order
+                  FROM project_modules pm3
+                  JOIN projects p3 ON pm3.project_id = p3.id
+                  JOIN users u3 ON p3.project_manager_id = u3.id
+                  WHERE pm3.id = t.module_id
+                  ORDER BY sort_order, name
+                ) u_agg) as assigned_users
+         FROM project_tasks t 
+         WHERE t.module_id = $1 
+         ORDER BY t.custom_id`,
+        [moduleId, userId]
+      );
     }
 
+    // 2. Regular Members: Show ONLY tasks they have explicit access to
     return query(
-      `SELECT t.* FROM project_tasks t
+      `SELECT t.*, true as is_assigned,
+              (SELECT json_agg(u_agg) FROM (
+                  SELECT u.id, 
+                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+                  FROM task_access ta2
+                  JOIN users u ON ta2.user_id = u.id 
+                  JOIN project_tasks pt2 ON ta2.task_id = pt2.id
+                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
+                  JOIN projects p2 ON pm2.project_id = p2.id
+                  WHERE ta2.task_id = t.id
+                  UNION
+                  SELECT u3.id, 
+                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         0 as sort_order
+                  FROM project_modules pm3
+                  JOIN projects p3 ON pm3.project_id = p3.id
+                  JOIN users u3 ON p3.project_manager_id = u3.id
+                  WHERE pm3.id = t.module_id
+                  ORDER BY sort_order, name
+                ) u_agg) as assigned_users
+       FROM project_tasks t
        JOIN task_access ta ON t.id = ta.task_id
        WHERE t.module_id = $1 AND ta.user_id = $2
        ORDER BY t.custom_id`,
@@ -479,62 +876,248 @@ export class ProjectService {
     );
   }
 
+  static async getActivitiesForTask(taskId: number, userId: number, role: string) {
+    // 1. Get Project Manager of the parent project
+    const taskRes = await query(`
+      SELECT p.project_manager_id 
+      FROM project_tasks t
+      JOIN project_modules m ON t.module_id = m.id
+      JOIN projects p ON m.project_id = p.id
+      WHERE t.id = $1`, [taskId]);
+    if (taskRes.rows.length === 0) return { rows: [] };
+    const isPM = taskRes.rows[0].project_manager_id === userId;
+    const isGlobal = role === 'super_admin' || role === 'hr';
+
+    if (isPM || isGlobal) {
+      return query(`
+        SELECT a.*,
+               (SELECT json_agg(u_agg) FROM (
+                  SELECT u.id, 
+                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+                  FROM activity_access aa 
+                  JOIN users u ON aa.user_id = u.id 
+                  JOIN project_activities pa2 ON aa.activity_id = pa2.id
+                  JOIN project_tasks pt2 ON pa2.task_id = pt2.id
+                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
+                  JOIN projects p2 ON pm2.project_id = p2.id
+                  WHERE aa.activity_id = a.id
+                  UNION
+                  SELECT u3.id, 
+                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         0 as sort_order
+                  FROM project_tasks pt3
+                  JOIN project_modules pm3 ON pt3.module_id = pm3.id
+                  JOIN projects p3 ON pm3.project_id = p3.id
+                  JOIN users u3 ON p3.project_manager_id = u3.id
+                  WHERE pt3.id = a.task_id
+                  ORDER BY sort_order, name
+                ) u_agg) as assigned_users
+        FROM project_activities a 
+        WHERE a.task_id = $1 
+        ORDER BY a.custom_id`, [taskId]);
+    }
+
+    // 2. Regular Members: Show ONLY activities they have explicit access to
+    return query(
+      `SELECT a.*,
+              (SELECT json_agg(u_agg) FROM (
+                  SELECT u.id, 
+                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+                  FROM activity_access aa2
+                  JOIN users u ON aa2.user_id = u.id 
+                  JOIN project_activities pa2 ON aa2.activity_id = pa2.id
+                  JOIN project_tasks pt2 ON pa2.task_id = pt2.id
+                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
+                  JOIN projects p2 ON pm2.project_id = p2.id
+                  WHERE aa2.activity_id = a.id
+                  UNION
+                  SELECT u3.id, 
+                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         0 as sort_order
+                  FROM project_tasks pt3
+                  JOIN project_modules pm3 ON pt3.module_id = pm3.id
+                  JOIN projects p3 ON pm3.project_id = p3.id
+                  JOIN users u3 ON p3.project_manager_id = u3.id
+                  WHERE pt3.id = a.task_id
+                  ORDER BY sort_order, name
+                ) u_agg) as assigned_users
+       FROM project_activities a
+       JOIN activity_access aa ON a.id = aa.activity_id
+       WHERE a.task_id = $1 AND aa.user_id = $2
+       ORDER BY a.custom_id`,
+      [taskId, userId]
+    );
+  }
+
   // --- 5. Access List Getters (for Dropdowns) ---
 
   static async getAccessList(level: 'project' | 'module' | 'task', id: number) {
     if (level === 'project') {
+      // 1. Get Project Manager
+      const pRes = await query('SELECT project_manager_id FROM projects WHERE id = $1', [id]);
+      if (pRes.rows.length === 0) return [];
+      const managerId = pRes.rows[0].project_manager_id;
+
+      // 2. Get Subordinates
+      const teamIds = await this.getReportingSubtree(managerId, pool);
+      console.log(`[ProjectService] View Team Debug: ManagerId=${managerId}, TeamIds=${JSON.stringify(teamIds)}`);
+
+      // 3. Return Subordinate Details + Project Manager
+      const allIds = [...teamIds, managerId];
+      console.log(`[ProjectService] View Team Debug: AllIds=${JSON.stringify(allIds)}`);
       const res = await query(
-        `SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
-             FROM project_members pm
-             JOIN users u ON pm.user_id = u.id
-             WHERE pm.project_id = $1
-             UNION
-             SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
-             FROM projects p
-             JOIN users u ON p.project_manager_id = u.id
-             WHERE p.id = $1`,
-        [id]
+        `SELECT id, emp_id as "empId", 
+                COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') as name, 
+                role,
+                COALESCE(email, '') as email,
+                COALESCE(designation, 'N/A') as designation,
+                COALESCE(department, 'N/A') as department
+             FROM users
+             WHERE id = ANY($1)`,
+        [allIds]
       );
       return res.rows;
     } else if (level === 'module') {
-      // For Tasks: Show users who have access to this module
-      // Implicitly PM has access, but user said "show only users... having access"
-      // Let's return explicit module_access + PM
+      // 1. Get PM of the parent project
+      const pRes = await query(`
+        SELECT p.project_manager_id 
+        FROM project_modules m
+        JOIN projects p ON m.project_id = p.id
+        WHERE m.id = $1`, [id]);
+      if (pRes.rows.length === 0) return [];
+      const managerId = pRes.rows[0].project_manager_id;
+
+      // 2. Get Subordinates
+      const teamIds = await this.getReportingSubtree(managerId, pool);
+      if (teamIds.length === 0) return [];
+
+      // 3. Return users who have module access AND are subordinates
       const res = await query(
-        `SELECT DISTINCT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.role
              FROM module_access ma
              JOIN users u ON ma.user_id = u.id
-             WHERE ma.module_id = $1
-             UNION
-             SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
-             FROM project_modules m
-             JOIN projects p ON m.project_id = p.id
-             JOIN users u ON p.project_manager_id = u.id
-             WHERE m.id = $1`,
-        [id]
+             WHERE ma.module_id = $1 AND ma.user_id = ANY($2)`,
+        [id, teamIds]
       );
       return res.rows;
     } else if (level === 'task') {
-      // For Activities: Show users who have access to this task
+      // 1. Get PM of the parent project
+      const pRes = await query(`
+        SELECT p.project_manager_id 
+        FROM project_tasks t
+        JOIN project_modules m ON t.module_id = m.id
+        JOIN projects p ON m.project_id = p.id
+        WHERE t.id = $1`, [id]);
+      if (pRes.rows.length === 0) return [];
+      const managerId = pRes.rows[0].project_manager_id;
+
+      // 2. Get Subordinates
+      const teamIds = await this.getReportingSubtree(managerId, pool);
+      if (teamIds.length === 0) return [];
+
+      // 3. Return users who have task access AND are subordinates
       const res = await query(
-        `SELECT DISTINCT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
+        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.role
              FROM task_access ta
              JOIN users u ON ta.user_id = u.id
-             WHERE ta.task_id = $1
-             UNION
-             SELECT u.id, u.emp_id as "empId", u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.role
-             FROM project_tasks t
-             JOIN project_modules m ON t.module_id = m.id
-             JOIN projects p ON m.project_id = p.id
-             JOIN users u ON p.project_manager_id = u.id
-             WHERE t.id = $1`,
-        [id]
+             WHERE ta.task_id = $1 AND ta.user_id = ANY($2)`,
+        [id, teamIds]
       );
       return res.rows;
     }
     return [];
   }
-  // --- 6. Project Deletion (Super Admin Only) ---
+
+  // --- 6. Permission Helpers ---
+  static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
+    const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
+    if (res.rows.length === 0) return false;
+    return res.rows[0].project_manager_id === userId;
+  }
+
+  static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
+    const res = await query(`
+      SELECT p.project_manager_id
+      FROM project_modules m
+      JOIN projects p ON m.project_id = p.id
+      WHERE m.id = $1`, [moduleId]);
+
+    if (res.rows.length === 0) return false;
+    const { project_manager_id } = res.rows[0];
+    return project_manager_id === userId;
+  }
+
+  static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
+    const res = await query(`
+      SELECT p.project_manager_id
+      FROM project_tasks t
+      JOIN project_modules m ON t.module_id = m.id
+      JOIN projects p ON m.project_id = p.id
+      WHERE t.id = $1`, [taskId]);
+
+    if (res.rows.length === 0) return false;
+    const { project_manager_id } = res.rows[0];
+    return project_manager_id === userId;
+  }
+
+  static async deleteTask(id: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Delete Activity Access for all activities in this task
+      await client.query(`
+        DELETE FROM activity_access 
+        WHERE activity_id IN (SELECT id FROM project_activities WHERE task_id = $1)
+      `, [id]);
+
+      // 2. Delete Activities in this task
+      await client.query(`DELETE FROM project_activities WHERE task_id = $1`, [id]);
+
+      // 3. Delete Task Access
+      await client.query(`DELETE FROM task_access WHERE task_id = $1`, [id]);
+
+      // 4. Delete Task
+      const res = await client.query(`DELETE FROM project_tasks WHERE id = $1 RETURNING *`, [id]);
+
+      await client.query('COMMIT');
+      return res.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async deleteActivity(id: number) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Delete Activity Access
+      await client.query(`DELETE FROM activity_access WHERE activity_id = $1`, [id]);
+
+      // 2. Delete Activity
+      const res = await client.query(`DELETE FROM project_activities WHERE id = $1 RETURNING *`, [id]);
+
+      await client.query('COMMIT');
+      return res.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  // --- 7. Project Deletion (Super Admin Only) ---
   static async deleteProject(projectId: number) {
     const client = await pool.connect();
     try {

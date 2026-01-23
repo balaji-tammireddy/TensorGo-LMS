@@ -174,6 +174,29 @@
     gap: 20px;
     width: 100%;
     margin-top: 10px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+.projects-grid-preview::-webkit-scrollbar {
+    height: 6px;
+    display: block;
+}
+
+.projects-grid-preview::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.projects-grid-preview::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 4px;
+}
+
+.projects-grid-preview::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
 }
 
 /* "View All" Button Style */
@@ -208,6 +231,10 @@
 .projects-row::-webkit-scrollbar-thumb {
     background-color: #cbd5e1;
     border-radius: 4px;
+}
+
+.projects-row::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
 }
 
 /* User-requested forced vertical scrollbar */

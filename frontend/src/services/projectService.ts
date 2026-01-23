@@ -22,6 +22,7 @@ export interface ProjectModule {
     name: string;
     description: string;
     status: string;
+    assigned_users?: { id: number; name: string; initials: string; }[];
 }
 
 export interface ProjectTask {
@@ -32,6 +33,8 @@ export interface ProjectTask {
     description: string;
     status: string;
     due_date?: string;
+    is_assigned?: boolean;
+    assigned_users?: { id: number; name: string; initials: string; }[];
 }
 
 export interface ProjectActivity {
@@ -41,6 +44,7 @@ export interface ProjectActivity {
     name: string;
     description: string;
     status: string;
+    assigned_users?: { id: number; name: string; initials: string; }[];
 }
 
 export const projectService = {
@@ -52,6 +56,11 @@ export const projectService = {
 
     getProjects: async () => {
         const response = await api.get<Project[]>('/projects');
+        return response.data;
+    },
+
+    getProjectMembers: async (projectId: number) => {
+        const response = await api.get(`/projects/${projectId}/access-list?level=project`);
         return response.data;
     },
 
@@ -73,6 +82,16 @@ export const projectService = {
         return response.data;
     },
 
+    updateModule: async (moduleId: number, data: any) => {
+        const response = await api.put(`/projects/modules/${moduleId}`, data);
+        return response.data;
+    },
+
+    deleteModule: async (moduleId: number) => {
+        const response = await api.delete(`/projects/modules/${moduleId}`);
+        return response.data;
+    },
+
     // Tasks
     createTask: async (moduleId: number, data: any) => {
         const response = await api.post(`/projects/modules/${moduleId}/tasks`, data);
@@ -84,10 +103,41 @@ export const projectService = {
         return response.data;
     },
 
+    updateTask: async (taskId: number, data: any) => {
+        const response = await api.put(`/projects/tasks/${taskId}`, data);
+        return response.data;
+    },
+
+    // Activities
+    createActivity: async (taskId: number, data: any) => {
+        const response = await api.post(`/projects/tasks/${taskId}/activities`, data);
+        return response.data;
+    },
+
+    getActivities: async (taskId: number) => {
+        const response = await api.get<ProjectActivity[]>(`/projects/tasks/${taskId}/activities`);
+        return response.data;
+    },
+
+    updateActivity: async (activityId: number, data: any) => {
+        const response = await api.put(`/projects/activities/${activityId}`, data);
+        return response.data;
+    },
+
+    deleteTask: async (taskId: number) => {
+        const response = await api.delete(`/projects/tasks/${taskId}`);
+        return response.data;
+    },
+
+    deleteActivity: async (activityId: number) => {
+        const response = await api.delete(`/projects/activities/${activityId}`);
+        return response.data;
+    },
+
     // Access
     deleteAccess: (level: string, id: number, userId: number) =>
-        api.delete('/project-management/access', { data: { level, id, userId } }),
+        api.delete('/projects/access', { data: { level, id, userId } }),
 
     getAccessList: (level: string, id: number) =>
-        api.get<any[]>(`/project-management/access/${level}/${id}`).then(res => res.data),
+        api.get<any[]>(`/projects/access/${level}/${id}`).then(res => res.data),
 };

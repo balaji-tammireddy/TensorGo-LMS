@@ -24,6 +24,7 @@ const LeaveRulesPage = lazy(() => import('../pages/LeaveRulesPage'));
 const ProjectDashboard = lazy(() => import('../pages/ProjectManagement/ProjectDashboard').then(m => ({ default: m.ProjectDashboard })));
 const ProjectListPage = lazy(() => import('../pages/ProjectManagement/ProjectListPage').then(m => ({ default: m.ProjectListPage })));
 const ProjectWorkspace = lazy(() => import('../pages/ProjectManagement/ProjectWorkspace').then(m => ({ default: m.ProjectWorkspace })));
+const ProjectTeamPage = lazy(() => import('../pages/ProjectManagement/ProjectTeamPage').then(m => ({ default: m.ProjectTeamPage })));
 
 import * as policyService from '../services/policyService';
 
@@ -185,6 +186,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <ProjectWorkspace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project-management/:id/team"
+          element={
+            <ProtectedRoute>
+              <ProjectTeamPage />
             </ProtectedRoute>
           }
         />

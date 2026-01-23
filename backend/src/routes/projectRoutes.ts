@@ -25,6 +25,12 @@ router.put(
     projectController.updateProject
 );
 
+router.get(
+    '/:id/access-list',
+    authenticateToken,
+    projectController.getAccessList
+);
+
 router.delete(
     '/:id',
     authenticateToken,
@@ -46,11 +52,25 @@ router.get(
     projectController.getModules
 );
 
+router.put(
+    '/modules/:moduleId',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.updateModule
+);
+
+router.delete(
+    '/modules/:moduleId',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.deleteModule
+);
+
 // Tasks
 router.post(
     '/modules/:moduleId/tasks',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee', 'intern']),
     projectController.createTask
 );
 
@@ -60,12 +80,46 @@ router.get(
     projectController.getTasks
 );
 
+router.put(
+    '/tasks/:taskId',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.updateTask
+);
+
+router.delete(
+    '/tasks/:taskId',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.deleteTask
+);
+
 // Activities
 router.post(
     '/tasks/:taskId/activities',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee', 'intern']),
     projectController.createActivity
+);
+
+router.get(
+    '/tasks/:taskId/activities',
+    authenticateToken,
+    projectController.getActivities
+);
+
+router.put(
+    '/activities/:activityId',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.updateActivity
+);
+
+router.delete(
+    '/activities/:activityId',
+    authenticateToken,
+    authorizeRole(['super_admin', 'hr', 'manager']),
+    projectController.deleteActivity
 );
 
 // Access Control

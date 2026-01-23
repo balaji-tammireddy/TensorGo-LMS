@@ -22,6 +22,7 @@ interface CreateModalProps {
     onSuccess: () => void;
     initialData?: any;
     isEdit?: boolean;
+    projectManagerId?: number;
 }
 
 export const CreateModal: React.FC<CreateModalProps> = ({
@@ -31,7 +32,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     parentId,
     onSuccess,
     initialData,
-    isEdit = false
+    isEdit = false,
+    projectManagerId
 }) => {
     const { showSuccess, showError } = useToast();
     const { user } = useAuth();
@@ -93,7 +95,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
 
         // Fetch Assignee Candidates for Module/Task/Activity
-        if (['module', 'task', 'activity'].includes(type) && parentId && !isEdit) {
+        if (['module', 'task', 'activity'].includes(type) && parentId) {
             setLoadingCandidates(true);
             let fetchLevel = '';
             // For Module creation, we need Project Members -> fetchLevel = 'project'
@@ -104,8 +106,26 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             if (type === 'activity') fetchLevel = 'task';
 
             projectService.getAccessList(fetchLevel, parentId)
-                .then(setAssigneeCandidates)
-                .catch(console.error)
+                .then(data => {
+                    // Filter out Project Manager from candidates
+                    const filteredData = projectManagerId
+                        ? data.filter((u: any) => u.id !== projectManagerId)
+                        : data;
+                    setAssigneeCandidates(filteredData);
+
+                    // If editing a module, also fetch WHO CURRENTLY HAS ACCESS to pre-fill checkboxes
+                    if (isEdit && type === 'module' && initialData?.id) {
+                        projectService.getAccessList('module', initialData.id).then(accessData => {
+                            setFormData(prev => ({
+                                ...prev,
+                                assignee_ids: accessData.map((u: any) => u.id)
+                            }));
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error(`[CreateModal] Error fetching ${fetchLevel} access list:`, err);
+                })
                 .finally(() => setLoadingCandidates(false));
         }
     }, [isOpen, type, user, isEdit, initialData, parentId]);
@@ -118,10 +138,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
         try {
             const payload = { ...formData };
-
-            if (!/^\d{3}$/.test(payload.custom_id)) {
-                throw new Error('ID must be exactly 3 integers (e.g., 101)');
-            }
 
             if (type === 'project') {
                 if (!payload.project_manager_id) {
@@ -148,11 +164,33 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     });
                 }
             } else if (type === 'module' && parentId) {
-                await projectService.createModule(parentId, payload);
+                if (isEdit && initialData?.id) {
+                    await projectService.updateModule(initialData.id, {
+                        ...payload,
+                        assigneeIds: payload.assignee_ids
+                    });
+                } else {
+                    await projectService.createModule(parentId, {
+                        ...payload,
+                        assigneeIds: payload.assignee_ids
+                    });
+                }
             } else if (type === 'task' && parentId) {
-                await projectService.createTask(parentId, payload);
-            } else if (type === 'activity' && parentId) {
-                // Activity creation stub
+                await projectService.createTask(parentId, {
+                    ...payload,
+                    assigneeIds: payload.assignee_ids
+                });
+            } else if (type === 'activity' && (parentId || initialData?.id)) {
+                if (isEdit && initialData?.id) {
+                    await projectService.updateActivity(initialData.id, {
+                        assigneeIds: payload.assignee_ids
+                    });
+                } else {
+                    await projectService.createActivity(parentId!, {
+                        ...payload,
+                        assigneeIds: payload.assignee_ids
+                    });
+                }
             }
 
             showSuccess(`${type.charAt(0).toUpperCase() + type.slice(1)} ${isEdit ? 'updated' : 'created'} successfully`);
@@ -166,12 +204,12 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     };
 
     const getTitle = () => {
+        if (type === 'activity') return 'Assign Activity Access';
         if (isEdit) return `Edit ${toTitleCase(type)}`;
         switch (type) {
             case 'project': return 'Create New Project';
             case 'module': return 'Add Module';
             case 'task': return 'Add Task';
-            case 'activity': return 'Add Activity';
             default: return 'Create';
         }
     };
@@ -226,26 +264,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
-                        {/* Custom ID */}
-                        <div className="form-group">
-                            <label className="form-label">
-                                ID <span className="text-danger">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                maxLength={3}
-                                className="form-input"
-                                value={formData.custom_id}
-                                onChange={e => {
-                                    const val = e.target.value;
-                                    if (/^\d*$/.test(val)) setFormData({ ...formData, custom_id: val });
-                                }}
-                                required
-                                disabled={isEdit}
-                                style={isEdit ? { backgroundColor: '#f3f4f6', cursor: 'not-allowed' } : {}}
-                            />
-                        </div>
-
                         {/* Name */}
                         <div className="form-group">
                             <label className="form-label">
@@ -377,23 +395,13 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                             </div>
                         )}
 
-                        {type === 'task' && (
-                            <div className="form-group">
-                                <label className="form-label">Due Date</label>
-                                <input
-                                    type="date"
-                                    className="form-input"
-                                    value={formData.due_date}
-                                    onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                                />
-                            </div>
-                        )}
+
 
                         {/* Access Assignment (For Module, Task, Activity) */}
                         {['module', 'task', 'activity'].includes(type) && !isEdit && (
                             <div className="form-group">
                                 <label className="form-label">
-                                    Assign Access <span className="text-muted">(Optional - PM has access by default)</span>
+                                    Assign Access
                                 </label>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -413,31 +421,58 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                             ) : assigneeCandidates.length === 0 ? (
                                                 <div className="p-3 text-sm text-gray-500">No users found with access to parent scope.</div>
                                             ) : (
-                                                assigneeCandidates.map(user => (
-                                                    <DropdownMenuItem
-                                                        key={user.id}
-                                                        onSelect={(e) => e.preventDefault()}
-                                                        onClick={() => {
-                                                            const ids = formData.assignee_ids.includes(user.id)
-                                                                ? formData.assignee_ids.filter(id => id !== user.id)
-                                                                : [...formData.assignee_ids, user.id];
-                                                            setFormData({ ...formData, assignee_ids: ids });
-                                                        }}
-                                                        className="manager-item"
-                                                    >
-                                                        <div className="flex items-center gap-2 w-full">
-                                                            <div className={`checkbox-custom ${formData.assignee_ids.includes(user.id) ? 'checked' : ''}`}>
-                                                                {formData.assignee_ids.includes(user.id) && <CheckSquare size={12} color="white" />}
+                                                <>
+                                                    {/* Select All / Clear All */}
+                                                    <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const allSelected = formData.assignee_ids.length === assigneeCandidates.length;
+                                                                setFormData({
+                                                                    ...formData,
+                                                                    assignee_ids: allSelected ? [] : assigneeCandidates.map(u => u.id)
+                                                                });
+                                                            }}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: '#3b82f6',
+                                                                fontSize: '13px',
+                                                                fontWeight: '500',
+                                                                cursor: 'pointer',
+                                                                padding: '4px 0'
+                                                            }}
+                                                        >
+                                                            {formData.assignee_ids.length === assigneeCandidates.length ? 'Clear All' : 'Select All'}
+                                                        </button>
+                                                    </div>
+                                                    {assigneeCandidates.map(user => (
+                                                        <DropdownMenuItem
+                                                            key={user.id}
+                                                            onSelect={(e) => e.preventDefault()}
+                                                            onClick={() => {
+                                                                const ids = formData.assignee_ids.includes(user.id)
+                                                                    ? formData.assignee_ids.filter(id => id !== user.id)
+                                                                    : [...formData.assignee_ids, user.id];
+                                                                setFormData({ ...formData, assignee_ids: ids });
+                                                            }}
+                                                            className="manager-item"
+                                                        >
+                                                            <div className="flex items-center gap-2 w-full">
+                                                                <div className={`checkbox-custom ${formData.assignee_ids.includes(user.id) ? 'checked' : ''}`}>
+                                                                    {formData.assignee_ids.includes(user.id) && <CheckSquare size={12} color="white" />}
+                                                                </div>
+                                                                <div className="manager-info">
+                                                                    <span className="manager-name">
+                                                                        {toTitleCase(user.name)} <span className="manager-id">({user.empId})</span>
+                                                                    </span>
+                                                                    <span className={`role-badge ${user.role}`}>{getRoleLabel(user.role)}</span>
+                                                                </div>
                                                             </div>
-                                                            <div className="manager-info">
-                                                                <span className="manager-name">
-                                                                    {toTitleCase(user.name)} <span className="manager-id">({user.empId})</span>
-                                                                </span>
-                                                                <span className={`role-badge ${user.role}`}>{getRoleLabel(user.role)}</span>
-                                                            </div>
-                                                        </div>
-                                                    </DropdownMenuItem>
-                                                ))
+                                                        </DropdownMenuItem>
+                                                    ))
+                                                    }
+                                                </>
                                             )}
                                         </div>
                                     </DropdownMenuContent>
