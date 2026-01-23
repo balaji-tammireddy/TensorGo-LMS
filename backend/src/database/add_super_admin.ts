@@ -29,7 +29,7 @@ async function upsertSuperAdmin() {
         emp_id,
         email,
         password_hash,
-        role,
+        user_role,
         first_name,
         last_name,
         date_of_joining,
@@ -40,7 +40,7 @@ async function upsertSuperAdmin() {
       ON CONFLICT (email) DO UPDATE SET
         emp_id = EXCLUDED.emp_id,
         password_hash = EXCLUDED.password_hash,
-        role = 'super_admin',
+        user_role = 'super_admin',
         first_name = EXCLUDED.first_name,
         last_name = EXCLUDED.last_name,
         date_of_joining = EXCLUDED.date_of_joining,

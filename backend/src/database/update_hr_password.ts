@@ -5,22 +5,22 @@ async function updateHRPassword() {
   try {
     const newPassword = 'hr1234';
     const hashedPassword = await hashPassword(newPassword);
-    
+
     const result = await pool.query(
       `UPDATE users 
        SET password_hash = $1 
-       WHERE email = 'hr@tensorgo.com' AND role = 'hr'
-       RETURNING email, role`,
+       WHERE email = 'hr@tensorgo.com' AND user_role = 'hr'
+       RETURNING email, user_role as role`,
       [hashedPassword]
     );
-    
+
     if (result.rows.length > 0) {
       console.log('✅ HR password updated successfully!');
       console.log('New password:', newPassword);
     } else {
       console.log('⚠️  HR user not found. Make sure the user exists.');
     }
-    
+
     await pool.end();
     process.exit(0);
   } catch (error) {

@@ -19,12 +19,12 @@ const sendDailyPendingLeaveReminders = async () => {
         u.email as manager_email,
         u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name
       FROM users u
-      WHERE u.role IN ('manager', 'hr')
+      WHERE u.user_role IN ('manager', 'hr')
         AND u.status NOT IN ('inactive', 'resigned')
         AND EXISTS (
           SELECT 1 FROM leave_requests lr
           JOIN users emp ON lr.employee_id = emp.id
-          WHERE (emp.reporting_manager_id = u.id OR u.role IN ('hr', 'super_admin'))
+          WHERE (emp.reporting_manager_id = u.id OR u.user_role IN ('hr', 'super_admin'))
             AND lr.current_status = 'pending'
             AND NOT EXISTS (
               SELECT 1 FROM leave_days ld
@@ -213,7 +213,7 @@ const checkAndSendHolidayListReminder = async () => {
     // 1. Get all HRs
     const hrResult = await pool.query(
       `SELECT email, first_name || ' ' || COALESCE(last_name, '') as name 
-       FROM users WHERE role = 'hr' AND status NOT IN ('inactive', 'resigned')`
+       FROM users WHERE user_role = 'hr' AND status NOT IN ('inactive', 'resigned')`
     );
 
     if (hrResult.rows.length === 0) {

@@ -11,16 +11,20 @@ export const getProfile = async (userId: number) => {
     `SELECT u.*,
 COALESCE(rm.id, sa.sa_id) as reporting_manager_id,
 COALESCE(rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
-COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id
+COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id,
+c.emp_id as created_by_emp_id,
+up.emp_id as updated_by_emp_id
 FROM users u
 LEFT JOIN users rm ON u.reporting_manager_id = rm.id
 LEFT JOIN LATERAL (
 SELECT id as sa_id, first_name || ' ' || COALESCE(last_name, '') as sa_full_name, emp_id as sa_emp_id
 FROM users
-WHERE role = 'super_admin'
+WHERE user_role = 'super_admin'
 ORDER BY id ASC
 LIMIT 1
-) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
+) sa ON u.reporting_manager_id IS NULL AND u.user_role != 'super_admin'
+LEFT JOIN users c ON u.created_by = c.id
+LEFT JOIN users up ON u.updated_by = up.id
 WHERE u.id = $1`,
     [userId]
   );
@@ -95,7 +99,9 @@ WHERE u.id = $1`,
     profilePhotoUrl: null, // Always null - use profilePhotoKey and signed URLs
     profilePhotoKey: user.profile_photo_url && user.profile_photo_url.startsWith('profile-photos/')
       ? user.profile_photo_url
-      : null
+      : null,
+    createdBy: user.created_by_emp_id || 'System',
+    updatedBy: user.updated_by_emp_id || user.created_by_emp_id || 'System'
   };
 };
 

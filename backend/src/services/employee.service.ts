@@ -20,10 +20,14 @@ export const getEmployees = async (
 
   const offset = (page - 1) * limit;
   let query = `
-    SELECT id, emp_id, first_name || ' ' || COALESCE(last_name, '') as name,
-           designation as position, date_of_joining as joining_date, status as status, user_role as role,
-           profile_photo_url as profile_photo_key
-    FROM users
+    SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+           u.designation as position, u.date_of_joining as joining_date, u.status as status, u.user_role as role,
+           u.profile_photo_url as profile_photo_key,
+           c.emp_id as created_by_emp_id,
+           up.emp_id as updated_by_emp_id
+    FROM users u
+    LEFT JOIN users c ON u.created_by = c.id
+    LEFT JOIN users up ON u.updated_by = up.id
     WHERE 1=1
   `;
   const params: any[] = [];
@@ -128,7 +132,9 @@ export const getEmployees = async (
       role: row.role,
       profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/')
         ? row.profile_photo_key
-        : null
+        : null,
+      createdBy: row.created_by_emp_id || 'System',
+      updatedBy: row.updated_by_emp_id || row.created_by_emp_id || 'System'
     })),
     pagination: {
       page,
@@ -168,8 +174,10 @@ export const getEmployeeById = async (employeeId: number) => {
   const result = await pool.query(
     `SELECT u.*, u.user_role as role, u.status as status,
             COALESCE(rm.id, sa.sa_id) as reporting_manager_id, 
-            COALESCE(u.reporting_manager_name, rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
-            COALESCE(sc.subordinate_count, 0) as subordinate_count
+            COALESCE(rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
+            COALESCE(sc.subordinate_count, 0) as subordinate_count,
+            c.emp_id as created_by_emp_id,
+            up.emp_id as updated_by_emp_id
      FROM users u
      LEFT JOIN users rm ON u.reporting_manager_id = rm.id
      LEFT JOIN LATERAL (
@@ -185,6 +193,8 @@ export const getEmployeeById = async (employeeId: number) => {
        WHERE sub.reporting_manager_id = u.id
        AND sub.status IN ('active', 'on_leave', 'on_notice')
      ) sc ON true
+     LEFT JOIN users c ON u.created_by = c.id
+     LEFT JOIN users up ON u.updated_by = up.id
      WHERE u.id = $1`,
     [employeeId]
   );
@@ -228,7 +238,9 @@ export const getEmployeeById = async (employeeId: number) => {
     ...user,
     date_of_birth: formatDateLocal(user.date_of_birth),
     date_of_joining: formatDateLocal(user.date_of_joining),
-    education: education
+    education: education,
+    createdBy: user.created_by_emp_id || 'System',
+    updatedBy: user.updated_by_emp_id || user.created_by_emp_id || 'System'
   };
 };
 
@@ -580,9 +592,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, status
+      current_address, permanent_address, reporting_manager_id, status, created_by
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
     ) RETURNING id`,
     [
       empId,
@@ -621,7 +633,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.currentAddress),
       toTitleCase(employeeData.permanentAddress),
       reportingManagerId,
-      employeeData.status || 'active'
+      employeeData.status || 'active',
+      requesterId || null
     ]
   );
 
@@ -1264,7 +1277,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   values.push(employeeId);
-  const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
+  const query = `UPDATE users SET ${updates.join(', ')}, updated_by = $${paramCount}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount + 1}`;
+  values.splice(values.length - 1, 0, requesterId || null);
 
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Executing update query: ${query}`);
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Query values: ${JSON.stringify(values)}`);

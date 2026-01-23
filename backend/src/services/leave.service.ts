@@ -301,7 +301,7 @@ export const applyLeave = async (
         WHERE user_role = 'super_admin'
         ORDER BY id ASC
         LIMIT 1
-      ) sa ON u.reporting_manager_id IS NULL AND u.role != 'super_admin'
+      ) sa ON u.reporting_manager_id IS NULL AND u.user_role != 'super_admin'
       WHERE u.id = $1`,
       [userId]
     );

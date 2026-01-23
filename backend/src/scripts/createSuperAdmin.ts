@@ -17,7 +17,7 @@ const createAdmin = async () => {
         if (check.rows.length > 0) {
             console.log('User already exists. Updating password and role...');
             await pool.query(
-                'UPDATE users SET password_hash = $1, role = $2, must_change_password = $3 WHERE email = $4',
+                'UPDATE users SET password_hash = $1, user_role = $2, must_change_password = $3 WHERE email = $4',
                 [hashedPassword, 'super_admin', false, email]
             );
             console.log('User updated successfully.');
