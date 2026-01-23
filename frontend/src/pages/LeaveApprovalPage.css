@@ -21,7 +21,7 @@
   border: 1px solid #d7deec;
   border-radius: 4px;
   font-size: 14px;
-  width: 300px;
+  width: 270px;
   padding-right: 32px;
   background-color: #f8f9fc;
   height: 42px;
@@ -55,7 +55,7 @@
 
 .search-clear {
   position: absolute;
-  right: 8px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   border: none;

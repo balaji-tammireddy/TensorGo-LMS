@@ -27,19 +27,18 @@
 }
 
 .search-box input {
-  padding: 10px 12px;
+  
   border: 1px solid #d7deec;
   border-radius: 4px;
   font-size: 14px;
-  width: 260px;
+  width: 250px;
   background-color: #f8f9fc;
-  padding-right: 32px;
   height: 42px;
 }
 
 .search-clear {
   position: absolute;
-  right: 8px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
