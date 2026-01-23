@@ -20,7 +20,7 @@ import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown, FaHistory, FaPlus, FaFilter, FaDownload } from 'react-icons/fa';
+import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -171,7 +171,7 @@ const EmployeeManagementPage: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isDetailLoading] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [newEmployee, setNewEmployee] = useState<any>(emptyEmployeeForm);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -749,85 +749,6 @@ const EmployeeManagementPage: React.FC = () => {
     }
   };
 
-  const openEmployeeModal = async (employeeId: number, mode: 'edit' | 'view') => {
-    try {
-      setIsDetailLoading(true);
-      const data: any = await employeeService.getEmployeeById(employeeId);
-      console.log('Employee data received:', data);
-
-      const educationFromApi = data.education || [];
-      const education = baseEducationLevels.map((level) => {
-        const existing = educationFromApi.find((edu: any) => edu.level === level);
-        return {
-          level,
-          groupStream: existing?.groupStream || '',
-          collegeUniversity: existing?.collegeUniversity || '',
-          year: existing?.year ? String(existing.year) : '',
-          scorePercentage:
-            existing?.scorePercentage === null ||
-              existing?.scorePercentage === undefined
-              ? ''
-              : String(existing.scorePercentage)
-        };
-      });
-
-      const currentAddress = data.current_address || '';
-      const permanentAddress = data.permanent_address || '';
-      const same =
-        !!currentAddress && currentAddress === permanentAddress && currentAddress !== '';
-
-      const today = format(new Date(), 'yyyy-MM-dd');
-
-      const employeeDetail = data.employee || data;
-
-      const fetchedEmployee = {
-        ...emptyEmployeeForm,
-        id: employeeDetail.id,
-        empId: employeeDetail.emp_id || '',
-        role: employeeDetail.role || '',
-        email: employeeDetail.email || '',
-        firstName: employeeDetail.first_name || '',
-        middleName: employeeDetail.middle_name || '',
-        lastName: employeeDetail.last_name || '',
-        contactNumber: employeeDetail.contact_number || employeeDetail.contactNumber || '',
-        altContact: employeeDetail.alt_contact || employeeDetail.altContact || '',
-        dateOfBirth: employeeDetail.date_of_birth ? (typeof employeeDetail.date_of_birth === 'string' ? employeeDetail.date_of_birth.split('T')[0] : new Date(employeeDetail.date_of_birth).toISOString().split('T')[0]) : '',
-        gender: employeeDetail.gender || '',
-        bloodGroup: employeeDetail.blood_group || '',
-        maritalStatus: employeeDetail.marital_status || '',
-        emergencyContactName: employeeDetail.emergency_contact_name || '',
-        emergencyContactNo: employeeDetail.emergency_contact_no || '',
-        emergencyContactRelation: employeeDetail.emergency_contact_relation || '',
-        designation: employeeDetail.designation || '',
-        department: employeeDetail.department || '',
-        dateOfJoining: employeeDetail.date_of_joining
-          ? (typeof employeeDetail.date_of_joining === 'string' ? employeeDetail.date_of_joining.split('T')[0] : new Date(employeeDetail.date_of_joining).toISOString().split('T')[0])
-          : today,
-        aadharNumber: employeeDetail.aadhar_number || '',
-        panNumber: employeeDetail.pan_number || '',
-        currentAddress: same ? permanentAddress : currentAddress,
-        permanentAddress,
-        status: employeeDetail.status || 'active',
-        education,
-        reportingManagerName: employeeDetail.reporting_manager_full_name || employeeDetail.reporting_manager_name || '',
-        reportingManagerId: employeeDetail.reporting_manager_id || null,
-        subordinateCount: employeeDetail.subordinate_count ? parseInt(String(employeeDetail.subordinate_count), 10) : 0
-      };
-
-      setNewEmployee(fetchedEmployee);
-      setInitialEmployeeData(fetchedEmployee);
-
-      setIsSameAddress(same);
-      setIsEditMode(mode === 'edit');
-      setIsViewMode(mode === 'view');
-      setEditingEmployeeId(employeeId);
-      setIsModalOpen(true);
-    } catch (error: any) {
-      showError(error?.response?.data?.error?.message || 'Load failed');
-    } finally {
-      setIsDetailLoading(false);
-    }
-  };
 
 
   /* Navigation to details page */
@@ -1161,17 +1082,13 @@ const EmployeeManagementPage: React.FC = () => {
                             <FaCalendarPlus />
                           </button>
 
-                          {/* Delete button (Visible to Super Admin and HR) */}
-                          {(user?.role === 'super_admin' || user?.role === 'hr') && (
+                          {/* Delete button (Visible to Super Admin only) */}
+                          {user?.role === 'super_admin' && (
                             <button
                               className="action-btn delete-btn"
-                              title={
-                                user?.role === 'hr'
-                                  ? "HR does not have permission to delete employees"
-                                  : (employee.id === user.id ? "You cannot delete your own account" : "Delete")
-                              }
+                              title={employee.id === user.id ? "You cannot delete your own account" : "Delete"}
                               onClick={() => handleDelete(employee.id)}
-                              disabled={user?.role === 'hr' || employee.id === user.id}
+                              disabled={employee.id === user.id}
                             >
                               <FaTrash />
                             </button>
