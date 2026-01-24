@@ -170,7 +170,7 @@ tr:hover {
   min-width: 160px !important;
   text-transform: capitalize;
   letter-spacing: 0.05em;
-  color: #fff;
+  color: #fff !important;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }

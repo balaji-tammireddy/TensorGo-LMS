@@ -1149,25 +1149,25 @@
 .status-applied {
   background-color: #3c6ff2;
   /* Blue */
-  color: #fff;
+  color: #fff !important;
 }
 
 .status-partial {
   background-color: #ff9800;
   /* Orange */
-  color: #fff;
+  color: #fff !important;
 }
 
 .status-approved {
   background-color: #059669;
   /* Emerald 600 */
-  color: #fff;
+  color: #fff !important;
 }
 
 .status-rejected {
   background-color: #dc2626;
   /* Red 600 */
-  color: #fff;
+  color: #fff !important;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;

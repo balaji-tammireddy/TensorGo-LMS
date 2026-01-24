@@ -316,31 +316,31 @@
 
 .status-pending {
   background: linear-gradient(135deg, #ffab00 0%, #ffc400 100%);
-  color: #fff;
+  color: #fff !important;
   box-shadow: 0 4px 12px rgba(255, 171, 0, 0.2);
 }
 
 .status-applied {
   background: linear-gradient(135deg, #3c6ff2 0%, #5a87f5 100%);
-  color: #fff;
+  color: #fff !important;
   box-shadow: 0 4px 12px rgba(60, 111, 242, 0.2);
 }
 
 .status-approved {
   background: linear-gradient(135deg, #00c853 0%, #00e676 100%);
-  color: #fff;
+  color: #fff !important;
   box-shadow: 0 4px 12px rgba(0, 200, 83, 0.2);
 }
 
 .status-rejected {
   background: linear-gradient(135deg, #ff5252 0%, #ff8080 100%);
-  color: #fff;
+  color: #fff !important;
   box-shadow: 0 4px 12px rgba(255, 82, 82, 0.2);
 }
 
 .status-partial {
   background: linear-gradient(135deg, #ff8c00 0%, #ffab00 100%);
-  color: #fff;
+  color: #fff !important;
   border: none;
   box-shadow: 0 4px 12px rgba(255, 140, 0, 0.2);
 }
