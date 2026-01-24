@@ -63,7 +63,7 @@ const LeaveApplyPage: React.FC = () => {
   const minStartDate = formData.leaveType === 'casual'
     ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days for casual
     : formData.leaveType === 'sick'
-      ? format(addDays(new Date(), -3), 'yyyy-MM-dd') // allow past 3 days for sick leave
+      ? format(addDays(new Date(), -1), 'yyyy-MM-dd') // allow past 1 day for sick leave
       : formData.leaveType === 'permission'
         ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // Permission can only be applied from tomorrow
         : todayStr; // LOP can be applied for today
