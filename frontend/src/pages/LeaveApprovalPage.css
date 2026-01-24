@@ -17,12 +17,12 @@
 }
 
 .search-box input {
-  padding: 10px 12px;
+  padding: 10px 20px;
   border: 1px solid #d7deec;
   border-radius: 4px;
   font-size: 14px;
-  width: 270px;
-  min-width: 270px;
+  width: 350px !important;
+  min-width: 350px !important;
   padding-right: 32px;
   background-color: #f8f9fc;
   height: 42px;
@@ -607,12 +607,12 @@
 }
 
 .recent-search-box input {
-  padding: 10px 12px;
+  padding: 10px 20px;
   border: 1px solid #d7deec;
   border-radius: 6px;
   font-size: 13px;
-  width: 320px;
-  min-width: 320px;
+  width: 350px !important;
+  min-width: 350px !important;
   padding-right: 32px;
   background-color: #f8f9fc;
   height: 42px;
