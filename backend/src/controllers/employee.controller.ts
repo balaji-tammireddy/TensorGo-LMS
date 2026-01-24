@@ -211,39 +211,31 @@ export const addLeavesToEmployee = [
       const employeeId = parseInt(req.params.id);
       const { leaveType, count } = req.body;
 
-      // Prevent Super Admin from adding leaves to themselves
-      if (req.user?.role === 'super_admin' && req.user?.id === employeeId) {
-        return res.status(403).json({
+      // Check if employee exists and get their role
+      const employeeCheckResult = await pool.query('SELECT id, user_role as role FROM users WHERE id = $1', [employeeId]);
+      if (employeeCheckResult.rows.length === 0) {
+        return res.status(404).json({
           error: {
-            code: 'FORBIDDEN',
-            message: 'Super Admin cannot add leaves to themselves'
+            code: 'NOT_FOUND',
+            message: 'Employee not found'
           }
         });
       }
 
-      // HR cannot add leaves to themselves or super_admin users
+      const employeeRole = employeeCheckResult.rows[0].role;
+
+      // Global restriction: Cannot add leaves to Super Admin
+      if (employeeRole === 'super_admin') {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Cannot add leave balances to Super Admin users'
+          }
+        });
+      }
+
+      // HR specific restrictions
       if (req.user?.role === 'hr') {
-        // Check if employee exists and get their role
-        const employeeCheckResult = await pool.query('SELECT id, user_role as role FROM users WHERE id = $1', [employeeId]);
-        if (employeeCheckResult.rows.length === 0) {
-          return res.status(404).json({
-            error: {
-              code: 'NOT_FOUND',
-              message: 'Employee not found'
-            }
-          });
-        }
-
-        const employeeRole = employeeCheckResult.rows[0].role;
-        if (employeeRole === 'super_admin') {
-          return res.status(403).json({
-            error: {
-              code: 'FORBIDDEN',
-              message: 'HR cannot add leaves to Super Admin users'
-            }
-          });
-        }
-
         if (employeeId === req.user.id) {
           return res.status(403).json({
             error: {

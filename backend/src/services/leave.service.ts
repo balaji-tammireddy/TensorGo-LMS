@@ -32,6 +32,16 @@ export const getLeaveBalances = async (userId: number): Promise<any> => {
   const userResult = await pool.query('SELECT user_role as role FROM users WHERE id = $1', [userId]);
   const role = userResult.rows[0]?.role || 'employee';
 
+  if (role === 'super_admin') {
+    logger.info(`[LEAVE] [GET LEAVE BALANCES] User is super_admin, returning zero balances`);
+    return {
+      casual: 0,
+      sick: 0,
+      lop: 0,
+      policies: {}
+    };
+  }
+
   const result = await pool.query(
     'SELECT casual_balance, sick_balance, lop_balance FROM leave_balances WHERE employee_id = $1',
     [userId]

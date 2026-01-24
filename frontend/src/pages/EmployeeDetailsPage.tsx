@@ -514,9 +514,11 @@ const EmployeeDetailsPage: React.FC = () => {
             {/* View Mode Buttons */}
             {!isEditMode && (
               <>
-                <Button variant="outline" onClick={() => navigate(`/employee-management/leaves/${id}`)}>
-                  View Leave Details
-                </Button>
+                {employeeData.role !== 'super_admin' && (
+                  <Button variant="outline" onClick={() => navigate(`/employee-management/leaves/${id}`)}>
+                    View Leave Details
+                  </Button>
+                )}
                 {(user?.role === 'super_admin' || user?.role === 'hr') && (
                   <Button
                     onClick={() => setIsEditMode(true)}

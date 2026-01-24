@@ -644,15 +644,20 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   // Initialize leave balances (set to 0 by default as per requirement to disable auto-add on joining)
   // LOP balance defaults to 10
-  const casualBalance = 0;
-  const sickBalance = 0;
+  // Skip creating leave balances for super_admin
+  if (role !== 'super_admin') {
+    const casualBalance = 0;
+    const sickBalance = 0;
 
-  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
-  await pool.query(
-    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
-    [userId, casualBalance, sickBalance]
-  );
-  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
+    await pool.query(
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
+      [userId, casualBalance, sickBalance]
+    );
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
+  } else {
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Skipped leave balance initialization for super_admin`);
+  }
 
   // Update education columns if provided
   if (employeeData.education) {
@@ -1415,11 +1420,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // If joining date was updated, recalculate leave balances
+  // If joining date was updated, recalculate leave balances (skip for super_admin)
   const oldJoiningDate = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
   const newJoiningDate = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
 
-  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin') {
+  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin' && finalRole !== 'super_admin') {
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
 
     // Update leave balances with recalculated credits
@@ -1452,6 +1457,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         [employeeId, casualBalance, sickBalance, requesterId]
       );
     }
+  }
+
+  // If role was changed to super_admin, remove any existing leave balances and details
+  if (isRoleChanged && newRole === 'super_admin') {
+    logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] User ${employeeId} promoted to super_admin. Cleaning up leave data.`);
+    await pool.query('DELETE FROM leave_days WHERE leave_request_id IN (SELECT id FROM leave_requests WHERE employee_id = $1)', [employeeId]);
+    await pool.query('DELETE FROM leave_requests WHERE employee_id = $1', [employeeId]);
+    await pool.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
   }
 
   // Update education columns atomically

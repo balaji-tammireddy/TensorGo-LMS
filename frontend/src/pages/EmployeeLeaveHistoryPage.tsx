@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { FaEye } from 'react-icons/fa';
 import { useToast } from '../contexts/ToastContext';
 import * as leaveService from '../services/leaveService';
+import * as employeeService from '../services/employeeService';
 import EmptyState from '../components/common/EmptyState';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import './EmployeeManagementPage.css'; // Reuse existing styles
@@ -21,11 +22,25 @@ const EmployeeLeaveHistoryPage: React.FC = () => {
 
     const employeeId = id ? parseInt(id) : null;
 
+    const { data: employee } = useQuery(
+        ['employee', employeeId],
+        () => id ? employeeService.getEmployeeById(parseInt(id)) : Promise.reject('No ID'),
+        {
+            enabled: !!id,
+            onSuccess: (data: any) => {
+                if ((data.role || data.employee?.role) === 'super_admin') {
+                    showError('Super Admins do not have leave records');
+                    navigate(`/employee-management/view/${id}`);
+                }
+            }
+        }
+    );
+
     const { data: balances, isLoading: balancesLoading } = useQuery(
         ['employee-leave-balances', employeeId],
         () => leaveService.getEmployeeLeaveBalances(employeeId!),
         {
-            enabled: !!employeeId,
+            enabled: !!employeeId && (employee?.role || employee?.employee?.role) !== 'super_admin',
             retry: false,
             onError: () => showError('Failed to load leave balances')
         }
@@ -35,7 +50,7 @@ const EmployeeLeaveHistoryPage: React.FC = () => {
         ['employee-leave-requests', employeeId],
         () => leaveService.getEmployeeLeaveRequests(employeeId!, 1, 100),
         {
-            enabled: !!employeeId,
+            enabled: !!employeeId && (employee?.role || employee?.employee?.role) !== 'super_admin',
             retry: false,
             onError: () => showError('Failed to load leave history')
         }

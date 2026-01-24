@@ -364,7 +364,9 @@ export const processDailyLeaveCredits = async () => {
     const result = await pool.query(
       `SELECT id, emp_id, date_of_joining, email, first_name || ' ' || COALESCE(last_name, '') as name 
        FROM users 
-       WHERE status NOT IN ('inactive', 'resigned') AND date_of_joining IS NOT NULL`
+       WHERE status NOT IN ('inactive', 'resigned') 
+         AND date_of_joining IS NOT NULL
+         AND user_role != 'super_admin'`
     );
 
     const employees = result.rows;

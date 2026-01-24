@@ -1091,25 +1091,27 @@ const EmployeeManagementPage: React.FC = () => {
                             <FaEye />
                           </button>
                           {/* Add Leaves button (Always visible, disabled if no permission) */}
-                          <button
-                            className="action-btn add-leaves-btn"
-                            title={
-                              !(employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
-                                ? "Cannot add leaves for inactive/resigned employees"
-                                : ((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
-                                  (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin'))
-                                  ? "Add Leaves"
-                                  : "You do not have permission to add leaves for this employee"
-                            }
-                            onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
-                            disabled={
-                              !(((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
-                                (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin')) &&
-                                (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned'))
-                            }
-                          >
-                            <FaCalendarPlus />
-                          </button>
+                          {employee.role !== 'super_admin' && (
+                            <button
+                              className="action-btn add-leaves-btn"
+                              title={
+                                !(employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
+                                  ? "Cannot add leaves for inactive/resigned employees"
+                                  : ((user?.role === 'hr' && employee.role !== 'hr') ||
+                                    (user?.role === 'super_admin' && employee.id !== user.id))
+                                    ? "Add Leaves"
+                                    : "You do not have permission to add leaves for this employee"
+                              }
+                              onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
+                              disabled={
+                                !(((user?.role === 'hr' && employee.role !== 'hr') ||
+                                  (user?.role === 'super_admin' && employee.id !== user.id)) &&
+                                  (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned'))
+                              }
+                            >
+                              <FaCalendarPlus />
+                            </button>
+                          )}
 
                           {/* Delete button (Visible to Super Admin only) */}
                           {user?.role === 'super_admin' && (
@@ -2386,21 +2388,21 @@ const EmployeeManagementPage: React.FC = () => {
               <div className="employee-modal-footer">
                 {isViewMode ? (
                   <>
-                    <button
-                      type="button"
-                      className="modal-save-button"
-                      onClick={() => {
-                        if (!showLeaveHistory) {
-                          refetchLeaveHistory();
-                          refetchEmployeeBalances();
-                        }
-                        setShowLeaveHistory(!showLeaveHistory);
-                      }}
-                      disabled={newEmployee.role === 'super_admin'}
-                      title={newEmployee.role === 'super_admin' ? "Super Admins do not have leave records" : ""}
-                    >
-                      {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
-                    </button>
+                    {newEmployee.role !== 'super_admin' && (
+                      <button
+                        type="button"
+                        className="modal-save-button"
+                        onClick={() => {
+                          if (!showLeaveHistory) {
+                            refetchLeaveHistory();
+                            refetchEmployeeBalances();
+                          }
+                          setShowLeaveHistory(!showLeaveHistory);
+                        }}
+                      >
+                        {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
+                      </button>
+                    )}
                     {/* Edit Employee Button (HR/Super Admin only) */}
                     {user && (user.role === 'super_admin' || user.role === 'hr') && (
                       <button
