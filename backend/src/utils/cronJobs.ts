@@ -323,8 +323,6 @@ const autoApprovePastPendingLeaves = async () => {
                  super_admin_approval_date = CURRENT_TIMESTAMP,
                  super_admin_approval_comment = 'Auto-approved: Leave date has passed',
                  super_admin_approved_by = $1,
-                 last_updated_by = $1,
-                 last_updated_by_role = 'super_admin',
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2`,
             [superAdminId, request.id]

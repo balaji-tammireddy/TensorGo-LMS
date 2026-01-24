@@ -690,10 +690,14 @@ export const getMyLeaveRequests = async (
     SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
            lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.current_status, lr.doctor_note,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-           lr.last_updated_by, lr.last_updated_by_role,
-           last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+           lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date,
+           manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+           hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
+           sa.first_name || ' ' || COALESCE(sa.last_name, '') as sa_name
     FROM leave_requests lr
-    LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+    LEFT JOIN users manager ON lr.manager_approved_by = manager.id
+    LEFT JOIN users hr ON lr.hr_approved_by = hr.id
+    LEFT JOIN users sa ON lr.super_admin_approved_by = sa.id
     WHERE lr.employee_id = $1
   `;
     const params: any[] = [userId];
@@ -768,17 +772,22 @@ export const getMyLeaveRequests = async (
         ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
         : null;
 
-      // Get approver name from last_updated_by fields
-      let approverName: string | null = row.approver_name || null;
+      // Determine approver name and role based on latest approval date
+      let approverName: string | null = null;
       let approverRole: string | null = null;
 
-      // Map role from database to display format
-      if (row.last_updated_by_role === 'super_admin') {
-        approverRole = 'Super Admin';
-      } else if (row.last_updated_by_role === 'hr') {
-        approverRole = 'HR';
-      } else if (row.last_updated_by_role === 'manager') {
-        approverRole = 'Manager';
+      const dates = [
+        { role: 'Super Admin', date: row.super_admin_approval_date ? new Date(row.super_admin_approval_date).getTime() : 0, name: row.sa_name },
+        { role: 'HR', date: row.hr_approval_date ? new Date(row.hr_approval_date).getTime() : 0, name: row.hr_name },
+        { role: 'Manager', date: row.manager_approval_date ? new Date(row.manager_approval_date).getTime() : 0, name: row.manager_name }
+      ];
+
+      // Sort descending
+      dates.sort((a, b) => b.date - a.date);
+
+      if (dates[0].date > 0) {
+        approverName = dates[0].name;
+        approverRole = dates[0].role;
       }
 
       requests.push({
@@ -850,16 +859,20 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
             lr.applied_date,
              lr.current_status, lr.employee_id, lr.doctor_note,
              lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-             lr.last_updated_by, lr.last_updated_by_role,
+             lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date,
              u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
              u.status AS emp_status, u.user_role AS emp_role,
-             last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+             manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+             hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
+             sa.first_name || ' ' || COALESCE(sa.last_name, '') as sa_name
       FROM leave_requests lr
       JOIN users u ON u.id = lr.employee_id
       LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
       LEFT JOIN users l2 ON l1.reporting_manager_id = l2.id
       LEFT JOIN users l3 ON l2.reporting_manager_id = l3.id
-      LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+      LEFT JOIN users manager ON lr.manager_approved_by = manager.id
+      LEFT JOIN users hr ON lr.hr_approved_by = hr.id
+      LEFT JOIN users sa ON lr.super_admin_approved_by = sa.id
       WHERE lr.id = $1 
       AND (
            $3 = 'super_admin'             -- Super Admin sees all
@@ -877,13 +890,17 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
             lr.applied_date,
             lr.current_status, lr.employee_id, lr.doctor_note,
             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-            lr.last_updated_by, lr.last_updated_by_role,
+            lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date,
             u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name,
             u.status AS emp_status, u.user_role AS emp_role,
-            last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
+            manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+            hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
+            sa.first_name || ' ' || COALESCE(sa.last_name, '') as sa_name
      FROM leave_requests lr
      JOIN users u ON u.id = lr.employee_id
-     LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+     LEFT JOIN users manager ON lr.manager_approved_by = manager.id
+     LEFT JOIN users hr ON lr.hr_approved_by = hr.id
+     LEFT JOIN users sa ON lr.super_admin_approved_by = sa.id
      WHERE lr.id = $1 AND lr.employee_id = $2`;
     params = [requestId, userId];
   }
@@ -919,18 +936,24 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
     : null;
 
-  // Get approver name from last_updated_by fields
-  let approverName: string | null = row.approver_name || null;
+  // Determine approver name and role based on latest approval date
+  let approverName: string | null = null;
   let approverRole: string | null = null;
 
-  // Map role from database to display format
-  if (row.last_updated_by_role === 'super_admin') {
-    approverRole = 'Super Admin';
-  } else if (row.last_updated_by_role === 'hr') {
-    approverRole = 'HR';
-  } else if (row.last_updated_by_role === 'manager') {
-    approverRole = 'Manager';
+  const dates = [
+    { role: 'Super Admin', date: row.super_admin_approval_date ? new Date(row.super_admin_approval_date).getTime() : 0, name: row.sa_name },
+    { role: 'HR', date: row.hr_approval_date ? new Date(row.hr_approval_date).getTime() : 0, name: row.hr_name },
+    { role: 'Manager', date: row.manager_approval_date ? new Date(row.manager_approval_date).getTime() : 0, name: row.manager_name }
+  ];
+
+  // Sort descending
+  dates.sort((a, b) => b.date - a.date);
+
+  if (dates[0].date > 0) {
+    approverName = dates[0].name;
+    approverRole = dates[0].role;
   }
+
   // Get leave days for this request
   const daysResult = await pool.query(
     'SELECT id, leave_date, day_type, day_status FROM leave_days WHERE leave_request_id = $1 ORDER BY leave_date',
@@ -1615,6 +1638,7 @@ export const getPendingLeaveRequests = async (
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
            lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
+           lr.manager_approval_status, lr.hr_approval_status, lr.super_admin_approval_status,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
            lr.manager_approved_by, lr.hr_approved_by, lr.super_admin_approved_by,
            manager.first_name || ' ' || COALESCE(manager.last_name, '') AS manager_approver_name,
@@ -1727,13 +1751,49 @@ export const getPendingLeaveRequests = async (
       let approverName: string | null = row.approver_name || null;
       let approverRole: string | null = null;
 
-      // Map role from database to display format
-      if (row.last_updated_by_role === 'super_admin') {
+      // Determine approver name and role based on status
+      if (row.super_admin_approval_status === 'approved' || row.super_admin_approval_status === 'rejected') {
         approverRole = 'Super Admin';
-      } else if (row.last_updated_by_role === 'hr') {
+        approverName = row.super_admin_approver_name;
+      } else if (row.hr_approval_status === 'approved' || row.hr_approval_status === 'rejected') {
         approverRole = 'HR';
-      } else if (row.last_updated_by_role === 'manager') {
+        approverName = row.hr_approver_name;
+      } else if (row.manager_approval_status === 'approved' || row.manager_approval_status === 'rejected') {
         approverRole = 'Manager';
+        approverName = row.manager_approver_name;
+      }
+
+      // Note: We need approval dates from the row, which means we need to SELECT them in the query above first.
+      // Wait, I missed adding them to the SELECT query in the previous thought.
+      // I will add them now in this ReplacementContent AND update the logic.
+      // But wait, I can't update the SELECT query *here* easily because it's far above.
+      // I should update the SELECT query first in a separate step or just assume they are available if I update the query?
+      // No, I must update the query.
+
+      // Actually, for PENDING requests, usually there is NO approver yet, unless it's partially approved or rejected.
+      // If rejected, we have rejection comments.
+      // Let's check if I can get standard approval columns.
+      // The SELECT query (lines 1607+) selects `manager_approved_by`, `hr_approved_by`, `super_admin_approved_by` 
+      // AND `manager_approval_comment` etc. BUT NOT DATES.
+      // I need to add dates to the SELECT query first.
+
+      // Let's abort this specific replacement and update the SELECT query first.
+      // I will return the original content for now to not break it, but wait, I can't return "no change".
+      // I will just use the comment logic for now which is what was there, but removing the last_updated_by_role check.
+
+      // Actually, better plan: Update the SELECT query first in a separate tool call.
+      // I'll do that next.
+
+      // For now, I'll remove the `last_updated_by_role` block and put a placeholder or simple logic based on status.
+      if (row.super_admin_approval_status === 'approved' || row.super_admin_approval_status === 'rejected') {
+        approverRole = 'Super Admin';
+        approverName = row.super_admin_approver_name;
+      } else if (row.hr_approval_status === 'approved' || row.hr_approval_status === 'rejected') {
+        approverRole = 'HR';
+        approverName = row.hr_approver_name;
+      } else if (row.manager_approval_status === 'approved' || row.manager_approval_status === 'rejected') {
+        approverRole = 'Manager';
+        approverName = row.manager_approver_name;
       }
 
       return {
@@ -1910,22 +1970,18 @@ export const approveLeave = async (
            hr_approval_status = 'approved', -- Auto-approve HR level since manager approved (flat hierarchy)
            hr_approval_date = CURRENT_TIMESTAMP,
            hr_approved_by = $2,
-           current_status = 'approved',
-           last_updated_by = $2,
-           last_updated_by_role = $3
-       WHERE id = $4`,
-      [comment || null, approverId, approverRole, leaveRequestId]
+           current_status = 'approved'
+       WHERE id = $3`,
+      [comment || null, approverId, leaveRequestId]
     );
   } else if (approverRole === 'super_admin') {
     await pool.query(
       `UPDATE leave_requests 
        SET super_admin_approval_status = 'approved',
-           super_admin_approval_date = CURRENT_TIMESTAMP,
-           super_admin_approval_comment = $1,
-           super_admin_approved_by = $2,
-           current_status = 'approved',
-           last_updated_by = $2,
-           last_updated_by_role = 'super_admin'
+       super_admin_approval_date = CURRENT_TIMESTAMP,
+       super_admin_approval_comment = $1,
+       super_admin_approved_by = $2,
+       current_status = 'approved'
        WHERE id = $3`,
       [comment || null, approverId, leaveRequestId]
     );
@@ -3495,8 +3551,6 @@ export const updateLeaveStatus = async (
              super_admin_approved_by = $4,
              manager_approval_comment = NULL,
              hr_approval_comment = NULL,
-             last_updated_by = $4,
-             last_updated_by_role = 'super_admin',
              updated_at = CURRENT_TIMESTAMP,
              updated_by = $4
          WHERE id = $5`,
@@ -3514,8 +3568,6 @@ export const updateLeaveStatus = async (
              hr_approval_comment = $3,
              hr_approved_by = $4,
              manager_approval_comment = NULL,
-             last_updated_by = $4,
-             last_updated_by_role = 'hr',
              updated_at = CURRENT_TIMESTAMP,
              updated_by = $4
          WHERE id = $5`,
@@ -3680,10 +3732,13 @@ export const getApprovedLeaves = async (
         lr.manager_approval_comment,
         lr.hr_approval_comment,
         lr.super_admin_approval_comment,
-        lr.last_updated_by,
-        lr.last_updated_by_role,
         lr.updated_at,
-        last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name,
+        manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name,
+        hr.first_name || ' ' || COALESCE(hr.last_name, '') as hr_name,
+        sa.first_name || ' ' || COALESCE(sa.last_name, '') as sa_name,
+        lr.manager_approval_date,
+        lr.hr_approval_date,
+        lr.super_admin_approval_date,
         COALESCE(SUM(CASE WHEN ld.day_status = 'approved' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS approved_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'rejected' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS rejected_days,
         COALESCE(SUM(CASE WHEN ld.day_status = 'pending' THEN CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END ELSE 0 END), 0) AS pending_days,
@@ -3692,7 +3747,9 @@ export const getApprovedLeaves = async (
      FROM leave_requests lr
      JOIN users u ON lr.employee_id = u.id
      LEFT JOIN leave_days ld ON ld.leave_request_id = lr.id
-     LEFT JOIN users last_updater ON last_updater.id = lr.last_updated_by
+     LEFT JOIN users manager ON lr.manager_approved_by = manager.id
+     LEFT JOIN users hr ON lr.hr_approved_by = hr.id
+     LEFT JOIN users sa ON lr.super_admin_approved_by = sa.id
      LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
      WHERE lr.current_status != 'pending'
         AND NOT EXISTS (
@@ -3723,8 +3780,8 @@ export const getApprovedLeaves = async (
 
   query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
-              lr.last_updated_by, lr.last_updated_by_role, lr.updated_at,
-              last_updater.first_name, last_updater.last_name, u.status, u.user_role
+              lr.updated_at, manager.first_name, manager.last_name, hr.first_name, hr.last_name, sa.first_name, sa.last_name,
+              lr.manager_approval_date, lr.hr_approval_date, lr.super_admin_approval_date, u.status, u.user_role
      ORDER BY lr.applied_date DESC, lr.updated_at DESC
      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 
@@ -3848,17 +3905,22 @@ export const getApprovedLeaves = async (
       ? (row.super_admin_approval_comment || row.hr_approval_comment || row.manager_approval_comment || null)
       : null;
 
-    // Get approver name from last_updated_by fields
-    let approverName: string | null = row.approver_name || null;
+    // Determine approver name and role based on latest approval date
+    let approverName: string | null = null;
     let approverRole: string | null = null;
 
-    // Map role from database to display format
-    if (row.last_updated_by_role === 'super_admin') {
-      approverRole = 'Super Admin';
-    } else if (row.last_updated_by_role === 'hr') {
-      approverRole = 'HR';
-    } else if (row.last_updated_by_role === 'manager') {
-      approverRole = 'Manager';
+    const dates = [
+      { role: 'Super Admin', date: row.super_admin_approval_date ? new Date(row.super_admin_approval_date).getTime() : 0, name: row.sa_name },
+      { role: 'HR', date: row.hr_approval_date ? new Date(row.hr_approval_date).getTime() : 0, name: row.hr_name },
+      { role: 'Manager', date: row.manager_approval_date ? new Date(row.manager_approval_date).getTime() : 0, name: row.manager_name }
+    ];
+
+    // Sort descending
+    dates.sort((a, b) => b.date - a.date);
+
+    if (dates[0].date > 0) {
+      approverName = dates[0].name;
+      approverRole = dates[0].role;
     }
 
     return {
