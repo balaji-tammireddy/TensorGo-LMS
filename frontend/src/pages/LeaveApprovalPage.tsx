@@ -582,46 +582,47 @@ const LeaveApprovalPage: React.FC = () => {
 
         const getProp = (obj: any, key: string) => {
           if (obj[key] !== undefined) return obj[key];
-          // Try snake_case if key is camelCase
           const snakeKey = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
           if (obj[snakeKey] !== undefined) return obj[snakeKey];
           return undefined;
         };
 
-        const parseDate = (dateStr: any) => {
-          if (!dateStr) return 0;
-          if (typeof dateStr !== 'string') {
-            const d = new Date(dateStr);
+        const parseDate = (value: any) => {
+          if (!value) return 0;
+          if (value instanceof Date) return value.getTime();
+          if (typeof value !== 'string') {
+            const d = new Date(value);
             return isNaN(d.getTime()) ? 0 : d.getTime();
           }
 
-          // Handle "YYYY-MM-DD" or "DD-MM-YYYY" with optional time
-          const parts = dateStr.match(/(\d+)/g);
+          // Handle ISO format (YYYY-MM-DD) directly first as it's the standard from our backend
+          if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+            // Use T12:00:00 to avoid timezone shifts during parsing
+            const d = new Date(value.substring(0, 10) + 'T12:00:00');
+            return isNaN(d.getTime()) ? 0 : d.getTime();
+          }
+
+          // Handle other formats or ranges
+          const parts = value.match(/(\d+)/g);
           if (parts && parts.length >= 3) {
-            let y, m, d, h = 0, min = 0, s = 0, ms = 0;
+            let y, m, d;
             if (parts[0].length === 4) { // YYYY, MM, DD
               y = parseInt(parts[0], 10);
               m = parseInt(parts[1], 10) - 1;
               d = parseInt(parts[2], 10);
-              // Extract time if available
-              h = parseInt(parts[3] || '0', 10);
-              min = parseInt(parts[4] || '0', 10);
-              s = parseInt(parts[5] || '0', 10);
-              ms = parseInt(parts[6] || '0', 10);
             } else if (parts[2].length === 4) { // DD, MM, YYYY
               y = parseInt(parts[2], 10);
               m = parseInt(parts[1], 10) - 1;
               d = parseInt(parts[0], 10);
-              // Time components usually follow the year in common formats or aren't present in DD-MM-YYYY
             } else {
-              const dateObj = new Date(dateStr);
-              return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
+              const dObj = new Date(value);
+              return isNaN(dObj.getTime()) ? 0 : dObj.getTime();
             }
-            return new Date(y, m, d, h, min, s, ms).getTime();
+            return new Date(y, m, d, 12, 0, 0).getTime();
           }
 
-          const fallbackDate = new Date(dateStr);
-          return isNaN(fallbackDate.getTime()) ? 0 : fallbackDate.getTime();
+          const fallback = new Date(value);
+          return isNaN(fallback.getTime()) ? 0 : fallback.getTime();
         };
 
         const key = recentSortConfig.key;
@@ -629,25 +630,27 @@ const LeaveApprovalPage: React.FC = () => {
         const valB = parseDate(getProp(b, key));
 
         // Primary sort
-        let result = 0;
-        if (recentSortConfig.direction === 'asc') {
-          result = valA - valB;
-        } else {
-          result = valB - valA;
+        let result = valA - valB;
+        if (isNaN(result)) result = 0;
+
+        if (recentSortConfig.direction === 'desc') {
+          result = -result;
         }
 
-        // If primary sort values are equal or both invalid, use secondary sort (Applied Date Descending then Latest Approval/Update)
+        // If primary sort values are equal or both invalid, use secondary sort (Applied Date Descending then Latest Update)
         if (result === 0) {
           if (key !== 'appliedDate') {
             const appliedA = parseDate(getProp(a, 'appliedDate'));
             const appliedB = parseDate(getProp(b, 'appliedDate'));
-            if (appliedA !== appliedB) return appliedB - appliedA; // appliedDate DESC
+            const appliedResult = appliedB - appliedA; // appliedDate DESC
+            if (!isNaN(appliedResult) && appliedResult !== 0) return appliedResult;
           }
 
-          // Latest Approval/Update tie-breaker
+          // Latest Update tie-breaker
           const updateA = parseDate(getProp(a, 'updatedAt'));
           const updateB = parseDate(getProp(b, 'updatedAt'));
-          if (updateA !== updateB) return updateB - updateA; // updatedAt DESC
+          const updateResult = updateB - updateA; // updatedAt DESC
+          if (!isNaN(updateResult) && updateResult !== 0) return updateResult;
 
           return (b.id || 0) - (a.id || 0);
         }
