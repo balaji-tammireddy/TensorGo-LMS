@@ -2275,12 +2275,20 @@ const EmployeeManagementPage: React.FC = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent
-                                side="top"
+                                side="bottom"
                                 align="start"
                                 className="leave-type-dropdown-content"
-                                style={{ maxHeight: '300px', overflowY: 'auto', width: 'var(--radix-dropdown-menu-trigger-width)' }}
+                                style={{
+                                  maxHeight: '300px',
+                                  overflowY: 'auto',
+                                  width: 'var(--radix-dropdown-menu-trigger-width)',
+                                  padding: 0,
+                                  backgroundColor: 'white',
+                                  border: '1px solid #eee',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                }}
                               >
-                                <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
+                                <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 10 }}>
                                   <div style={{ position: 'relative' }}>
                                     <input
                                       type="text"
@@ -2298,7 +2306,8 @@ const EmployeeManagementPage: React.FC = () => {
                                         fontSize: '13px',
                                         border: '1px solid #ddd',
                                         borderRadius: '4px',
-                                        fontFamily: 'Poppins, sans-serif'
+                                        fontFamily: 'Poppins, sans-serif',
+                                        backgroundColor: '#fff'
                                       }}
                                       onClick={(e) => e.stopPropagation()}
                                     />
