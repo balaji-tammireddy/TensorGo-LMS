@@ -583,6 +583,9 @@ export const applyLeave = async (
           await client.query(`UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
         } catch (err: any) {
           if (err.code === '23514' || (err.message && err.message.includes('check_'))) {
+            if (err.constraint === 'check_casual_non_negative' || (err.message && err.message.includes('check_casual_non_negative'))) {
+              throw new Error('No casual leave balance to update');
+            }
             throw new Error(`Insufficient ${leaveData.leaveType} leave balance`);
           }
           throw err;
@@ -1410,6 +1413,9 @@ export const updateLeaveRequest = async (
         await client.query(`UPDATE leave_balances SET ${newBalanceColumn} = ${newBalanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
       } catch (err: any) {
         if (err.code === '23514' || (err.message && err.message.includes('check_'))) {
+          if (err.constraint === 'check_casual_non_negative' || (err.message && err.message.includes('check_casual_non_negative'))) {
+            throw new Error('No casual leave balance to update');
+          }
           throw new Error(`Insufficient ${leaveData.leaveType} leave balance`);
         }
         throw err;
@@ -3499,31 +3505,41 @@ export const updateLeaveStatus = async (
             ? 'sick_balance'
             : 'lop_balance';
 
-      if (leave.leave_type === 'lop') {
-        const currentBalanceResult = await client.query(
-          'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
-          [leave.employee_id]
-        );
-        const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
-        let newLopBalance = currentLop + refundAmount;
+      try {
+        if (leave.leave_type === 'lop') {
+          const currentBalanceResult = await client.query(
+            'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
+            [leave.employee_id]
+          );
+          const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
+          let newLopBalance = currentLop + refundAmount;
 
-        // Cap LOP balance at 10
-        if (newLopBalance > 10) newLopBalance = 10;
-        // Don't allow LOP balance to go below 0 (shouldn't happen with valid requests, but safe)
-        if (newLopBalance < 0) newLopBalance = 0;
+          // Cap LOP balance at 10
+          if (newLopBalance > 10) newLopBalance = 10;
+          // Don't allow LOP balance to go below 0 (shouldn't happen with valid requests, but safe)
+          if (newLopBalance < 0) newLopBalance = 0;
 
-        await client.query(
-          `UPDATE leave_balances SET lop_balance = $1 WHERE employee_id = $2`,
-          [newLopBalance, leave.employee_id]
-        );
-      } else {
-        // For Casual/Sick, we just apply the adjustment
-        await client.query(
-          `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
-          [refundAmount, leave.employee_id]
-        );
+          await client.query(
+            `UPDATE leave_balances SET lop_balance = $1 WHERE employee_id = $2`,
+            [newLopBalance, leave.employee_id]
+          );
+        } else {
+          // For Casual/Sick, we just apply the adjustment
+          await client.query(
+            `UPDATE leave_balances SET ${balanceColumn} = ${balanceColumn} + $1 WHERE employee_id = $2`,
+            [refundAmount, leave.employee_id]
+          );
+        }
+        logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Adjusted ${balanceColumn} by ${refundAmount} for employee ${leave.employee_id}`);
+      } catch (err: any) {
+        if (err.code === '23514' || (err.message && err.message.includes('check_'))) {
+          if (err.constraint === 'check_casual_non_negative' || (err.message && err.message.includes('check_casual_non_negative'))) {
+            throw new Error('No casual leave balance to update');
+          }
+          throw new Error(`Insufficient ${leave.leave_type} leave balance to update status`);
+        }
+        throw err;
       }
-      logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Adjusted ${balanceColumn} by ${refundAmount} for employee ${leave.employee_id}`);
     }
 
     // 4. Update leave_requests header status
