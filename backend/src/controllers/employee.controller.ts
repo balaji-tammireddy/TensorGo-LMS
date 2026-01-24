@@ -20,8 +20,10 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
     const joiningDate = req.query.joiningDate as string | undefined;
     const status = req.query.status as string | undefined;
     const role = req.query.role as string | undefined;
+    const sortBy = req.query.sortBy as string | undefined;
+    const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'asc';
 
-    const result = await employeeService.getEmployees(page, limit, search, joiningDate, status, role);
+    const result = await employeeService.getEmployees(page, limit, search, joiningDate, status, role, sortBy, sortOrder);
     logger.info(`[CONTROLLER] [EMPLOYEE] [GET EMPLOYEES] Retrieved ${result.employees.length} employees, Total: ${result.pagination.total}`);
     res.json(result);
   } catch (error: any) {

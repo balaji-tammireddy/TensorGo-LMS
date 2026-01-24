@@ -2504,7 +2504,7 @@ const LeaveApplyPage: React.FC = () => {
                   <th>No. Of Days</th>
                   <th>Leave Type</th>
                   <th>Approved Dates</th>
-                  <th>Current Status</th>
+                  <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>

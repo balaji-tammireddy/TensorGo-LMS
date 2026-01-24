@@ -13,10 +13,12 @@ export const getEmployees = async (
   search?: string,
   joiningDate?: string,
   status?: string,
-  role?: string
+  role?: string,
+  sortBy?: string,
+  sortOrder: 'asc' | 'desc' = 'asc'
 ) => {
   logger.info(`[EMPLOYEE] [GET EMPLOYEES] ========== FUNCTION CALLED ==========`);
-  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}, Role: ${role || 'none'}`);
+  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}, Role: ${role || 'none'}, SortBy: ${sortBy || 'none'}, SortOrder: ${sortOrder}`);
 
   const offset = (page - 1) * limit;
   let query = `
@@ -33,54 +35,75 @@ export const getEmployees = async (
   const params: any[] = [];
 
   if (search) {
-    // Check for special characters and emojis (allow only alphanumeric and spaces)
-    const isValid = /^[a-zA-Z0-9\s]*$/.test(search);
+    // Check for special characters and emojis (allow alphanumeric, spaces, and hyphens)
+    const isValid = /^[a-zA-Z0-9\s-]*$/.test(search);
     if (!isValid) {
       logger.warn(`[EMPLOYEE] [GET EMPLOYEES] Invalid search term detected: ${search}`);
       throw new Error('Search term contains invalid characters. Emojis and special characters are not allowed.');
     }
 
     // Search by employee ID or name (first or last name)
-    query += ` AND (emp_id ILIKE $${params.length + 1} OR first_name ILIKE $${params.length + 1} OR last_name ILIKE $${params.length + 1})`;
+    query += ` AND (u.emp_id ILIKE $${params.length + 1} OR u.first_name ILIKE $${params.length + 1} OR u.last_name ILIKE $${params.length + 1})`;
     params.push(`%${search}%`);
   }
 
   if (status) {
     if (status === 'inactive') {
       // Treat "inactive" as any non-active AND non-on-notice status
-      query += ` AND status NOT IN ('active', 'on_notice')`;
+      query += ` AND u.status NOT IN ('active', 'on_notice')`;
     } else {
-      query += ` AND status = $${params.length + 1}`;
+      query += ` AND u.status = $${params.length + 1}`;
       params.push(status);
     }
   }
 
   if (role) {
-    query += ` AND user_role = $${params.length + 1}`;
+    query += ` AND u.user_role = $${params.length + 1}`;
     params.push(role);
   }
 
   if (joiningDate) {
     // Filter by exact date of joining (YYYY-MM-DD)
-    query += ` AND date_of_joining::date = $${params.length + 1}`;
+    query += ` AND u.date_of_joining::date = $${params.length + 1}`;
     params.push(joiningDate);
   }
 
-  if (search) {
-    logger.info(`[EMPLOYEE] [GET EMPLOYEES] Applying search sort preference for: ${search}`);
-    // Prioritize results starting with the search term
+  // Handle Ordering
+  if (search && (!sortBy || sortBy === 'empId')) {
+    // Relevance sort for search
     const prefixParamIdx = params.length + 1;
     params.push(`${search}%`);
 
     query += ` ORDER BY 
       CASE 
-        WHEN first_name ILIKE $${prefixParamIdx} THEN 0 
-        WHEN emp_id ILIKE $${prefixParamIdx} THEN 1
+        WHEN u.first_name ILIKE $${prefixParamIdx} THEN 0 
+        WHEN u.emp_id ILIKE $${prefixParamIdx} THEN 1
         ELSE 2 
       END, 
-      emp_id ASC`;
+      u.emp_id ${sortOrder}`;
+  } else if (sortBy) {
+    // Custom sort
+    const allowedSortColumns: Record<string, string> = {
+      'empId': 'u.emp_id',
+      'name': 'name',
+      'joiningDate': 'u.date_of_joining',
+      'role': 'u.user_role',
+      'status': 'u.status'
+    };
+
+    const sortColumn = allowedSortColumns[sortBy] || 'u.emp_id';
+
+    // For numeric empId, we might want natural sort if they are purely numeric
+    if (sortBy === 'empId') {
+      query += ` ORDER BY 
+        CASE WHEN u.emp_id ~ '^[0-9]+$' THEN CAST(u.emp_id AS INTEGER) ELSE 0 END ${sortOrder},
+        u.emp_id ${sortOrder}`;
+    } else {
+      query += ` ORDER BY ${sortColumn} ${sortOrder}`;
+    }
   } else {
-    query += ` ORDER BY emp_id ASC`;
+    // Default sort
+    query += ` ORDER BY CASE WHEN u.emp_id ~ '^[0-9]+$' THEN CAST(u.emp_id AS INTEGER) ELSE 0 END ASC, u.emp_id ASC`;
   }
 
   query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;

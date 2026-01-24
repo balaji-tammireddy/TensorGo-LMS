@@ -239,7 +239,7 @@ const EmployeeManagementPage: React.FC = () => {
   );
 
   const { data: employeesData, isLoading: employeesLoading, error } = useQuery(
-    ['employees', appliedSearch, statusFilter, roleFilter],
+    ['employees', appliedSearch, statusFilter, roleFilter, sortConfig],
     () =>
       employeeService.getEmployees(
         1,
@@ -247,7 +247,9 @@ const EmployeeManagementPage: React.FC = () => {
         appliedSearch,
         undefined,
         statusFilter || undefined,
-        roleFilter || undefined
+        roleFilter || undefined,
+        sortConfig.key,
+        sortConfig.direction
       ),
     {
       retry: false,
@@ -302,32 +304,8 @@ const EmployeeManagementPage: React.FC = () => {
 
 
   const sortedEmployees = React.useMemo(() => {
-    if (!employeesData?.employees) return [];
-
-    // If we are searching and using default sort, use backend's relevance sort
-    if (appliedSearch && sortConfig.key === 'empId' && sortConfig.direction === 'asc') {
-      return employeesData.employees;
-    }
-
-    return [...employeesData.employees].sort((a, b) => {
-      if (sortConfig.key === 'empId') {
-        const aId = parseInt(a.empId) || 0;
-        const bId = parseInt(b.empId) || 0;
-        return sortConfig.direction === 'asc' ? aId - bId : bId - aId;
-      } else if (sortConfig.key === 'joiningDate') {
-        const aDate = new Date(a.joiningDate + 'T00:00:00').getTime();
-        const bDate = new Date(b.joiningDate + 'T00:00:00').getTime();
-        return sortConfig.direction === 'asc' ? aDate - bDate : bDate - aDate;
-      } else if (sortConfig.key === 'name') {
-        const aName = a.name?.toLowerCase() || '';
-        const bName = b.name?.toLowerCase() || '';
-        if (aName < bName) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aName > bName) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      }
-      return 0;
-    });
-  }, [employeesData, sortConfig]);
+    return employeesData?.employees || [];
+  }, [employeesData]);
 
   const createMutation = useMutation(employeeService.createEmployee, {
     onSuccess: () => {
