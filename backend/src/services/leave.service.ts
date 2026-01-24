@@ -1771,7 +1771,22 @@ export const getPendingLeaveRequests = async (
       )
     )`;
 
-  query += ' ORDER BY lr.applied_date DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+  // Handle Ordering preference for search
+  if (search) {
+    const prefixParamIdx = params.length + 1;
+    params.push(`${search}%`);
+    query += ` ORDER BY 
+      CASE 
+        WHEN u.first_name ILIKE $${prefixParamIdx} THEN 0 
+        WHEN u.emp_id ILIKE $${prefixParamIdx} THEN 1
+        ELSE 2 
+      END, 
+      lr.applied_date DESC`;
+  } else {
+    query += ' ORDER BY lr.applied_date DESC';
+  }
+
+  query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
   const result = await pool.query(query, params);

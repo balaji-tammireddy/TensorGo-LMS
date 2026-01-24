@@ -129,7 +129,7 @@ const LeaveApprovalPage: React.FC = () => {
         // We do NOT optimistically remove the request anymore to avoid state inconsistency
         // while the modal is open. We just wait for invalidation.
       },
-      onSuccess: async (_response, variables) => {
+      onSuccess: async () => {
         // Invalidate in background
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
@@ -398,7 +398,7 @@ const LeaveApprovalPage: React.FC = () => {
 
         return { previousPending, previousApproved };
       },
-      onSuccess: async (_response, variables) => {
+      onSuccess: async () => {
         // Invalidate in background (non-blocking)
         queryClient.invalidateQueries(['pendingLeaves']);
         queryClient.invalidateQueries(['approvedLeaves']);
@@ -530,6 +530,27 @@ const LeaveApprovalPage: React.FC = () => {
 
     // Sort based on pendingSortConfig
     return mapped.sort((a: any, b: any) => {
+      // Search relevance sort (Primary when searching)
+      if (search) {
+        const term = search.toLowerCase();
+
+        const nameA = (a.empName || '').toLowerCase();
+        const nameB = (b.empName || '').toLowerCase();
+        const idA = (a.empId || '').toString().toLowerCase();
+        const idB = (b.empId || '').toString().toLowerCase();
+
+        const getRelevance = (name: string, id: string) => {
+          if (name.startsWith(term)) return 0;
+          if (id.startsWith(term)) return 1;
+          return 2;
+        };
+
+        const relA = getRelevance(nameA, idA);
+        const relB = getRelevance(nameB, idB);
+
+        if (relA !== relB) return relA - relB;
+      }
+
       if (!pendingSortConfig.key) return 0;
 
       let valA: number, valB: number;
@@ -628,6 +649,27 @@ const LeaveApprovalPage: React.FC = () => {
         const key = recentSortConfig.key;
         const valA = parseDate(getProp(a, key));
         const valB = parseDate(getProp(b, key));
+
+        // Search relevance sort (Primary when searching)
+        if (recentSearch) {
+          const term = recentSearch.toLowerCase();
+
+          const nameA = (a.empName || '').toLowerCase();
+          const nameB = (b.empName || '').toLowerCase();
+          const idA = (a.empId || '').toString().toLowerCase();
+          const idB = (b.empId || '').toString().toLowerCase();
+
+          const getRelevance = (name: string, id: string) => {
+            if (name.startsWith(term)) return 0;
+            if (id.startsWith(term)) return 1;
+            return 2;
+          };
+
+          const relA = getRelevance(nameA, idA);
+          const relB = getRelevance(nameB, idB);
+
+          if (relA !== relB) return relA - relB;
+        }
 
         // Primary sort
         let result = valA - valB;
