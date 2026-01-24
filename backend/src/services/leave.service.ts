@@ -563,9 +563,9 @@ export const applyLeave = async (
       // Store RAW types in DB to preserve UI state (first_half vs second_half)
       // Constraint has been updated to allow these values.
       const leaveRequestResult = await client.query(
-        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
+        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
       );
       leaveRequestId = leaveRequestResult.rows[0].id;
 
@@ -688,7 +688,7 @@ export const getMyLeaveRequests = async (
     const offset = (page - 1) * limit;
     let query = `
     SELECT lr.id, lr.applied_date, lr.reason as leave_reason, lr.start_date, lr.start_type, lr.end_date, lr.end_type,
-           lr.no_of_days, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.current_status, lr.doctor_note,
+           lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.current_status, lr.doctor_note,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
            lr.last_updated_by, lr.last_updated_by_role,
            last_updater.first_name || ' ' || COALESCE(last_updater.last_name, '') AS approver_name
@@ -747,7 +747,7 @@ export const getMyLeaveRequests = async (
     const requests = [];
     for (const row of result.rows) {
       const days = allLeaveDaysMap.get(row.id) || [];
-      const totalDays = days.length || parseFloat(row.no_of_days) || 0;
+      const totalDays = days.reduce((acc: number, d: any) => acc + (d.day_type === 'half' ? 0.5 : 1), 0);
       const approvedDays = days.reduce((acc, d) => acc + (d.day_status === 'approved' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
       const rejectedDays = days.reduce((acc, d) => acc + (d.day_status === 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
       const pendingDays = days.reduce((acc, d) => acc + (d.day_status !== 'approved' && d.day_status !== 'rejected' ? (d.day_type === 'half' ? 0.5 : 1) : 0), 0);
@@ -789,7 +789,7 @@ export const getMyLeaveRequests = async (
         startType: row.start_type || 'full',
         endDate: formatDate(row.end_date),
         endType: row.end_type || 'full',
-        noOfDays: approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days),
+        noOfDays: approvedDays > 0 ? approvedDays : totalDays,
         leaveType: row.leave_type,
         currentStatus: displayStatus,
         rejectionReason,
@@ -847,7 +847,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     query = `
       SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
              lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
-             lr.no_of_days, lr.applied_date,
+            lr.applied_date,
              lr.current_status, lr.employee_id, lr.doctor_note,
              lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
              lr.last_updated_by, lr.last_updated_by_role,
@@ -874,7 +874,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     // Regular employees can only view their own
     query = `SELECT lr.id, lr.leave_type, lr.start_date, lr.start_type, lr.end_date, lr.end_type, 
             lr.reason, lr.time_for_permission_start, lr.time_for_permission_end,
-            lr.no_of_days, lr.applied_date,
+            lr.applied_date,
             lr.current_status, lr.employee_id, lr.doctor_note,
             lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
             lr.last_updated_by, lr.last_updated_by_role,
@@ -948,7 +948,7 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
     empName: row.emp_name,
     empStatus: row.emp_status,
     appliedDate: formatDate(row.applied_date),
-    noOfDays: parseFloat(row.no_of_days),
+    noOfDays: daysResult.rows.reduce((acc: number, d: any) => acc + (d.day_type === 'half' ? 0.5 : 1), 0),
     currentStatus: row.current_status,
     leaveType: row.leave_type,
     startDate: formatDate(row.start_date),
@@ -990,8 +990,9 @@ export const updateLeaveRequest = async (
   logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] ========== FUNCTION CALLED ==========`);
   logger.info(`[LEAVE] [UPDATE LEAVE REQUEST] Request ID: ${requestId}, User ID: ${userId}, Role: ${userRole}, Leave Type: ${leaveData.leaveType}, Start: ${leaveData.startDate}, End: ${leaveData.endDate}`);
   // Verify the request and authorization
+  // Verify the request and authorization
   const checkResult = await pool.query(
-    'SELECT lr.current_status, lr.employee_id, lr.leave_type, lr.no_of_days, u.user_role as employee_role FROM leave_requests lr JOIN users u ON lr.employee_id = u.id WHERE lr.id = $1',
+    'SELECT lr.current_status, lr.employee_id, lr.leave_type, u.user_role as employee_role FROM leave_requests lr JOIN users u ON lr.employee_id = u.id WHERE lr.id = $1',
     [requestId]
   );
 
@@ -1002,7 +1003,15 @@ export const updateLeaveRequest = async (
   const belongsToUser = checkResult.rows[0].employee_id === userId;
   const currentStatus = checkResult.rows[0].current_status;
   const oldLeaveType = checkResult.rows[0].leave_type;
-  const oldDays = parseFloat(checkResult.rows[0].no_of_days);
+
+  // Calculate oldDays from leave_days table
+  const oldDaysResult = await pool.query(
+    `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+     FROM leave_days WHERE leave_request_id = $1`,
+    [requestId]
+  );
+  const oldDays = parseFloat(oldDaysResult.rows[0].total_days) || 0;
+
   const employeeRole = checkResult.rows[0].employee_role;
 
   // HR and Super Admin can edit any leave (approved, rejected, etc.)
@@ -1326,12 +1335,11 @@ export const updateLeaveRequest = async (
 
     // Fetch the original request to handle "balance refund" logic during edit
     const originalRequestResult = await pool.query(
-      'SELECT leave_type, no_of_days FROM leave_requests WHERE id = $1',
+      'SELECT leave_type FROM leave_requests WHERE id = $1',
       [requestId]
     );
     const originalRequest = originalRequestResult.rows[0];
 
-    // Determine the relevant balance
     // Determine the relevant balance
     if (leaveData.leaveType === 'casual') availableBalance = Number(balances.casual);
     else if (leaveData.leaveType === 'sick') availableBalance = Number(balances.sick);
@@ -1340,7 +1348,7 @@ export const updateLeaveRequest = async (
     // If we are updating the SAME leave type, valid available balance = current + old days
     // (Because the old days will be refunded when this update succeeds)
     if (originalRequest && originalRequest.leave_type === leaveData.leaveType) {
-      availableBalance += Number(originalRequest.no_of_days);
+      availableBalance += oldDays;
     }
 
     if (leaveData.leaveType !== 'lop' && availableBalance < requestedDays) {
@@ -1352,7 +1360,7 @@ export const updateLeaveRequest = async (
       if (availableBalance <= 0) {
         throw new Error(`${balanceName} leave balance is zero. You cannot apply ${leaveData.leaveType} leave.`);
       }
-      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${originalRequest && originalRequest.leave_type === leaveData.leaveType ? (availableBalance - Number(originalRequest.no_of_days)) : availableBalance}, Requested: ${requestedDays}.`);
+      throw new Error(`Insufficient ${leaveData.leaveType} leave balance. Available: ${originalRequest && originalRequest.leave_type === leaveData.leaveType ? (availableBalance - oldDays) : availableBalance}, Requested: ${requestedDays}.`);
     }
   }
 
@@ -1396,11 +1404,11 @@ export const updateLeaveRequest = async (
     await client.query(
       `UPDATE leave_requests 
        SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5, 
-           reason = $6, no_of_days = $7, time_for_permission_start = $8, time_for_permission_end = $9,
-           doctor_note = $10, updated_at = CURRENT_TIMESTAMP,
+           reason = $6, time_for_permission_start = $7, time_for_permission_end = $8,
+           doctor_note = $9, updated_at = CURRENT_TIMESTAMP,
            current_status = 'pending',
            manager_approval_status = 'pending', hr_approval_status = 'pending', super_admin_approval_status = 'pending'
-       WHERE id = $11`,
+       WHERE id = $10`,
       [
         leaveData.leaveType,
         startDateStr,
@@ -1408,7 +1416,6 @@ export const updateLeaveRequest = async (
         endDateStr,
         leaveData.endType,   // Pass RAW type to DB
         leaveData.reason,
-        days,
         leaveData.timeForPermission?.start || null,
         leaveData.timeForPermission?.end || null,
         leaveData.doctorNote || null,
@@ -1606,7 +1613,7 @@ export const getPendingLeaveRequests = async (
   let query = `
     SELECT lr.id, lr.employee_id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as emp_name, u.status as emp_status, u.user_role as emp_role,
            lr.applied_date, lr.start_date, lr.end_date, lr.start_type, lr.end_type,
-           lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.reason as leave_reason, lr.current_status,
+           lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.reason as leave_reason, lr.current_status,
            lr.doctor_note, u.reporting_manager_id,
            lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
            lr.manager_approved_by, lr.hr_approved_by, lr.super_admin_approved_by,
@@ -1742,7 +1749,7 @@ export const getPendingLeaveRequests = async (
           start: row.time_for_permission_start.toString().substring(0, 5),
           end: row.time_for_permission_end.toString().substring(0, 5)
         } : undefined,
-        noOfDays: parseFloat(row.no_of_days),
+        noOfDays: days.reduce((acc: number, d: any) => acc + (d.day_type === 'half' ? 0.5 : 1), 0),
         leaveReason: row.leave_reason,
         currentStatus: row.current_status,
         startDate: formatDate(row.start_date),
@@ -1973,6 +1980,14 @@ export const approveLeave = async (
         logger.info(`[EMAIL] Manager approval - sending email to employee (TO)`);
       }
 
+      // Calculate days for email
+      const daysResult = await pool.query(
+        `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+         FROM leave_days WHERE leave_request_id = $1`,
+        [leaveRequestId]
+      );
+      const noOfDays = parseFloat(daysResult.rows[0].total_days) || 0;
+
       await sendLeaveStatusEmail(leave.employee_email, {
         employeeName: leave.employee_name || 'Employee',
         employeeEmpId: leave.employee_emp_id || '',
@@ -1983,7 +1998,7 @@ export const approveLeave = async (
         startType: leave.start_type,
         endDate: leave.end_date,
         endType: leave.end_type,
-        noOfDays: parseFloat(leave.no_of_days),
+        noOfDays: noOfDays,
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
         approverEmpId: leave.approver_emp_id || '',
@@ -3601,7 +3616,7 @@ export const updateLeaveStatus = async (
             startType: emailLeave.start_type,
             endDate: emailLeave.end_date,
             endType: emailLeave.end_type,
-            noOfDays: parseFloat(emailLeave.no_of_days),
+            noOfDays: 0, // Placeholder, calculated properly below
             reason: emailLeave.reason,
             approverName: emailLeave.approver_name || 'Approver',
             approverEmpId: emailLeave.approver_emp_id || '',
@@ -3611,6 +3626,14 @@ export const updateLeaveStatus = async (
             approvedStartDate,
             approvedEndDate
           };
+
+          // Calculate days for email
+          const daysResult = await pool.query(
+            `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+             FROM leave_days WHERE leave_request_id = $1`,
+            [leaveRequestId]
+          );
+          emailData.noOfDays = parseFloat(daysResult.rows[0].total_days) || 0;
 
           const emailSent = await sendLeaveStatusEmail(emailLeave.employee_email, emailData, ccEmails.length > 0 ? ccEmails : undefined);
           if (emailSent) {
@@ -3653,7 +3676,6 @@ export const getApprovedLeaves = async (
         lr.leave_type,
         lr.time_for_permission_start,
         lr.time_for_permission_end,
-        lr.no_of_days,
         lr.current_status AS leave_status,
         lr.manager_approval_comment,
         lr.hr_approval_comment,
@@ -3699,7 +3721,7 @@ export const getApprovedLeaves = async (
     params.push(approverId);
   }
 
-  query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.no_of_days, lr.current_status,
+  query += ` GROUP BY lr.id, u.emp_id, u.first_name, u.last_name, lr.applied_date, lr.start_date, lr.end_date, lr.leave_type, lr.time_for_permission_start, lr.time_for_permission_end, lr.current_status,
               lr.manager_approval_comment, lr.hr_approval_comment, lr.super_admin_approval_comment,
               lr.last_updated_by, lr.last_updated_by_role, lr.updated_at,
               last_updater.first_name, last_updater.last_name, u.status, u.user_role
@@ -3809,11 +3831,11 @@ export const getApprovedLeaves = async (
     // Calculate total days based on status
     let noOfDays: number;
     if (displayStatus === 'approved' || displayStatus === 'partially_approved') {
-      noOfDays = approvedDays > 0 ? approvedDays : parseFloat(row.no_of_days);
+      noOfDays = approvedDays > 0 ? approvedDays : (approvedDays + rejectedDays + pendingDays);
     } else if (displayStatus === 'rejected') {
-      noOfDays = rejectedDays > 0 ? rejectedDays : parseFloat(row.no_of_days);
+      noOfDays = rejectedDays > 0 ? rejectedDays : (approvedDays + rejectedDays + pendingDays);
     } else {
-      noOfDays = parseFloat(row.no_of_days);
+      noOfDays = (approvedDays + rejectedDays + pendingDays);
     }
 
     // Manager can only view, HR and Super Admin can view and edit
@@ -3953,7 +3975,14 @@ export const convertLeaveRequestLopToCasual = async (requestId: number, adminUse
     }
 
     const employeeId = request.employee_id;
-    const noOfDays = parseFloat(request.no_of_days);
+
+    // Calculate days from leave_days table
+    const daysResult = await client.query(
+      `SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1 END), 0) as total_days
+         FROM leave_days WHERE leave_request_id = $1`,
+      [requestId]
+    );
+    const noOfDays = parseFloat(daysResult.rows[0].total_days) || 0;
 
     // 4. Check Casual balance
     const balanceResult = await client.query(
