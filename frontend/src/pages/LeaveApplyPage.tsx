@@ -1235,7 +1235,9 @@ const LeaveApplyPage: React.FC = () => {
               });
 
               if (existingCount + newCount > 10) {
-                showWarning(`Casual leave limit exceeded for ${monthKey}. Max 10 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
+                const [year, month] = monthKey.split('-');
+                const displayMonth = `${month}/${year.slice(-2)}`;
+                showWarning(`Casual leave limit exceeded for ${displayMonth}. Max 10 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
                 return;
               }
             }
@@ -1338,7 +1340,9 @@ const LeaveApplyPage: React.FC = () => {
               });
 
               if (existingCount + newCount > 5) {
-                showWarning(`LOP limit exceeded for ${monthKey}. Max 5 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
+                const [year, month] = monthKey.split('-');
+                const displayMonth = `${month}/${year.slice(-2)}`;
+                showWarning(`LOP limit exceeded for ${displayMonth}. Max 5 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
                 return;
               }
             }

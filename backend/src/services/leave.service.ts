@@ -530,7 +530,9 @@ export const applyLeave = async (
           const totalDays = existingCount + newCount;
 
           if (totalDays > maxLeavePerMonth) {
-            throw new Error(`${leaveData.leaveType.toUpperCase()} leave request exceeds monthly limit of ${maxLeavePerMonth} days. You have already used/requested ${existingCount} days in ${monthKey}, and this request adds ${newCount} days.`);
+            const [year, month] = monthKey.split('-');
+            const displayMonth = `${month}/${year.slice(-2)}`;
+            throw new Error(`${leaveData.leaveType.toUpperCase()} leave request exceeds monthly limit of ${maxLeavePerMonth} days. You have already used/requested ${existingCount} days in ${displayMonth}, and this request adds ${newCount} days.`);
           }
         }
       }
@@ -1036,7 +1038,8 @@ export const updateLeaveRequest = async (
     throw new Error('Leave request not found');
   }
 
-  const belongsToUser = checkResult.rows[0].employee_id === userId;
+  const employeeId = checkResult.rows[0].employee_id;
+  const belongsToUser = employeeId === userId;
   const currentStatus = checkResult.rows[0].current_status;
   const oldLeaveType = checkResult.rows[0].leave_type;
 
@@ -1365,7 +1368,7 @@ export const updateLeaveRequest = async (
 
   // For all leave types except permission, enforce available balance > 0 and sufficient for requested days
   if (leaveData.leaveType !== 'permission') {
-    const balances = await getLeaveBalances(userId);
+    const balances = await getLeaveBalances(employeeId);
     let requestedDays = days; // Default to calculated days
     let availableBalance = 0;
 
@@ -1413,14 +1416,14 @@ export const updateLeaveRequest = async (
     // If status is rejected, the balance was already refunded (or never deducted), so don't refund again
     if (oldLeaveType !== 'permission' && currentStatus !== 'rejected') {
       const oldBalanceColumn = oldLeaveType === 'casual' ? 'casual_balance' : oldLeaveType === 'sick' ? 'sick_balance' : 'lop_balance';
-      await client.query(`UPDATE leave_balances SET ${oldBalanceColumn} = ${oldBalanceColumn} + $1 WHERE employee_id = $2`, [oldDays, userId]);
+      await client.query(`UPDATE leave_balances SET ${oldBalanceColumn} = ${oldBalanceColumn} + $1 WHERE employee_id = $2`, [oldDays, employeeId]);
     }
 
     // 2. Deduct new balance (if not permission)
     if (leaveData.leaveType !== 'permission') {
       const newBalanceColumn = leaveData.leaveType === 'casual' ? 'casual_balance' : leaveData.leaveType === 'sick' ? 'sick_balance' : 'lop_balance';
       try {
-        await client.query(`UPDATE leave_balances SET ${newBalanceColumn} = ${newBalanceColumn} - $1 WHERE employee_id = $2`, [days, userId]);
+        await client.query(`UPDATE leave_balances SET ${newBalanceColumn} = ${newBalanceColumn} - $1 WHERE employee_id = $2`, [days, employeeId]);
       } catch (err: any) {
         if (err.code === '23514' || (err.message && err.message.includes('check_'))) {
           if (err.constraint === 'check_casual_non_negative' || (err.message && err.message.includes('check_casual_non_negative'))) {
@@ -1479,6 +1482,57 @@ export const updateLeaveRequest = async (
 
     await client.query('COMMIT');
 
+    // Special Async Block for Email - Send confirmation after update
+    (async () => {
+      try {
+        const userDataResult = await pool.query(
+          "SELECT first_name || ' ' || COALESCE(last_name, '') as name, emp_id, email FROM users WHERE id = $1",
+          [employeeId]
+        );
+        const userData = userDataResult.rows[0];
+
+        const hierarchyResult = await pool.query(`
+          SELECT 
+            l1.email as l1_email, l1.first_name || ' ' || COALESCE(l1.last_name, '') as l1_name,
+            l2.email as l2_email, l2.first_name || ' ' || COALESCE(l2.last_name, '') as l2_name
+          FROM users u
+          LEFT JOIN users l1 ON u.reporting_manager_id = l1.id
+          LEFT JOIN users l2 ON l1.reporting_manager_id = l2.id
+          WHERE u.id = $1
+        `, [employeeId]);
+
+        const chain = hierarchyResult.rows[0];
+        const appliedDate = new Date().toISOString().split('T')[0];
+
+        const emailData = {
+          employeeName: userData.name,
+          employeeEmpId: userData.emp_id,
+          managerName: chain.l1_name || 'Reporting Manager',
+          leaveType: leaveData.leaveType,
+          startDate: checkStartDateStr,
+          startType: leaveData.startType,
+          endDate: checkEndDateStr,
+          endType: leaveData.endType,
+          noOfDays: days,
+          reason: leaveData.reason,
+          timeForPermissionStart: leaveData.timeForPermission?.start || null,
+          timeForPermissionEnd: leaveData.timeForPermission?.end || null,
+          doctorNote: leaveData.doctorNote || null,
+          appliedDate
+        };
+
+        const toEmail = chain.l1_email;
+        const ccEmails: string[] = [];
+        if (chain.l2_email) ccEmails.push(chain.l2_email);
+
+        if (toEmail) {
+          await sendLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+        }
+      } catch (e) {
+        logger.error('Async email error in updateLeaveRequest:', e);
+      }
+    })();
+
     return { message: 'Leave request updated successfully', id: requestId };
   } catch (error: any) {
     // Rollback transaction - wrap in try-catch to handle already-aborted transactions
@@ -1504,7 +1558,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
   // Verify the request
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Verifying leave request exists`);
   const checkResult = await pool.query(
-    'SELECT current_status, employee_id, leave_type, no_of_days, doctor_note FROM leave_requests WHERE id = $1',
+    'SELECT current_status, employee_id, leave_type, doctor_note FROM leave_requests WHERE id = $1',
     [requestId]
   );
 
@@ -1514,7 +1568,8 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
   }
   logger.info(`[LEAVE] [DELETE LEAVE REQUEST] Leave request found - Status: ${checkResult.rows[0].current_status}, Employee ID: ${checkResult.rows[0].employee_id}`);
 
-  const belongsToUser = checkResult.rows[0].employee_id === userId;
+  const employeeId = checkResult.rows[0].employee_id;
+  const belongsToUser = employeeId === userId;
   const currentStatus = checkResult.rows[0].current_status;
 
   // Authorization: Super Admin and HR can delete any leave, others can only delete their own
@@ -1528,7 +1583,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
     throw new Error('Only pending leave requests can be deleted');
   }
 
-  const { leave_type, no_of_days } = checkResult.rows[0];
+  const { leave_type } = checkResult.rows[0];
 
   const client = await pool.connect();
   try {
@@ -1539,9 +1594,11 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
     // For pending leaves: refund all days (they were deducted but never approved)
     // For partially approved leaves: refund all non-rejected days (pending + approved)
     if (leave_type !== 'permission') {
-      // Get total days that need to be refunded (all days minus rejected days)
-      // Rejected days were already refunded when rejected, so don't refund again
-      let daysToRefund = parseFloat(no_of_days || '0');
+      const daysResult = await client.query(
+        "SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1.0 END), 0) as total_days FROM leave_days WHERE leave_request_id = $1",
+        [requestId]
+      );
+      let daysToRefund = parseFloat(daysResult.rows[0].total_days || '0');
 
       if (daysToRefund > 0) {
         const balanceColumn =
@@ -1555,7 +1612,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
         if (leave_type === 'lop') {
           const currentBalanceResult = await client.query(
             'SELECT lop_balance FROM leave_balances WHERE employee_id = $1',
-            [userId]
+            [employeeId]
           );
           const currentLop = parseFloat(currentBalanceResult.rows[0]?.lop_balance || '0') || 0;
           const newLopBalance = currentLop + daysToRefund;
@@ -1565,7 +1622,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
             if (cappedRefund > 0) {
               await client.query(
                 `UPDATE leave_balances SET lop_balance = 10 WHERE employee_id = $1`,
-                [userId]
+                [employeeId]
               );
               logger.warn(
                 `[DELETE LEAVE REQUEST] LOP balance would exceed 10. Current: ${currentLop}, Refunding: ${daysToRefund}, Would be: ${newLopBalance}. Capped at 10 (refunded ${cappedRefund} instead of ${daysToRefund}).`
@@ -1578,7 +1635,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
           } else {
             await client.query(
               `UPDATE leave_balances SET lop_balance = lop_balance + $1 WHERE employee_id = $2`,
-              [daysToRefund, userId]
+              [daysToRefund, employeeId]
             );
           }
         } else {
@@ -1586,7 +1643,7 @@ export const deleteLeaveRequest = async (requestId: number, userId: number, user
             `UPDATE leave_balances 
            SET ${balanceColumn} = ${balanceColumn} + $1
            WHERE employee_id = $2`,
-            [daysToRefund, userId]
+            [daysToRefund, employeeId]
           );
         }
       }
@@ -2311,6 +2368,12 @@ export const rejectLeave = async (
         logger.info(`[EMAIL] Manager rejection - sending email to employee (TO)`);
       }
 
+      const daysQuery = await pool.query(
+        "SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1.0 END), 0) as total_days FROM leave_days WHERE leave_request_id = $1",
+        [leave.id]
+      );
+      const calculatedNoOfDays = parseFloat(daysQuery.rows[0].total_days || '0');
+
       await sendLeaveStatusEmail(leave.employee_email, {
         employeeName: leave.employee_name || 'Employee',
         employeeEmpId: leave.employee_emp_id || '',
@@ -2321,7 +2384,7 @@ export const rejectLeave = async (
         startType: leave.start_type,
         endDate: leave.end_date,
         endType: leave.end_type,
-        noOfDays: parseFloat(leave.no_of_days),
+        noOfDays: calculatedNoOfDays,
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
         approverEmpId: leave.approver_emp_id || '',
@@ -2344,7 +2407,7 @@ export const rejectLeave = async (
 // Helper: recalc request status based on day_status values
 const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
   const leaveResult = await pool.query(
-    'SELECT employee_id, leave_type, no_of_days, current_status FROM leave_requests WHERE id = $1',
+    'SELECT employee_id, leave_type, current_status FROM leave_requests WHERE id = $1',
     [leaveRequestId]
   );
   if (leaveResult.rows.length === 0) {
@@ -2384,7 +2447,7 @@ const recalcLeaveRequestStatus = async (leaveRequestId: number) => {
     newStatus = 'pending';
   }
 
-  // Update header status only; keep original no_of_days for balance refunds
+  // Update header status only; keep original leave_days for balance refunds
   await pool.query(
     `UPDATE leave_requests SET current_status = $1 WHERE id = $2`,
     [newStatus, leaveRequestId]
@@ -2579,6 +2642,12 @@ export const approveLeaveDay = async (
         logger.info(`[EMAIL] Manager day approval - sending email to employee (TO)`);
       }
 
+      const daysQuery = await pool.query(
+        "SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1.0 END), 0) as total_days FROM leave_days WHERE leave_request_id = $1",
+        [leaveRequestId]
+      );
+      const calculatedNoOfDays = parseFloat(daysQuery.rows[0].total_days || '0');
+
       await sendLeaveStatusEmail(leave.employee_email, {
         employeeName: leave.employee_name || 'Employee',
         employeeEmpId: leave.employee_emp_id || '',
@@ -2589,7 +2658,7 @@ export const approveLeaveDay = async (
         startType: leave.start_type,
         endDate: leave.end_date,
         endType: leave.end_type,
-        noOfDays: parseFloat(leave.no_of_days),
+        noOfDays: calculatedNoOfDays,
         reason: leave.reason,
         approverName: leave.approver_name || 'Approver',
         approverEmpId: leave.approver_emp_id || '',
@@ -2912,6 +2981,12 @@ export const approveLeaveDays = async (
       }
     }
 
+    const daysQuery = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN day_type = 'half' THEN 0.5 ELSE 1.0 END), 0) as total_days FROM leave_days WHERE leave_request_id = $1",
+      [leaveRequestId]
+    );
+    const calculatedNoOfDays = parseFloat(daysQuery.rows[0].total_days || '0');
+
     sendLeaveStatusEmail(leave.employee_email, {
       employeeName: leave.employee_name || 'Employee',
       employeeEmpId: leave.employee_emp_id || '',
@@ -2922,7 +2997,7 @@ export const approveLeaveDays = async (
       startType: leave.start_type,
       endDate: leave.end_date,
       endType: leave.end_type,
-      noOfDays: parseFloat(leave.no_of_days),
+      noOfDays: calculatedNoOfDays,
       reason: leave.reason,
       approverName: leave.approver_name || 'Approver',
       approverEmpId: leave.approver_emp_id || '',
