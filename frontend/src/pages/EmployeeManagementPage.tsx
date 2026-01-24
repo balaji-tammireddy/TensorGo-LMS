@@ -307,6 +307,28 @@ const EmployeeManagementPage: React.FC = () => {
     return employeesData?.employees || [];
   }, [employeesData]);
 
+  const sortedManagers = React.useMemo(() => {
+    if (!managersData) return [];
+
+    const rolePriority: Record<string, number> = {
+      'super_admin': 0,
+      'hr': 1,
+      'manager': 2
+    };
+
+    return [...managersData].sort((a: any, b: any) => {
+      const priorityA = rolePriority[a.role] ?? 3;
+      const priorityB = rolePriority[b.role] ?? 3;
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // Secondary sort: by Employee ID (numeric string comparison)
+      return (a.empId || '').localeCompare(b.empId || '', undefined, { numeric: true });
+    });
+  }, [managersData]);
+
   const createMutation = useMutation(employeeService.createEmployee, {
     onSuccess: () => {
       queryClient.invalidateQueries('employees');
@@ -2242,7 +2264,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   <span>
                                     {newEmployee.reportingManagerName
                                       ? (() => {
-                                        const manager = managersData?.find((m: any) => m.id === newEmployee.reportingManagerId);
+                                        const manager = sortedManagers?.find((m: any) => m.id === newEmployee.reportingManagerId);
                                         const roleLabel = manager?.role ? getRoleLabel(manager.role) : '';
                                         // Only show role in selected text if it exists and isn't a placeholder
                                         return `${newEmployee.reportingManagerName}${roleLabel && roleLabel !== '-' ? ` (${roleLabel})` : ''}`;
@@ -2312,12 +2334,12 @@ const EmployeeManagementPage: React.FC = () => {
                                     )}
                                   </div>
                                 </div>
-                                {managersData?.length === 0 ? (
+                                {sortedManagers?.length === 0 ? (
                                   <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666' }}>
                                     No managers found
                                   </div>
                                 ) : (
-                                  managersData?.map((manager: any, index: number) => (
+                                  sortedManagers?.map((manager: any, index: number) => (
                                     <React.Fragment key={manager.id}>
                                       <DropdownMenuItem
                                         onClick={() => {
@@ -2349,7 +2371,7 @@ const EmployeeManagementPage: React.FC = () => {
                                           </span>
                                         </div>
                                       </DropdownMenuItem>
-                                      {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
+                                      {index < (sortedManagers?.length || 0) - 1 && <DropdownMenuSeparator />}
                                     </React.Fragment>
                                   ))
                                 )}
