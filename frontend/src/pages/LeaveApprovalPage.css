@@ -22,6 +22,7 @@
   border-radius: 4px;
   font-size: 14px;
   width: 270px;
+  min-width: 270px;
   padding-right: 32px;
   background-color: #f8f9fc;
   height: 42px;
@@ -610,7 +611,8 @@
   border: 1px solid #d7deec;
   border-radius: 6px;
   font-size: 13px;
-  width: 280px;
+  width: 320px;
+  min-width: 320px;
   padding-right: 32px;
   background-color: #f8f9fc;
   height: 42px;
