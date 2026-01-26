@@ -411,6 +411,19 @@ async function migrate() {
       console.warn('Audit columns migration warning:', auditError.message);
     }
 
+    // Run Timesheet Module migration (023)
+    try {
+      // Check if project_entries table exists to avoid errors, although IF NOT EXISTS is in SQL
+      const timesheetFile = readFileSync(
+        join(__dirname, 'migrations', '023_timesheet_module.sql'),
+        'utf-8'
+      );
+      await pool.query(timesheetFile);
+      console.log('Timesheet Module migration (023) completed');
+    } catch (timesheetError: any) {
+      console.warn('Timesheet module migration warning:', timesheetError.message);
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);

@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { deleteFromOVH } from '../utils/storage';
 import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail, sendLopToCasualConversionEmail } from '../utils/emailTemplates';
+import { TimesheetService } from './timesheet.service';
 
 // Local date formatter to avoid timezone shifts
 const formatDate = (date: Date | string): string => {
@@ -159,6 +160,11 @@ export const createHoliday = async (holidayDate: string, holidayName: string, re
 
     logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${result.rows[0].id}`);
 
+    // Hook: Log Holiday Immediately
+    TimesheetService.logHolidayForEveryone(holidayDate, trimmedName).catch(e => {
+      logger.error(`[LEAVE] Failed to log holiday to timesheets`, e);
+    });
+
     return {
       id: result.rows[0].id,
       date: formatDate(result.rows[0].holiday_date),
@@ -189,6 +195,11 @@ export const deleteHoliday = async (holidayId: number) => {
     }
 
     logger.info(`[LEAVE] [DELETE HOLIDAY] Holiday deleted successfully - ID: ${holidayId}`);
+
+    // Hook: Remove Holiday Logs
+    TimesheetService.removeHolidayLog(formatDate(result.rows[0].holiday_date)).catch((e: any) => {
+      logger.error(`[LEAVE] Failed to remove holiday logs for date ${result.rows[0].holiday_date}`, e);
+    });
 
     return {
       id: result.rows[0].id,
@@ -1930,6 +1941,11 @@ export const approveLeave = async (
   try {
     await recalcLeaveRequestStatus(leaveRequestId);
     logger.info(`[EMAIL DEBUG] Status recalculated successfully for leave request ${leaveRequestId}`);
+
+    // Hook: Sync Timesheet immediately after approval
+    TimesheetService.syncApprovedLeave(leave.employee_id, leaveRequestId).catch((e: any) => {
+      logger.error(`[LEAVE] Failed to sync timesheet for leave request ${leaveRequestId}`, e);
+    });
   } catch (recalcError: any) {
     logger.error(`[EMAIL DEBUG] Error recalculating status for leave request ${leaveRequestId}:`, recalcError);
     // Continue with email sending even if recalc fails
@@ -2765,6 +2781,14 @@ export const approveLeaveDays = async (
     [leaveRequestId]
   );
   const actualStatus = statusResult.rows[0]?.current_status || 'pending';
+
+  // Hook: Sync Timesheet if Approved/Partially Approved
+  if (actualStatus === 'approved' || actualStatus === 'partially_approved') {
+    TimesheetService.syncApprovedLeave(leave.employee_id, leaveRequestId).catch((e: any) => {
+      logger.error(`[LEAVE] Failed to sync timesheet for leave request ${leaveRequestId}`, e);
+    });
+  }
+
   const emailStatus: 'approved' | 'partially_approved' | 'rejected' =
     actualStatus === 'partially_approved' ? 'partially_approved' :
       actualStatus === 'approved' ? 'approved' : 'rejected';
@@ -3514,6 +3538,13 @@ export const updateLeaveStatus = async (
     await client.query('COMMIT');
     logger.info(`[LEAVE] [UPDATE LEAVE STATUS] Transaction committed successfully for Request ID: ${leaveRequestId}`);
 
+    // Hook: Sync Timesheet if Approved/Partially Approved (Post-Commit)
+    if (finalRequestStatus === 'approved' || finalRequestStatus === 'partially_approved') {
+      TimesheetService.syncApprovedLeave(leave.employee_id, leaveRequestId).catch((e: any) => {
+        logger.error(`[LEAVE] Failed to sync timesheet for leave request ${leaveRequestId}`, e);
+      });
+    }
+
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error(`[LEAVE] [UPDATE LEAVE STATUS] Transaction rolled back for Request ID: ${leaveRequestId}. Error:`, error);
@@ -3911,6 +3942,16 @@ export const updateHoliday = async (id: number, holidayDate: string, holidayName
   );
 
   logger.info(`[LEAVE SERVICE] [UPDATE HOLIDAY] Holiday updated successfully - ID: ${id}`);
+
+  // Hook: Update Holiday Logs
+  TimesheetService.updateHolidayLog(
+    formatDate(checkResult.rows[0].holiday_date),
+    formatDate(result.rows[0].holiday_date),
+    result.rows[0].holiday_name
+  ).catch((e: any) => {
+    logger.error(`[LEAVE] Failed to update holiday logs`, e);
+  });
+
   return result.rows[0];
 };
 

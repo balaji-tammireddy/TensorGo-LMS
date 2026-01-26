@@ -1074,39 +1074,67 @@ export class ProjectService {
 
       // 2. Get Subordinates
       const teamIds = await this.getReportingSubtree(managerId, pool);
-      if (teamIds.length === 0) return [];
+      const allIds = [...teamIds, managerId];
 
-      // 3. Return users who have module access AND are subordinates
+      // 3. Return ALL eligible users (Project Team) for selection
       const res = await query(
-        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.user_role as role
-             FROM module_access ma
-             JOIN users u ON ma.user_id = u.id
-             WHERE ma.module_id = $1 AND ma.user_id = ANY($2)`,
-        [id, teamIds]
+        `SELECT id, emp_id as "empId", 
+                COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') as name, 
+                user_role as role,
+                COALESCE(email, '') as email,
+                COALESCE(designation, 'N/A') as designation,
+                COALESCE(department, 'N/A') as department
+         FROM users
+         WHERE id = ANY($1)
+         ORDER BY name`,
+        [allIds]
       );
       return res.rows;
     } else if (level === 'task') {
-      // 1. Get PM of the parent project
-      const pRes = await query(`
-        SELECT p.project_manager_id 
-        FROM project_tasks t
-        JOIN project_modules m ON t.module_id = m.id
-        JOIN projects p ON m.project_id = p.id
-        WHERE t.id = $1`, [id]);
-      if (pRes.rows.length === 0) return [];
-      const managerId = pRes.rows[0].project_manager_id;
+      // Cascade Rule: For a TASK, show only users who have access to the parent MODULE
 
-      // 2. Get Subordinates
-      const teamIds = await this.getReportingSubtree(managerId, pool);
-      if (teamIds.length === 0) return [];
+      // 1. Get Parent Module ID
+      const tRes = await query(`SELECT module_id FROM project_tasks WHERE id = $1`, [id]);
+      if (tRes.rows.length === 0) return [];
+      const moduleId = tRes.rows[0].module_id;
 
-      // 3. Return users who have task access AND are subordinates
+      // 2. Return users who have ACCESS to the parent module
       const res = await query(
-        `SELECT DISTINCT u.id, u.emp_id as "empId", COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, u.user_role as role
-             FROM task_access ta
-             JOIN users u ON ta.user_id = u.id
-             WHERE ta.task_id = $1 AND ta.user_id = ANY($2)`,
-        [id, teamIds]
+        `SELECT DISTINCT u.id, u.emp_id as "empId", 
+                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, 
+                u.user_role as role,
+                COALESCE(u.email, '') as email,
+                COALESCE(u.designation, 'N/A') as designation,
+                COALESCE(u.department, 'N/A') as department
+         FROM module_access ma
+         JOIN users u ON ma.user_id = u.id
+         WHERE ma.module_id = $1
+         ORDER BY name`,
+        [moduleId]
+      );
+      return res.rows;
+
+    } else if (level === 'activity') {
+      // Cascade Rule: For an ACTIVITY, show only users who have access to the parent TASK
+
+      // 1. Get Parent Task ID
+      const aRes = await query(`SELECT task_id FROM project_activities WHERE id = $1`, [id]);
+      if (aRes.rows.length === 0) return [];
+      const taskId = aRes.rows[0].task_id;
+
+      // 2. Return users who have ACCESS to the parent task
+      const res = await query(
+        `SELECT DISTINCT u.id, u.emp_id as "empId", 
+                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, 
+                u.user_role as role,
+                COALESCE(u.email, '') as email,
+                COALESCE(u.designation, 'N/A') as designation,
+                COALESCE(u.department, 'N/A') as department
+         FROM task_access ta
+         JOIN users u ON ta.user_id = u.id
+         WHERE ta.task_id = $1
+         ORDER BY name`,
+        [taskId]
       );
       return res.rows;
     }

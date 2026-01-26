@@ -25,6 +25,7 @@ const ProjectDashboard = lazy(() => import('../pages/ProjectManagement/ProjectDa
 const ProjectListPage = lazy(() => import('../pages/ProjectManagement/ProjectListPage').then(m => ({ default: m.ProjectListPage })));
 const ProjectWorkspace = lazy(() => import('../pages/ProjectManagement/ProjectWorkspace').then(m => ({ default: m.ProjectWorkspace })));
 const ProjectTeamPage = lazy(() => import('../pages/ProjectManagement/ProjectTeamPage').then(m => ({ default: m.ProjectTeamPage })));
+const TimesheetPage = lazy(() => import('../pages/Timesheet/TimesheetPage').then(m => ({ default: m.TimesheetPage })));
 
 import * as policyService from '../services/policyService';
 
@@ -194,6 +195,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <ProjectTeamPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/timesheets"
+          element={
+            <ProtectedRoute>
+              <TimesheetPage />
             </ProtectedRoute>
           }
         />

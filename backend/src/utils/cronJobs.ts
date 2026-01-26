@@ -3,6 +3,7 @@ import { pool } from '../database/db';
 import { logger } from './logger';
 import { sendPendingLeaveReminderEmail, sendBirthdayWishEmail, sendHolidayListReminderEmail, sendLeaveAllocationEmail } from './emailTemplates';
 import { isLastWorkingDayOfMonth, hasCompleted3Years, hasCompleted5Years } from './leaveCredit';
+import { TimesheetService } from '../services/timesheet.service';
 
 /**
  * Send daily pending leave reminders to managers and HR
@@ -501,5 +502,31 @@ export const initializeCronJobs = () => {
   // Run immediately on startup for testing (optional - remove in production)
   // sendDailyPendingLeaveReminders();
   // sendBirthdayWishes();
+
+  // --- Timesheet Cron Jobs ---
+
+  // 1. Daily Auto-Fill: Daily 08:00 AM
+  cron.schedule('0 8 * * *', TimesheetService.processDailyAutoFill, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Timesheet Daily Auto-Fill (08:00 AM)');
+
+  // 2. Daily Reminders: 8 PM (Sun, Mon, Tue, Wed, Thu, Sat)
+  cron.schedule('0 20 * * 0,1,2,3,4,6', TimesheetService.processDailyReminders, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Timesheet Daily Reminder (8 PM except Fri)');
+
+  // 3. Friday Validation: 4 PM (Fri only)
+  cron.schedule('0 16 * * 5', TimesheetService.processFridayValidation, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Timesheet Friday Validation (4 PM)');
+
+  // 4. Saturday Submission: 9 PM (Sat only)
+  cron.schedule('0 21 * * 6', TimesheetService.processWeeklySubmission, {
+    timezone: 'Asia/Kolkata'
+  });
+  logger.info('✅ Cron job scheduled: Timesheet Weekly Submission (Sat 9 PM)');
 };
 

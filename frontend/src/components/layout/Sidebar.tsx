@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog, FaBriefcase } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog, FaBriefcase, FaClock } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -79,6 +79,11 @@ const Sidebar: React.FC = memo(() => {
     // Project Management - For all roles (employees/interns see their assigned projects)
     if (['manager', 'hr', 'super_admin', 'employee', 'intern'].includes(user.role)) {
       routes.push({ path: '/project-management', icon: <FaBriefcase />, label: 'Projects' });
+    }
+
+    // Timesheet - For all except Super Admin
+    if (['manager', 'hr', 'employee', 'intern'].includes(user.role)) {
+      routes.push({ path: '/timesheets', icon: <FaClock />, label: 'Timesheets' });
     }
 
     // Profile is always available

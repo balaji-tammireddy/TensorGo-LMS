@@ -515,16 +515,14 @@ export const ProjectWorkspace: React.FC = () => {
                                     onDelete={() => handleDeleteModule(module.id)}
                                     isPM={isPM}
                                     isCompact={true}
-                                    // Pass ALL project members as candidates (no filter)
-                                    // Pass ALL project members + current assignees to ensure everyone is listed
+                                    // Pass ALL project members as candidates (Project Team)
                                     availableUsers={(() => {
-                                        const candidates = allEmployees || [];
+                                        const candidates = projectMembers || [];
                                         const current = module.assigned_users || [];
                                         // Merge and unique by ID
                                         const uniqueMap = new Map();
                                         [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
                                             .map((pm: any) => ({
                                                 ...pm,
                                                 initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
