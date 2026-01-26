@@ -239,7 +239,7 @@ const EmployeeManagementPage: React.FC = () => {
   );
 
   const { data: employeesData, isLoading: employeesLoading, error } = useQuery(
-    ['employees', appliedSearch, statusFilter, roleFilter],
+    ['employees', appliedSearch, statusFilter, roleFilter, sortConfig],
     () =>
       employeeService.getEmployees(
         1,
@@ -247,7 +247,9 @@ const EmployeeManagementPage: React.FC = () => {
         appliedSearch,
         undefined,
         statusFilter || undefined,
-        roleFilter || undefined
+        roleFilter || undefined,
+        sortConfig.key,
+        sortConfig.direction
       ),
     {
       retry: false,
@@ -302,32 +304,30 @@ const EmployeeManagementPage: React.FC = () => {
 
 
   const sortedEmployees = React.useMemo(() => {
-    if (!employeesData?.employees) return [];
+    return employeesData?.employees || [];
+  }, [employeesData]);
 
-    // If we are searching and using default sort, use backend's relevance sort
-    if (appliedSearch && sortConfig.key === 'empId' && sortConfig.direction === 'asc') {
-      return employeesData.employees;
-    }
+  const sortedManagers = React.useMemo(() => {
+    if (!managersData) return [];
 
-    return [...employeesData.employees].sort((a, b) => {
-      if (sortConfig.key === 'empId') {
-        const aId = parseInt(a.empId) || 0;
-        const bId = parseInt(b.empId) || 0;
-        return sortConfig.direction === 'asc' ? aId - bId : bId - aId;
-      } else if (sortConfig.key === 'joiningDate') {
-        const aDate = new Date(a.joiningDate + 'T00:00:00').getTime();
-        const bDate = new Date(b.joiningDate + 'T00:00:00').getTime();
-        return sortConfig.direction === 'asc' ? aDate - bDate : bDate - aDate;
-      } else if (sortConfig.key === 'name') {
-        const aName = a.name?.toLowerCase() || '';
-        const bName = b.name?.toLowerCase() || '';
-        if (aName < bName) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aName > bName) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+    const rolePriority: Record<string, number> = {
+      'super_admin': 0,
+      'hr': 1,
+      'manager': 2
+    };
+
+    return [...managersData].sort((a: any, b: any) => {
+      const priorityA = rolePriority[a.role] ?? 3;
+      const priorityB = rolePriority[b.role] ?? 3;
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
       }
-      return 0;
+
+      // Secondary sort: by Employee ID (numeric string comparison)
+      return (a.empId || '').localeCompare(b.empId || '', undefined, { numeric: true });
     });
-  }, [employeesData, sortConfig]);
+  }, [managersData]);
 
   const createMutation = useMutation(employeeService.createEmployee, {
     onSuccess: () => {
@@ -1091,25 +1091,27 @@ const EmployeeManagementPage: React.FC = () => {
                             <FaEye />
                           </button>
                           {/* Add Leaves button (Always visible, disabled if no permission) */}
-                          <button
-                            className="action-btn add-leaves-btn"
-                            title={
-                              !(employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
-                                ? "Cannot add leaves for inactive/resigned employees"
-                                : ((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
-                                  (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin'))
-                                  ? "Add Leaves"
-                                  : "You do not have permission to add leaves for this employee"
-                            }
-                            onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
-                            disabled={
-                              !(((user?.role === 'hr' && employee.role !== 'super_admin' && employee.role !== 'hr') ||
-                                (user?.role === 'super_admin' && employee.id !== user.id && employee.role !== 'super_admin')) &&
-                                (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned'))
-                            }
-                          >
-                            <FaCalendarPlus />
-                          </button>
+                          {employee.role !== 'super_admin' && (
+                            <button
+                              className="action-btn add-leaves-btn"
+                              title={
+                                !(employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
+                                  ? "Cannot add leaves for inactive/resigned employees"
+                                  : ((user?.role === 'hr' && employee.role !== 'hr') ||
+                                    (user?.role === 'super_admin' && employee.id !== user.id))
+                                    ? "Add Leaves"
+                                    : "You do not have permission to add leaves for this employee"
+                              }
+                              onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
+                              disabled={
+                                !(((user?.role === 'hr' && employee.role !== 'hr') ||
+                                  (user?.role === 'super_admin' && employee.id !== user.id)) &&
+                                  (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned'))
+                              }
+                            >
+                              <FaCalendarPlus />
+                            </button>
+                          )}
 
                           {/* Delete button (Visible to Super Admin only) */}
                           {user?.role === 'super_admin' && (
@@ -2262,7 +2264,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   <span>
                                     {newEmployee.reportingManagerName
                                       ? (() => {
-                                        const manager = managersData?.find((m: any) => m.id === newEmployee.reportingManagerId);
+                                        const manager = sortedManagers?.find((m: any) => m.id === newEmployee.reportingManagerId);
                                         const roleLabel = manager?.role ? getRoleLabel(manager.role) : '';
                                         // Only show role in selected text if it exists and isn't a placeholder
                                         return `${newEmployee.reportingManagerName}${roleLabel && roleLabel !== '-' ? ` (${roleLabel})` : ''}`;
@@ -2273,12 +2275,20 @@ const EmployeeManagementPage: React.FC = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent
-                                side="top"
+                                side="bottom"
                                 align="start"
                                 className="leave-type-dropdown-content"
-                                style={{ maxHeight: '300px', overflowY: 'auto', width: 'var(--radix-dropdown-menu-trigger-width)' }}
+                                style={{
+                                  maxHeight: '300px',
+                                  overflowY: 'auto',
+                                  width: 'var(--radix-dropdown-menu-trigger-width)',
+                                  padding: 0,
+                                  backgroundColor: 'white',
+                                  border: '1px solid #eee',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                }}
                               >
-                                <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
+                                <div className="manager-search-wrapper" style={{ padding: '8px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 10 }}>
                                   <div style={{ position: 'relative' }}>
                                     <input
                                       type="text"
@@ -2296,7 +2306,8 @@ const EmployeeManagementPage: React.FC = () => {
                                         fontSize: '13px',
                                         border: '1px solid #ddd',
                                         borderRadius: '4px',
-                                        fontFamily: 'Poppins, sans-serif'
+                                        fontFamily: 'Poppins, sans-serif',
+                                        backgroundColor: '#fff'
                                       }}
                                       onClick={(e) => e.stopPropagation()}
                                     />
@@ -2332,12 +2343,12 @@ const EmployeeManagementPage: React.FC = () => {
                                     )}
                                   </div>
                                 </div>
-                                {managersData?.length === 0 ? (
+                                {sortedManagers?.length === 0 ? (
                                   <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666' }}>
                                     No managers found
                                   </div>
                                 ) : (
-                                  managersData?.map((manager: any, index: number) => (
+                                  sortedManagers?.map((manager: any, index: number) => (
                                     <React.Fragment key={manager.id}>
                                       <DropdownMenuItem
                                         onClick={() => {
@@ -2369,7 +2380,7 @@ const EmployeeManagementPage: React.FC = () => {
                                           </span>
                                         </div>
                                       </DropdownMenuItem>
-                                      {index < (managersData?.length || 0) - 1 && <DropdownMenuSeparator />}
+                                      {index < (sortedManagers?.length || 0) - 1 && <DropdownMenuSeparator />}
                                     </React.Fragment>
                                   ))
                                 )}
@@ -2386,21 +2397,21 @@ const EmployeeManagementPage: React.FC = () => {
               <div className="employee-modal-footer">
                 {isViewMode ? (
                   <>
-                    <button
-                      type="button"
-                      className="modal-save-button"
-                      onClick={() => {
-                        if (!showLeaveHistory) {
-                          refetchLeaveHistory();
-                          refetchEmployeeBalances();
-                        }
-                        setShowLeaveHistory(!showLeaveHistory);
-                      }}
-                      disabled={newEmployee.role === 'super_admin'}
-                      title={newEmployee.role === 'super_admin' ? "Super Admins do not have leave records" : ""}
-                    >
-                      {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
-                    </button>
+                    {newEmployee.role !== 'super_admin' && (
+                      <button
+                        type="button"
+                        className="modal-save-button"
+                        onClick={() => {
+                          if (!showLeaveHistory) {
+                            refetchLeaveHistory();
+                            refetchEmployeeBalances();
+                          }
+                          setShowLeaveHistory(!showLeaveHistory);
+                        }}
+                      >
+                        {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
+                      </button>
+                    )}
                     {/* Edit Employee Button (HR/Super Admin only) */}
                     {user && (user.role === 'super_admin' || user.role === 'hr') && (
                       <button

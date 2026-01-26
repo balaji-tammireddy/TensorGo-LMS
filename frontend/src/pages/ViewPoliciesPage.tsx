@@ -13,7 +13,17 @@ import {
     FaPlus,
     FaSpinner,
     FaTimes,
-    FaCloudUploadAlt
+    FaCloudUploadAlt,
+    // Pool of additional icons for variety
+    FaShieldAlt, FaLock, FaPlane, FaUmbrellaBeach, FaShareAlt, FaHeartbeat, FaHandshake,
+    FaGlobe, FaLightbulb, FaBullhorn, FaGavel, FaBalanceScale, FaAward, FaBriefcase,
+    FaCoffee, FaCreditCard, FaEnvelope, FaGraduationCap, FaHome, FaKey, FaMap,
+    FaMoneyBillWave, FaRocket, FaSearch, FaStar, FaTools, FaTv, FaUser, FaUsers,
+    FaWrench, FaAnchor, FaBinoculars, FaBook, FaCamera, FaCloud, FaCode, FaCog,
+    FaCompass, FaDesktop, FaDownload, FaEye, FaFlag, FaFlask, FaFolder, FaGift,
+    FaGlassMartini, FaHammer, FaHeadset, FaHospital, FaIcons, FaImages, FaLeaf,
+    FaMagic, FaMicrophone, FaMobileAlt, FaPaw, FaPuzzlePiece, FaRoad, FaSeedling,
+    FaStamp, FaTrophy, FaUniversity, FaUtensils, FaZhihu
 } from 'react-icons/fa';
 import AppLayout from '../components/layout/AppLayout';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -53,15 +63,52 @@ const ViewPoliciesPage: React.FC = () => {
 
     const canManage = user?.role === 'super_admin' || user?.role === 'hr';
 
-    const getIconForTitle = (title: string) => {
+    // LARGE POOL OF ICONS (for variety if no keyword match)
+    const iconPool = [
+        <FaFileAlt />, <FaGlobe />, <FaLightbulb />, <FaBullhorn />, <FaGavel />,
+        <FaBalanceScale />, <FaAward />, <FaBriefcase />, <FaCoffee />, <FaCreditCard />,
+        <FaEnvelope />, <FaGraduationCap />, <FaHome />, <FaKey />, <FaMap />,
+        <FaMoneyBillWave />, <FaRocket />, <FaSearch />, <FaStar />, <FaTools />,
+        <FaTv />, <FaUser />, <FaUsers />, <FaWrench />, <FaAnchor />,
+        <FaBinoculars />, <FaBook />, <FaCamera />, <FaCloud />, <FaCode />,
+        <FaCog />, <FaCompass />, <FaDesktop />, <FaDownload />, <FaEye />,
+        <FaFlag />, <FaFlask />, <FaFolder />, <FaGift />, <FaGlassMartini />,
+        <FaHammer />, <FaHeadset />, <FaHospital />, <FaIcons />, <FaImages />,
+        <FaLeaf />, <FaMagic />, <FaMicrophone />, <FaMobileAlt />, <FaPaw />,
+        <FaPuzzlePiece />, <FaRoad />, <FaSeedling />, <FaStamp />, <FaTrophy />,
+        <FaUniversity />, <FaUtensils />, <FaZhihu />
+    ];
+
+    const getUniqueIconForTitle = (title: string) => {
         const lowerTitle = title.toLowerCase();
-        if (lowerTitle.includes('asset')) return <FaLaptop />;
-        if (lowerTitle.includes('communication')) return <FaComments />;
+
+        // 1. High-priority keyword matches (First Layer)
+        if (lowerTitle.includes('asset') || lowerTitle.includes('it policy') || lowerTitle.includes('laptop')) return <FaLaptop />;
+        if (lowerTitle.includes('communication') || lowerTitle.includes('feedback')) return <FaComments />;
         if (lowerTitle.includes('dress')) return <FaUserTie />;
-        if (lowerTitle.includes('leave')) return <FaCalendarAlt />;
-        if (lowerTitle.includes('quality')) return <FaCheckCircle />;
+        if (lowerTitle.includes('holiday')) return <FaUmbrellaBeach />;
+        if (lowerTitle.includes('quality') || lowerTitle.includes('compliance')) return <FaCheckCircle />;
         if (lowerTitle.includes('wfo') || lowerTitle.includes('office') || lowerTitle.includes('work')) return <FaBuilding />;
-        return <FaFileAlt />;
+        if (lowerTitle.includes('security')) return <FaShieldAlt />;
+        if (lowerTitle.includes('privacy')) return <FaLock />;
+        if (lowerTitle.includes('travel') || lowerTitle.includes('expense')) return <FaPlane />;
+        if (lowerTitle.includes('social')) return <FaShareAlt />;
+        if (lowerTitle.includes('health') || lowerTitle.includes('insurance') || lowerTitle.includes('medical')) return <FaHeartbeat />;
+        if (lowerTitle.includes('code of conduct') || lowerTitle.includes('ethics') || lowerTitle.includes('integrity')) return <FaHandshake />;
+
+        // 2. Specialized sub-categories for 'Leave' to prevent duplicate calendars
+        if (lowerTitle.includes('casual leave')) return <FaIcons />;
+        if (lowerTitle.includes('sick leave')) return <FaHospital />;
+        if (lowerTitle.includes('annual leave')) return <FaUmbrellaBeach />;
+        if (lowerTitle.includes('leave') || lowerTitle.includes('attendance')) return <FaCalendarAlt />;
+
+        // 3. Fallback: Deterministic Selection from Pool based on Title (prevents all others being FaFileAlt)
+        let hash = 0;
+        for (let i = 0; i < title.length; i++) {
+            hash = title.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash) % iconPool.length;
+        return iconPool[index];
     };
 
     // Queries
@@ -75,7 +122,7 @@ const ViewPoliciesPage: React.FC = () => {
                 return (data || []).map((p: any) => ({
                     id: p.id,
                     title: p.title,
-                    icon: getIconForTitle(p.title),
+                    icon: getUniqueIconForTitle(p.title),
                     link: p.public_url
                 }));
             },

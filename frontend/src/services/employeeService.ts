@@ -26,13 +26,17 @@ export const getEmployees = async (
   search?: string,
   joiningDate?: string,
   status?: string,
-  role?: string
+  role?: string,
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc'
 ): Promise<EmployeeListResponse> => {
   const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
   if (search) params.append('search', search);
   if (joiningDate) params.append('joiningDate', joiningDate);
   if (status) params.append('status', status);
   if (role) params.append('role', role);
+  if (sortBy) params.append('sortBy', sortBy);
+  if (sortOrder) params.append('sortOrder', sortOrder);
   const response = await api.get(`/employees?${params}`);
   return response.data;
 };

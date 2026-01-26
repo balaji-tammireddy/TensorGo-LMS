@@ -406,14 +406,7 @@
     gap: 6px;
 }
 
-.status-badge {
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-}
+/* Removed .status-badge override to use global styles */
 
 .status-active {
     background-color: #c6f6d5;

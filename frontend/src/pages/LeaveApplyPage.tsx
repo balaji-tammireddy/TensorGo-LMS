@@ -63,7 +63,7 @@ const LeaveApplyPage: React.FC = () => {
   const minStartDate = formData.leaveType === 'casual'
     ? format(addDays(new Date(), 3), 'yyyy-MM-dd') // block today + next two days for casual
     : formData.leaveType === 'sick'
-      ? format(addDays(new Date(), -3), 'yyyy-MM-dd') // allow past 3 days for sick leave
+      ? format(addDays(new Date(), -1), 'yyyy-MM-dd') // allow past 1 day for sick leave
       : formData.leaveType === 'permission'
         ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // Permission can only be applied from tomorrow
         : todayStr; // LOP can be applied for today
@@ -1235,7 +1235,9 @@ const LeaveApplyPage: React.FC = () => {
               });
 
               if (existingCount + newCount > 10) {
-                showWarning(`Casual leave limit exceeded for ${monthKey}. Max 10 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
+                const [year, month] = monthKey.split('-');
+                const displayMonth = `${month}/${year.slice(-2)}`;
+                showWarning(`Casual leave limit exceeded for ${displayMonth}. Max 10 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
                 return;
               }
             }
@@ -1338,7 +1340,9 @@ const LeaveApplyPage: React.FC = () => {
               });
 
               if (existingCount + newCount > 5) {
-                showWarning(`LOP limit exceeded for ${monthKey}. Max 5 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
+                const [year, month] = monthKey.split('-');
+                const displayMonth = `${month}/${year.slice(-2)}`;
+                showWarning(`LOP limit exceeded for ${displayMonth}. Max 5 days allowed per month. You have used ${existingCount} and are requesting ${newCount}.`);
                 return;
               }
             }
@@ -2500,7 +2504,7 @@ const LeaveApplyPage: React.FC = () => {
                   <th>No. Of Days</th>
                   <th>Leave Type</th>
                   <th>Approved Dates</th>
-                  <th>Current Status</th>
+                  <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>

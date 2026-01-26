@@ -201,15 +201,18 @@ export const updatePolicy = async (
         values.push(updates.effective_from === '' ? null : updates.effective_from);
     }
 
-    values.push(id);
-
+    // Add updated_by as a SET field
     fields.push(`updated_by = $${idx++}`);
     values.push(requesterId);
+
+    // Finally add the ID for the WHERE clause
+    const idIdx = idx;
+    values.push(id);
 
     const query = `
     UPDATE leave_policy_configurations
     SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-    WHERE id = $${idx}
+    WHERE id = $${idIdx}
     RETURNING *
   `;
 

@@ -13,10 +13,12 @@ export const getEmployees = async (
   search?: string,
   joiningDate?: string,
   status?: string,
-  role?: string
+  role?: string,
+  sortBy?: string,
+  sortOrder: 'asc' | 'desc' = 'asc'
 ) => {
   logger.info(`[EMPLOYEE] [GET EMPLOYEES] ========== FUNCTION CALLED ==========`);
-  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}, Role: ${role || 'none'}`);
+  logger.info(`[EMPLOYEE] [GET EMPLOYEES] Page: ${page}, Limit: ${limit}, Search: ${search || 'none'}, JoiningDate: ${joiningDate || 'none'}, Status: ${status || 'none'}, Role: ${role || 'none'}, SortBy: ${sortBy || 'none'}, SortOrder: ${sortOrder}`);
 
   const offset = (page - 1) * limit;
   let query = `
@@ -33,54 +35,75 @@ export const getEmployees = async (
   const params: any[] = [];
 
   if (search) {
-    // Check for special characters and emojis (allow only alphanumeric and spaces)
-    const isValid = /^[a-zA-Z0-9\s]*$/.test(search);
+    // Check for special characters and emojis (allow alphanumeric, spaces, and hyphens)
+    const isValid = /^[a-zA-Z0-9\s-]*$/.test(search);
     if (!isValid) {
       logger.warn(`[EMPLOYEE] [GET EMPLOYEES] Invalid search term detected: ${search}`);
       throw new Error('Search term contains invalid characters. Emojis and special characters are not allowed.');
     }
 
     // Search by employee ID or name (first or last name)
-    query += ` AND (emp_id ILIKE $${params.length + 1} OR first_name ILIKE $${params.length + 1} OR last_name ILIKE $${params.length + 1})`;
+    query += ` AND (u.emp_id ILIKE $${params.length + 1} OR u.first_name ILIKE $${params.length + 1} OR u.last_name ILIKE $${params.length + 1})`;
     params.push(`%${search}%`);
   }
 
   if (status) {
     if (status === 'inactive') {
       // Treat "inactive" as any non-active AND non-on-notice status
-      query += ` AND status NOT IN ('active', 'on_notice')`;
+      query += ` AND u.status NOT IN ('active', 'on_notice')`;
     } else {
-      query += ` AND status = $${params.length + 1}`;
+      query += ` AND u.status = $${params.length + 1}`;
       params.push(status);
     }
   }
 
   if (role) {
-    query += ` AND user_role = $${params.length + 1}`;
+    query += ` AND u.user_role = $${params.length + 1}`;
     params.push(role);
   }
 
   if (joiningDate) {
     // Filter by exact date of joining (YYYY-MM-DD)
-    query += ` AND date_of_joining::date = $${params.length + 1}`;
+    query += ` AND u.date_of_joining::date = $${params.length + 1}`;
     params.push(joiningDate);
   }
 
-  if (search) {
-    logger.info(`[EMPLOYEE] [GET EMPLOYEES] Applying search sort preference for: ${search}`);
-    // Prioritize results starting with the search term
+  // Handle Ordering
+  if (search && (!sortBy || sortBy === 'empId')) {
+    // Relevance sort for search
     const prefixParamIdx = params.length + 1;
     params.push(`${search}%`);
 
     query += ` ORDER BY 
       CASE 
-        WHEN first_name ILIKE $${prefixParamIdx} THEN 0 
-        WHEN emp_id ILIKE $${prefixParamIdx} THEN 1
+        WHEN u.first_name ILIKE $${prefixParamIdx} THEN 0 
+        WHEN u.emp_id ILIKE $${prefixParamIdx} THEN 1
         ELSE 2 
       END, 
-      emp_id ASC`;
+      u.emp_id ${sortOrder}`;
+  } else if (sortBy) {
+    // Custom sort
+    const allowedSortColumns: Record<string, string> = {
+      'empId': 'u.emp_id',
+      'name': 'name',
+      'joiningDate': 'u.date_of_joining',
+      'role': 'u.user_role',
+      'status': 'u.status'
+    };
+
+    const sortColumn = allowedSortColumns[sortBy] || 'u.emp_id';
+
+    // For numeric empId, we might want natural sort if they are purely numeric
+    if (sortBy === 'empId') {
+      query += ` ORDER BY 
+        CASE WHEN u.emp_id ~ '^[0-9]+$' THEN CAST(u.emp_id AS INTEGER) ELSE 0 END ${sortOrder},
+        u.emp_id ${sortOrder}`;
+    } else {
+      query += ` ORDER BY ${sortColumn} ${sortOrder}`;
+    }
   } else {
-    query += ` ORDER BY emp_id ASC`;
+    // Default sort
+    query += ` ORDER BY CASE WHEN u.emp_id ~ '^[0-9]+$' THEN CAST(u.emp_id AS INTEGER) ELSE 0 END ASC, u.emp_id ASC`;
   }
 
   query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -644,15 +667,20 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   // Initialize leave balances (set to 0 by default as per requirement to disable auto-add on joining)
   // LOP balance defaults to 10
-  const casualBalance = 0;
-  const sickBalance = 0;
+  // Skip creating leave balances for super_admin
+  if (role !== 'super_admin') {
+    const casualBalance = 0;
+    const sickBalance = 0;
 
-  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
-  await pool.query(
-    'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
-    [userId, casualBalance, sickBalance]
-  );
-  logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
+    await pool.query(
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
+      [userId, casualBalance, sickBalance]
+    );
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
+  } else {
+    logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Skipped leave balance initialization for super_admin`);
+  }
 
   // Update education columns if provided
   if (employeeData.education) {
@@ -1415,11 +1443,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // If joining date was updated, recalculate leave balances
+  // If joining date was updated, recalculate leave balances (skip for super_admin)
   const oldJoiningDate = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
   const newJoiningDate = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
 
-  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin') {
+  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin' && finalRole !== 'super_admin') {
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
 
     // Update leave balances with recalculated credits
@@ -1452,6 +1480,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         [employeeId, casualBalance, sickBalance, requesterId]
       );
     }
+  }
+
+  // If role was changed to super_admin, remove any existing leave balances and details
+  if (isRoleChanged && newRole === 'super_admin') {
+    logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] User ${employeeId} promoted to super_admin. Cleaning up leave data.`);
+    await pool.query('DELETE FROM leave_days WHERE leave_request_id IN (SELECT id FROM leave_requests WHERE employee_id = $1)', [employeeId]);
+    await pool.query('DELETE FROM leave_requests WHERE employee_id = $1', [employeeId]);
+    await pool.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
   }
 
   // Update education columns atomically

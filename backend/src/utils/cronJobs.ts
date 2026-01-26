@@ -54,7 +54,8 @@ const sendDailyPendingLeaveReminders = async () => {
             lr.leave_type,
             lr.start_date,
             lr.end_date,
-            lr.no_of_days,
+            (SELECT COALESCE(SUM(CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END), 0) 
+             FROM leave_days ld WHERE ld.leave_request_id = lr.id) as no_of_days,
             lr.applied_date,
             emp.first_name || ' ' || COALESCE(emp.last_name, '') as employee_name,
             emp.emp_id as employee_emp_id
@@ -294,7 +295,7 @@ const autoApprovePastPendingLeaves = async () => {
       // 1. Find all pending leave requests where the end date is before today
       // Using CURRENT_DATE ensures we compare with the start of today
       const pastPendingResult = await client.query(
-        `SELECT id, employee_id, leave_type, no_of_days 
+        `SELECT id, employee_id, leave_type 
          FROM leave_requests 
          WHERE current_status = 'pending' 
            AND end_date < CURRENT_DATE`
@@ -323,8 +324,6 @@ const autoApprovePastPendingLeaves = async () => {
                  super_admin_approval_date = CURRENT_TIMESTAMP,
                  super_admin_approval_comment = 'Auto-approved: Leave date has passed',
                  super_admin_approved_by = $1,
-                 last_updated_by = $1,
-                 last_updated_by_role = 'super_admin',
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2`,
             [superAdminId, request.id]
@@ -366,7 +365,9 @@ export const processDailyLeaveCredits = async () => {
     const result = await pool.query(
       `SELECT id, emp_id, date_of_joining, email, first_name || ' ' || COALESCE(last_name, '') as name 
        FROM users 
-       WHERE status NOT IN ('inactive', 'resigned') AND date_of_joining IS NOT NULL`
+       WHERE status NOT IN ('inactive', 'resigned') 
+         AND date_of_joining IS NOT NULL
+         AND user_role != 'super_admin'`
     );
 
     const employees = result.rows;
