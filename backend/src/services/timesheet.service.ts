@@ -92,10 +92,14 @@ export class TimesheetService {
                 throw new Error("Cannot log time for future dates");
             }
 
-            // Validation 2: Current Week Only
+            // Validation 2: Current and Past 1 Week Only
             const { start, end } = this.getCurrentWeekRange();
-            if (logDateOnly < start || logDateOnly > end) {
-                // throw new Error("Can only log time for the current week");
+            const allowedStart = new Date(start);
+            allowedStart.setDate(allowedStart.getDate() - 7); // Allow 1 week prior
+
+            // Relax validation for Updates (to allow fixing rejected logs from older weeks)
+            if (!entry.id && (logDateOnly < allowedStart || logDateOnly > end)) {
+                throw new Error("Can only log time for the current or previous week");
             }
 
             if (entry.id) {
@@ -173,7 +177,189 @@ export class TimesheetService {
         }
     }
 
-    // --- CRON JOBS ---
+    // --- APPROVAL MODULE ---
+
+    static async getTeamStatus(approverId: number, role: string, startDateStr: string, endDateStr: string) {
+        // 1. Determine User Scope
+        let userFilter = '';
+        const params: any[] = [startDateStr, endDateStr];
+        let paramIdx = 3;
+
+        if (role === 'super_admin' || role === 'hr') {
+            // Can view all, but for "Team Status" specifically, we might want to return ALL employees?
+            // The requirement says: "HR and Super admin role users can see all users time sheets".
+            // So no extra filter on users table, other than active/non-admin.
+        } else {
+            // Manager: Direct reportees only
+            userFilter = `AND u.reporting_manager_id = $${paramIdx}`;
+            params.push(approverId);
+        }
+
+        const query = `
+            SELECT 
+                u.id, 
+                u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+                u.emp_id,
+                u.designation,
+                COALESCE(SUM(pe.duration), 0)::float as total_hours,
+                COUNT(pe.id) as log_count,
+                COUNT(CASE WHEN pe.log_status = 'approved' THEN 1 END) as approved_count,
+                COUNT(CASE WHEN pe.log_status = 'rejected' THEN 1 END) as rejected_count,
+                COUNT(CASE WHEN pe.log_status = 'submitted' THEN 1 END) as submitted_count,
+                COUNT(CASE WHEN pe.log_status = 'draft' THEN 1 END) as draft_count
+            FROM users u
+            LEFT JOIN project_entries pe ON u.id = pe.user_id 
+                AND pe.log_date >= $1 AND pe.log_date <= $2
+            WHERE u.status = 'active' 
+              AND u.user_role != 'super_admin'
+              ${userFilter}
+            GROUP BY u.id
+            ORDER BY u.first_name ASC
+        `;
+
+        const res = await pool.query(query, params);
+
+        return res.rows.map(row => {
+            let status = 'draft';
+            if (row.rejected_count > 0) status = 'rejected';
+            else if (row.log_count > 0 && row.approved_count === row.log_count) status = 'approved';
+            else if (row.submitted_count > 0 && row.draft_count === 0) status = 'submitted';
+            else if (row.total_hours >= 40 && row.draft_count > 0) status = 'pending_submission'; // Highlight readily submittable
+
+            return {
+                id: row.id,
+                name: row.name,
+                emp_id: row.emp_id,
+                designation: row.designation,
+                total_hours: row.total_hours,
+                status // 'draft', 'submitted', 'approved', 'rejected', 'pending_submission'
+            };
+        });
+    }
+
+    static async approveTimesheet(approverId: number, targetUserId: number, startDateStr: string, endDateStr: string) {
+        // Validate Access: In a real controller we check if approver manages targetUser.
+        // For Service, we simply execute. Controller checks permissions.
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Approve all entries in range that are 'submitted' (or 'draft' if we allow direct approval)
+            // Ideally only 'submitted' should be approvable? 
+            // The requirement says automatic submission happens on Sunday. 
+            // But managers can approve "weeks timesheet".
+            // Let's allow approving any non-approved entry to be safe.
+
+            await client.query(`
+                UPDATE project_entries 
+                SET log_status = 'approved', 
+                    manager_comment = 'Approved by Manager',
+                    updated_by = $1, 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = $2 
+                  AND log_date >= $3 AND log_date <= $4
+                  AND log_status != 'approved'
+            `, [approverId, targetUserId, startDateStr, endDateStr]);
+
+            // Notify User
+            const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [targetUserId]);
+            if (userRes.rows.length > 0) {
+                await sendEmail({
+                    to: userRes.rows[0].email,
+                    subject: 'Timesheet Approved',
+                    text: `Hi ${userRes.rows[0].first_name},\n\nYour timesheet for ${startDateStr} to ${endDateStr} has been approved.`
+                });
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
+
+    static async rejectTimesheetEntry(approverId: number, entryId: number, reason: string) {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const res = await client.query(`
+                UPDATE project_entries 
+                SET log_status = 'rejected', 
+                    rejection_reason = $1,
+                    updated_by = $2, 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $3
+                RETURNING user_id, log_date
+            `, [reason, approverId, entryId]);
+
+            if (res.rows.length > 0) {
+                const { user_id, log_date } = res.rows[0];
+                // Notify User
+                const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [user_id]);
+                if (userRes.rows.length > 0) {
+                    await sendEmail({
+                        to: userRes.rows[0].email,
+                        subject: 'Timesheet Entry Rejected',
+                        text: `Hi ${userRes.rows[0].first_name},\n\nYour timesheet entry for ${this.formatDate(log_date)} has been rejected.\nReason: ${reason}\nPlease log in to correct and resubmit.`
+                    });
+                }
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
+
+    static async rejectTimesheet(approverId: number, targetUserId: number, startDate: string, endDate: string, reason: string) {
+        // Validate Access
+        if (!(await this.isManagerOrAdmin(approverId, targetUserId))) {
+            throw new Error('Unauthorized');
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const res = await client.query(`
+                UPDATE project_entries
+                SET log_status = 'rejected', rejection_reason = $1, updated_by = $2, updated_at = NOW()
+                WHERE user_id = $3 AND log_date BETWEEN $4 AND $5
+                AND log_status != 'approved'
+                RETURNING id
+            `, [reason, approverId, targetUserId, startDate, endDate]);
+
+            // Notify User
+            if (res.rowCount && res.rowCount > 0) {
+                const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [targetUserId]);
+                if (userRes.rows.length > 0) {
+                    sendEmail({
+                        to: userRes.rows[0].email,
+                        subject: 'Timesheet Rejected',
+                        text: `Hi ${userRes.rows[0].first_name},\n\nYour timesheet entries for ${startDate} to ${endDate} have been rejected.\nReason: ${reason}\nPlease log in to correct and resubmit.`
+                    }).catch(console.error);
+                }
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
+
 
     // 1. Daily Auto-Fill (8 AM)
     static async processDailyAutoFill() {
@@ -314,25 +500,35 @@ export class TimesheetService {
                 const hours = parseFloat(u.total_hours);
 
                 if (hours >= 40) {
-                    // Submit
+                    // Criteria Met: Submit
                     await client.query(`
                         UPDATE project_entries 
                         SET log_status = 'submitted', updated_at = CURRENT_TIMESTAMP
                         WHERE user_id = $1 AND log_date >= $2 AND log_date <= $3 AND log_status = 'draft'
                     `, [u.id, startStr, endStr]);
-                    logger.info(`[Timesheet] User ${u.id} Submitted (${hours} hrs)`);
-                } else {
+
+                    logger.info(`[Timesheet] User ${u.id} Auto-Submitted (${hours} hrs)`);
+
                     // Notify Manager
                     if (u.reporting_manager_id) {
                         const mgrRes = await client.query('SELECT email FROM users WHERE id = $1', [u.reporting_manager_id]);
                         if (mgrRes.rows.length > 0) {
                             await sendEmail({
                                 to: mgrRes.rows[0].email,
-                                subject: 'Timesheet Submission Failed: Under Hours',
-                                text: `Employee ${u.first_name} has logged only ${hours} hours this week (Min 40 required). Timesheet was NOT submitted.`
+                                subject: 'Timesheet Auto-Submitted',
+                                text: `Employee ${u.first_name} has met the 40-hour criteria (${hours} hours). Timesheet submitted for approval.`
                             });
                         }
                     }
+
+                } else {
+                    // Criteria Not Met: Warn User
+                    await sendEmail({
+                        to: u.email,
+                        subject: 'Timesheet Criteria Not Met',
+                        text: `Hi ${u.first_name},\n\nYou have logged only ${hours} hours this week (Min 40 required). Your timesheet was NOT submitted. Please update it immediately.`
+                    });
+                    logger.info(`[Timesheet] User ${u.id} Not Submitted (<40h). Warning sent.`);
                 }
             }
 
@@ -542,5 +738,70 @@ export class TimesheetService {
         } finally {
             client.release();
         }
+    }
+
+
+    static async isManagerOrAdmin(approverId: number, targetUserId: number) {
+        // Prevent Self-Approval
+        if (approverId === targetUserId) return false;
+
+        const client = await pool.connect();
+        try {
+            // Check Role
+            const roleRes = await client.query('SELECT user_role FROM users WHERE id = $1', [approverId]);
+            const role = roleRes.rows[0]?.user_role;
+            if (role === 'super_admin' || role === 'hr') return true;
+
+            // Check Manager Link
+            const linkRes = await client.query('SELECT 1 FROM users WHERE id = $1 AND reporting_manager_id = $2', [targetUserId, approverId]);
+            return linkRes.rows.length > 0;
+        } finally {
+            client.release();
+        }
+    }
+
+    static async getReportData(filters: any) {
+        // Build dynamic query
+        let query = `
+            SELECT 
+                u.first_name || ' ' || COALESCE(u.last_name, '') as employee_name,
+                pe.log_date,
+                p.name as project_name,
+                m.name as module_name,
+                t.name as task_name,
+                a.name as activity_name,
+                pe.duration::float,
+                pe.description,
+                pe.work_status,
+                pe.log_status,
+                manager.first_name || ' ' || COALESCE(manager.last_name, '') as manager_name
+            FROM project_entries pe
+            JOIN users u ON pe.user_id = u.id
+            LEFT JOIN users manager ON u.reporting_manager_id = manager.id
+            LEFT JOIN projects p ON pe.project_id = p.id
+            LEFT JOIN project_modules m ON pe.module_id = m.id
+            LEFT JOIN project_tasks t ON pe.task_id = t.id
+            LEFT JOIN project_activities a ON pe.activity_id = a.id
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+        let pIdx = 1;
+
+        if (filters.startDate) { query += ` AND pe.log_date >= $${pIdx++}`; params.push(filters.startDate); }
+        if (filters.endDate) { query += ` AND pe.log_date <= $${pIdx++}`; params.push(filters.endDate); }
+        if (filters.userId) { query += ` AND pe.user_id = $${pIdx++}`; params.push(filters.userId); }
+        if (filters.projectId) { query += ` AND pe.project_id = $${pIdx++}`; params.push(filters.projectId); }
+        // If module, task, activity are passed
+        if (filters.moduleId) { query += ` AND pe.module_id = $${pIdx++}`; params.push(filters.moduleId); }
+
+        // Scope Filter (Manager sees only reportees)
+        if (filters.managerScopeId) {
+            query += ` AND (u.reporting_manager_id = $${pIdx++})`; params.push(filters.managerScopeId);
+        }
+
+        query += ` ORDER BY pe.log_date DESC, u.first_name ASC`;
+
+        const res = await pool.query(query, params);
+        return res.rows;
     }
 }

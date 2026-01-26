@@ -512,11 +512,11 @@ export const initializeCronJobs = () => {
   });
   logger.info('✅ Cron job scheduled: Timesheet Daily Auto-Fill (08:00 AM)');
 
-  // 2. Daily Reminders: 8 PM (Sun, Mon, Tue, Wed, Thu, Sat)
-  cron.schedule('0 20 * * 0,1,2,3,4,6', TimesheetService.processDailyReminders, {
+  // 2. Daily Reminders: 6 PM Daily
+  cron.schedule('0 18 * * *', TimesheetService.processDailyReminders, {
     timezone: 'Asia/Kolkata'
   });
-  logger.info('✅ Cron job scheduled: Timesheet Daily Reminder (8 PM except Fri)');
+  logger.info('✅ Cron job scheduled: Timesheet Daily Reminder (6 PM)');
 
   // 3. Friday Validation: 4 PM (Fri only)
   cron.schedule('0 16 * * 5', TimesheetService.processFridayValidation, {
@@ -524,10 +524,10 @@ export const initializeCronJobs = () => {
   });
   logger.info('✅ Cron job scheduled: Timesheet Friday Validation (4 PM)');
 
-  // 4. Saturday Submission: 9 PM (Sat only)
-  cron.schedule('0 21 * * 6', TimesheetService.processWeeklySubmission, {
+  // 4. Weekly Auto-Processing: Sunday 9 PM
+  cron.schedule('0 21 * * 0', TimesheetService.processWeeklySubmission, {
     timezone: 'Asia/Kolkata'
   });
-  logger.info('✅ Cron job scheduled: Timesheet Weekly Submission (Sat 9 PM)');
+  logger.info('✅ Cron job scheduled: Timesheet Weekly Processing (Sun 9 PM)');
 };
 

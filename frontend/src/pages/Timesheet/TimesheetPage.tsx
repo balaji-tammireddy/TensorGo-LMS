@@ -53,6 +53,19 @@ export const TimesheetPage: React.FC = () => {
 
     const weekRange = useMemo(() => getWeekRange(currentDate), [currentDate]);
 
+    const isWeekEditable = useMemo(() => {
+        const today = new Date();
+        const { start: currentWeekStart } = getWeekRange(today);
+        currentWeekStart.setHours(0, 0, 0, 0); // Normalize to midnight
+
+        const viewWeekStart = new Date(weekRange.start);
+        viewWeekStart.setHours(0, 0, 0, 0);
+
+        // Strict: Only Current Week (or future, effectively limited by max date)
+        // Previous weeks are locked for NEW logs.
+        return viewWeekStart.getTime() >= currentWeekStart.getTime();
+    }, [weekRange]);
+
     // Form State
     const initialFormState = {
         project_id: '',
@@ -366,254 +379,259 @@ export const TimesheetPage: React.FC = () => {
                     {/* Left Column: Form */}
                     <div className="form-column">
                         <div className="log-form-card">
-                            <div className="form-title">
-                                <Clock size={18} />
-                                {editingId ? 'Edit Log Entry' : 'Log Time'}
-                            </div>
-                            <form onSubmit={handleSubmit}>
-                                {/* Date */}
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Date</label>
-                                    <DatePicker
-                                        value={selectedDate}
-                                        onChange={setSelectedDate}
-                                        max={new Date().toISOString().split('T')[0]} // Cannot log future
-                                    />
+                            <div className="form-title" style={{ justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Clock size={18} />
+                                    {editingId ? 'Edit Log Entry' : 'Log Time'}
                                 </div>
+                                {!isWeekEditable && !editingId && <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Locked</span>}
+                            </div>
+                            <fieldset disabled={!isWeekEditable && !editingId} style={{ border: 'none', padding: 0, margin: 0 }}>
+                                <form onSubmit={handleSubmit}>
+                                    {/* Date */}
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Date</label>
+                                        <DatePicker
+                                            value={selectedDate}
+                                            onChange={setSelectedDate}
+                                            max={new Date().toISOString().split('T')[0]} // Cannot log future
+                                        />
+                                    </div>
 
-                                {/* Project Struct */}
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Project</label>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="ts-dropdown-trigger"
+                                    {/* Project Struct */}
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Project</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="ts-dropdown-trigger"
+                                                    type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
+                                                >
+                                                    <span>
+                                                        {projects.find(p => String(p.id) === formData.project_id)?.name || 'Select Project'}
+                                                    </span>
+                                                    <ChevronDown size={14} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                                {projects.map(p => (
+                                                    <DropdownMenuItem
+                                                        key={p.id}
+                                                        onClick={() => handleProjectChange(String(p.id))}
+                                                    >
+                                                        {p.name}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                                {projects.length === 0 && <DropdownEmptyState message="No projects available" />}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Module</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="ts-dropdown-trigger"
+                                                    type="button"
+                                                >
+                                                    <span>
+                                                        {modules.find(m => String(m.id) === formData.module_id)?.name || 'Select Module'}
+                                                    </span>
+                                                    <ChevronDown size={14} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                                {!formData.project_id ? (
+                                                    <DropdownEmptyState message="Please select a project first" />
+                                                ) : modules.length === 0 ? (
+                                                    <DropdownEmptyState message="No modules available for this project" />
+                                                ) : (
+                                                    modules.map(m => (
+                                                        <DropdownMenuItem
+                                                            key={m.id}
+                                                            onClick={() => handleModuleChange(String(m.id))}
+                                                        >
+                                                            {m.name}
+                                                        </DropdownMenuItem>
+                                                    ))
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Task</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="ts-dropdown-trigger"
+                                                    type="button"
+                                                >
+                                                    <span>
+                                                        {tasks.find(t => String(t.id) === formData.task_id)?.name || 'Select Task'}
+                                                    </span>
+                                                    <ChevronDown size={14} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                                {!formData.module_id ? (
+                                                    <DropdownEmptyState message="Please select a module first" />
+                                                ) : tasks.length === 0 ? (
+                                                    <DropdownEmptyState message="No tasks available for this module" />
+                                                ) : (
+                                                    tasks.map(t => (
+                                                        <DropdownMenuItem
+                                                            key={t.id}
+                                                            onClick={() => handleTaskChange(String(t.id))}
+                                                        >
+                                                            {t.name}
+                                                        </DropdownMenuItem>
+                                                    ))
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Activity</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="ts-dropdown-trigger"
+                                                    type="button"
+                                                >
+                                                    <span>
+                                                        {activities.find(a => String(a.id) === formData.activity_id)?.name || 'Select Activity'}
+                                                    </span>
+                                                    <ChevronDown size={14} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                                {!formData.task_id ? (
+                                                    <DropdownEmptyState message="Please select a task first" />
+                                                ) : activities.length === 0 ? (
+                                                    <DropdownEmptyState message="No activities available" />
+                                                ) : (
+                                                    activities.map(a => (
+                                                        <DropdownMenuItem
+                                                            key={a.id}
+                                                            onClick={() => setFormData({ ...formData, activity_id: String(a.id) })}
+                                                        >
+                                                            {a.name}
+                                                        </DropdownMenuItem>
+                                                    ))
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Time Spent (Hrs)</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            min="0.5"
+                                            max="24"
+                                            className="ts-form-input"
+                                            value={formData.duration}
+                                            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                                            placeholder="e.g. 4.0"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Work Status</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="ts-dropdown-trigger"
+                                                    type="button"
+                                                >
+                                                    <span>
+                                                        {formData.work_status === 'in_progress' ? 'In Progress' :
+                                                            formData.work_status === 'closed' ? 'Closed' :
+                                                                formData.work_status === 'differed' ? 'Differed' :
+                                                                    formData.work_status === 'review' ? 'Review' :
+                                                                        formData.work_status === 'testing' ? 'Testing' :
+                                                                            formData.work_status === 'fixed' ? 'Fixed' :
+                                                                                formData.work_status === 'not_applicable' ? 'Not Applicable' : 'Select Work Status'}
+                                                    </span>
+                                                    <ChevronDown size={14} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                                {[
+                                                    { val: 'in_progress', label: 'In Progress' },
+                                                    { val: 'closed', label: 'Closed' },
+                                                    { val: 'differed', label: 'Differed' },
+                                                    { val: 'review', label: 'Review' },
+                                                    { val: 'testing', label: 'Testing' },
+                                                    { val: 'fixed', label: 'Fixed' },
+                                                    { val: 'not_applicable', label: 'Not Applicable' }
+                                                ].map(s => (
+                                                    <DropdownMenuItem
+                                                        key={s.val}
+                                                        onClick={() => setFormData({ ...formData, work_status: s.val })}
+                                                    >
+                                                        {s.label}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="ts-form-group">
+                                        <label className="ts-form-label">Description</label>
+                                        <textarea
+                                            className="ts-form-textarea"
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            placeholder="Work description..."
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="form-actions">
+                                        {editingId && (
+                                            <button
                                                 type="button"
-                                                style={{
-                                                    width: '100%',
-                                                    justifyContent: 'space-between',
-                                                    padding: '12px 16px',
-                                                    fontSize: '15px',
-                                                    fontFamily: 'Poppins, sans-serif',
-                                                    border: '1px solid #e6e8f0',
-                                                    borderRadius: '8px',
-                                                    backgroundColor: '#ffffff',
-                                                    color: '#203050',
-                                                    height: 'auto',
-                                                    fontWeight: 500
+                                                className="ts-submit-btn"
+                                                style={{ backgroundColor: '#64748b', marginBottom: '8px' }}
+                                                onClick={() => {
+                                                    setEditingId(null);
+                                                    setFormData(initialFormState);
                                                 }}
                                             >
-                                                <span>
-                                                    {projects.find(p => String(p.id) === formData.project_id)?.name || 'Select Project'}
-                                                </span>
-                                                <ChevronDown size={14} />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                            {projects.map(p => (
-                                                <DropdownMenuItem
-                                                    key={p.id}
-                                                    onClick={() => handleProjectChange(String(p.id))}
-                                                >
-                                                    {p.name}
-                                                </DropdownMenuItem>
-                                            ))}
-                                            {projects.length === 0 && <DropdownEmptyState message="No projects available" />}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Module</label>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="ts-dropdown-trigger"
-                                                type="button"
-                                            >
-                                                <span>
-                                                    {modules.find(m => String(m.id) === formData.module_id)?.name || 'Select Module'}
-                                                </span>
-                                                <ChevronDown size={14} />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                            {!formData.project_id ? (
-                                                <DropdownEmptyState message="Please select a project first" />
-                                            ) : modules.length === 0 ? (
-                                                <DropdownEmptyState message="No modules available for this project" />
-                                            ) : (
-                                                modules.map(m => (
-                                                    <DropdownMenuItem
-                                                        key={m.id}
-                                                        onClick={() => handleModuleChange(String(m.id))}
-                                                    >
-                                                        {m.name}
-                                                    </DropdownMenuItem>
-                                                ))
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Task</label>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="ts-dropdown-trigger"
-                                                type="button"
-                                            >
-                                                <span>
-                                                    {tasks.find(t => String(t.id) === formData.task_id)?.name || 'Select Task'}
-                                                </span>
-                                                <ChevronDown size={14} />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                            {!formData.module_id ? (
-                                                <DropdownEmptyState message="Please select a module first" />
-                                            ) : tasks.length === 0 ? (
-                                                <DropdownEmptyState message="No tasks available for this module" />
-                                            ) : (
-                                                tasks.map(t => (
-                                                    <DropdownMenuItem
-                                                        key={t.id}
-                                                        onClick={() => handleTaskChange(String(t.id))}
-                                                    >
-                                                        {t.name}
-                                                    </DropdownMenuItem>
-                                                ))
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Activity</label>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="ts-dropdown-trigger"
-                                                type="button"
-                                            >
-                                                <span>
-                                                    {activities.find(a => String(a.id) === formData.activity_id)?.name || 'Select Activity'}
-                                                </span>
-                                                <ChevronDown size={14} />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                            {!formData.task_id ? (
-                                                <DropdownEmptyState message="Please select a task first" />
-                                            ) : activities.length === 0 ? (
-                                                <DropdownEmptyState message="No activities available" />
-                                            ) : (
-                                                activities.map(a => (
-                                                    <DropdownMenuItem
-                                                        key={a.id}
-                                                        onClick={() => setFormData({ ...formData, activity_id: String(a.id) })}
-                                                    >
-                                                        {a.name}
-                                                    </DropdownMenuItem>
-                                                ))
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Time Spent (Hrs)</label>
-                                    <input
-                                        type="number"
-                                        step="0.5"
-                                        min="0.5"
-                                        max="24"
-                                        className="ts-form-input"
-                                        value={formData.duration}
-                                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                                        placeholder="e.g. 4.0"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Work Status</label>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="ts-dropdown-trigger"
-                                                type="button"
-                                            >
-                                                <span>
-                                                    {formData.work_status === 'in_progress' ? 'In Progress' :
-                                                        formData.work_status === 'closed' ? 'Closed' :
-                                                            formData.work_status === 'differed' ? 'Differed' :
-                                                                formData.work_status === 'review' ? 'Review' :
-                                                                    formData.work_status === 'testing' ? 'Testing' :
-                                                                        formData.work_status === 'fixed' ? 'Fixed' :
-                                                                            formData.work_status === 'not_applicable' ? 'Not Applicable' : 'Select Work Status'}
-                                                </span>
-                                                <ChevronDown size={14} />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                            {[
-                                                { val: 'in_progress', label: 'In Progress' },
-                                                { val: 'closed', label: 'Closed' },
-                                                { val: 'differed', label: 'Differed' },
-                                                { val: 'review', label: 'Review' },
-                                                { val: 'testing', label: 'Testing' },
-                                                { val: 'fixed', label: 'Fixed' },
-                                                { val: 'not_applicable', label: 'Not Applicable' }
-                                            ].map(s => (
-                                                <DropdownMenuItem
-                                                    key={s.val}
-                                                    onClick={() => setFormData({ ...formData, work_status: s.val })}
-                                                >
-                                                    {s.label}
-                                                </DropdownMenuItem>
-                                            ))}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                <div className="ts-form-group">
-                                    <label className="ts-form-label">Description</label>
-                                    <textarea
-                                        className="ts-form-textarea"
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        placeholder="Work description..."
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-actions">
-                                    {editingId && (
-                                        <button
-                                            type="button"
-                                            className="ts-submit-btn"
-                                            style={{ backgroundColor: '#64748b', marginBottom: '8px' }}
-                                            onClick={() => {
-                                                setEditingId(null);
-                                                setFormData(initialFormState);
-                                            }}
-                                        >
-                                            Cancel Edit
+                                                Cancel Edit
+                                            </button>
+                                        )}
+                                        <button type="submit" className="ts-submit-btn" disabled={loading || (!isWeekEditable && !editingId)}>
+                                            <Save size={18} />
+                                            {editingId ? 'Update' : 'Log Time'}
                                         </button>
-                                    )}
-                                    <button type="submit" className="ts-submit-btn" disabled={loading}>
-                                        <Save size={18} />
-                                        {editingId ? 'Update' : 'Log Time'}
-                                    </button>
-                                </div>
-                            </form>
+                                    </div>
+                                </form>
+                            </fieldset>
                         </div>
                     </div>
 
@@ -708,7 +726,9 @@ export const TimesheetPage: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 dayEntries.map(entry => {
-                                                    const isEditable = !entry.project_name?.includes('System') && (entry.log_status === 'draft' || entry.log_status === 'rejected');
+                                                    const isEditable = !entry.project_name?.includes('System') && (
+                                                        entry.log_status === 'rejected' || (isWeekEditable && entry.log_status === 'draft')
+                                                    );
                                                     const formattedDesc = entry.description?.length > 100
                                                         ? entry.description.substring(0, 100) + '...'
                                                         : entry.description;
@@ -738,6 +758,12 @@ export const TimesheetPage: React.FC = () => {
                                                                 <div className="description-text">
                                                                     {formattedDesc || 'No description provided.'}
                                                                 </div>
+
+                                                                {entry.log_status === 'rejected' && entry.rejection_reason && (
+                                                                    <div style={{ marginTop: '8px', padding: '8px', background: '#fee2e2', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '13px', color: '#b91c1c' }}>
+                                                                        <strong>Rejection:</strong> {entry.rejection_reason}
+                                                                    </div>
+                                                                )}
 
                                                                 <div className="entry-footer">
                                                                     <div className="status-pill pill-progress">

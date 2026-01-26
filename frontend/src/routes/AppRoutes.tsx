@@ -26,6 +26,7 @@ const ProjectListPage = lazy(() => import('../pages/ProjectManagement/ProjectLis
 const ProjectWorkspace = lazy(() => import('../pages/ProjectManagement/ProjectWorkspace').then(m => ({ default: m.ProjectWorkspace })));
 const ProjectTeamPage = lazy(() => import('../pages/ProjectManagement/ProjectTeamPage').then(m => ({ default: m.ProjectTeamPage })));
 const TimesheetPage = lazy(() => import('../pages/Timesheet/TimesheetPage').then(m => ({ default: m.TimesheetPage })));
+const TimesheetApprovalPage = lazy(() => import('../pages/Timesheet/TimesheetApprovalPage').then(m => ({ default: m.TimesheetApprovalPage })));
 
 import * as policyService from '../services/policyService';
 
@@ -203,6 +204,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <TimesheetPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/timesheet/approvals"
+          element={
+            <ProtectedRoute allowedRoles={['manager', 'hr', 'super_admin']}>
+              <TimesheetApprovalPage />
             </ProtectedRoute>
           }
         />
