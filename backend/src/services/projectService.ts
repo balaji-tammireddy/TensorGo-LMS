@@ -106,7 +106,7 @@ export class ProjectService {
       const insertRes = await client.query(
         `INSERT INTO projects (
           custom_id, name, description, project_manager_id, start_date, end_date, created_by, updated_by, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           customId,
@@ -116,13 +116,14 @@ export class ProjectService {
           startDate, // Automatic start date
           data.end_date || null,
           data.created_by,
+          data.created_by, // updated_by same as created_by initially
           'active' // Default status is active
         ]
       );
       const project = insertRes.rows[0];
 
       // 3. Recursive Team Generation
-      await this.syncProjectTeam(project.id, data.project_manager_id, client);
+      await this.syncProjectTeam(project.id, data.project_manager_id, client, data.created_by);
 
       await client.query('COMMIT');
       return project;
@@ -198,7 +199,7 @@ export class ProjectService {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await this.syncProjectTeam(project.id, data.project_manager_id, client);
+        await this.syncProjectTeam(project.id, data.project_manager_id, client, requesterId);
         await this.resetProjectResourcesToNewManager(project.id, data.project_manager_id, client);
         await client.query('COMMIT');
       } catch (e) {
@@ -213,7 +214,7 @@ export class ProjectService {
   }
 
   // Recursive "Tree" Algorithm
-  static async syncProjectTeam(projectId: number, managerId: number, clientOrPool: any = pool) {
+  static async syncProjectTeam(projectId: number, managerId: number, clientOrPool: any = pool, createdBy?: number) {
     // 1. Find all reports recursively
     const teamIds = await this.getReportingSubtree(managerId, clientOrPool);
 
@@ -226,10 +227,10 @@ export class ProjectService {
 
     for (const userId of allMemberIds) {
       await clientOrPool.query(
-        `INSERT INTO project_members (project_id, user_id)
-         VALUES ($1, $2)
+        `INSERT INTO project_members (project_id, user_id, created_by, updated_by)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT (project_id, user_id) DO NOTHING`,
-        [projectId, userId]
+        [projectId, userId, createdBy || managerId, createdBy || managerId]
       );
     }
   }
