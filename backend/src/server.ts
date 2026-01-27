@@ -50,10 +50,10 @@ app.use(
       const allowedOrigins = [
         process.env.FRONTEND_URL || 'http://localhost:3000',
         'http://51.15.227.10:3000',
-        'http://intra.tensorgo.com'
+        'http://intra.tensorgo.com', 'https://intra.tensorgo.com'
       ];
 
-      if (origin === allowedOrigins[0] || origin === 'http://51.15.227.10:3000' || origin === 'http://intra.tensorgo.com') {
+      if (origin === allowedOrigins[0] || origin === 'http://51.15.227.10:3000' || origin === 'http://intra.tensorgo.com' || origin === 'https://intra.tensorgo.com') {
         return callback(null, true);
       }
 
@@ -93,8 +93,8 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/leave-rules', leaveRuleRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/timesheets', timesheetRoutes);
+// app.use('/api/projects', projectRoutes);
+// app.use('/api/timesheets', timesheetRoutes);
 
 // Error handling
 app.use(errorHandler);

@@ -730,7 +730,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   // Send welcome email with credentials
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
-    const loginUrl = 'http://51.15.227.10:3000/login';
+    // const loginUrl = 'http://51.15.227.10:3000/login';
+    const loginUrl = 'https://intra.tensorgo.com/login';
     const temporaryPassword = finalPassword;
 
     await emailTemplates.sendNewEmployeeCredentialsEmail(employeeData.email, {
