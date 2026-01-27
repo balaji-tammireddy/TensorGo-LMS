@@ -34,15 +34,16 @@ export interface ActivityData {
 
 export class ProjectService {
   private static async generateNextCustomId(table: string, prefix: string, parentColumn?: string, parentId?: number, client: any = pool): Promise<string> {
-    let queryStr = `SELECT custom_id FROM ${table}`;
-    const params: any[] = [];
+    // Filter by prefix pattern to avoid conflicts with system projects or different ID formats
+    let queryStr = `SELECT custom_id FROM ${table} WHERE custom_id LIKE $1`;
+    const params: any[] = [`${prefix}-%`];
 
     if (parentColumn && parentId !== undefined) {
-      queryStr += ` WHERE ${parentColumn} = $1`;
+      queryStr += ` AND ${parentColumn} = $2`;
       params.push(parentId);
     }
 
-    queryStr += ` ORDER BY id DESC LIMIT 1`;
+    queryStr += ` ORDER BY custom_id DESC LIMIT 1`;
 
     const res = await client.query(queryStr, params);
     if (res.rows.length === 0) {
@@ -54,7 +55,10 @@ export class ProjectService {
     const match = lastId.match(/(\d+)$/);
     console.log(`[ProjectService] ID Generation: Last ID=${lastId}, Match=${match ? match[1] : 'null'}`);
 
-    if (!match) return `${prefix}-001`;
+    if (!match) {
+      console.log(`[ProjectService] ID Generation: Failed to parse number from ${lastId}. Starting at 001.`);
+      return `${prefix}-001`;
+    }
 
     const nextNum = parseInt(match[1]) + 1;
     const nextId = `${prefix}-${nextNum.toString().padStart(3, '0')}`;
@@ -269,14 +273,14 @@ export class ProjectService {
 
     // 2. Assign New Manager to ALL modules
     await client.query(`
-      INSERT INTO module_access (module_id, user_id, granted_by)
-      SELECT id, $2, $2 FROM project_modules WHERE project_id = $1
+      INSERT INTO module_access (module_id, user_id, granted_by, created_by, updated_by)
+      SELECT id, $2, $2, $2, $2 FROM project_modules WHERE project_id = $1
     `, [projectId, newManagerId]);
 
     // 3. Assign New Manager to ALL tasks
     await client.query(`
-      INSERT INTO task_access (task_id, user_id, granted_by)
-      SELECT t.id, $2, $2 
+      INSERT INTO task_access (task_id, user_id, granted_by, created_by, updated_by)
+      SELECT t.id, $2, $2, $2, $2 
       FROM project_tasks t
       JOIN project_modules m ON t.module_id = m.id
       WHERE m.project_id = $1
@@ -284,8 +288,8 @@ export class ProjectService {
 
     // 4. Assign New Manager to ALL activities
     await client.query(`
-      INSERT INTO activity_access (activity_id, user_id, granted_by)
-      SELECT a.id, $2, $2 
+      INSERT INTO activity_access (activity_id, user_id, granted_by, created_by, updated_by)
+      SELECT a.id, $2, $2, $2, $2 
       FROM project_activities a
       JOIN project_tasks t ON a.task_id = t.id
       JOIN project_modules m ON t.module_id = m.id
@@ -522,10 +526,10 @@ export class ProjectService {
     // clientOrPool allows participating in existing transaction
     for (const userId of userIds) {
       await clientOrPool.query(
-        `INSERT INTO module_access (module_id, user_id, granted_by)
-         VALUES ($1, $2, $3)
+        `INSERT INTO module_access (module_id, user_id, granted_by, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (module_id, user_id) DO NOTHING`,
-        [moduleId, userId, grantedBy]
+        [moduleId, userId, grantedBy, grantedBy, grantedBy]
       );
     }
   }
@@ -533,10 +537,10 @@ export class ProjectService {
   static async assignTaskAccess(taskId: number, userIds: number[], grantedBy: number, clientOrPool: any = pool) {
     for (const userId of userIds) {
       await clientOrPool.query(
-        `INSERT INTO task_access (task_id, user_id, granted_by)
-               VALUES ($1, $2, $3)
+        `INSERT INTO task_access (task_id, user_id, granted_by, created_by, updated_by)
+               VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (task_id, user_id) DO NOTHING`,
-        [taskId, userId, grantedBy]
+        [taskId, userId, grantedBy, grantedBy, grantedBy]
       );
     }
   }
@@ -659,10 +663,10 @@ export class ProjectService {
   static async assignActivityAccess(activityId: number, userIds: number[], grantedBy: number, clientOrPool: any = pool) {
     for (const userId of userIds) {
       await clientOrPool.query(
-        `INSERT INTO activity_access (activity_id, user_id, granted_by)
-               VALUES ($1, $2, $3)
+        `INSERT INTO activity_access (activity_id, user_id, granted_by, created_by, updated_by)
+               VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (activity_id, user_id) DO NOTHING`,
-        [activityId, userId, grantedBy]
+        [activityId, userId, grantedBy, grantedBy, grantedBy]
       );
     }
   }
