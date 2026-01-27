@@ -94,7 +94,6 @@
   animation: slideUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   display: flex;
   flex-direction: column;
-  margin-top: 80px;
   /* Glowing Border Effect */
   border: 1px solid rgba(60, 111, 242, 0.08);
   outline: 1px solid rgba(255, 255, 255, 0.5);
