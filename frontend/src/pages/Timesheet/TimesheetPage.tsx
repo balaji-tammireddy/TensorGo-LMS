@@ -143,14 +143,8 @@ export const TimesheetPage: React.FC = () => {
         return days;
     }, [weekRange]);
 
-    // Ensure selectedDate is within the current week view
-    useEffect(() => {
-        const startStr = formatDate(weekRange.start);
-        const endStr = formatDate(weekRange.end);
-        if (selectedDate < startStr || selectedDate > endStr) {
-            setSelectedDate(startStr);
-        }
-    }, [weekRange, selectedDate]);
+    // Note: Removed auto-reset of selectedDate to allow selecting dates in previous weeks
+    // The date picker and validation will handle invalid dates
 
     // Cascading Dropdowns
     const handleProjectChange = async (projectId: string) => {
@@ -394,6 +388,17 @@ export const TimesheetPage: React.FC = () => {
                                         <DatePicker
                                             value={selectedDate}
                                             onChange={setSelectedDate}
+                                            min={(() => {
+                                                // Calculate previous week Monday
+                                                const today = new Date();
+                                                const currentDay = today.getDay();
+                                                const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+                                                const currentWeekMonday = new Date(today);
+                                                currentWeekMonday.setDate(diff);
+                                                const previousWeekMonday = new Date(currentWeekMonday);
+                                                previousWeekMonday.setDate(currentWeekMonday.getDate() - 7);
+                                                return previousWeekMonday.toISOString().split('T')[0];
+                                            })()}
                                             max={new Date().toISOString().split('T')[0]} // Cannot log future
                                         />
                                     </div>

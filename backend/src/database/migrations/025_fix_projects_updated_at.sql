@@ -1,0 +1,4 @@
+-- Fix projects.updated_at to be NOT NULL
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
+ALTER TABLE projects ALTER COLUMN updated_at SET NOT NULL;

@@ -92,14 +92,15 @@ export class TimesheetService {
                 throw new Error("Cannot log time for future dates");
             }
 
-            // Validation 2: Current and Past 1 Week Only
+            // Validation 2: Current Week and One Previous Week Only
             const { start, end } = this.getCurrentWeekRange();
-            const allowedStart = new Date(start);
-            allowedStart.setDate(allowedStart.getDate() - 7); // Allow 1 week prior
+            const previousWeekStart = new Date(start);
+            previousWeekStart.setDate(previousWeekStart.getDate() - 7); // One week before current week Monday
 
             // Relax validation for Updates (to allow fixing rejected logs from older weeks)
-            if (!entry.id && (logDateOnly < allowedStart || logDateOnly > end)) {
-                throw new Error("Can only log time for the current or previous week");
+            // Allow logging from previous week Monday to today
+            if (!entry.id && (logDateOnly < previousWeekStart || logDateOnly > today)) {
+                throw new Error("Can only log time for the current week or previous week");
             }
 
             if (entry.id) {
@@ -550,7 +551,7 @@ export class TimesheetService {
         let pRes = await client.query("SELECT id FROM projects WHERE custom_id = $1", [projectCustomId]);
         if (pRes.rows.length === 0) {
             logger.info(`[Timesheet] Creating System Project '${projectCustomId}'...`);
-            const ins = await client.query("INSERT INTO projects (custom_id, name, description, status) VALUES ($1, 'TensorGo', 'System Project', 'active') RETURNING id", [projectCustomId]);
+            const ins = await client.query("INSERT INTO projects (custom_id, name, description, status, created_by, updated_by) VALUES ($1, 'TensorGo', 'System Project', 'active', 1, 1) RETURNING id", [projectCustomId]);
             pRes = ins;
         }
         const pid = pRes.rows[0].id;
@@ -561,7 +562,7 @@ export class TimesheetService {
         let mid;
         if (mRes.rows.length === 0) {
             logger.info(`[Timesheet] Creating System Module '${moduleCustomId}'...`);
-            const ins = await client.query("INSERT INTO project_modules (project_id, custom_id, name, description, status) VALUES ($1, $2, $3, 'System Module', 'active') RETURNING id", [pid, moduleCustomId, type]);
+            const ins = await client.query("INSERT INTO project_modules (project_id, custom_id, name, description, status, created_by, updated_by) VALUES ($1, $2, $3, 'System Module', 'active', 1, 1) RETURNING id", [pid, moduleCustomId, type]);
             mid = ins.rows[0].id;
         } else {
             mid = mRes.rows[0].id;
@@ -573,7 +574,7 @@ export class TimesheetService {
         let tid;
         if (tRes.rows.length === 0) {
             logger.info(`[Timesheet] Creating System Task '${taskCustomId}'...`);
-            const ins = await client.query("INSERT INTO project_tasks (module_id, custom_id, name, status) VALUES ($1, $2, $3, 'active') RETURNING id", [mid, taskCustomId, type]);
+            const ins = await client.query("INSERT INTO project_tasks (module_id, custom_id, name, status, created_by, updated_by) VALUES ($1, $2, $3, 'active', 1, 1) RETURNING id", [mid, taskCustomId, type]);
             tid = ins.rows[0].id;
         } else {
             tid = tRes.rows[0].id;
@@ -585,7 +586,7 @@ export class TimesheetService {
         let aid;
         if (aRes.rows.length === 0) {
             logger.info(`[Timesheet] Creating System Activity '${activityCustomId}'...`);
-            const ins = await client.query("INSERT INTO project_activities (task_id, custom_id, name, status) VALUES ($1, $2, $3, 'active') RETURNING id", [tid, activityCustomId, type]);
+            const ins = await client.query("INSERT INTO project_activities (task_id, custom_id, name, status, created_by, updated_by) VALUES ($1, $2, $3, 'active', 1, 1) RETURNING id", [tid, activityCustomId, type]);
             aid = ins.rows[0].id;
         } else {
             aid = aRes.rows[0].id;
@@ -793,6 +794,8 @@ export class TimesheetService {
         if (filters.projectId) { query += ` AND pe.project_id = $${pIdx++}`; params.push(filters.projectId); }
         // If module, task, activity are passed
         if (filters.moduleId) { query += ` AND pe.module_id = $${pIdx++}`; params.push(filters.moduleId); }
+        if (filters.taskId) { query += ` AND pe.task_id = $${pIdx++}`; params.push(filters.taskId); }
+        if (filters.activityId) { query += ` AND pe.activity_id = $${pIdx++}`; params.push(filters.activityId); }
 
         // Scope Filter (Manager sees only reportees)
         if (filters.managerScopeId) {

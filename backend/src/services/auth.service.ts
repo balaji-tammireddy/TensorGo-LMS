@@ -243,8 +243,8 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   // Store new OTP
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] Storing new OTP in database`);
   await pool.query(
-    `INSERT INTO password_reset_otps (user_id, email, otp, expires_at)
-     VALUES ($1, $2, $3, $4)`,
+    `INSERT INTO password_reset_otps (user_id, email, otp, expires_at, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $1, $1)`,
     [user.id, normalizedEmail, otp, expiresAt]
   );
   logger.info(`[AUTH] [REQUEST PASSWORD RESET] OTP stored successfully`);

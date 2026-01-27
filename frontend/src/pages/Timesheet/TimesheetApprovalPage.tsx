@@ -6,6 +6,7 @@ import { timesheetService, TimesheetEntry } from '../../services/timesheetServic
 import AppLayout from '../../components/layout/AppLayout';
 import { Button } from '../../components/ui/button';
 import { Modal } from '../../components/ui/modal';
+import { TimesheetReportModal } from '../../components/timesheet/TimesheetReportModal';
 import './TimesheetApprovalPage.css';
 
 interface TeamMemberStatus {
@@ -670,45 +671,11 @@ export const TimesheetApprovalPage: React.FC = () => {
                     </div>
                 </Modal>
 
-                {/* Report Modal */}
-                <Modal
+                {/* PDF Report Modal */}
+                <TimesheetReportModal
                     isOpen={reportModalOpen}
                     onClose={() => setReportModalOpen(false)}
-                    title="Download Report"
-                    footer={
-                        <>
-                            <button className="modal-btn secondary" onClick={() => setReportModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn primary" onClick={handleDownloadReport}>Download CSV</button>
-                        </>
-                    }
-                >
-                    <div style={{ display: 'grid', gap: '16px' }}>
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Date Range</label>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <input
-                                    type="date"
-                                    className="ts-form-input"
-                                    value={reportFilters.startDate}
-                                    onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
-                                />
-                                <input
-                                    type="date"
-                                    className="ts-form-input"
-                                    value={reportFilters.endDate}
-                                    onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        {/* Add project/module filtering inputs if needed. 
-                            The user requirement 8 says: "Manager: name of their reportees only... project, module... only if he is manager".
-                            For now keeping simplified to Date Range + implicit scope filter in backend.
-                        */}
-                        <p style={{ fontSize: '13px', color: '#64748b' }}>
-                            Report will include all timesheet entries for your reportees within the selected date range.
-                        </p>
-                    </div>
-                </Modal>
+                />
             </div>
         </AppLayout >
     );

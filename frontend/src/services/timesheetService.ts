@@ -72,5 +72,31 @@ export const timesheetService = {
 
         const response = await api.get(`/timesheets/report?${params.toString()}`);
         return response.data;
+    },
+
+    generatePDFReport: async (filters: {
+        employeeId?: number;
+        projectId?: number;
+        moduleId?: number;
+        taskId?: number;
+        activityId?: number;
+        startDate?: string;
+        endDate?: string;
+    }): Promise<Blob> => {
+        const params = new URLSearchParams();
+
+        if (filters.employeeId) params.append('targetUserId', filters.employeeId.toString());
+        if (filters.projectId) params.append('projectId', filters.projectId.toString());
+        if (filters.moduleId) params.append('moduleId', filters.moduleId.toString());
+        if (filters.taskId) params.append('taskId', filters.taskId.toString());
+        if (filters.activityId) params.append('activityId', filters.activityId.toString());
+        if (filters.startDate) params.append('startDate', filters.startDate);
+        if (filters.endDate) params.append('endDate', filters.endDate);
+
+        const response = await api.get(`/timesheets/report/pdf?${params.toString()}`, {
+            responseType: 'blob'
+        });
+
+        return response.data;
     }
 };

@@ -674,8 +674,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
-      [userId, casualBalance, sickBalance]
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by) VALUES ($1, $2, $3, 10, $4, $4)',
+      [userId, casualBalance, sickBalance, requesterId || userId]
     );
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
   } else {
@@ -1475,8 +1475,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     } else {
       // Create new balance record if it doesn't exist
       await pool.query(
-        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
-         VALUES ($1, $2, $3, 10, $4)`,
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by)
+         VALUES ($1, $2, $3, 10, $4, $4)`,
         [employeeId, casualBalance, sickBalance, requesterId]
       );
     }
@@ -1712,8 +1712,8 @@ export const addLeavesToEmployee = async (
       initialBalances[balanceColumn] = count;
 
       await client.query(
-        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
-         VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $5)`,
         [
           employeeId,
           initialBalances.casual_balance,

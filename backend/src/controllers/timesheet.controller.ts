@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { TimesheetService } from '../services/timesheet.service';
 import { logger } from '../utils/logger';
+import { pool } from '../database/db';
 
 export const saveEntry = async (req: AuthRequest, res: Response) => {
     try {
@@ -97,12 +98,30 @@ export const getTeamStatus = async (req: AuthRequest, res: Response) => {
 export const getMemberWeeklyEntries = async (req: AuthRequest, res: Response) => {
     try {
         const approverId = req.user?.id;
+        const approverRole = req.user?.role;
         const { targetUserId } = req.params;
         const { start_date, end_date } = req.query;
 
         if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
 
-        // Check Permissions
+        // Allow HR and Super Admin to view their own timesheets
+        const isSelf = approverId === parseInt(targetUserId);
+        const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin';
+
+        if (isSelf && isHROrAdmin) {
+            // HR/Super Admin viewing their own timesheet - allow it
+            const entries = await TimesheetService.getEntriesForWeek(parseInt(targetUserId), String(start_date), String(end_date));
+            return res.json(entries);
+        }
+
+        // Check Permissions for viewing other users
+        // HR and Super Admin can VIEW all users' timesheets (but can only APPROVE their reportees)
+        if (isHROrAdmin) {
+            const entries = await TimesheetService.getEntriesForWeek(parseInt(targetUserId), String(start_date), String(end_date));
+            return res.json(entries);
+        }
+
+        // For Managers: Check if they manage this user
         const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, parseInt(targetUserId));
         if (!isAllowed) return res.status(403).json({ error: 'You are not authorized to view this user\'s timesheet' });
 
@@ -173,13 +192,15 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const { projectId, moduleId, startDate, endDate, targetUserId } = req.query;
+        const { projectId, moduleId, taskId, activityId, startDate, endDate, targetUserId } = req.query;
 
         const filters: any = {
             startDate: startDate ? String(startDate) : undefined,
             endDate: endDate ? String(endDate) : undefined,
             projectId: projectId ? parseInt(String(projectId)) : undefined,
             moduleId: moduleId ? parseInt(String(moduleId)) : undefined,
+            taskId: taskId ? parseInt(String(taskId)) : undefined,
+            activityId: activityId ? parseInt(String(activityId)) : undefined,
             userId: targetUserId ? parseInt(String(targetUserId)) : undefined
         };
 
@@ -194,6 +215,80 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         res.json(data);
     } catch (error: any) {
         logger.error('[TimeSheet] Report Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const generatePDFReport = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const userName = req.user?.name;
+        const role = req.user?.role;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { projectId, moduleId, taskId, activityId, startDate, endDate, targetUserId } = req.query;
+
+        const filters: any = {
+            startDate: startDate ? String(startDate) : undefined,
+            endDate: endDate ? String(endDate) : undefined,
+            projectId: projectId ? parseInt(String(projectId)) : undefined,
+            moduleId: moduleId ? parseInt(String(moduleId)) : undefined,
+            taskId: taskId ? parseInt(String(taskId)) : undefined,
+            activityId: activityId ? parseInt(String(activityId)) : undefined,
+            userId: targetUserId ? parseInt(String(targetUserId)) : undefined
+        };
+
+        // Scope enforcement
+        if (role !== 'super_admin' && role !== 'hr') {
+            filters.managerScopeId = userId; // Limit to reportees
+        }
+
+        const entries = await TimesheetService.getReportData(filters);
+
+        // Get filter names for display
+        const filterNames: any = {};
+        if (filters.userId) {
+            const userRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [filters.userId]);
+            if (userRes.rows.length > 0) {
+                filterNames.employeeName = `${userRes.rows[0].first_name} ${userRes.rows[0].last_name || ''}`.trim();
+            }
+        }
+        if (filters.projectId) {
+            const projRes = await pool.query('SELECT name FROM projects WHERE id = $1', [filters.projectId]);
+            if (projRes.rows.length > 0) filterNames.projectName = projRes.rows[0].name;
+        }
+        if (filters.moduleId) {
+            const modRes = await pool.query('SELECT name FROM project_modules WHERE id = $1', [filters.moduleId]);
+            if (modRes.rows.length > 0) filterNames.moduleName = modRes.rows[0].name;
+        }
+        if (filters.taskId) {
+            const taskRes = await pool.query('SELECT name FROM project_tasks WHERE id = $1', [filters.taskId]);
+            if (taskRes.rows.length > 0) filterNames.taskName = taskRes.rows[0].name;
+        }
+        if (filters.activityId) {
+            const actRes = await pool.query('SELECT name FROM project_activities WHERE id = $1', [filters.activityId]);
+            if (actRes.rows.length > 0) filterNames.activityName = actRes.rows[0].name;
+        }
+        if (filters.startDate) filterNames.startDate = filters.startDate;
+        if (filters.endDate) filterNames.endDate = filters.endDate;
+
+        // Generate PDF
+        const { generateTimesheetPDF } = await import('../utils/pdfGenerator');
+        const pdfBuffer = await generateTimesheetPDF({
+            entries,
+            filters: filterNames,
+            generatedBy: userName || 'Unknown User',
+            generatedAt: new Date().toISOString()
+        });
+
+        // Set response headers for PDF download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=timesheet-report-${new Date().toISOString().split('T')[0]}.pdf`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        res.send(pdfBuffer);
+    } catch (error: any) {
+        logger.error('[TimeSheet] PDF Report Error:', error);
         res.status(500).json({ error: error.message });
     }
 };

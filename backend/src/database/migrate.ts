@@ -101,18 +101,18 @@ async function migrate() {
 
     // Insert sample holidays (2025 calendar)
     await pool.query(`
-      INSERT INTO holidays (holiday_date, holiday_name, is_active)
+      INSERT INTO holidays (holiday_date, holiday_name, is_active, created_by, updated_by)
       VALUES 
-        ('2025-01-01', 'New Year Day', true),
-        ('2025-01-14', 'Sankranti', true),
-        ('2025-02-26', 'Maha Shivaratri', true),
-        ('2025-03-14', 'Holi', true),
-        ('2025-08-15', 'Independence Day', true),
-        ('2025-08-27', 'Ganesh Chaturthi', true),
-        ('2025-10-02', 'Dussera', true),
-        ('2025-10-20', 'Deepavali', true),
-        ('2025-10-21', 'Govardhan Puja', true),
-        ('2025-12-25', 'Christmas', true)
+        ('2025-01-01', 'New Year Day', true, 1, 1),
+        ('2025-01-14', 'Sankranti', true, 1, 1),
+        ('2025-02-26', 'Maha Shivaratri', true, 1, 1),
+        ('2025-03-14', 'Holi', true, 1, 1),
+        ('2025-08-15', 'Independence Day', true, 1, 1),
+        ('2025-08-27', 'Ganesh Chaturthi', true, 1, 1),
+        ('2025-10-02', 'Dussera', true, 1, 1),
+        ('2025-10-20', 'Deepavali', true, 1, 1),
+        ('2025-10-21', 'Govardhan Puja', true, 1, 1),
+        ('2025-12-25', 'Christmas', true, 1, 1)
       ON CONFLICT (holiday_date) DO NOTHING
     `);
 
@@ -422,6 +422,30 @@ async function migrate() {
       console.log('Timesheet Module migration (023) completed');
     } catch (timesheetError: any) {
       console.warn('Timesheet module migration warning:', timesheetError.message);
+    }
+
+    // Run NOT NULL audit columns migration (024)
+    try {
+      const auditNotNullFile = readFileSync(
+        join(__dirname, 'migrations', '024_add_not_null_audit_columns.sql'),
+        'utf-8'
+      );
+      await pool.query(auditNotNullFile);
+      console.log('NOT NULL audit columns migration (024) completed');
+    } catch (auditNotNullError: any) {
+      console.warn('NOT NULL audit columns migration warning:', auditNotNullError.message);
+    }
+
+    // Run fix projects updated_at migration (025)
+    try {
+      const fixProjectsFile = readFileSync(
+        join(__dirname, 'migrations', '025_fix_projects_updated_at.sql'),
+        'utf-8'
+      );
+      await pool.query(fixProjectsFile);
+      console.log('Fix projects.updated_at migration (025) completed');
+    } catch (fixProjectsError: any) {
+      console.warn('Fix projects migration warning:', fixProjectsError.message);
     }
 
     console.log('Default data inserted');

@@ -12,8 +12,9 @@ router.get('/weekly', authenticateToken, timesheetController.getWeeklyEntries);
 router.get('/team-status', authenticateToken, timesheetController.getTeamStatus);
 router.get('/member/:targetUserId', authenticateToken, timesheetController.getMemberWeeklyEntries);
 router.post('/approve', authenticateToken, timesheetController.approveTimesheet);
-router.post('/reject', authenticateToken, timesheetController.rejectEntry);
-router.post('/reject-bulk', authenticateToken, timesheetController.rejectTimesheet);
+router.post('/reject-entry', authenticateToken, timesheetController.rejectEntry);
+router.post('/reject', authenticateToken, timesheetController.rejectTimesheet);
 router.get('/report', authenticateToken, timesheetController.generateReport);
+router.get('/report/pdf', authenticateToken, timesheetController.generatePDFReport);
 
 export default router;

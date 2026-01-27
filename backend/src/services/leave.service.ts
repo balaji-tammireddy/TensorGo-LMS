@@ -53,8 +53,8 @@ export const getLeaveBalances = async (userId: number): Promise<any> => {
   if (result.rows.length === 0) {
     logger.info(`[LEAVE] [GET LEAVE BALANCES] No balance record found, initializing with defaults`);
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
-      [userId]
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by) VALUES ($1, 0, 0, 10, $2, $2)',
+      [userId, userId]
     );
     balancesRaw = { casual: 0, sick: 0, lop: 10 };
   } else {
@@ -1481,8 +1481,8 @@ export const updateLeaveRequest = async (
       const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
 
       await client.query(
-        'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)',
-        [requestId, leaveDayDateStr, day.type, leaveData.leaveType, userId]
+        'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id, created_by, updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [requestId, leaveDayDateStr, day.type, leaveData.leaveType, userId, userId, userId]
       );
     }
 
