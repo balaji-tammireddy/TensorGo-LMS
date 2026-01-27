@@ -1896,3 +1896,161 @@ TensorGo Intranet
     `
   });
 };
+
+// ============================================================================
+// TIMESHEET EMAILS
+// ============================================================================
+
+export interface TimesheetStatusEmailData {
+  employeeName: string;
+  employeeEmpId?: string;
+  status: 'approved' | 'rejected';
+  startDate?: string;
+  endDate?: string;
+  logDate?: string; // For single entry rejection
+  reason?: string;
+  approverName?: string;
+}
+
+export interface TimesheetReminderEmailData {
+  employeeName: string;
+  reminderType: 'daily' | 'friday_alert' | 'criteria_not_met';
+  hoursLogged?: number;
+  date?: string;
+}
+
+export interface TimesheetSubmissionEmailData {
+  managerName?: string;
+  employeeName: string;
+  hoursLogged: number;
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * Send Timesheet Status Email (Approval/Rejection)
+ */
+export const sendTimesheetStatusEmail = async (
+  recipientEmail: string,
+  data: TimesheetStatusEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const isApproved = data.status === 'approved';
+  const title = `Timesheet ${isApproved ? 'Approved' : 'Rejected'}`;
+
+  let mainMessage = `Dear ${data.employeeName},<br/><br/>`;
+  if (isApproved) {
+    mainMessage += `Your timesheet for the period <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong> has been <strong>approved</strong>.`;
+  } else {
+    if (data.logDate) {
+      mainMessage += `Your timesheet entry for <strong>${data.logDate}</strong> has been <strong>rejected</strong>.`;
+    } else {
+      mainMessage += `Your timesheet entries for <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong> have been <strong>rejected</strong>.`;
+    }
+  }
+
+  const detailsTable = generateDetailsTable([
+    { label: 'Status:', value: data.status.toUpperCase(), isBold: true },
+    ...(data.startDate ? [{ label: 'Period:', value: `${data.startDate} to ${data.endDate}` }] : []),
+    ...(data.logDate ? [{ label: 'Date:', value: data.logDate }] : []),
+    ...(data.reason ? [{ label: 'Reason:', value: data.reason }] : []),
+    ...(data.approverName ? [{ label: 'Action By:', value: data.approverName }] : []),
+  ]);
+
+  const content = `
+    ${mainMessage}
+    ${detailsTable}
+    ${!isApproved ? '<p style="margin-top: 20px; color: #dc2626;"><strong>Action Required:</strong> Please log in to the portal to correct and resubmit your timesheet.</p>' : ''}
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
+  `;
+
+  return await sendEmail({
+    to: recipientEmail,
+    subject: `${title} - TensorGo Intranet [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, `${title} notification`),
+    text: `${title}\n\n${mainMessage.replace(/<br\/>/g, '\n').replace(/<\/?[^>]+(>|$)/g, "")}`
+  });
+};
+
+/**
+ * Send Timesheet Reminder/Alert Email
+ */
+export const sendTimesheetReminderEmail = async (
+  recipientEmail: string,
+  data: TimesheetReminderEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  let title = 'Timesheet Reminder';
+  let message = '';
+  let preview = '';
+
+  if (data.reminderType === 'daily') {
+    title = 'Daily Timesheet Reminder';
+    message = `You haven't logged your timesheet for today (<strong>${data.date}</strong>). Please log it as soon as possible.`;
+    preview = `Don't forget to log your timesheet for ${data.date}`;
+  } else if (data.reminderType === 'friday_alert') {
+    title = 'Timesheet Alert: Low Hours';
+    message = `You have logged only <strong>${data.hoursLogged} hours</strong> this week. Please ensure you meet the 40-hour criteria by Saturday 9 PM.`;
+    preview = `Weekly hours alert: ${data.hoursLogged} hours logged`;
+  } else if (data.reminderType === 'criteria_not_met') {
+    title = 'Timesheet Criteria Not Met';
+    message = `You have logged only <strong>${data.hoursLogged} hours</strong> this week (Minimum 40 required). Your timesheet was <strong>NOT</strong> submitted. Please update it immediately.`;
+    preview = 'Timesheet auto-submission failed - hours below 40';
+  }
+
+  const content = `
+    <p>Dear ${data.employeeName},</p>
+    <p>${message}</p>
+    <div style="margin: 30px 0; text-align: center;">
+      <a href="https://intranet.tensorgo.com/project-management" style="background-color:#1e3a8a;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:50px;text-align:center;text-decoration:none;width:200px;border-radius:6px;">Update Timesheet</a>
+    </div>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
+  `;
+
+  return await sendEmail({
+    to: recipientEmail,
+    subject: `${title} - TensorGo Intranet [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, preview),
+    text: `${title}\n\nDear ${data.employeeName},\n\n${message.replace(/<\/?[^>]+(>|$)/g, "")}`
+  });
+};
+
+/**
+ * Send Timesheet Submission Email (to Manager)
+ */
+export const sendTimesheetSubmissionEmail = async (
+  managerEmail: string,
+  data: TimesheetSubmissionEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const title = 'Timesheet Auto-Submitted';
+  const content = `
+    <p>Dear Manager,</p>
+    <p>The timesheet for <strong>${data.employeeName}</strong> has been auto-submitted as they have met the weekly 40-hour criteria.</p>
+    ${generateDetailsTable([
+    { label: 'Employee Name:', value: data.employeeName, isBold: true },
+    { label: 'Weekly Hours:', value: `${data.hoursLogged} hours`, isBold: true },
+    { label: 'Period:', value: `${data.startDate} to ${data.endDate}` },
+    { label: 'Status:', value: 'SUBMITTED', isBold: true }
+  ])}
+    <p style="margin-top: 30px;">Please log in to the portal to review and approve the timesheet entries.</p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
+  `;
+
+  return await sendEmail({
+    to: managerEmail,
+    subject: `Timesheet Submitted: ${data.employeeName} [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, `${data.employeeName} submitted their timesheet`),
+    text: `${title}\n\nThe timesheet for ${data.employeeName} has been auto-submitted with ${data.hoursLogged} hours.`
+  });
+};
+

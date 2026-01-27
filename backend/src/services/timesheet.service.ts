@@ -1,6 +1,7 @@
 import { pool } from '../database/db';
 import { logger } from '../utils/logger';
 import { sendEmail } from '../utils/email';
+import { sendTimesheetStatusEmail, sendTimesheetReminderEmail, sendTimesheetSubmissionEmail } from '../utils/emailTemplates';
 
 export interface TimesheetEntry {
     id?: number;
@@ -266,10 +267,11 @@ export class TimesheetService {
             // Notify User
             const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [targetUserId]);
             if (userRes.rows.length > 0) {
-                await sendEmail({
-                    to: userRes.rows[0].email,
-                    subject: 'Timesheet Approved',
-                    text: `Hi ${userRes.rows[0].first_name},\n\nYour timesheet for ${startDateStr} to ${endDateStr} has been approved.`
+                await sendTimesheetStatusEmail(userRes.rows[0].email, {
+                    employeeName: userRes.rows[0].first_name,
+                    status: 'approved',
+                    startDate: startDateStr,
+                    endDate: endDateStr
                 });
             }
 
@@ -303,10 +305,11 @@ export class TimesheetService {
                 // Notify User
                 const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [user_id]);
                 if (userRes.rows.length > 0) {
-                    await sendEmail({
-                        to: userRes.rows[0].email,
-                        subject: 'Timesheet Entry Rejected',
-                        text: `Hi ${userRes.rows[0].first_name},\n\nYour timesheet entry for ${this.formatDate(log_date)} has been rejected.\nReason: ${reason}\nPlease log in to correct and resubmit.`
+                    await sendTimesheetStatusEmail(userRes.rows[0].email, {
+                        employeeName: userRes.rows[0].first_name,
+                        status: 'rejected',
+                        logDate: this.formatDate(log_date),
+                        reason: reason
                     });
                 }
             }
@@ -343,10 +346,12 @@ export class TimesheetService {
             if (res.rowCount && res.rowCount > 0) {
                 const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [targetUserId]);
                 if (userRes.rows.length > 0) {
-                    sendEmail({
-                        to: userRes.rows[0].email,
-                        subject: 'Timesheet Rejected',
-                        text: `Hi ${userRes.rows[0].first_name},\n\nYour timesheet entries for ${startDate} to ${endDate} have been rejected.\nReason: ${reason}\nPlease log in to correct and resubmit.`
+                    sendTimesheetStatusEmail(userRes.rows[0].email, {
+                        employeeName: userRes.rows[0].first_name,
+                        status: 'rejected',
+                        startDate: startDate,
+                        endDate: endDate,
+                        reason: reason
                     }).catch(console.error);
                 }
             }
@@ -440,10 +445,10 @@ export class TimesheetService {
         `, [todayStr]);
 
         for (const u of res.rows) {
-            await sendEmail({
-                to: u.email,
-                subject: 'Timesheet Reminder',
-                text: `Hi ${u.first_name},\n\nYou haven't logged your timesheet for today (${todayStr}). Please log it now.`
+            await sendTimesheetReminderEmail(u.email, {
+                employeeName: u.first_name,
+                reminderType: 'daily',
+                date: todayStr
             });
         }
     }
@@ -467,10 +472,10 @@ export class TimesheetService {
         `, [startStr, endStr]);
 
         for (const u of res.rows) {
-            await sendEmail({
-                to: u.email,
-                subject: 'Timesheet Alert: Less than 32 Hours',
-                text: `Hi ${u.first_name},\n\nYou have logged only ${u.total_hours} hours this week. Please ensure you meet the 40-hour criteria by Saturday 9 PM.`
+            await sendTimesheetReminderEmail(u.email, {
+                employeeName: u.first_name,
+                reminderType: 'friday_alert',
+                hoursLogged: parseFloat(u.total_hours)
             });
         }
     }
@@ -514,20 +519,21 @@ export class TimesheetService {
                     if (u.reporting_manager_id) {
                         const mgrRes = await client.query('SELECT email FROM users WHERE id = $1', [u.reporting_manager_id]);
                         if (mgrRes.rows.length > 0) {
-                            await sendEmail({
-                                to: mgrRes.rows[0].email,
-                                subject: 'Timesheet Auto-Submitted',
-                                text: `Employee ${u.first_name} has met the 40-hour criteria (${hours} hours). Timesheet submitted for approval.`
+                            await sendTimesheetSubmissionEmail(mgrRes.rows[0].email, {
+                                employeeName: u.first_name,
+                                hoursLogged: hours,
+                                startDate: startStr,
+                                endDate: endStr
                             });
                         }
                     }
 
                 } else {
                     // Criteria Not Met: Warn User
-                    await sendEmail({
-                        to: u.email,
-                        subject: 'Timesheet Criteria Not Met',
-                        text: `Hi ${u.first_name},\n\nYou have logged only ${hours} hours this week (Min 40 required). Your timesheet was NOT submitted. Please update it immediately.`
+                    await sendTimesheetReminderEmail(u.email, {
+                        employeeName: u.first_name,
+                        reminderType: 'criteria_not_met',
+                        hoursLogged: hours
                     });
                     logger.info(`[Timesheet] User ${u.id} Not Submitted (<40h). Warning sent.`);
                 }
