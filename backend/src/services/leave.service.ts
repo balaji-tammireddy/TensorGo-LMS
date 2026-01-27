@@ -668,21 +668,16 @@ export const applyLeave = async (
         const toEmail = chain.l1_email;
         const toName = chain.l1_name || 'Reporting Manager';
 
-        // CC list: Reporting HR (L2) only if employee/intern applied
-        const ccSet = new Set<string>();
-        if (chain.l2_email) ccSet.add(chain.l2_email);
-
-        // Remove 'To' email from CC if somehow duplicated
-        if (toEmail) ccSet.delete(toEmail);
-
-        const ccEmails = Array.from(ccSet);
+        // CC list: Removed HR (L2) from CC list as per requirement
+        // The email should go only to the reporting manager
+        const ccEmails: string[] = [];
 
         if (toEmail) {
           const emailData = { ...baseEmailData, managerName: toName };
           if (isUrgent) {
-            await sendUrgentLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+            await sendUrgentLeaveApplicationEmail(toEmail, emailData, undefined);
           } else {
-            await sendLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+            await sendLeaveApplicationEmail(toEmail, emailData, undefined);
           }
         } else {
           logger.warn(`No reporting manager (L1) found for user ${userId}. Email not sent.`);
@@ -1533,11 +1528,11 @@ export const updateLeaveRequest = async (
         };
 
         const toEmail = chain.l1_email;
+        // CC list: Removed HR (L2) from CC list as per requirement
         const ccEmails: string[] = [];
-        if (chain.l2_email) ccEmails.push(chain.l2_email);
 
         if (toEmail) {
-          await sendLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+          await sendLeaveApplicationEmail(toEmail, emailData, undefined);
         }
       } catch (e) {
         logger.error('Async email error in updateLeaveRequest:', e);
