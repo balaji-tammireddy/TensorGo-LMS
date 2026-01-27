@@ -54,8 +54,7 @@ const sendDailyPendingLeaveReminders = async () => {
             lr.leave_type,
             lr.start_date,
             lr.end_date,
-            (SELECT COALESCE(SUM(CASE WHEN ld.day_type = 'half' THEN 0.5 ELSE 1 END), 0) 
-             FROM leave_days ld WHERE ld.leave_request_id = lr.id) as no_of_days,
+            (lr.end_date - lr.start_date + 1) as no_of_days,
             lr.applied_date,
             emp.first_name || ' ' || COALESCE(emp.last_name, '') as employee_name,
             emp.emp_id as employee_emp_id
