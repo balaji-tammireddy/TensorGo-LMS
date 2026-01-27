@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, Search, UserX, CheckSquare } from 'lucide-react';
+import { X, ChevronDown, Search, UserX } from 'lucide-react';
 import EmptyState from '../../../components/common/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -52,6 +52,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     // Multi-select state
     const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
     const [loadingCandidates, setLoadingCandidates] = useState(false);
+
 
     useEffect(() => {
         if (!isOpen) return;
@@ -275,8 +276,12 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                 className="form-input"
                                 value={formData.name}
                                 onChange={e => {
-                                    if (e.target.value.length <= NAME_LIMIT) {
-                                        setFormData({ ...formData, name: toTitleCase(e.target.value) });
+                                    const val = e.target.value;
+                                    // Validation: Only letters, numbers and spaces allowed
+                                    const isValid = /^[a-zA-Z0-9 ]*$/.test(val);
+
+                                    if (isValid && val.length <= NAME_LIMIT) {
+                                        setFormData({ ...formData, name: toTitleCase(val) });
                                     }
                                 }}
                                 required

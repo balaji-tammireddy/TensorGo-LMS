@@ -73,7 +73,6 @@ export const ProjectWorkspace: React.FC = () => {
     // Permissions Logic
     const isPM = !!project?.is_pm;
     const isSuperAdmin = user?.role === 'super_admin';
-    const isHR = user?.role === 'hr';
 
     // Check if project is in a read-only state
     const isProjectReadOnly = project?.status === 'completed' || project?.status === 'archived';
@@ -83,7 +82,6 @@ export const ProjectWorkspace: React.FC = () => {
     //    - PM: can edit THEIR projects (but cannot change PM), unless completed/archived
     //    - HR: can only edit if they are PM, unless completed/archived
     const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
-    const canChangePM = isSuperAdmin && !isProjectReadOnly; // Only super_admin can change project manager
 
     // 2. Module/Task/Activity Creation: PM or Super Admin can create, unless project is read-only
     const canCreateModule = (isPM || isSuperAdmin) && !isProjectReadOnly;
@@ -179,7 +177,6 @@ export const ProjectWorkspace: React.FC = () => {
         },
         {
             onMutate: async ({ moduleId, userId, action, userObj }) => {
-                console.log('[MODULE MUTATE] Starting:', { moduleId, userId, action, userObj });
                 await queryClient.cancelQueries(['modules', projectId]);
                 const previousModules = queryClient.getQueryData<any[]>(['modules', projectId]);
 
@@ -191,7 +188,6 @@ export const ProjectWorkspace: React.FC = () => {
                         const isAssigned = action === 'remove'; // Use explicit action
 
                         let newAssignedUsers = m.assigned_users || [];
-                        console.log('[MODULE MUTATE] Before:', { currentUsers: newAssignedUsers.length, action });
 
                         if (isAssigned) {
                             newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
@@ -218,21 +214,15 @@ export const ProjectWorkspace: React.FC = () => {
                         } else {
                             // Use provided userObj or search fallback
                             if (userObj) {
-                                console.log('[MODULE MUTATE] Adding user from userObj:', userObj);
                                 newAssignedUsers = [...newAssignedUsers, userObj];
                             } else {
-                                console.log('[MODULE MUTATE] userObj not provided, searching in cache');
                                 const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
                                 const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
                                 if (candidate) {
-                                    console.log('[MODULE MUTATE] Found candidate in cache:', candidate);
                                     newAssignedUsers = [...newAssignedUsers, candidate];
-                                } else {
-                                    console.warn('[MODULE MUTATE] Candidate not found!');
                                 }
                             }
                         }
-                        console.log('[MODULE MUTATE] After:', { newUsers: newAssignedUsers.length });
                         return { ...m, assigned_users: newAssignedUsers };
                     });
                 }) as any);
@@ -240,14 +230,12 @@ export const ProjectWorkspace: React.FC = () => {
                 return { previousModules };
             },
             onSuccess: (data, { moduleId }) => {
-                console.log('[MODULE SUCCESS] Server response:', { moduleId, updatedUsers: data.updatedUsers });
                 // Force update with server's authoritative response
                 if (data.updatedUsers !== undefined) {
                     queryClient.setQueryData(['modules', projectId], ((old: any[] | undefined) => {
                         if (!old) return [];
                         return old.map(m => {
                             if (String(m.id) === String(moduleId)) {
-                                console.log('[MODULE SUCCESS] Updating module:', { moduleId, updatedUsersCount: data.updatedUsers.length });
                                 return { ...m, assigned_users: data.updatedUsers };
                             }
                             return m;
