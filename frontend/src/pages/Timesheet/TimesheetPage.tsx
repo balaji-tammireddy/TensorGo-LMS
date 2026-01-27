@@ -558,7 +558,6 @@ export const TimesheetPage: React.FC = () => {
                                             className="ts-form-input"
                                             value={formData.duration}
                                             onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                                            placeholder="e.g. 4.0"
                                             required
                                         />
                                     </div>
@@ -611,7 +610,6 @@ export const TimesheetPage: React.FC = () => {
                                             className="ts-form-textarea"
                                             value={formData.description}
                                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            placeholder="Work description..."
                                             required
                                         />
                                     </div>
