@@ -268,11 +268,11 @@ export const addLeavesToEmployee = [
 
       // Implicitly handle form-data parsing quirks (sometimes strings)
       // Validate leaveType
-      if (leaveType !== 'casual') {
+      if (leaveType !== 'casual' && leaveType !== 'lop') {
         return res.status(400).json({
           error: {
             code: 'BAD_REQUEST',
-            message: 'Only casual leaves can be added manually'
+            message: 'Only casual and LOP leaves can be added manually'
           }
         });
       }
