@@ -72,15 +72,23 @@ export const ProjectWorkspace: React.FC = () => {
 
     // Permissions Logic
     const isPM = !!project?.is_pm;
-    const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hr';
+    const isSuperAdmin = user?.role === 'super_admin';
+    const isHR = user?.role === 'hr';
 
-    // 1. Project-level: Super Admin or PM can edit/delete/status
-    const canManageProject = isSuperAdmin || isPM;
+    // Check if project is in a read-only state
+    const isProjectReadOnly = project?.status === 'completed' || project?.status === 'archived';
 
-    // 2. Module/Task/Activity Creation: ONLY PM can create these
-    const canCreateModule = isPM;
-    const canAddTask = isPM;
-    const canAddActivity = isPM;
+    // 1. Project-level editing:
+    //    - Super Admin: can edit ANY project (including changing PM), unless completed/archived
+    //    - PM: can edit THEIR projects (but cannot change PM), unless completed/archived
+    //    - HR: can only edit if they are PM, unless completed/archived
+    const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
+    const canChangePM = isSuperAdmin && !isProjectReadOnly; // Only super_admin can change project manager
+
+    // 2. Module/Task/Activity Creation: PM or Super Admin can create, unless project is read-only
+    const canCreateModule = (isPM || isSuperAdmin) && !isProjectReadOnly;
+    const canAddTask = (isPM || isSuperAdmin) && !isProjectReadOnly;
+    const canAddActivity = (isPM || isSuperAdmin) && !isProjectReadOnly;
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type
@@ -438,17 +446,28 @@ export const ProjectWorkspace: React.FC = () => {
         if (!currentStatus) return null;
 
         const statusOptions = [
-            { value: 'active', label: 'Active', color: '#10B981', bg: '#ECFDF5' },
-            { value: 'on_hold', label: 'On Hold', color: '#B45309', bg: '#FFFBEB' },
-            { value: 'completed', label: 'Completed', color: '#374151', bg: '#F3F4F6' },
-            { value: 'archived', label: 'Archived', color: '#EF4444', bg: '#FEF2F2' }
+            { value: 'active', label: 'Active', color: '#FFFFFF', bg: '#10B981', border: '#059669' },
+            { value: 'on_hold', label: 'On Hold', color: '#FFFFFF', bg: '#F59E0B', border: '#D97706' },
+            { value: 'completed', label: 'Completed', color: '#FFFFFF', bg: '#6366F1', border: '#4F46E5' },
+            { value: 'archived', label: 'Archived', color: '#FFFFFF', bg: '#64748B', border: '#475569' }
         ];
 
         const current = statusOptions.find(s => s.value === currentStatus) || statusOptions[0];
 
         if (!canManageStatus) {
             return (
-                <span className="ws-status-badge" style={{ backgroundColor: current.bg, color: current.color, border: `1px solid ${current.color}30` }}>
+                <span
+                    className="ws-status-badge"
+                    style={{
+                        backgroundColor: current.bg,
+                        color: current.color,
+                        border: `2px solid ${current.border}`,
+                        fontWeight: '600',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        fontSize: '12px'
+                    }}
+                >
                     {current.label}
                 </span>
             );
@@ -462,11 +481,16 @@ export const ProjectWorkspace: React.FC = () => {
                         style={{
                             backgroundColor: current.bg,
                             color: current.color,
-                            border: `1px solid ${current.color}30`,
+                            border: `2px solid ${current.border}`,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '6px',
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            fontSize: '12px',
+                            transition: 'all 0.2s'
                         }}
                     >
                         {current.label}
@@ -479,14 +503,21 @@ export const ProjectWorkspace: React.FC = () => {
                             key={option.value}
                             onClick={() => handleStatusChange(option.value)}
                             className="status-dropdown-item"
-                            style={{ color: option.color }}
+                            style={{
+                                color: '#374151', // Dark text color for dropdown
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                fontWeight: '500'
+                            }}
                         >
                             <span style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                backgroundColor: option.color,
-                                marginRight: '8px'
+                                width: '10px',
+                                height: '10px',
+                                borderRadius: '3px',
+                                backgroundColor: option.bg,
+                                border: `2px solid ${option.border}`,
+                                flexShrink: 0
                             }} />
                             {option.label}
                         </DropdownMenuItem>

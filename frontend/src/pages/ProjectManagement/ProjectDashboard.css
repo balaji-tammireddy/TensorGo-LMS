@@ -409,18 +409,48 @@
 /* Removed .status-badge override to use global styles */
 
 .status-active {
-    background-color: #c6f6d5;
-    color: #22543d;
+    background-color: #10B981;
+    color: white !important;
+    border: 1px solid #059669;
+}
+
+.status-on-hold {
+    background-color: #F59E0B;
+    color: white !important;
+    border: 1px solid #D97706;
 }
 
 .status-completed {
-    background-color: #edf2f7;
-    color: #2d3748;
+    background-color: #6366F1;
+    color: white !important;
+    border: 1px solid #4F46E5;
+}
+
+.status-archived {
+    background-color: #64748B;
+    color: white !important;
+    border: 1px solid #475569;
 }
 
 .status-other {
-    background-color: #feebc8;
-    color: #744210;
+    background-color: #94A3B8;
+    color: white !important;
+    border: 1px solid #64748B;
+}
+
+/* Base status badge styling for cards */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    text-align: center;
 }
 
 .btn-delete-card {

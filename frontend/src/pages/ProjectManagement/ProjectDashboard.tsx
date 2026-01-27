@@ -42,7 +42,9 @@ export const ProjectDashboard: React.FC = () => {
 
     const getStatusClass = (status: string) => {
         if (status === 'active') return 'status-active';
+        if (status === 'on_hold') return 'status-on-hold';
         if (status === 'completed') return 'status-completed';
+        if (status === 'archived') return 'status-archived';
         return 'status-other';
     };
 
