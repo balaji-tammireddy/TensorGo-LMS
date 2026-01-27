@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
-import * as employeeService from '../../services/employeeService';
+// import * as employeeService from '../../services/employeeService'; // Unused after refactor
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -73,20 +73,24 @@ export const ProjectWorkspace: React.FC = () => {
     // Permissions Logic
     const isPM = !!project?.is_pm;
     const isSuperAdmin = user?.role === 'super_admin';
+    const isHR = user?.role === 'hr';
+    const isGlobalAdmin = isSuperAdmin || isHR;
 
     // Check if project is in a read-only state
     const isProjectReadOnly = project?.status === 'completed' || project?.status === 'archived';
 
     // 1. Project-level editing:
-    //    - Super Admin: can edit ANY project (including changing PM), unless completed/archived
+    //    - Super Admin/HR: can edit ANY project (including changing PM), unless completed/archived
     //    - PM: can edit THEIR projects (but cannot change PM), unless completed/archived
-    //    - HR: can only edit if they are PM, unless completed/archived
-    const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
+    const canManageProject = (isGlobalAdmin || isPM) && !isProjectReadOnly;
 
-    // 2. Module/Task/Activity Creation: PM or Super Admin can create, unless project is read-only
-    const canCreateModule = (isPM || isSuperAdmin) && !isProjectReadOnly;
-    const canAddTask = (isPM || isSuperAdmin) && !isProjectReadOnly;
-    const canAddActivity = (isPM || isSuperAdmin) && !isProjectReadOnly;
+    // 2. Module/Task/Activity Creation: PM or Super Admin/HR can create, unless project is read-only
+    const canCreateModule = (isPM || isGlobalAdmin) && !isProjectReadOnly;
+    const canAddTask = (isPM || isGlobalAdmin) && !isProjectReadOnly;
+    const canAddActivity = (isPM || isGlobalAdmin) && !isProjectReadOnly;
+
+    // 3. Status Management: Super Admin can ALWAYS change status, others follow read-only rules
+    const canManageStatus = isSuperAdmin || canManageProject;
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type
@@ -396,7 +400,7 @@ export const ProjectWorkspace: React.FC = () => {
         if (createType === 'activity') refetchActivities();
     };
 
-    const canManageStatus = canManageProject;
+    // const canManageStatus = canManageProject; // Moved early to permission logic block
 
     // Optimistic Update Mutation
     const updateStatusMutation = useMutation(
