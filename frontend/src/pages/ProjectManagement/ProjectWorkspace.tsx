@@ -166,11 +166,12 @@ export const ProjectWorkspace: React.FC = () => {
     };
 
     const assignModuleUserMutation = useMutation(
-        ({ moduleId, userId, action }: { moduleId: number, userId: number, action: 'add' | 'remove' }) => {
+        ({ moduleId, userId, action, userObj }: { moduleId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('module', moduleId, userId, action);
         },
         {
-            onMutate: async ({ moduleId, userId, action }) => {
+            onMutate: async ({ moduleId, userId, action, userObj }) => {
+                console.log('[MODULE MUTATE] Starting:', { moduleId, userId, action, userObj });
                 await queryClient.cancelQueries(['modules', projectId]);
                 const previousModules = queryClient.getQueryData<any[]>(['modules', projectId]);
 
@@ -182,6 +183,8 @@ export const ProjectWorkspace: React.FC = () => {
                         const isAssigned = action === 'remove'; // Use explicit action
 
                         let newAssignedUsers = m.assigned_users || [];
+                        console.log('[MODULE MUTATE] Before:', { currentUsers: newAssignedUsers.length, action });
+
                         if (isAssigned) {
                             newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
 
@@ -205,12 +208,23 @@ export const ProjectWorkspace: React.FC = () => {
                             }) as any);
 
                         } else {
-                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
-                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
-                            if (candidate) {
-                                newAssignedUsers = [...newAssignedUsers, candidate];
+                            // Use provided userObj or search fallback
+                            if (userObj) {
+                                console.log('[MODULE MUTATE] Adding user from userObj:', userObj);
+                                newAssignedUsers = [...newAssignedUsers, userObj];
+                            } else {
+                                console.log('[MODULE MUTATE] userObj not provided, searching in cache');
+                                const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
+                                const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
+                                if (candidate) {
+                                    console.log('[MODULE MUTATE] Found candidate in cache:', candidate);
+                                    newAssignedUsers = [...newAssignedUsers, candidate];
+                                } else {
+                                    console.warn('[MODULE MUTATE] Candidate not found!');
+                                }
                             }
                         }
+                        console.log('[MODULE MUTATE] After:', { newUsers: newAssignedUsers.length });
                         return { ...m, assigned_users: newAssignedUsers };
                     });
                 }) as any);
@@ -218,11 +232,21 @@ export const ProjectWorkspace: React.FC = () => {
                 return { previousModules };
             },
             onSuccess: (data, { moduleId }) => {
-                if (data.updatedUsers) {
+                console.log('[MODULE SUCCESS] Server response:', { moduleId, updatedUsers: data.updatedUsers });
+                // Force update with server's authoritative response
+                if (data.updatedUsers !== undefined) {
                     queryClient.setQueryData(['modules', projectId], ((old: any[] | undefined) => {
                         if (!old) return [];
-                        return old.map(m => String(m.id) === String(moduleId) ? { ...m, assigned_users: data.updatedUsers } : m);
+                        return old.map(m => {
+                            if (String(m.id) === String(moduleId)) {
+                                console.log('[MODULE SUCCESS] Updating module:', { moduleId, updatedUsersCount: data.updatedUsers.length });
+                                return { ...m, assigned_users: data.updatedUsers };
+                            }
+                            return m;
+                        });
                     }) as any);
+                } else {
+                    console.warn('[MODULE SUCCESS] updatedUsers is undefined!');
                 }
             },
             onError: (_err, _newTodo, context: any) => {
@@ -238,11 +262,11 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     const assignTaskUserMutation = useMutation(
-        ({ taskId, userId, action }: { taskId: number, userId: number, action: 'add' | 'remove' }) => {
+        ({ taskId, userId, action, userObj }: { taskId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('task', taskId, userId, action);
         },
         {
-            onMutate: async ({ taskId, userId, action }) => {
+            onMutate: async ({ taskId, userId, action, userObj }) => {
                 await queryClient.cancelQueries(['tasks', selectedModuleId]);
                 const previousTasks = queryClient.getQueryData<any[]>(['tasks', selectedModuleId]);
 
@@ -267,10 +291,15 @@ export const ProjectWorkspace: React.FC = () => {
                             }) as any);
 
                         } else {
-                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
-                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
-                            if (candidate) {
-                                newAssignedUsers = [...newAssignedUsers, candidate];
+                            // Use provided userObj or search fallback
+                            if (userObj) {
+                                newAssignedUsers = [...newAssignedUsers, userObj];
+                            } else {
+                                const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
+                                const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
+                                if (candidate) {
+                                    newAssignedUsers = [...newAssignedUsers, candidate];
+                                }
                             }
                         }
                         return { ...t, assigned_users: newAssignedUsers };
@@ -279,10 +308,16 @@ export const ProjectWorkspace: React.FC = () => {
                 return { previousTasks };
             },
             onSuccess: (data, { taskId }) => {
-                if (data.updatedUsers) {
+                // Force update with server's authoritative response
+                if (data.updatedUsers !== undefined) {
                     queryClient.setQueryData(['tasks', selectedModuleId], ((old: any[] | undefined) => {
                         if (!old) return [];
-                        return old.map(t => String(t.id) === String(taskId) ? { ...t, assigned_users: data.updatedUsers } : t);
+                        return old.map(t => {
+                            if (String(t.id) === String(taskId)) {
+                                return { ...t, assigned_users: data.updatedUsers };
+                            }
+                            return t;
+                        });
                     }) as any);
                 }
             },
@@ -298,11 +333,11 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     const assignActivityUserMutation = useMutation(
-        ({ activityId, userId, action }: { activityId: number, userId: number, action: 'add' | 'remove' }) => {
+        ({ activityId, userId, action, userObj }: { activityId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('activity', activityId, userId, action);
         },
         {
-            onMutate: async ({ activityId, userId, action }) => {
+            onMutate: async ({ activityId, userId, action, userObj }) => {
                 await queryClient.cancelQueries(['activities', selectedTaskId]);
                 const previousActivities = queryClient.getQueryData<any[]>(['activities', selectedTaskId]);
 
@@ -317,10 +352,15 @@ export const ProjectWorkspace: React.FC = () => {
                         if (isAssigned) {
                             newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
                         } else {
-                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
-                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
-                            if (candidate) {
-                                newAssignedUsers = [...newAssignedUsers, candidate];
+                            // Use provided userObj or search fallback
+                            if (userObj) {
+                                newAssignedUsers = [...newAssignedUsers, userObj];
+                            } else {
+                                const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
+                                const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
+                                if (candidate) {
+                                    newAssignedUsers = [...newAssignedUsers, candidate];
+                                }
                             }
                         }
                         return { ...a, assigned_users: newAssignedUsers };
@@ -329,10 +369,16 @@ export const ProjectWorkspace: React.FC = () => {
                 return { previousActivities };
             },
             onSuccess: (data, { activityId }) => {
-                if (data.updatedUsers) {
+                // Force update with server's authoritative response
+                if (data.updatedUsers !== undefined) {
                     queryClient.setQueryData(['activities', selectedTaskId], ((old: any[] | undefined) => {
                         if (!old) return [];
-                        return old.map(a => String(a.id) === String(activityId) ? { ...a, assigned_users: data.updatedUsers } : a);
+                        return old.map(a => {
+                            if (String(a.id) === String(activityId)) {
+                                return { ...a, assigned_users: data.updatedUsers };
+                            }
+                            return a;
+                        });
                     }) as any);
                 }
             },
@@ -529,8 +575,20 @@ export const ProjectWorkspace: React.FC = () => {
                                             }));
                                     })()}
                                     onAssignUser={(userId) => {
+                                        const availableUsers = (() => {
+                                            const candidates = projectMembers || [];
+                                            const current = module.assigned_users || [];
+                                            const uniqueMap = new Map();
+                                            [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+                                            return Array.from(uniqueMap.values())
+                                                .map((pm: any) => ({
+                                                    ...pm,
+                                                    initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                }));
+                                        })();
+                                        const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
                                         const isAssigned = (module.assigned_users || []).some((u: any) => String(u.id) === String(userId));
-                                        assignModuleUserMutation.mutate({ moduleId: module.id, userId, action: isAssigned ? 'remove' : 'add' });
+                                        assignModuleUserMutation.mutate({ moduleId: module.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
                                     }}
                                 />
                             ))}
@@ -610,8 +668,19 @@ export const ProjectWorkspace: React.FC = () => {
                                                 }));
                                         })()}
                                         onAssignUser={(userId) => {
+                                            const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
+                                            const current = task.assigned_users || [];
+                                            const uniqueMap = new Map();
+                                            [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+                                            const availableUsers = Array.from(uniqueMap.values())
+                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id))
+                                                .map((pm: any) => ({
+                                                    ...pm,
+                                                    initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                }));
+                                            const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
                                             const isAssigned = (task.assigned_users || []).some((u: any) => String(u.id) === String(userId));
-                                            assignTaskUserMutation.mutate({ taskId: task.id, userId, action: isAssigned ? 'remove' : 'add' });
+                                            assignTaskUserMutation.mutate({ taskId: task.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
                                         }}
                                     />
                                 ))
@@ -681,8 +750,20 @@ export const ProjectWorkspace: React.FC = () => {
                                             onEdit={() => handleEdit('activity', activity)}
                                             onDelete={() => handleDeleteActivity(activity.id)}
                                             onAssignUser={(userId) => {
+                                                const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
+                                                const taskMembers = selectedTask?.assigned_users || [];
+                                                const current = activity.assigned_users || [];
+                                                const uniqueMap = new Map();
+                                                [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+                                                const availableUsers = Array.from(uniqueMap.values())
+                                                    .filter((u: any) => String(u.id) !== String(project?.project_manager_id))
+                                                    .map((pm: any) => ({
+                                                        ...pm,
+                                                        initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                    }));
+                                                const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
                                                 const isAssigned = (activity.assigned_users || []).some((u: any) => String(u.id) === String(userId));
-                                                assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add' });
+                                                assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
                                             }}
                                             availableUsers={availableUsers}
                                             isPM={isPM}

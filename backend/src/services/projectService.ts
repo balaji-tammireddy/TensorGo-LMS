@@ -1163,10 +1163,10 @@ export class ProjectService {
       if (action === 'add') {
         console.log(`[ACCESS_TRACE] Adding ${uId} to ${table} for ${idColumn}=${tId}`);
         const result = await client.query(
-          `INSERT INTO ${table} (${idColumn}, user_id, granted_by)
-           VALUES ($1, $2, $3)
+          `INSERT INTO ${table} (${idColumn}, user_id, granted_by, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (${idColumn}, user_id) DO NOTHING`,
-          [tId, uId, requestedBy]
+          [tId, uId, requestedBy, requestedBy, requestedBy]
         );
         console.log(`[ACCESS_TRACE] Add result:`, result.rowCount);
       } else {
