@@ -46,7 +46,7 @@ export const updateProject = async (req: AuthRequest, res: Response) => {
         // Basic validation or permission check
         // In a real app we might check if user is manager or admin here
 
-        const project = await ProjectService.updateProject(parseInt(id), updates);
+        const project = await ProjectService.updateProject(parseInt(id), updates, userId);
         res.json(project);
     } catch (error: any) {
         console.error('[PROJECT] Update Error:', error);

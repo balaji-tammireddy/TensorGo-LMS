@@ -586,9 +586,9 @@ export const applyLeave = async (
       // Store RAW types in DB to preserve UI state (first_half vs second_half)
       // Constraint has been updated to allow these values.
       const leaveRequestResult = await client.query(
-        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
+        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
       );
       leaveRequestId = leaveRequestResult.rows[0].id;
 
@@ -1452,11 +1452,12 @@ export const updateLeaveRequest = async (
     await client.query(
       `UPDATE leave_requests 
        SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5, 
-           reason = $6, time_for_permission_start = $7, time_for_permission_end = $8,
-           doctor_note = $9, updated_at = CURRENT_TIMESTAMP,
+           reason = $6, no_of_days = $7, time_for_permission_start = $8, time_for_permission_end = $9,
+           doctor_note = $10, updated_at = CURRENT_TIMESTAMP,
            current_status = 'pending',
-           manager_approval_status = 'pending', hr_approval_status = 'pending', super_admin_approval_status = 'pending'
-       WHERE id = $10`,
+           manager_approval_status = 'pending', hr_approval_status = 'pending', super_admin_approval_status = 'pending',
+           updated_by = $11
+       WHERE id = $12`,
       [
         leaveData.leaveType,
         startDateStr,
@@ -1464,10 +1465,12 @@ export const updateLeaveRequest = async (
         endDateStr,
         leaveData.endType,   // Pass RAW type to DB
         leaveData.reason,
+        days,                // New days count
         leaveData.timeForPermission?.start || null,
         leaveData.timeForPermission?.end || null,
         leaveData.doctorNote || null,
-        requestId
+        userId,              // updated_by
+        requestId            // WHERE condition
       ]
     );
 
