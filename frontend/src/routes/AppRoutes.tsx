@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useQueryClient } from 'react-query';
 import * as profileService from '../services/profileService';
 import * as leaveService from '../services/leaveService';
+import SkeletonLoader from '../components/common/SkeletonLoader';
 
 // Lazy load pages for code splitting and faster initial load
 const LoginPage = lazy(() => import('../pages/LoginPage'));
@@ -61,18 +62,7 @@ const AppRoutes: React.FC = () => {
 
 
   return (
-    <Suspense fallback={
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontSize: '18px',
-        color: '#666'
-      }}>
-        Loading...
-      </div>
-    }>
+    <Suspense fallback={<SkeletonLoader variant="page" rows={5} />}>
       <DataPrefetcher />
       <Routes>
         <Route

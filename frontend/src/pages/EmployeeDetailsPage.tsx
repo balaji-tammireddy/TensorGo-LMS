@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
+import SkeletonLoader from '../components/common/SkeletonLoader';
 import { useToast } from '../contexts/ToastContext';
 import { DatePicker } from '../components/ui/date-picker';
 import {
@@ -494,7 +495,7 @@ const EmployeeDetailsPage: React.FC = () => {
     return (
       <AppLayout>
         <div className="employee-management-page">
-          <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+          <SkeletonLoader variant="profile" />
         </div>
       </AppLayout>
     )
