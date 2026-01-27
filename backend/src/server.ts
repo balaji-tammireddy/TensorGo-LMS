@@ -50,10 +50,11 @@ app.use(
       const allowedOrigins = [
         process.env.FRONTEND_URL || 'http://localhost:3000',
         'http://51.15.227.10:3000',
-        'http://intra.tensorgo.com'
+        'http://intra.tensorgo.com',
+        'https://intra.tensorgo.com'
       ];
 
-      if (origin === allowedOrigins[0] || origin === 'http://51.15.227.10:3000' || origin === 'http://intra.tensorgo.com') {
+      if (origin === allowedOrigins[0] || origin === 'http://51.15.227.10:3000' || origin === 'http://intra.tensorgo.com' || origin === 'https://intra.tensorgo.com') {
         return callback(null, true);
       }
 
