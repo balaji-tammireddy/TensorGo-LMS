@@ -78,9 +78,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
         setManagerSearch('');
 
-        // Fetch Managers for Project Creation
+        // Fetch Managers for Project Creation/Edit (Admin/HR only)
         if (type === 'project' && user) {
-            if (user.role === 'super_admin') {
+            if (['super_admin', 'hr'].includes(user.role)) {
                 employeeService.getEmployees(1, 1000).then(res => {
                     const eligibleManagers = res.employees.filter((emp: any) =>
                         ['super_admin', 'hr', 'manager'].includes(emp.role) &&
@@ -88,7 +88,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     );
                     setManagers(eligibleManagers);
                 }).catch(() => { });
-            } else if (['hr', 'manager'].includes(user.role)) {
+            } else if (user.role === 'manager') {
                 if (!isEdit) {
                     setFormData(prev => ({ ...prev, project_manager_id: String(user.id) }));
                 }
@@ -151,7 +151,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         description: payload.description
                     };
 
-                    if (user?.role === 'super_admin') {
+                    if (['super_admin', 'hr'].includes(user?.role || '')) {
                         updateData.project_manager_id = parseInt(payload.project_manager_id);
                     }
 
@@ -216,7 +216,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
     };
 
-    const isManagerSelectDisabled = user?.role !== 'super_admin';
+    const isManagerSelectDisabled = !['super_admin', 'hr'].includes(user?.role || '');
 
     // Character limits
     const NAME_LIMIT = 20;
@@ -243,7 +243,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     const getSelectedManagerLabel = () => {
         if (formData.project_manager_id) {
-            if (user?.role !== 'super_admin' && formData.project_manager_id === String(user?.id)) {
+            if (!['super_admin', 'hr'].includes(user?.role || '') && formData.project_manager_id === String(user?.id)) {
                 return `${toTitleCase((user as any).name || 'Me')} (${user?.empId})`;
             }
             const selected = managers.find(m => String(m.id) === formData.project_manager_id);

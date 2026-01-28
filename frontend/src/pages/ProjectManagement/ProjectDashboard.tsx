@@ -35,16 +35,13 @@ export const ProjectDashboard: React.FC = () => {
         'projects',
         projectService.getProjects
     );
-
     // Helper to check if user can create (Admin/HR/Manager)
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
     const isGlobalAdmin = ['super_admin', 'hr'].includes(user?.role || '');
 
     const getStatusClass = (status: string) => {
         if (status === 'active') return 'status-active';
-        if (status === 'on_hold') return 'status-on-hold';
         if (status === 'completed') return 'status-completed';
-        if (status === 'archived') return 'status-archived';
         return 'status-other';
     };
 
@@ -71,7 +68,6 @@ export const ProjectDashboard: React.FC = () => {
         projects,
         filterType,
         emptyMsg,
-        sectionId,
         isOpen,
         onToggle
     }: {
@@ -79,12 +75,11 @@ export const ProjectDashboard: React.FC = () => {
         projects: Project[],
         filterType: string,
         emptyMsg: string,
-        sectionId: string,
         isOpen: boolean,
         onToggle: () => void
     }) => {
-        const displayProjects = projects.slice(0, 4); // Show only top 4
-        const hasMore = projects.length > 4;
+        const displayProjects = projects.slice(0, 3); // Show only top 3
+        const hasMore = projects.length > 3;
 
         return (
             <div className={`section-container ${isOpen ? 'open' : ''}`}>
@@ -129,7 +124,7 @@ export const ProjectDashboard: React.FC = () => {
                                         navigate={navigate}
                                         getStatusClass={getStatusClass}
                                         onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                        canDelete={user?.role === 'super_admin'}
+                                        canDelete={['super_admin', 'hr'].includes(user?.role || '')}
                                     />
                                 ))}
                             </div>
@@ -156,11 +151,6 @@ export const ProjectDashboard: React.FC = () => {
                         </button>
                     )}
                 </div>
-
-                {/* Loading State */}
-                {isLoading && (
-                    <div className="project-loading">Loading projects...</div>
-                )}
 
                 {/* Projects Content Split */}
                 {!isLoading && (

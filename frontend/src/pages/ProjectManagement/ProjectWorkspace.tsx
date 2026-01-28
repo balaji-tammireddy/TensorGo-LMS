@@ -24,7 +24,9 @@ export const ProjectWorkspace: React.FC = () => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
+    /* 
     const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then(res => res.employees));
+    */
 
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -176,11 +178,11 @@ export const ProjectWorkspace: React.FC = () => {
     };
 
     const assignModuleUserMutation = useMutation(
-        ({ moduleId, userId, action, userObj }: { moduleId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
+        ({ moduleId, userId, action, userObj: _userObj }: { moduleId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('module', moduleId, userId, action);
         },
         {
-            onMutate: async ({ moduleId, userId, action, userObj }) => {
+            onMutate: async ({ moduleId, userId, action, userObj: _userObj }) => {
                 await queryClient.cancelQueries(['modules', projectId]);
                 const previousModules = queryClient.getQueryData<any[]>(['modules', projectId]);
 
@@ -217,8 +219,8 @@ export const ProjectWorkspace: React.FC = () => {
 
                         } else {
                             // Use provided userObj or search fallback
-                            if (userObj) {
-                                newAssignedUsers = [...newAssignedUsers, userObj];
+                            if (_userObj) {
+                                newAssignedUsers = [...newAssignedUsers, _userObj];
                             } else {
                                 const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
                                 const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
@@ -262,11 +264,11 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     const assignTaskUserMutation = useMutation(
-        ({ taskId, userId, action, userObj }: { taskId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
+        ({ taskId, userId, action, userObj: _userObj }: { taskId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('task', taskId, userId, action);
         },
         {
-            onMutate: async ({ taskId, userId, action, userObj }) => {
+            onMutate: async ({ taskId, userId, action, userObj: _userObj }) => {
                 await queryClient.cancelQueries(['tasks', selectedModuleId]);
                 const previousTasks = queryClient.getQueryData<any[]>(['tasks', selectedModuleId]);
 
@@ -292,8 +294,8 @@ export const ProjectWorkspace: React.FC = () => {
 
                         } else {
                             // Use provided userObj or search fallback
-                            if (userObj) {
-                                newAssignedUsers = [...newAssignedUsers, userObj];
+                            if (_userObj) {
+                                newAssignedUsers = [...newAssignedUsers, _userObj];
                             } else {
                                 const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
                                 const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
@@ -333,11 +335,11 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     const assignActivityUserMutation = useMutation(
-        ({ activityId, userId, action, userObj }: { activityId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
+        ({ activityId, userId, action, userObj: _userObj }: { activityId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('activity', activityId, userId, action);
         },
         {
-            onMutate: async ({ activityId, userId, action, userObj }) => {
+            onMutate: async ({ activityId, userId, action, userObj: _userObj }) => {
                 await queryClient.cancelQueries(['activities', selectedTaskId]);
                 const previousActivities = queryClient.getQueryData<any[]>(['activities', selectedTaskId]);
 
@@ -353,8 +355,8 @@ export const ProjectWorkspace: React.FC = () => {
                             newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
                         } else {
                             // Use provided userObj or search fallback
-                            if (userObj) {
-                                newAssignedUsers = [...newAssignedUsers, userObj];
+                            if (_userObj) {
+                                newAssignedUsers = [...newAssignedUsers, _userObj];
                             } else {
                                 const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
                                 const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
@@ -582,7 +584,7 @@ export const ProjectWorkspace: React.FC = () => {
                                     onClick={() => { setSelectedModuleId(module.id); setSelectedTaskId(null); }}
                                     onEdit={() => handleEdit('module', module)}
                                     onDelete={() => handleDeleteModule(module.id)}
-                                    isPM={isPM}
+                                    isPM={isPM || isGlobalAdmin}
                                     isCompact={true}
                                     // Pass ALL project members as candidates (Project Team)
                                     availableUsers={(() => {
@@ -592,6 +594,7 @@ export const ProjectWorkspace: React.FC = () => {
                                         const uniqueMap = new Map();
                                         [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                         return Array.from(uniqueMap.values())
+                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
                                             .map((pm: any) => ({
                                                 ...pm,
                                                 initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -604,6 +607,7 @@ export const ProjectWorkspace: React.FC = () => {
                                             const uniqueMap = new Map();
                                             [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             return Array.from(uniqueMap.values())
+                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
                                                 .map((pm: any) => ({
                                                     ...pm,
                                                     initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -674,7 +678,7 @@ export const ProjectWorkspace: React.FC = () => {
                                         onClick={() => setSelectedTaskId(task.id)}
                                         onEdit={() => handleEdit('task', task)}
                                         onDelete={() => handleDeleteTask(task.id)}
-                                        isPM={isPM}
+                                        isPM={isPM || isGlobalAdmin}
                                         isCompact={true}
                                         // Pass ALL module assignees as candidates
                                         // Pass ALL module assignees + current task assignees
@@ -789,7 +793,7 @@ export const ProjectWorkspace: React.FC = () => {
                                                 assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
                                             }}
                                             availableUsers={availableUsers}
-                                            isPM={isPM}
+                                            isPM={isPM || isGlobalAdmin}
                                             isCompact={true}
                                         />
                                     );

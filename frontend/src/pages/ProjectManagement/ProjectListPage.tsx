@@ -21,7 +21,7 @@ export const ProjectListPage: React.FC = () => {
     const filterType = searchParams.get('filter') || 'all';
 
     // Fetch projects
-    const { data: projects, isLoading, refetch } = useQuery(
+    const { data: projects, refetch } = useQuery(
         'projects',
         projectService.getProjects
     );
@@ -32,11 +32,10 @@ export const ProjectListPage: React.FC = () => {
         return 'status-other';
     };
 
+
     const confirmDelete = async () => {
         if (!deleteConfirm) return;
         setIsDeleting(true);
-        const projectId = deleteConfirm.id;
-        const projectName = deleteConfirm.name;
         setDeleteConfirm(null);
         try {
             await projectService.deleteProject(deleteConfirm.id);
@@ -54,12 +53,19 @@ export const ProjectListPage: React.FC = () => {
     const getFilteredProjects = () => {
         if (!projects) return [];
         const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
+        const isGlobalAdmin = ['super_admin', 'hr'].includes(user?.role || '');
 
         if (filterType === 'my-projects') {
-            return projects.filter((p: Project) => isPMView ? p.is_pm : p.is_member);
+            return projects.filter((p: Project) => isPMView ? (p.is_pm || p.is_member) : p.is_member);
         } else {
             // "All Projects" logic
-            return projects.filter((p: Project) => !p.is_pm);
+            // For Global Admin (Super Admin/HR), show everything
+            if (isGlobalAdmin) return projects;
+            // For others, show projects they are member of but NOT the PM (matching "All Projects" intent)
+            // Actually, for regular users, "All Projects" usually means "Projects in organization" 
+            // but they can only see what they are assigned to.
+            // Let's stick to the definition: Organization-wide for admins, member-but-not-pm for others.
+            return projects.filter((p: Project) => p.is_member && !p.is_pm);
         }
     };
 
@@ -114,7 +120,7 @@ export const ProjectListPage: React.FC = () => {
                                     navigate={navigate}
                                     getStatusClass={getStatusClass}
                                     onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                    canDelete={user?.role === 'super_admin'}
+                                    canDelete={['super_admin', 'hr'].includes(user?.role || '')}
                                 />
                             ))}
 

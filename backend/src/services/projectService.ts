@@ -441,10 +441,12 @@ export class ProjectService {
           await client.query('DELETE FROM project_activities WHERE id = ANY($1)', [activityIds]);
         }
 
+        await client.query('DELETE FROM project_entries WHERE task_id = ANY($1)', [taskIds]);
         await client.query('DELETE FROM task_access WHERE task_id = ANY($1)', [taskIds]);
         await client.query('DELETE FROM project_tasks WHERE id = ANY($1)', [taskIds]);
       }
 
+      await client.query('DELETE FROM project_entries WHERE module_id = $1', [id]);
       await client.query('DELETE FROM module_access WHERE module_id = $1', [id]);
       await client.query('DELETE FROM project_modules WHERE id = $1', [id]);
 
@@ -1255,12 +1257,14 @@ export class ProjectService {
 
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
+    if (role === 'super_admin' || role === 'hr') return true;
     const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
     if (res.rows.length === 0) return false;
     return res.rows[0].project_manager_id === userId;
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
+    if (role === 'super_admin' || role === 'hr') return true;
     const res = await query(`
       SELECT p.project_manager_id
       FROM project_modules m
@@ -1273,6 +1277,7 @@ export class ProjectService {
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
+    if (role === 'super_admin' || role === 'hr') return true;
     const res = await query(`
       SELECT p.project_manager_id
       FROM project_tasks t
@@ -1290,19 +1295,28 @@ export class ProjectService {
     try {
       await client.query('BEGIN');
 
-      // 1. Delete Activity Access for all activities in this task
+      // 1. Delete associated timesheet entries
+      await client.query(`
+        DELETE FROM project_entries 
+        WHERE activity_id IN (SELECT id FROM project_activities WHERE task_id = $1)
+      `, [id]);
+
+      // 2. Delete Activity Access for all activities in this task
       await client.query(`
         DELETE FROM activity_access 
         WHERE activity_id IN (SELECT id FROM project_activities WHERE task_id = $1)
       `, [id]);
 
-      // 2. Delete Activities in this task
+      // 3. Delete Activities in this task
       await client.query(`DELETE FROM project_activities WHERE task_id = $1`, [id]);
 
-      // 3. Delete Task Access
+      // 4. Delete associated timesheet entries for the task itself
+      await client.query(`DELETE FROM project_entries WHERE task_id = $1`, [id]);
+
+      // 5. Delete Task Access
       await client.query(`DELETE FROM task_access WHERE task_id = $1`, [id]);
 
-      // 4. Delete Task
+      // 6. Delete Task
       const res = await client.query(`DELETE FROM project_tasks WHERE id = $1 RETURNING *`, [id]);
 
       await client.query('COMMIT');
@@ -1320,10 +1334,13 @@ export class ProjectService {
     try {
       await client.query('BEGIN');
 
-      // 1. Delete Activity Access
+      // 1. Delete associated timesheet entries
+      await client.query(`DELETE FROM project_entries WHERE activity_id = $1`, [id]);
+
+      // 2. Delete Activity Access
       await client.query(`DELETE FROM activity_access WHERE activity_id = $1`, [id]);
 
-      // 2. Delete Activity
+      // 3. Delete Activity
       const res = await client.query(`DELETE FROM project_activities WHERE id = $1 RETURNING *`, [id]);
 
       await client.query('COMMIT');
@@ -1342,8 +1359,10 @@ export class ProjectService {
     try {
       await client.query('BEGIN');
 
-      // Manual cascade for clean deletion (if DB doesn't have it)
-      // 1. Delete Activity Access
+      // 1. Delete associated timesheet entries
+      await client.query(`DELETE FROM project_entries WHERE project_id = $1`, [projectId]);
+
+      // 2. Delete Activity Access
       await client.query(`
         DELETE FROM activity_access 
         WHERE activity_id IN (
@@ -1353,7 +1372,7 @@ export class ProjectService {
           WHERE m.project_id = $1
         )`, [projectId]);
 
-      // 2. Delete Activities
+      // 3. Delete Activities
       await client.query(`
         DELETE FROM project_activities 
         WHERE task_id IN (
@@ -1362,7 +1381,7 @@ export class ProjectService {
           WHERE m.project_id = $1
         )`, [projectId]);
 
-      // 3. Delete Task Access
+      // 4. Delete Task Access
       await client.query(`
         DELETE FROM task_access 
         WHERE task_id IN (
@@ -1371,27 +1390,27 @@ export class ProjectService {
           WHERE m.project_id = $1
         )`, [projectId]);
 
-      // 4. Delete Tasks
+      // 5. Delete Tasks
       await client.query(`
         DELETE FROM project_tasks 
         WHERE module_id IN (
           SELECT id FROM project_modules WHERE project_id = $1
         )`, [projectId]);
 
-      // 5. Delete Module Access
+      // 6. Delete Module Access
       await client.query(`
         DELETE FROM module_access 
         WHERE module_id IN (
           SELECT id FROM project_modules WHERE project_id = $1
         )`, [projectId]);
 
-      // 6. Delete Modules
+      // 7. Delete Modules
       await client.query(`DELETE FROM project_modules WHERE project_id = $1`, [projectId]);
 
-      // 7. Delete Project Members
+      // 8. Delete Project Members
       await client.query(`DELETE FROM project_members WHERE project_id = $1`, [projectId]);
 
-      // 8. Delete Project
+      // 9. Delete Project
       const deleteRes = await client.query(`DELETE FROM projects WHERE id = $1 RETURNING *`, [projectId]);
 
       if (deleteRes.rows.length === 0) {
