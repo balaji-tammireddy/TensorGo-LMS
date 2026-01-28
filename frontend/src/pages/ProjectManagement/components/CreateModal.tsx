@@ -53,7 +53,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
     const [loadingCandidates, setLoadingCandidates] = useState(false);
 
-
     useEffect(() => {
         if (!isOpen) return;
 
@@ -71,7 +70,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 custom_id: '',
                 name: '',
                 description: '',
-                project_manager_id: '',
+                project_manager_id: (type === 'project' && user?.role === 'manager') ? String(user.id) : '',
                 due_date: '',
                 assignee_ids: []
             });
@@ -80,6 +79,16 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
         // Fetch Managers for Project Creation/Edit (Admin/HR only)
         if (type === 'project' && user) {
+            // IMMEDIATE: Pre-populate managers list with the current PM if editing
+            // to avoid "Select Project Manager" flicker while list loads
+            if (isEdit && initialData?.project_manager_id) {
+                setManagers([{
+                    id: initialData.project_manager_id,
+                    name: initialData.manager_name || 'Project Manager',
+                    empId: '' // We can leave this empty or pass it if available
+                }]);
+            }
+
             if (['super_admin', 'hr'].includes(user.role)) {
                 employeeService.getEmployees(1, 1000).then(res => {
                     const eligibleManagers = res.employees.filter((emp: any) =>
@@ -88,10 +97,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     );
                     setManagers(eligibleManagers);
                 }).catch(() => { });
-            } else if (user.role === 'manager') {
-                if (!isEdit) {
-                    setFormData(prev => ({ ...prev, project_manager_id: String(user.id) }));
-                }
             }
         }
 
@@ -146,14 +151,16 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }
 
                 if (isEdit && initialData?.id) {
+                    // STRICT: Only Super Admin can edit project metadata
+                    if (user?.role !== 'super_admin') {
+                        throw new Error('Only Super Admin can edit project details');
+                    }
+
                     const updateData: any = {
                         name: payload.name,
-                        description: payload.description
+                        description: payload.description,
+                        project_manager_id: parseInt(payload.project_manager_id)
                     };
-
-                    if (['super_admin', 'hr'].includes(user?.role || '')) {
-                        updateData.project_manager_id = parseInt(payload.project_manager_id);
-                    }
 
                     await projectService.updateProject(initialData.id, updateData);
                 } else {
@@ -165,6 +172,10 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     });
                 }
             } else if (type === 'module' && parentId) {
+                // STRICT: Only Project Manager can add/edit modules
+                const isPM = projectManagerId === user?.id;
+                if (!isPM) throw new Error('Only the Project Manager can manage modules');
+
                 if (isEdit && initialData?.id) {
                     await projectService.updateModule(initialData.id, {
                         ...payload,
@@ -177,11 +188,26 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     });
                 }
             } else if (type === 'task' && parentId) {
-                await projectService.createTask(parentId, {
-                    ...payload,
-                    assigneeIds: payload.assignee_ids
-                });
+                // STRICT: Only Project Manager can add/edit tasks
+                const isPM = projectManagerId === user?.id;
+                if (!isPM) throw new Error('Only the Project Manager can manage tasks');
+
+                if (isEdit && initialData?.id) {
+                    await projectService.updateTask(initialData.id, {
+                        ...payload,
+                        assigneeIds: payload.assignee_ids
+                    });
+                } else {
+                    await projectService.createTask(parentId, {
+                        ...payload,
+                        assigneeIds: payload.assignee_ids
+                    });
+                }
             } else if (type === 'activity' && (parentId || initialData?.id)) {
+                // STRICT: Only Project Manager can add/edit activities
+                const isPM = projectManagerId === user?.id;
+                if (!isPM) throw new Error('Only the Project Manager can manage activities');
+
                 if (isEdit && initialData?.id) {
                     await projectService.updateActivity(initialData.id, {
                         ...payload,
@@ -216,7 +242,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
     };
 
-    const isManagerSelectDisabled = !['super_admin', 'hr'].includes(user?.role || '');
+    const canEditMetadata = type === 'project' && isEdit && user?.role === 'super_admin';
+    const isManagerSelectDisabled = !['super_admin', 'hr'].includes(user?.role || '') || (type === 'project' && isEdit && user?.role !== 'super_admin');
 
     // Character limits
     const NAME_LIMIT = 20;
@@ -248,7 +275,11 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             }
             const selected = managers.find(m => String(m.id) === formData.project_manager_id);
             if (selected) {
-                return `${toTitleCase(selected.name)} (${selected.empId})`;
+                return `${toTitleCase(selected.name)}${selected.empId ? ` (${selected.empId})` : ''}`;
+            }
+            // FALLBACK: If still loading, use initialData PM information
+            if (isEdit && type === 'project' && initialData && String(initialData.project_manager_id) === formData.project_manager_id) {
+                return toTitleCase(initialData.manager_name || 'Project Manager');
             }
         }
         return 'Select Project Manager';
@@ -273,7 +304,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                             </label>
                             <input
                                 type="text"
-                                className="form-input"
+                                className={`form-input ${isEdit && type === 'project' && !canEditMetadata ? 'disabled' : ''}`}
                                 value={formData.name}
                                 onChange={e => {
                                     const val = e.target.value;
@@ -285,6 +316,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                     }
                                 }}
                                 required
+                                disabled={isEdit && type === 'project' && !canEditMetadata}
                             />
                             <div className="char-counter">
                                 {formData.name.length}/{NAME_LIMIT}
@@ -295,7 +327,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         <div className="form-group">
                             <label className="form-label">Description</label>
                             <textarea
-                                className="form-textarea"
+                                className={`form-textarea ${isEdit && type === 'project' && !canEditMetadata ? 'disabled' : ''}`}
                                 rows={5}
                                 value={formData.description}
                                 onChange={e => {
@@ -303,6 +335,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                         setFormData({ ...formData, description: toTitleCase(e.target.value) });
                                     }
                                 }}
+                                disabled={isEdit && type === 'project' && !canEditMetadata}
                             />
                             <div className="char-counter">
                                 {formData.description.length}/{DESC_LIMIT}
@@ -317,7 +350,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                 </label>
 
                                 <DropdownMenu onOpenChange={(open) => !open && setManagerSearch('')}>
-                                    <DropdownMenuTrigger asChild>
+                                    <DropdownMenuTrigger asChild disabled={isManagerSelectDisabled}>
                                         <button
                                             type="button"
                                             className={`custom-select-trigger ${isManagerSelectDisabled ? 'disabled' : ''}`}

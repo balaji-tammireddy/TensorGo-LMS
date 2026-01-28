@@ -59,6 +59,11 @@ export const projectService = {
         return response.data;
     },
 
+    getProject: async (id: number) => {
+        const response = await api.get<Project>(`/projects/${id}`);
+        return response.data;
+    },
+
     getProjectMembers: async (projectId: number) => {
         const response = await api.get(`/projects/${projectId}/access-list?level=project`);
         return response.data;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
@@ -16,6 +16,106 @@ import {
 import { WorkspaceCard } from './components/WorkspaceCard';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import './ProjectWorkspace.css';
+
+const StatusDropdown = React.memo(({
+    currentStatus,
+    canManageStatus,
+    onStatusChange
+}: {
+    currentStatus?: string;
+    canManageStatus: boolean;
+    onStatusChange: (status: string) => void;
+}) => {
+    if (!currentStatus) return null;
+
+    const statusOptions = [
+        { value: 'active', label: 'Active', color: '#FFFFFF', bg: '#10B981', border: '#059669' },
+        { value: 'on_hold', label: 'On Hold', color: '#FFFFFF', bg: '#F59E0B', border: '#D97706' },
+        { value: 'completed', label: 'Completed', color: '#FFFFFF', bg: '#6366F1', border: '#4F46E5' },
+        { value: 'archived', label: 'Archived', color: '#FFFFFF', bg: '#64748B', border: '#475569' }
+    ];
+
+    const current = statusOptions.find(s => s.value === currentStatus) || statusOptions[0];
+
+    if (!canManageStatus) {
+        return (
+            <span
+                className="ws-status-badge"
+                style={{
+                    backgroundColor: current.bg,
+                    color: current.color,
+                    border: `2px solid ${current.border}`,
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    fontSize: '12px',
+                    padding: '6px 16px',
+                    borderRadius: '20px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
+            >
+                {current.label}
+            </span>
+        );
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    className="ws-status-badge"
+                    style={{
+                        backgroundColor: current.bg,
+                        color: current.color,
+                        border: `2px solid ${current.border}`,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        fontSize: '12px',
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    {current.label}
+                    <ChevronDown size={14} strokeWidth={2.5} />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                {statusOptions.map(option => (
+                    <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => onStatusChange(option.value)}
+                        className="status-dropdown-item"
+                        style={{
+                            color: '#374151',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            fontWeight: '500'
+                        }}
+                    >
+                        <span style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '3px',
+                            backgroundColor: option.bg,
+                            border: `2px solid ${option.border}`,
+                            flexShrink: 0
+                        }} />
+                        {option.label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+});
 
 export const ProjectWorkspace: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -42,9 +142,12 @@ export const ProjectWorkspace: React.FC = () => {
         id: number | null;
     }>({ isOpen: false, type: null, id: null });
 
-    // Fetch Project Details (Client-side find for now)
-    const { data: projects } = useQuery('projects', projectService.getProjects);
-    const project = projects?.find(p => p.id === projectId);
+    // Fetch Specific Project Details
+    const { data: project, refetch: refetchProject } = useQuery(
+        ['project', projectId],
+        () => projectService.getProject(projectId),
+        { enabled: !!projectId }
+    );
 
     // Queries
     const { data: modules, refetch: refetchModules } = useQuery(
@@ -66,33 +169,33 @@ export const ProjectWorkspace: React.FC = () => {
         { enabled: !!selectedTaskId }
     );
 
-    const { data: projectMembers } = useQuery(
-        ['projectMembers', projectId],
-        () => projectService.getAccessList('project', projectId),
+    const { data: projectMembers, refetch: refetchProjectMembers } = useQuery(
+        ['project-members', projectId],
+        () => projectService.getProjectMembers(projectId),
         { enabled: !!projectId }
     );
 
     // Permissions Logic
     const isPM = !!project?.is_pm;
     const isSuperAdmin = user?.role === 'super_admin';
-    const isHR = user?.role === 'hr';
-    const isGlobalAdmin = isSuperAdmin || isHR;
 
     // Check if project is in a read-only state
-    const isProjectReadOnly = project?.status === 'completed' || project?.status === 'archived';
+    // Details can be edited ONLY in active state
+    const isProjectReadOnly = project?.status !== 'active';
 
-    // 1. Project-level editing:
-    //    - Super Admin/HR: can edit ANY project (including changing PM), unless completed/archived
-    //    - PM: can edit THEIR projects (but cannot change PM), unless completed/archived
-    const canManageProject = (isGlobalAdmin || isPM) && !isProjectReadOnly;
+    // 1. Project-level metadata editing (Name, Desc, PM, Status):
+    //    - STRICT: Only Super Admin can edit project metadata
+    const canManageProject = isSuperAdmin && !isProjectReadOnly;
 
-    // 2. Module/Task/Activity Creation: PM or Super Admin/HR can create, unless project is read-only
-    const canCreateModule = (isPM || isGlobalAdmin) && !isProjectReadOnly;
-    const canAddTask = (isPM || isGlobalAdmin) && !isProjectReadOnly;
-    const canAddActivity = (isPM || isGlobalAdmin) && !isProjectReadOnly;
+    // 2. Module/Task/Activity Operational Control:
+    //    - STRICT: Only the Project Manager can create/edit/delete/assign
+    const canCreateModule = isPM && !isProjectReadOnly;
+    const canAddTask = isPM && !isProjectReadOnly;
+    const canAddActivity = isPM && !isProjectReadOnly;
 
-    // 3. Status Management: Super Admin can ALWAYS change status, others follow read-only rules
-    const canManageStatus = isSuperAdmin || canManageProject;
+    // 3. Status Management:
+    //    - STRICT: Only Super Admin can change status
+    const canManageStatus = isSuperAdmin;
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type
@@ -104,10 +207,12 @@ export const ProjectWorkspace: React.FC = () => {
         setIsEdit(false);
     };
 
-    const handleEditProject = () => {
+    const handleEditProject = async () => {
         if (!canManageProject) return;
+        // Refetch project before editing to ensure modal has latest data
+        const { data: freshProject } = await refetchProject();
         setCreateType('project');
-        setEditData(project);
+        setEditData(freshProject || project);
         setIsEdit(true);
     };
 
@@ -397,6 +502,16 @@ export const ProjectWorkspace: React.FC = () => {
 
 
     const handleCreateSuccess = () => {
+        if (createType === 'project') {
+            queryClient.invalidateQueries('projects');
+            queryClient.invalidateQueries(['project', projectId]);
+            refetchProject();
+            refetchProjectMembers();
+            // PM change affects ALL resource access, refetch everything
+            refetchModules();
+            if (selectedModuleId) refetchTasks();
+            if (selectedTaskId) refetchActivities();
+        }
         if (createType === 'module') refetchModules();
         if (createType === 'task') refetchTasks();
         if (createType === 'activity') refetchActivities();
@@ -410,116 +525,47 @@ export const ProjectWorkspace: React.FC = () => {
         {
             onMutate: async (newStatus) => {
                 await queryClient.cancelQueries('projects');
+                await queryClient.cancelQueries(['project', projectId]);
+
                 const previousProjects = queryClient.getQueryData<any[]>('projects');
+                const previousProject = queryClient.getQueryData<any>(['project', projectId]);
 
                 if (previousProjects) {
                     queryClient.setQueryData('projects', previousProjects.map(p =>
                         p.id === project?.id ? { ...p, status: newStatus } : p
                     ));
                 }
-                return { previousProjects };
+
+                if (previousProject) {
+                    queryClient.setQueryData(['project', projectId], { ...previousProject, status: newStatus });
+                }
+
+                return { previousProjects, previousProject };
             },
             onError: (err, _newStatus, context: any) => {
                 if (context?.previousProjects) {
                     queryClient.setQueryData('projects', context.previousProjects);
                 }
+                if (context?.previousProject) {
+                    queryClient.setQueryData(['project', projectId], context.previousProject);
+                }
                 console.error('Failed to update status', err);
             },
             onSettled: () => {
+                queryClient.invalidateQueries(['project', projectId]);
                 queryClient.invalidateQueries('projects');
+                // Only refetch members/resources if they aren't already loading
+                // This reduces the "cascade" pressure on the UI
+                refetchProject();
             }
         }
     );
 
-    const handleStatusChange = (newStatus: string) => {
+    const handleStatusChange = useCallback((newStatus: string) => {
         if (!project || !canManageStatus) return;
         updateStatusMutation.mutate(newStatus);
-    };
+    }, [project, canManageStatus, updateStatusMutation]);
 
-    const StatusDropdown = ({ currentStatus }: { currentStatus?: string }) => {
-        if (!currentStatus) return null;
-
-        const statusOptions = [
-            { value: 'active', label: 'Active', color: '#FFFFFF', bg: '#10B981', border: '#059669' },
-            { value: 'on_hold', label: 'On Hold', color: '#FFFFFF', bg: '#F59E0B', border: '#D97706' },
-            { value: 'completed', label: 'Completed', color: '#FFFFFF', bg: '#6366F1', border: '#4F46E5' },
-            { value: 'archived', label: 'Archived', color: '#FFFFFF', bg: '#64748B', border: '#475569' }
-        ];
-
-        const current = statusOptions.find(s => s.value === currentStatus) || statusOptions[0];
-
-        if (!canManageStatus) {
-            return (
-                <span
-                    className="ws-status-badge"
-                    style={{
-                        backgroundColor: current.bg,
-                        color: current.color,
-                        border: `2px solid ${current.border}`,
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        fontSize: '12px'
-                    }}
-                >
-                    {current.label}
-                </span>
-            );
-        }
-
-        return (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <button
-                        className="ws-status-badge"
-                        style={{
-                            backgroundColor: current.bg,
-                            color: current.color,
-                            border: `2px solid ${current.border}`,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontWeight: '600',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            fontSize: '12px',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        {current.label}
-                        <ChevronDown size={14} strokeWidth={2.5} />
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    {statusOptions.map(option => (
-                        <DropdownMenuItem
-                            key={option.value}
-                            onClick={() => handleStatusChange(option.value)}
-                            className="status-dropdown-item"
-                            style={{
-                                color: '#374151', // Dark text color for dropdown
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                fontWeight: '500'
-                            }}
-                        >
-                            <span style={{
-                                width: '10px',
-                                height: '10px',
-                                borderRadius: '3px',
-                                backgroundColor: option.bg,
-                                border: `2px solid ${option.border}`,
-                                flexShrink: 0
-                            }} />
-                            {option.label}
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
-        );
-    };
 
     return (
         <AppLayout>
@@ -543,7 +589,11 @@ export const ProjectWorkspace: React.FC = () => {
                         </div>
                     </div>
                     <div className="ws-header-right">
-                        <StatusDropdown currentStatus={project?.status} />
+                        <StatusDropdown
+                            currentStatus={project?.status}
+                            canManageStatus={canManageStatus}
+                            onStatusChange={handleStatusChange}
+                        />
 
                         {canManageProject && (
                             <button className="btn-edit-project" onClick={handleEditProject}>
@@ -584,7 +634,7 @@ export const ProjectWorkspace: React.FC = () => {
                                     onClick={() => { setSelectedModuleId(module.id); setSelectedTaskId(null); }}
                                     onEdit={() => handleEdit('module', module)}
                                     onDelete={() => handleDeleteModule(module.id)}
-                                    isPM={isPM || isGlobalAdmin}
+                                    isPM={isPM}
                                     isCompact={true}
                                     // Pass ALL project members as candidates (Project Team)
                                     availableUsers={(() => {
@@ -678,7 +728,7 @@ export const ProjectWorkspace: React.FC = () => {
                                         onClick={() => setSelectedTaskId(task.id)}
                                         onEdit={() => handleEdit('task', task)}
                                         onDelete={() => handleDeleteTask(task.id)}
-                                        isPM={isPM || isGlobalAdmin}
+                                        isPM={isPM}
                                         isCompact={true}
                                         // Pass ALL module assignees as candidates
                                         // Pass ALL module assignees + current task assignees
@@ -793,7 +843,7 @@ export const ProjectWorkspace: React.FC = () => {
                                                 assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
                                             }}
                                             availableUsers={availableUsers}
-                                            isPM={isPM || isGlobalAdmin}
+                                            isPM={isPM}
                                             isCompact={true}
                                         />
                                     );

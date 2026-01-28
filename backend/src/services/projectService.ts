@@ -68,16 +68,23 @@ export class ProjectService {
 
   // --- 1. Project Creation & Team Gen ---
 
-  static async createProject(data: ProjectData) {
+  static async createProject(data: ProjectData, creatorRole: string) {
     const client = await pool.connect();
 
     try {
       await client.query('BEGIN');
 
-      // 1. Validate Manager Status
+      // 1. Manager Assignment Logic
+      let managerId = data.project_manager_id;
+      if (creatorRole === 'manager') {
+        // Enforce: Manager creating project MUST be the PM
+        managerId = data.created_by;
+      }
+
+      // 2. Validate Manager Status
       const managerRes = await client.query(
         `SELECT status FROM users WHERE id = $1`,
-        [data.project_manager_id]
+        [managerId]
       );
 
       if (managerRes.rows.length === 0) {
@@ -85,28 +92,16 @@ export class ProjectService {
       }
 
       const managerStatus = managerRes.rows[0].status;
-      // Strict "One-Strike" Rule
       const forbiddenStatuses = ['on_notice', 'resigned', 'terminated', 'inactive'];
       if (forbiddenStatuses.includes(managerStatus)) {
-        throw new Error('Cannot assign a user on notice as Project Manager');
+        throw new Error('Cannot assign a user on notice/inactive as Project Manager');
       }
 
-      // Generate Custom ID automatically
+      // Generate Custom ID
       const customId = await this.generateNextCustomId('projects', 'PRO', undefined, undefined, client);
 
-      // Check for duplicate Custom ID (Optional now but safe)
-      const existingProject = await client.query(
-        `SELECT id FROM projects WHERE custom_id = $1`,
-        [customId]
-      );
-      if (existingProject.rows.length > 0) {
-        // Fallback or retry if needed, but sequential should be fine
-      }
-
-      // 2. Insert Project
-      // AUTOMATION: Set start_date to NOW() automatically
+      // 3. Insert Project
       const startDate = new Date();
-
       const insertRes = await client.query(
         `INSERT INTO projects (
           custom_id, name, description, project_manager_id, start_date, end_date, created_by, updated_by, status
@@ -116,18 +111,18 @@ export class ProjectService {
           customId,
           data.name,
           data.description || null,
-          data.project_manager_id,
-          startDate, // Automatic start date
+          managerId,
+          startDate,
           data.end_date || null,
           data.created_by,
-          data.created_by, // updated_by same as created_by initially
-          'active' // Default status is active
+          data.created_by,
+          'active'
         ]
       );
       const project = insertRes.rows[0];
 
-      // 3. Recursive Team Generation
-      await this.syncProjectTeam(project.id, data.project_manager_id, client, data.created_by);
+      // 4. Recursive Team Generation
+      await this.syncProjectTeam(project.id, managerId, client, data.created_by);
 
       await client.query('COMMIT');
       return project;
@@ -141,102 +136,154 @@ export class ProjectService {
   }
 
   static async updateProject(id: number, data: Partial<ProjectData> & { status?: string }, requesterId?: number) {
-    // AUTOMATION: Check for status change to set end_date
-    if (data.status) {
-      const currentRes = await pool.query('SELECT status FROM projects WHERE id = $1', [id]);
-      if (currentRes.rows.length > 0) {
-        const currentStatus = currentRes.rows[0].status;
-        // If changing from 'active' to anything else (completed, on_hold, etc.)
-        // And end_date isn't explicitly provided, set it to NOW
-        if (currentStatus === 'active' && data.status !== 'active' && !data.end_date) {
-          data.end_date = new Date().toISOString();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 0. Fetch Current Project State
+      const currentRes = await client.query('SELECT project_manager_id, status FROM projects WHERE id = $1', [id]);
+      if (currentRes.rows.length === 0) throw new Error('Project not found');
+      const currentProject = currentRes.rows[0];
+
+      // 1. Check for PM Change
+      const isManagerChanging = data.project_manager_id && data.project_manager_id !== currentProject.project_manager_id;
+
+      // 2. AUTOMATION: Check for status change to set end_date
+      if (data.status && currentProject.status === 'active' && data.status !== 'active' && !data.end_date) {
+        data.end_date = new Date().toISOString();
+      }
+
+      // 3. Build dynamic update query
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
+      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.start_date !== undefined) { updates.push(`start_date = $${idx++}`); values.push(data.start_date); }
+      if (data.end_date !== undefined) { updates.push(`end_date = $${idx++}`); values.push(data.end_date); }
+
+      if (data.project_manager_id) {
+        const managerRes = await client.query('SELECT status FROM users WHERE id = $1', [data.project_manager_id]);
+        if (managerRes.rows.length === 0) throw new Error('Project Manager not found');
+        if (['on_notice', 'resigned', 'terminated', 'inactive'].includes(managerRes.rows[0].status)) {
+          throw new Error('Cannot assign a user on notice/inactive as Project Manager');
         }
-      }
-    }
-
-    // Build dynamic update query
-    const updates: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
-    if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
-    if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
-    if (data.start_date !== undefined) { updates.push(`start_date = $${idx++}`); values.push(data.start_date); }
-    if (data.end_date !== undefined) { updates.push(`end_date = $${idx++}`); values.push(data.end_date); }
-
-    // Update Manager logic with validation
-    if (data.project_manager_id) {
-      const managerRes = await pool.query('SELECT status FROM users WHERE id = $1', [data.project_manager_id]);
-      if (managerRes.rows.length === 0) throw new Error('Project Manager not found');
-
-      const managerStatus = managerRes.rows[0].status;
-      const forbiddenStatuses = ['on_notice', 'resigned', 'terminated', 'inactive'];
-      if (forbiddenStatuses.includes(managerStatus)) {
-        throw new Error('Cannot assign a user on notice/inactive as Project Manager');
+        updates.push(`project_manager_id = $${idx++}`);
+        values.push(data.project_manager_id);
       }
 
-      updates.push(`project_manager_id = $${idx++}`);
-      values.push(data.project_manager_id);
-    }
+      if (data.status) { updates.push(`status = $${idx++}`); values.push(data.status); }
 
-    if (data.status) { updates.push(`status = $${idx++}`); values.push(data.status); }
+      if (updates.length > 0) {
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        if (requesterId) {
+          updates.push(`updated_by = $${idx++}`);
+          values.push(requesterId);
+        }
+        values.push(id);
+        const res = await client.query(`UPDATE projects SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`, values);
+        const project = res.rows[0];
 
-    if (updates.length === 0) return null;
+        // 4. IF PM Changed: Trigger Reset Logic
+        if (isManagerChanging) {
+          console.log(`[ProjectService] Triggering metadata-driven PM swap logic for project ${id}`);
+          // A. Wipe all Module/Task/Activity access
+          await this.wipeProjectResourceAccess(id, client);
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    if (requesterId) {
-      updates.push(`updated_by = $${idx++}`);
-      values.push(requesterId);
-    }
+          // B. Re-sync Project Team (Subtree)
+          await this.syncProjectTeam(id, data.project_manager_id!, client, requesterId);
 
-    values.push(id);
+          // C. Re-assign NEW PM to everything
+          await this.assignIrrevocableAccess(id, data.project_manager_id!, client);
+        }
 
-    const res = await query(
-      `UPDATE projects SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    );
-
-    const project = res.rows[0];
-
-    // If manager changed, re-sync team AND reset resource access
-    if (data.project_manager_id) {
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        await this.syncProjectTeam(project.id, data.project_manager_id, client, requesterId);
-        await this.resetProjectResourcesToNewManager(project.id, data.project_manager_id, client);
         await client.query('COMMIT');
-      } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-      } finally {
-        client.release();
+        // Return full joined data including manager_name and is_pm
+        return this.getProject(id, requesterId!, 'super_admin'); // We use super_admin here to bypass visibility checks for the return value
       }
-    }
 
-    return project;
+      await client.query('COMMIT');
+      return this.getProject(id, requesterId!, 'super_admin');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  // --- Helpers for PM Swap ---
+  private static async wipeProjectResourceAccess(projectId: number, client: any) {
+    // 1. Module access
+    await client.query(`DELETE FROM module_access WHERE module_id IN (SELECT id FROM project_modules WHERE project_id = $1)`, [projectId]);
+    // 2. Task access
+    await client.query(`
+      DELETE FROM task_access 
+      WHERE task_id IN (SELECT t.id FROM project_tasks t JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = $1)
+    `, [projectId]);
+    // 3. Activity access
+    await client.query(`
+      DELETE FROM activity_access 
+      WHERE activity_id IN (
+        SELECT a.id FROM project_activities a 
+        JOIN project_tasks t ON a.task_id = t.id 
+        JOIN project_modules m ON t.module_id = m.id 
+        WHERE m.project_id = $1
+      )
+    `, [projectId]);
+  }
+
+  private static async assignIrrevocableAccess(projectId: number, managerId: number, client: any) {
+    // 1. Modules, Tasks, and Activities in one go via subqueries
+    await client.query(`
+      INSERT INTO module_access (module_id, user_id, granted_by, created_by, updated_by)
+      SELECT id, $2, $2, $2, $2 FROM project_modules WHERE project_id = $1
+      ON CONFLICT (module_id, user_id) DO NOTHING
+    `, [projectId, managerId]);
+
+    await client.query(`
+      INSERT INTO task_access (task_id, user_id, granted_by, created_by, updated_by)
+      SELECT t.id, $2, $2, $2, $2 FROM project_tasks t JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = $1
+      ON CONFLICT (task_id, user_id) DO NOTHING
+    `, [projectId, managerId]);
+
+    await client.query(`
+      INSERT INTO activity_access (activity_id, user_id, granted_by, created_by, updated_by)
+      SELECT a.id, $2, $2, $2, $2 FROM project_activities a JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = $1
+      ON CONFLICT (activity_id, user_id) DO NOTHING
+    `, [projectId, managerId]);
   }
 
   // Recursive "Tree" Algorithm
   static async syncProjectTeam(projectId: number, managerId: number, clientOrPool: any = pool, createdBy?: number) {
-    // 1. Find all reports recursively
-    const teamIds = await this.getReportingSubtree(managerId, clientOrPool);
+    // 1. Fetch subtree and update members in ONE query using Recursive CTE
+    await clientOrPool.query(`
+      WITH RECURSIVE subordinates AS (
+        SELECT id FROM users WHERE id = $2
+        UNION ALL
+        SELECT u.id FROM users u
+        INNER JOIN subordinates s ON s.id = u.reporting_manager_id
+      )
+      INSERT INTO project_members (project_id, user_id, created_by, updated_by)
+      SELECT $1, id, $3, $3 FROM subordinates
+      ON CONFLICT (project_id, user_id) DO NOTHING
+    `, [projectId, managerId, createdBy || managerId]);
 
-    // Add the manager themselves to the team
-    const allMemberIds = new Set([managerId, ...teamIds]);
-
-    // 2. Overwrite project_members
-    // First remove old members to handle manager changes
-    await clientOrPool.query('DELETE FROM project_members WHERE project_id = $1', [projectId]);
-
-    for (const userId of allMemberIds) {
-      await clientOrPool.query(
-        `INSERT INTO project_members (project_id, user_id, created_by, updated_by)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (project_id, user_id) DO NOTHING`,
-        [projectId, userId, createdBy || managerId, createdBy || managerId]
-      );
-    }
+    // 2. Remove users who are no longer in the subtree (if PM changed)
+    await clientOrPool.query(`
+      DELETE FROM project_members 
+      WHERE project_id = $1 
+      AND user_id NOT IN (
+        WITH RECURSIVE subordinates AS (
+          SELECT id FROM users WHERE id = $2
+          UNION ALL
+          SELECT u.id FROM users u
+          INNER JOIN subordinates s ON s.id = u.reporting_manager_id
+        )
+        SELECT id FROM subordinates
+      )
+    `, [projectId, managerId]);
   }
 
   // NEW: Reset all resource access when PM changes
@@ -298,22 +345,17 @@ export class ProjectService {
   }
 
   protected static async getReportingSubtree(managerId: number, client: any): Promise<number[]> {
-    // Find direct reports
-    const res = await client.query(
-      `SELECT id FROM users WHERE reporting_manager_id = $1`,
-      [managerId]
-    );
+    const res = await client.query(`
+      WITH RECURSIVE subordinates AS (
+        SELECT id FROM users WHERE reporting_manager_id = $1
+        UNION ALL
+        SELECT u.id FROM users u
+        INNER JOIN subordinates s ON s.id = u.reporting_manager_id
+      )
+      SELECT id FROM subordinates
+    `, [managerId]);
 
-    let subordinates: number[] = [];
-
-    for (const row of res.rows) {
-      subordinates.push(row.id);
-      // Recursion
-      const grandSubordinates = await this.getReportingSubtree(row.id, client);
-      subordinates = [...subordinates, ...grandSubordinates];
-    }
-
-    return subordinates;
+    return res.rows.map((row: any) => row.id);
   }
 
   // --- 2. Hierarchy Creation (Module/Task/Activity) ---
@@ -766,6 +808,39 @@ export class ProjectService {
   }
 
   // --- 4. Getters with Access Control ---
+
+  static async getProject(projectId: number, userId: number, role: string) {
+    const isGlobalViewer = role === 'super_admin' || role === 'hr';
+
+    let queryStr = `
+      SELECT p.*, 
+             COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
+             (p.project_manager_id = $1) as is_pm,
+             EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+      FROM projects p 
+      LEFT JOIN users u ON p.project_manager_id = u.id
+      WHERE p.id = $2
+    `;
+
+    if (!isGlobalViewer) {
+      // For PM/Members, ensure they have access (matching getProjectsForUser visibility)
+      queryStr += `
+        AND (
+          p.project_manager_id = $1 
+          OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1)
+          OR EXISTS (
+            SELECT 1 FROM project_modules m 
+            JOIN module_access ma ON m.id = ma.module_id 
+            WHERE m.project_id = p.id AND ma.user_id = $1
+          )
+        )
+      `;
+    }
+
+    const res = await query(queryStr, [userId, projectId]);
+    if (res.rows.length === 0) throw new Error('Project not found or access denied');
+    return res.rows[0];
+  }
 
   static async getProjectsForUser(userId: number, role: string) {
     // Global Viewers
@@ -1257,14 +1332,18 @@ export class ProjectService {
 
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr') return true;
+    // STRICT: Only Super Admin can edit project METADATA (name, desc, PM, status)
+    return role === 'super_admin';
+  }
+
+  static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
+    // STRICT: Only the Project Manager can add/edit modules, tasks, activities
     const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
     if (res.rows.length === 0) return false;
     return res.rows[0].project_manager_id === userId;
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr') return true;
     const res = await query(`
       SELECT p.project_manager_id
       FROM project_modules m
@@ -1272,12 +1351,10 @@ export class ProjectService {
       WHERE m.id = $1`, [moduleId]);
 
     if (res.rows.length === 0) return false;
-    const { project_manager_id } = res.rows[0];
-    return project_manager_id === userId;
+    return res.rows[0].project_manager_id === userId;
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr') return true;
     const res = await query(`
       SELECT p.project_manager_id
       FROM project_tasks t
@@ -1286,8 +1363,20 @@ export class ProjectService {
       WHERE t.id = $1`, [taskId]);
 
     if (res.rows.length === 0) return false;
-    const { project_manager_id } = res.rows[0];
-    return project_manager_id === userId;
+    return res.rows[0].project_manager_id === userId;
+  }
+
+  static async canUserManageActivity(userId: number, role: string, activityId: number): Promise<boolean> {
+    const res = await query(`
+      SELECT p.project_manager_id
+      FROM project_activities a
+      JOIN project_tasks t ON a.task_id = t.id
+      JOIN project_modules m ON t.module_id = m.id
+      JOIN projects p ON m.project_id = p.id
+      WHERE a.id = $1`, [activityId]);
+
+    if (res.rows.length === 0) return false;
+    return res.rows[0].project_manager_id === userId;
   }
 
   static async deleteTask(id: number) {

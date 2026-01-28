@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
@@ -15,6 +15,7 @@ import './ProjectDashboard.css';
 export const ProjectDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const queryClient = useQueryClient();
     const { showSuccess, showError } = useToast();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number, name: string } | null>(null);
@@ -54,6 +55,7 @@ export const ProjectDashboard: React.FC = () => {
             await projectService.deleteProject(deleteConfirm.id);
             showSuccess(`Project "${deleteConfirm.name}" deleted successfully`);
             setDeleteConfirm(null);
+            queryClient.invalidateQueries('projects');
             refetch();
         } catch (error: any) {
             console.error('[PROJECT] Delete Error:', error);
@@ -224,7 +226,10 @@ export const ProjectDashboard: React.FC = () => {
                     isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
                     type="project"
-                    onSuccess={refetch}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries('projects');
+                        refetch();
+                    }}
                 />
 
 
