@@ -98,5 +98,13 @@ export const timesheetService = {
         });
 
         return response.data;
+    },
+    approveEntry: async (entryId: number) => {
+        const response = await api.post('/timesheets/approve-entry', { entryId });
+        return response.data;
+    },
+    submitTimesheet: async (startDate: string, endDate: string) => {
+        const response = await api.post('/timesheets/submit-manual', { start_date: startDate, end_date: endDate });
+        return response.data;
     }
 };

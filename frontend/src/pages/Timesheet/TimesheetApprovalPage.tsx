@@ -621,9 +621,26 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                         <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
                                                                     </div>
                                                                 </div>
-
                                                                 {entry.log_status !== 'approved' && entry.log_status !== 'rejected' && !entry.project_name?.includes('System') && (
                                                                     <div className="entry-actions-sidebar">
+                                                                        <button
+                                                                            className="action-btn-styled edit"
+                                                                            title="Approve"
+                                                                            onClick={async () => {
+                                                                                if (entry.id) {
+                                                                                    try {
+                                                                                        await timesheetService.approveEntry(entry.id);
+                                                                                        showSuccess('Entry approved');
+                                                                                        if (selectedMemberId) fetchMemberEntries(selectedMemberId);
+                                                                                        fetchTeamStatus();
+                                                                                    } catch (err: any) {
+                                                                                        showError(err.message || 'Failed to approve');
+                                                                                    }
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <CheckCircle size={16} />
+                                                                        </button>
                                                                         <button
                                                                             className="action-btn-styled delete"
                                                                             title="Reject"

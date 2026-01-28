@@ -133,6 +133,22 @@ export const getMemberWeeklyEntries = async (req: AuthRequest, res: Response) =>
     }
 };
 
+export const approveEntry = async (req: AuthRequest, res: Response) => {
+    try {
+        const approverId = req.user?.id;
+        const { entryId } = req.body;
+
+        if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!entryId) return res.status(400).json({ error: 'Entry ID is required' });
+
+        await TimesheetService.approveTimesheetEntry(approverId, entryId);
+        res.json({ success: true, message: 'Entry approved successfully' });
+    } catch (error: any) {
+        logger.error('[TimeSheet] Approve Entry Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const approveTimesheet = async (req: AuthRequest, res: Response) => {
     try {
         const approverId = req.user?.id;
@@ -163,6 +179,22 @@ export const rejectEntry = async (req: AuthRequest, res: Response) => {
         res.json({ success: true, message: 'Rejected successfully' });
     } catch (error: any) {
         logger.error('[TimeSheet] Reject Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const manualSubmit = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { start_date, end_date } = req.body;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!start_date || !end_date) return res.status(400).json({ error: 'Date range required' });
+
+        await TimesheetService.manualSubmitTimesheet(userId, start_date, end_date);
+        res.json({ success: true, message: 'Timesheet submitted successfully' });
+    } catch (error: any) {
+        logger.error('[TimeSheet] Manual Submit Error:', error);
         res.status(500).json({ error: error.message });
     }
 };

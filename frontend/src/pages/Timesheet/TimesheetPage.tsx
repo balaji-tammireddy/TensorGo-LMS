@@ -359,6 +359,58 @@ export const TimesheetPage: React.FC = () => {
                             <span>{totalHours} hours logged this week</span>
                         </div>
 
+                        {/* Submit Button (Manual - Past Weeks) */}
+                        {(() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            // Only show for PAST weeks
+                            if (weekRange.end < today) {
+                                const th = parseFloat(String(totalHours));
+                                // Check if already submitted/approved
+                                const isSubmitted = entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
+                                const hasRejected = entries.some(e => e.log_status === 'rejected');
+
+                                if (!isSubmitted || hasRejected) {
+                                    return (
+                                        <Button
+                                            className="btn-primary"
+                                            style={{ height: '36px', gap: '8px', backgroundColor: hasRejected ? '#dc2626' : undefined }}
+                                            disabled={th < 40 || loading}
+                                            onClick={async () => {
+                                                if (th < 40) {
+                                                    showError('You need at least 40 hours to submit.');
+                                                    return;
+                                                }
+                                                try {
+                                                    setLoading(true);
+                                                    await timesheetService.submitTimesheet(
+                                                        formatDate(weekRange.start),
+                                                        formatDate(weekRange.end)
+                                                    );
+                                                    showSuccess('Timesheet submitted successfully');
+                                                    fetchEntries();
+                                                } catch (e: any) {
+                                                    showError(e.message || 'Submission failed');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            <Save size={16} />
+                                            {hasRejected ? 'Resubmit Timesheet' : 'Submit Timesheet'}
+                                        </Button>
+                                    )
+                                } else {
+                                    return (
+                                        <div className="logged-hours-badge success">
+                                            <span>Submitted</span>
+                                        </div>
+                                    )
+                                }
+                            }
+                            return null;
+                        })()}
+
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
                             <span className="current-week-display">
@@ -558,6 +610,7 @@ export const TimesheetPage: React.FC = () => {
                                             className="ts-form-input"
                                             value={formData.duration}
                                             onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                                            onWheel={(e) => e.currentTarget.blur()}
                                             required
                                         />
                                     </div>
