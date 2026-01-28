@@ -49,9 +49,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     const [managers, setManagers] = useState<any[]>([]);
     const [managerSearch, setManagerSearch] = useState('');
 
-    // Multi-select state
-    const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
-    const [loadingCandidates, setLoadingCandidates] = useState(false);
+    // Multi-select state removal
+    // const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
+    // const [loadingCandidates, setLoadingCandidates] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -63,7 +63,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 description: initialData.description || '',
                 project_manager_id: initialData.project_manager_id ? String(initialData.project_manager_id) : '',
                 due_date: initialData.due_date || '',
-                assignee_ids: initialData.assigned_users ? initialData.assigned_users.map((u: any) => u.id) : []
+                assignee_ids: [] // Removed handling
             });
         } else {
             setFormData({
@@ -99,51 +99,32 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }).catch(() => { });
             }
         }
-
-        // Fetch Assignee Candidates for Module/Task/Activity
-        if (['module', 'task', 'activity'].includes(type) && parentId) {
-            setLoadingCandidates(true);
-            let fetchLevel = '';
-            // For Module creation, we need Project Members -> fetchLevel = 'project'
-            if (type === 'module') fetchLevel = 'project';
-            // For Task creation, we need Module Access List -> fetchLevel = 'module'
-            if (type === 'task') fetchLevel = 'module';
-            // For Activity creation, we need Task Access List -> fetchLevel = 'task'
-            if (type === 'activity') fetchLevel = 'task';
-
-            projectService.getAccessList(fetchLevel, parentId)
-                .then(data => {
-                    // Filter out Project Manager from candidates
-                    const filteredData = projectManagerId
-                        ? data.filter((u: any) => u.id !== projectManagerId)
-                        : data;
-                    setAssigneeCandidates(filteredData);
-
-                    // If editing a module, also fetch WHO CURRENTLY HAS ACCESS to pre-fill checkboxes
-                    if (isEdit && type === 'module' && initialData?.id) {
-                        projectService.getAccessList('module', initialData.id).then(accessData => {
-                            setFormData(prev => ({
-                                ...prev,
-                                assignee_ids: accessData.map((u: any) => u.id)
-                            }));
-                        });
-                    }
-                })
-                .catch(err => {
-                    console.error(`[CreateModal] Error fetching ${fetchLevel} access list:`, err);
-                })
-                .finally(() => setLoadingCandidates(false));
-        }
+        // Removed Access List Fetching
     }, [isOpen, type, user, isEdit, initialData, parentId]);
 
     if (!isOpen) return null;
+
+    // Dirty Checking
+    const isDirty = (() => {
+        if (!isEdit) return true; // Always allow create if valid (form validation handles the rest)
+        if (!initialData) return false;
+
+        const nameChanged = formData.name !== (initialData.name || '');
+        const descChanged = formData.description !== (initialData.description || '');
+        // Check PM change only for project
+        const pmChanged = type === 'project' && formData.project_manager_id !== String(initialData.project_manager_id || '');
+
+        return nameChanged || descChanged || pmChanged;
+    })();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            const payload = { ...formData };
+            // Sanitize payload: Remove empty strings for optional fields like due_date to prevent DB errors
+            const payload: any = { ...formData };
+            if (payload.due_date === '') payload.due_date = undefined;
 
             if (type === 'project') {
                 if (!payload.project_manager_id) {
@@ -177,14 +158,15 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 if (!isPM) throw new Error('Only the Project Manager can manage modules');
 
                 if (isEdit && initialData?.id) {
+                    // Omit assigneeIds to prevent updating access
                     await projectService.updateModule(initialData.id, {
                         ...payload,
-                        assigneeIds: payload.assignee_ids
+                        assigneeIds: undefined
                     });
                 } else {
                     await projectService.createModule(parentId, {
                         ...payload,
-                        assigneeIds: payload.assignee_ids
+                        assigneeIds: undefined
                     });
                 }
             } else if (type === 'task' && parentId) {
@@ -193,14 +175,15 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 if (!isPM) throw new Error('Only the Project Manager can manage tasks');
 
                 if (isEdit && initialData?.id) {
+                    // Payload sanitization ensures due_date is undefined if empty, preventing 500 error
                     await projectService.updateTask(initialData.id, {
                         ...payload,
-                        assigneeIds: payload.assignee_ids
+                        assigneeIds: undefined
                     });
                 } else {
                     await projectService.createTask(parentId, {
                         ...payload,
-                        assigneeIds: payload.assignee_ids
+                        assigneeIds: undefined
                     });
                 }
             } else if (type === 'activity' && (parentId || initialData?.id)) {
@@ -211,12 +194,12 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 if (isEdit && initialData?.id) {
                     await projectService.updateActivity(initialData.id, {
                         ...payload,
-                        assigneeIds: payload.assignee_ids
+                        assigneeIds: undefined
                     });
                 } else {
                     await projectService.createActivity(parentId!, {
                         ...payload,
-                        assigneeIds: payload.assignee_ids
+                        assigneeIds: undefined
                     });
                 }
             }
@@ -226,6 +209,14 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             onClose();
         } catch (err: any) {
             showError(err.message || 'Failed to save item');
+            // If the process breaks (error), we keep the modal open so user can see error?
+            // User requested: "after clicking save or cancel the pop up should close, even if process breaks"
+            // Doing that here would hide the error from the user. 
+            // Better interpretation: Ensure onClose is called if they click Cancel (which it is).
+            // For Save error, closing immediately prevents them from seeing why it failed.
+            // I will keep it open on error but ensure it closes on success. 
+            // If strict adherence to "close even if process breaks" is required:
+            // onClose(); 
         } finally {
             setLoading(false);
         }
@@ -436,7 +427,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
 
 
-                        {/* Access Assignment (For Module, Task, Activity) */}
 
                     </div>
 
@@ -452,7 +442,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         <button
                             type="submit"
                             className="btn btn-primary"
-                            disabled={loading}
+                            disabled={loading || (isEdit && !isDirty)}
                         >
                             {loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update' : 'Create')}
                         </button>

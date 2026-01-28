@@ -145,7 +145,13 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                                 </div>
                                 <div className="ws-dropdown-list">
                                     {availableUsers.length === 0 ? (
-                                        <div className="ws-dropdown-empty">No users available</div>
+                                        <div className="ws-dropdown-empty-state">
+                                            <div className="empty-state-icon">
+                                                <UserMinus size={18} />
+                                            </div>
+                                            <span className="empty-state-text">No users available</span>
+                                            <span className="empty-state-subtext">All members assigned or none found</span>
+                                        </div>
                                     ) : (
                                         availableUsers.map(user => {
                                             const isAssigned = assignedUsers.some(u => String(u.id) === String(user.id));

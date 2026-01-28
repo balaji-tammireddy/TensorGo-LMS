@@ -640,11 +640,16 @@ export const ProjectWorkspace: React.FC = () => {
                                     availableUsers={(() => {
                                         const candidates = projectMembers || [];
                                         const current = module.assigned_users || [];
+
+                                        // Robust PM ID detection: checking both project metadata and member list flags
+                                        const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
+
                                         // Merge and unique by ID
                                         const uniqueMap = new Map();
                                         [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
+                                            .filter((u: any) => String(u.id) !== pmId) // Exclude PM
                                             .map((pm: any) => ({
                                                 ...pm,
                                                 initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -654,10 +659,12 @@ export const ProjectWorkspace: React.FC = () => {
                                         const availableUsers = (() => {
                                             const candidates = projectMembers || [];
                                             const current = module.assigned_users || [];
+                                            const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
+
                                             const uniqueMap = new Map();
                                             [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             return Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
+                                                .filter((u: any) => String(u.id) !== pmId) // Exclude PM
                                                 .map((pm: any) => ({
                                                     ...pm,
                                                     initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -735,10 +742,15 @@ export const ProjectWorkspace: React.FC = () => {
                                         availableUsers={(() => {
                                             const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
                                             const current = task.assigned_users || [];
+
+                                            // Robust PM ID: try getting from member list, then project (if available)
+                                            // We check detailed projectMembers list if available, otherwise rely on project metatdata
+                                            const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
+
                                             const uniqueMap = new Map();
                                             [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             return Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
+                                                .filter((u: any) => String(u.id) !== globalPmId) // Exclude PM
                                                 .map((pm: any) => ({
                                                     ...pm,
                                                     initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -747,10 +759,12 @@ export const ProjectWorkspace: React.FC = () => {
                                         onAssignUser={(userId) => {
                                             const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
                                             const current = task.assigned_users || [];
+                                            const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
+
                                             const uniqueMap = new Map();
                                             [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             const availableUsers = Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id))
+                                                .filter((u: any) => String(u.id) !== globalPmId)
                                                 .map((pm: any) => ({
                                                     ...pm,
                                                     initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -805,10 +819,13 @@ export const ProjectWorkspace: React.FC = () => {
                                     const availableUsers = (() => {
                                         const taskMembers = selectedTask?.assigned_users || [];
                                         const current = activity.assigned_users || [];
+
+                                        const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
+
                                         const uniqueMap = new Map();
                                         [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
+                                            .filter((u: any) => String(u.id) !== globalPmId) // Exclude PM
                                             .map((pm: any) => ({
                                                 ...pm,
                                                 initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -830,10 +847,13 @@ export const ProjectWorkspace: React.FC = () => {
                                                 const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
                                                 const taskMembers = selectedTask?.assigned_users || [];
                                                 const current = activity.assigned_users || [];
+
+                                                const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
+
                                                 const uniqueMap = new Map();
                                                 [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                                 const availableUsers = Array.from(uniqueMap.values())
-                                                    .filter((u: any) => String(u.id) !== String(project?.project_manager_id))
+                                                    .filter((u: any) => String(u.id) !== globalPmId)
                                                     .map((pm: any) => ({
                                                         ...pm,
                                                         initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')

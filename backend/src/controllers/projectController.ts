@@ -370,7 +370,8 @@ export const toggleAccess = async (req: AuthRequest, res: Response) => {
 
 export const getAccessList = async (req: AuthRequest, res: Response) => {
     try {
-        const { level, id } = req.params;
+        const { id } = req.params;
+        const level = (req.params.level || req.query.level) as string;
         // level: 'project' | 'module' | 'task'
         // id: ID of the scope
 
