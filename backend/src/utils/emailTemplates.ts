@@ -2008,7 +2008,7 @@ export const sendTimesheetReminderEmail = async (
     <p>Dear ${data.employeeName},</p>
     <p>${message}</p>
     <div style="margin: 30px 0; text-align: center;">
-      <a href="https://intranet.tensorgo.com/project-management" style="background-color:#1e3a8a;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:50px;text-align:center;text-decoration:none;width:200px;border-radius:6px;">Update Timesheet</a>
+      <a href="https://intra.tensorgo.com/project-management" style="background-color:#1e3a8a;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:50px;text-align:center;text-decoration:none;width:200px;border-radius:6px;">Update Timesheet</a>
     </div>
     <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
