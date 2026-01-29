@@ -110,7 +110,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                         <div
                             key={user.id}
                             className={`ws-avatar ${isCompact ? 'compact' : ''}`}
-                            style={{ zIndex: 5 - idx }}
+                            style={{ zIndex: displayUsers.length - idx }}
                             title={user.name}
                         >
                             {user.initials}

@@ -907,7 +907,7 @@ export class ProjectService {
                (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
                   FROM module_access ma 
                   JOIN users u ON ma.user_id = u.id 
@@ -917,7 +917,7 @@ export class ProjectService {
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
                   FROM projects p3
                   JOIN users u3 ON p3.project_manager_id = u3.id
@@ -935,7 +935,7 @@ export class ProjectService {
               (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
                   FROM module_access ma2
                   JOIN users u ON ma2.user_id = u.id 
@@ -945,7 +945,7 @@ export class ProjectService {
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
                   FROM projects p3
                   JOIN users u3 ON p3.project_manager_id = u3.id
@@ -978,7 +978,7 @@ export class ProjectService {
                 (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
                   FROM task_access ta2
                   JOIN users u ON ta2.user_id = u.id 
@@ -989,7 +989,7 @@ export class ProjectService {
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
                   FROM project_modules pm3
                   JOIN projects p3 ON pm3.project_id = p3.id
@@ -1010,7 +1010,7 @@ export class ProjectService {
               (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
                   FROM task_access ta2
                   JOIN users u ON ta2.user_id = u.id 
@@ -1021,7 +1021,7 @@ export class ProjectService {
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
                   FROM project_modules pm3
                   JOIN projects p3 ON pm3.project_id = p3.id
@@ -1055,7 +1055,7 @@ export class ProjectService {
                (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
                   FROM activity_access aa 
                   JOIN users u ON aa.user_id = u.id 
@@ -1067,7 +1067,7 @@ export class ProjectService {
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
                   FROM project_tasks pt3
                   JOIN project_modules pm3 ON pt3.module_id = pm3.id
@@ -1087,7 +1087,7 @@ export class ProjectService {
               (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
                   FROM activity_access aa2
                   JOIN users u ON aa2.user_id = u.id 
@@ -1099,7 +1099,7 @@ export class ProjectService {
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(u3.first_name, 1)) || UPPER(LEFT(COALESCE(u3.last_name, ' '), 1)) as initials,
+                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
                   FROM project_tasks pt3
                   JOIN project_modules pm3 ON pt3.module_id = pm3.id
@@ -1315,7 +1315,7 @@ export class ProjectService {
         const res = await client.query(`
           SELECT u.id, 
                  COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                 UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                  CASE WHEN u.id = p.project_manager_id THEN 0 ELSE 1 END as sort_order
           FROM module_access ma 
           JOIN users u ON ma.user_id = u.id 
@@ -1327,7 +1327,7 @@ export class ProjectService {
           
           SELECT u.id, 
                  COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                 UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                  0 as sort_order
           FROM project_modules m
           JOIN projects p ON m.project_id = p.id
@@ -1340,7 +1340,7 @@ export class ProjectService {
         const res = await client.query(`
           SELECT u.id, 
                  COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                 UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                  CASE WHEN u.id = p.project_manager_id THEN 0 ELSE 1 END as sort_order
           FROM task_access ta 
           JOIN users u ON ta.user_id = u.id 
@@ -1353,7 +1353,7 @@ export class ProjectService {
           
           SELECT u.id, 
                  COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                 UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                  0 as sort_order
           FROM project_tasks t
           JOIN project_modules m ON t.module_id = m.id
@@ -1367,7 +1367,7 @@ export class ProjectService {
         const res = await client.query(`
           SELECT u.id, 
                  COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                 UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                  CASE WHEN u.id = p.project_manager_id THEN 0 ELSE 1 END as sort_order
           FROM activity_access aa 
           JOIN users u ON aa.user_id = u.id 
@@ -1381,7 +1381,7 @@ export class ProjectService {
           
           SELECT u.id, 
                  COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                 UPPER(LEFT(u.first_name, 1)) || UPPER(LEFT(COALESCE(u.last_name, ' '), 1)) as initials,
+                 UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                  0 as sort_order
           FROM project_activities a
           JOIN project_tasks t ON a.task_id = t.id

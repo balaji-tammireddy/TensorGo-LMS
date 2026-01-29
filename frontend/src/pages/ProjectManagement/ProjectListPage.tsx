@@ -120,7 +120,7 @@ export const ProjectListPage: React.FC = () => {
                                     navigate={navigate}
                                     getStatusClass={getStatusClass}
                                     onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                    canDelete={['super_admin', 'hr'].includes(user?.role || '')}
+                                    canDelete={user?.role === 'super_admin'}
                                 />
                             ))}
 

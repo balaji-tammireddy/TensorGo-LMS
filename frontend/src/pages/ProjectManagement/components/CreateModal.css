@@ -23,6 +23,7 @@
   animation: slideIn 0.2s ease-out;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Ensure header/footer stay within rounded corners */
 }
 
 @keyframes slideIn {
@@ -45,7 +46,9 @@
   /* Added specific padding */
   border-bottom: 1px solid #F3F4F6;
   margin-bottom: 0;
-  /* Remove margin, body has padding */
+  /* Ensure top corners are rounded if header backgrounds are added */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
 .modal-header h2 {
@@ -150,7 +153,9 @@
   /* Match header horizontal padding */
   border-top: 1px solid #F3F4F6;
   margin-top: 0;
-  /* Remove margin, border handles separation */
+  /* Ensure bottom corners are rounded */
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .btn {

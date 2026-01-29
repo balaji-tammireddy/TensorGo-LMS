@@ -25,8 +25,10 @@ export const ProjectDashboard: React.FC = () => {
     const [openSection, setOpenSection] = useState<string | null>('my-projects');
 
     const handleToggleSection = (section: string) => {
-        // Enforce one section always open (optimal space usage)
-        if (openSection !== section) {
+        if (openSection === section) {
+            // If clicking the already open section, open the other one
+            setOpenSection(section === 'my-projects' ? 'all-projects' : 'my-projects');
+        } else {
             setOpenSection(section);
         }
     };
@@ -68,20 +70,28 @@ export const ProjectDashboard: React.FC = () => {
     const ProjectListSection = ({
         title,
         projects,
-        filterType,
         emptyMsg,
         isOpen,
         onToggle
     }: {
         title: string,
         projects: Project[],
-        filterType: string,
         emptyMsg: string,
         isOpen: boolean,
         onToggle: () => void
     }) => {
-        const displayProjects = projects.slice(0, 3); // Show only top 3
-        const hasMore = projects.length > 3;
+        const scrollRef = React.useRef<HTMLDivElement>(null);
+        const displayProjects = projects;
+
+        const handleScroll = (direction: 'left' | 'right') => {
+            if (scrollRef.current) {
+                const scrollAmount = 364; // card width (340) + gap (24)
+                scrollRef.current.scrollBy({
+                    left: direction === 'left' ? -scrollAmount : scrollAmount,
+                    behavior: 'smooth'
+                });
+            }
+        };
 
         return (
             <div className={`section-container ${isOpen ? 'open' : ''}`}>
@@ -94,16 +104,23 @@ export const ProjectDashboard: React.FC = () => {
                         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                         <h2 className="section-title" style={{ margin: 0 }}>{title}</h2>
                     </div>
-                    {hasMore && isOpen && (
-                        <button
-                            className="btn-view-all"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/project-management/list?filter=${filterType}`);
-                            }}
-                        >
-                            View All &gt;
-                        </button>
+                    {isOpen && projects.length > 0 && (
+                        <div className="header-scroll-actions" onClick={e => e.stopPropagation()}>
+                            <button
+                                className="header-scroll-btn"
+                                onClick={() => handleScroll('left')}
+                                title="Scroll Left"
+                            >
+                                <ChevronDown size={18} style={{ transform: 'rotate(90deg)' }} />
+                            </button>
+                            <button
+                                className="header-scroll-btn"
+                                onClick={() => handleScroll('right')}
+                                title="Scroll Right"
+                            >
+                                <ChevronDown size={18} style={{ transform: 'rotate(-90deg)' }} />
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -118,7 +135,7 @@ export const ProjectDashboard: React.FC = () => {
                                 className="dashboard-empty-state"
                             />
                         ) : (
-                            <div className="projects-grid-preview">
+                            <div className="projects-grid-preview" ref={scrollRef}>
                                 {displayProjects.map((project: Project) => (
                                     <ProjectCard
                                         key={project.id}
@@ -126,7 +143,7 @@ export const ProjectDashboard: React.FC = () => {
                                         navigate={navigate}
                                         getStatusClass={getStatusClass}
                                         onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                        canDelete={['super_admin', 'hr'].includes(user?.role || '')}
+                                        canDelete={user?.role === 'super_admin'}
                                     />
                                 ))}
                             </div>
@@ -169,7 +186,6 @@ export const ProjectDashboard: React.FC = () => {
                                     <ProjectListSection
                                         title="My Projects"
                                         projects={myProjectsList}
-                                        filterType="my-projects"
                                         emptyMsg="No projects found in this section."
                                         isOpen={openSection === 'my-projects'}
                                         onToggle={() => handleToggleSection('my-projects')}
@@ -187,7 +203,6 @@ export const ProjectDashboard: React.FC = () => {
                                         <ProjectListSection
                                             title="All Projects"
                                             projects={allOtherProjects}
-                                            filterType="all"
                                             emptyMsg="No global projects to display."
                                             isOpen={openSection === 'all-projects'}
                                             onToggle={() => handleToggleSection('all-projects')}

@@ -367,9 +367,20 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                                     type="text"
                                                     placeholder="Search by name or ID..."
                                                     value={managerSearch}
-                                                    onChange={(e) => setManagerSearch(e.target.value)}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        // Validation: Allow only letters and spaces
+                                                        if (/^[a-zA-Z ]*$/.test(val)) {
+                                                            setManagerSearch(val);
+                                                        }
+                                                    }}
                                                     className="dropdown-search-input"
                                                     autoFocus
+                                                    onKeyDown={(e) => {
+                                                        // CRITICAL: Stop propagation for ALL keys to prevent Radix UI's 
+                                                        // "type-ahead" logic from stealing focus while user is typing
+                                                        e.stopPropagation();
+                                                    }}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                                 {managerSearch && (

@@ -81,7 +81,8 @@
     min-width: 0;
     max-width: 100%;
     /* Force strict containment */
-    overflow: hidden;
+    overflow-y: hidden;
+    /* Lock vertical scroll since we use carousels */
     padding: 15px 25px 25px;
     gap: 20px;
 }
@@ -183,35 +184,34 @@
     overflow: hidden;
 }
 
-/* Filtered Grid Preview for Dashboard */
+/* Horizontal Carousel Preview (Single Row Peek) */
 .projects-grid-preview {
     display: flex;
-    gap: 20px;
+    flex-wrap: nowrap;
+    gap: 24px;
     width: 100%;
     margin-top: 10px;
     overflow-x: auto;
-    padding-bottom: 12px;
     scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    /* Hide scrollbar Firefox */
+    -ms-overflow-style: none;
+    /* Hide scrollbar IE/Edge */
+    padding-bottom: 5px;
+    /* Tiny buffer */
+    height: 250px;
+    /* Locked height to prevent vertical bleeding */
 }
 
 .projects-grid-preview::-webkit-scrollbar {
-    height: 6px;
-    display: block;
+    display: none;
+    /* Hide scrollbar Chrome/Safari */
 }
 
-.projects-grid-preview::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-}
-
-.projects-grid-preview::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1;
-    border-radius: 4px;
-}
-
-.projects-grid-preview::-webkit-scrollbar-thumb:hover {
-    background-color: #94a3b8;
+.projects-grid-preview>* {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
 }
 
 /* "View All" Button Style */
@@ -332,11 +332,10 @@
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
     border: 1px solid #e2e8f0;
-    /* Force strict width */
+    /* Carousel Dimensions - Locked Width */
     min-width: 340px;
     max-width: 340px;
     width: 340px;
-    /* Force strict height */
     height: 240px;
     flex: 0 0 auto;
     /* CRITICAL: Do not shrink, do not grow, use basis */
@@ -692,24 +691,6 @@
     padding-bottom: 20px;
 }
 
-/* Update grid preview to center horizontally if content is smaller than width */
-/* Update grid preview to center horizontally if content is smaller than width */
-.projects-grid-preview {
-    display: flex;
-    gap: 20px;
-    width: 100%;
-    margin-top: 10px;
-    overflow-x: auto;
-    padding-bottom: 12px;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-
-    /* Horizontal Center Logic - CHANGED to Left Align as per request */
-    margin-left: 0;
-    margin-right: 0;
-    justify-content: flex-start;
-    /* Start from left */
-}
 
 /* If you want to center the CARDS themselves when they don't fill the width: */
 .projects-grid-preview::after {
