@@ -850,3 +850,26 @@
     color: #64748b;
     margin: 0;
 }
+
+/* Pulse highlighting for editing */
+@keyframes editPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+        border-color: #2563eb;
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+        border-color: #2563eb;
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+        border-color: #e2e8f0;
+    }
+}
+
+.edit-highlight {
+    animation: editPulse 1.5s ease-out;
+    border-color: #2563eb !important;
+}

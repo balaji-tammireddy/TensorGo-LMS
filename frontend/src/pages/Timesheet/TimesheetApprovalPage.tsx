@@ -16,6 +16,8 @@ interface TeamMemberStatus {
     designation: string;
     total_hours: number;
     status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'pending_submission';
+    is_late: boolean;
+    is_resubmission: boolean;
 }
 
 export const TimesheetApprovalPage: React.FC = () => {
@@ -186,7 +188,7 @@ export const TimesheetApprovalPage: React.FC = () => {
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
-            showError(err.message || 'Failed to approve');
+            showError(err.response?.data?.error || err.message || 'Failed to approve');
         }
     };
 
@@ -198,7 +200,7 @@ export const TimesheetApprovalPage: React.FC = () => {
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
-            showError(err.message || 'Failed to approve day');
+            showError(err.response?.data?.error || err.message || 'Failed to approve day');
         }
     };
 
@@ -233,7 +235,7 @@ export const TimesheetApprovalPage: React.FC = () => {
             if (selectedMemberId) fetchMemberEntries(selectedMemberId);
             fetchTeamStatus();
         } catch (err: any) {
-            showError(err.message || 'Failed to reject');
+            showError(err.response?.data?.error || err.message || 'Failed to reject');
         }
     };
 
@@ -369,8 +371,14 @@ export const TimesheetApprovalPage: React.FC = () => {
                                         <span className="emp-role">{member.designation}</span>
                                     </div>
                                     <div className="emp-status">
-                                        <div className={`status-dot ${member.status}`} title={member.status} />
-                                        <span className="hours-pill">{member.total_hours.toFixed(1)}h</span>
+                                        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                                            {member.is_late && <span style={{ fontSize: '9px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fee2e2', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>LATE</span>}
+                                            {member.is_resubmission && <span style={{ fontSize: '9px', background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>RESUB</span>}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div className={`status-dot ${member.status}`} title={member.status} />
+                                            <span className="hours-pill">{member.total_hours.toFixed(1)}h</span>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -650,28 +658,13 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                     )}
                                                                     <div className="entry-footer">
                                                                         <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
+                                                                        {entry.is_late && <span className="status-pill warn" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7' }}>Late</span>}
+                                                                        {entry.is_resubmission && <span className="status-pill info" style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>Resubmission</span>}
                                                                     </div>
                                                                 </div>
                                                                 {entry.log_status !== 'approved' && entry.log_status !== 'rejected' && !entry.project_name?.includes('System') && (
                                                                     <div className="entry-actions-sidebar">
-                                                                        <button
-                                                                            className="action-btn-styled edit"
-                                                                            title="Approve"
-                                                                            onClick={async () => {
-                                                                                if (entry.id) {
-                                                                                    try {
-                                                                                        await timesheetService.approveEntry(entry.id);
-                                                                                        showSuccess('Entry approved');
-                                                                                        if (selectedMemberId) fetchMemberEntries(selectedMemberId);
-                                                                                        fetchTeamStatus();
-                                                                                    } catch (err: any) {
-                                                                                        showError(err.message || 'Failed to approve');
-                                                                                    }
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            <CheckCircle size={16} />
-                                                                        </button>
+                                                                        {/* Removed Individual Approval as per plan */}
                                                                         <button
                                                                             className="action-btn-styled delete"
                                                                             title="Reject"

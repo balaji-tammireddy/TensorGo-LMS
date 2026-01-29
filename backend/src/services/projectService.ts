@@ -1228,6 +1228,21 @@ export class ProjectService {
     try {
       await client.query('BEGIN');
 
+      // 0. Status Check: Management actions only allowed for ACTIVE projects
+      let statusQuery = '';
+      if (level === 'module') {
+        statusQuery = `SELECT p.status FROM project_modules m JOIN projects p ON m.project_id = p.id WHERE m.id = $1`;
+      } else if (level === 'task') {
+        statusQuery = `SELECT p.status FROM project_tasks t JOIN project_modules m ON t.module_id = m.id JOIN projects p ON m.project_id = p.id WHERE t.id = $1`;
+      } else if (level === 'activity') {
+        statusQuery = `SELECT p.status FROM project_activities a JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id JOIN projects p ON m.project_id = p.id WHERE a.id = $1`;
+      }
+
+      const statusRes = await client.query(statusQuery, [targetId]);
+      if (statusRes.rows.length === 0 || statusRes.rows[0].status !== 'active') {
+        throw new Error('Action denied: Management actions are only allowed when the project status is Active.');
+      }
+
       console.log(`[ACCESS_TRACE] Start: level=${level}, targetId=${targetId}, userId=${userId}, action=${action}`);
 
       const table = `${level}_access`;
@@ -1406,43 +1421,53 @@ export class ProjectService {
 
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
-    // STRICT: Only Super Admin can edit project METADATA (name, desc, PM, status)
-    return role === 'super_admin';
+    // Super Admin and HR can manage any project
+    if (role === 'super_admin' || role === 'hr') return true;
+
+    // Project Manager can manage their own project
+    const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
+    if (res.rows.length === 0) return false;
+    // Fix: Use string comparison to handle potential type discrepancies (string vs number)
+    return String(res.rows[0].project_manager_id) === String(userId);
   }
 
   static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
     // STRICT: Only the Project Manager can add/edit modules, tasks, activities
-    const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
+    // AND ONLY if the project is ACTIVE
+    const res = await query(`SELECT project_manager_id, status FROM projects WHERE id = $1`, [projectId]);
     if (res.rows.length === 0) return false;
-    return res.rows[0].project_manager_id === userId;
+    const project = res.rows[0];
+    return project.project_manager_id === userId && project.status === 'active';
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
     const res = await query(`
-      SELECT p.project_manager_id
+      SELECT p.project_manager_id, p.status
       FROM project_modules m
       JOIN projects p ON m.project_id = p.id
       WHERE m.id = $1`, [moduleId]);
 
     if (res.rows.length === 0) return false;
-    return res.rows[0].project_manager_id === userId;
+    const project = res.rows[0];
+    return project.project_manager_id === userId && project.status === 'active';
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
     const res = await query(`
-      SELECT p.project_manager_id
+      SELECT p.project_manager_id, p.status
       FROM project_tasks t
       JOIN project_modules m ON t.module_id = m.id
       JOIN projects p ON m.project_id = p.id
       WHERE t.id = $1`, [taskId]);
 
     if (res.rows.length === 0) return false;
-    return res.rows[0].project_manager_id === userId;
+    const project = res.rows[0];
+    return project.project_manager_id === userId && project.status === 'active';
   }
 
   static async canUserManageActivity(userId: number, role: string, activityId: number): Promise<boolean> {
     const res = await query(`
-      SELECT p.project_manager_id
+      SELECT p.project_manager_id, p.status
       FROM project_activities a
       JOIN project_tasks t ON a.task_id = t.id
       JOIN project_modules m ON t.module_id = m.id
@@ -1450,7 +1475,8 @@ export class ProjectService {
       WHERE a.id = $1`, [activityId]);
 
     if (res.rows.length === 0) return false;
-    return res.rows[0].project_manager_id === userId;
+    const project = res.rows[0];
+    return project.project_manager_id === userId && project.status === 'active';
   }
 
   static async deleteTask(id: number) {

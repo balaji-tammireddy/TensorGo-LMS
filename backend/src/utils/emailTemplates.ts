@@ -1925,6 +1925,8 @@ export interface TimesheetSubmissionEmailData {
   hoursLogged: number;
   startDate: string;
   endDate: string;
+  isLate?: boolean;
+  isResubmission?: boolean;
 }
 
 /**
@@ -2032,15 +2034,18 @@ export const sendTimesheetSubmissionEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const title = 'Timesheet Auto-Submitted';
+  const title = data.isLate ? 'Late Timesheet Submitted' : 'Timesheet Submitted';
+
   const content = `
     <p>Dear Manager,</p>
-    <p>The timesheet for <strong>${data.employeeName}</strong> has been auto-submitted as they have met the weekly 40-hour criteria.</p>
+    <p>The timesheet for <strong>${data.employeeName}</strong> has been submitted.</p>
     ${generateDetailsTable([
     { label: 'Employee Name:', value: data.employeeName, isBold: true },
     { label: 'Weekly Hours:', value: `${data.hoursLogged} hours`, isBold: true },
     { label: 'Period:', value: `${data.startDate} to ${data.endDate}` },
-    { label: 'Status:', value: 'SUBMITTED', isBold: true }
+    { label: 'Status:', value: 'SUBMITTED', isBold: true },
+    ...(data.isLate ? [{ label: 'Submission Type:', value: '<span style="color: #dc2626; font-weight: bold;">LATE SUBMISSION</span>', isHtml: true }] : []),
+    ...(data.isResubmission ? [{ label: 'Submission Detail:', value: '<span style="color: #2563eb; font-weight: bold;">RESUBMISSION</span>', isHtml: true }] : [])
   ])}
     <p style="margin-top: 30px;">Please log in to the portal to review and approve the timesheet entries.</p>
     <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
@@ -2048,9 +2053,9 @@ export const sendTimesheetSubmissionEmail = async (
 
   return await sendEmail({
     to: managerEmail,
-    subject: `Timesheet Submitted: ${data.employeeName} [Ref: ${uniqueId}]`,
-    html: generateEmailWrapper(title, content, uniqueId, `${data.employeeName} submitted their timesheet`),
-    text: `${title}\n\nThe timesheet for ${data.employeeName} has been auto-submitted with ${data.hoursLogged} hours.`
+    subject: `Timesheet Submitted: ${data.employeeName} ${data.isLate ? '(LATE)' : ''} [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, `${data.employeeName} submitted their timesheet ${data.isLate ? '(LATE)' : ''}`),
+    text: `${title}\n\nThe timesheet for ${data.employeeName} has been submitted with ${data.hoursLogged} hours. ${data.isLate ? 'This is a LATE submission.' : ''} ${data.isResubmission ? 'This is a RESUBMISSION.' : ''}`
   });
 };
 

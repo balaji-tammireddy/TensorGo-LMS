@@ -42,7 +42,9 @@ export const TimesheetPage: React.FC = () => {
 
     // Date State
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isEditHighlight, setIsEditHighlight] = useState(false);
+    const [originalEntry, setOriginalEntry] = useState<TimesheetEntry | null>(null);
 
     // Data State
     const [entries, setEntries] = useState<TimesheetEntry[]>([]);
@@ -262,9 +264,10 @@ export const TimesheetPage: React.FC = () => {
             showSuccess(editingId ? "Entry updated" : "Time logged successfully");
             setFormData(initialFormState);
             setEditingId(null);
+            setOriginalEntry(null);
             fetchEntries();
         } catch (err: any) {
-            showError(err.message || 'Failed to save entry');
+            showError(err.response?.data?.error || err.message || 'Failed to save entry');
         } finally {
             setLoading(false);
         }
@@ -282,17 +285,23 @@ export const TimesheetPage: React.FC = () => {
         setCurrentDate(eDate); // Ensure weekly view switches to the entry's week
         setEditingId(entry.id!);
 
+        // Scroll to top smoothly as requested
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Trigger pulse animation
+        setIsEditHighlight(true);
+        setTimeout(() => setIsEditHighlight(false), 1500);
+
         try {
-            setFormData(prev => ({ ...prev, project_id: String(entry.project_id) }));
-            const mods = await projectService.getModules(entry.project_id);
+            // Fetch all dependent data in parallel for speed
+            const [mods, tsks, acts] = await Promise.all([
+                projectService.getModules(entry.project_id),
+                projectService.getTasks(entry.module_id),
+                projectService.getActivities(entry.task_id)
+            ]);
+
             setModules(mods);
-
-            setFormData(prev => ({ ...prev, module_id: String(entry.module_id) }));
-            const tsks = await projectService.getTasks(entry.module_id);
             setTasks(tsks);
-
-            setFormData(prev => ({ ...prev, task_id: String(entry.task_id) }));
-            const acts = await projectService.getActivities(entry.task_id);
             setActivities(acts);
 
             setFormData({
@@ -304,6 +313,7 @@ export const TimesheetPage: React.FC = () => {
                 work_status: entry.work_status,
                 description: entry.description
             });
+            setOriginalEntry(entry);
 
         } catch (e) {
             console.error("Error populating edit form", e);
@@ -319,7 +329,7 @@ export const TimesheetPage: React.FC = () => {
             showSuccess("Entry deleted successfully");
             fetchEntries();
         } catch (err: any) {
-            showError(err.message || "Failed to delete");
+            showError(err.response?.data?.error || err.message || "Failed to delete");
         } finally {
             setIsDeleteModalOpen(false);
             setEntryToDelete(null);
@@ -361,6 +371,23 @@ export const TimesheetPage: React.FC = () => {
             formData.description.trim() !== ''
         );
     }, [formData]);
+
+    const isFormChanged = useMemo(() => {
+        if (!editingId || !originalEntry) return true;
+        const eDate = new Date(originalEntry.log_date);
+        const originalDateStr = formatDate(eDate);
+
+        return (
+            formData.project_id !== String(originalEntry.project_id) ||
+            formData.module_id !== String(originalEntry.module_id) ||
+            formData.task_id !== String(originalEntry.task_id) ||
+            formData.activity_id !== String(originalEntry.activity_id) ||
+            formData.duration !== String(originalEntry.duration) ||
+            formData.work_status !== originalEntry.work_status ||
+            formData.description !== originalEntry.description ||
+            selectedDate !== originalDateStr
+        );
+    }, [formData, selectedDate, editingId, originalEntry]);
 
     // Dropdown Empty State Component
     const DropdownEmptyState = ({ message }: { message: string }) => (
@@ -453,7 +480,7 @@ export const TimesheetPage: React.FC = () => {
                 <div className="timesheet-layout">
                     {/* Left Column: Form */}
                     <div className="form-column">
-                        <div className="log-form-card">
+                        <div className={`log-form-card ${isEditHighlight ? 'edit-highlight' : ''}`}>
                             <div className="form-title" style={{ justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Clock size={18} />
@@ -765,21 +792,22 @@ export const TimesheetPage: React.FC = () => {
                                         />
                                     </div>
 
-                                    <div className="form-actions">
+                                    <div className="form-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         {editingId && (
                                             <button
                                                 type="button"
                                                 className="ts-submit-btn"
-                                                style={{ backgroundColor: '#64748b', marginBottom: '8px' }}
+                                                style={{ backgroundColor: '#64748b', margin: 0 }}
                                                 onClick={() => {
                                                     setEditingId(null);
+                                                    setOriginalEntry(null);
                                                     setFormData(initialFormState);
                                                 }}
                                             >
                                                 Cancel Edit
                                             </button>
                                         )}
-                                        <button type="submit" className="ts-submit-btn" disabled={loading || (!isWeekEditable && !editingId) || !isFormValid}>
+                                        <button type="submit" className="ts-submit-btn" style={{ margin: 0 }} disabled={loading || (!isWeekEditable && !editingId) || !isFormValid || (!!editingId && !isFormChanged)}>
                                             <Save size={18} />
                                             {editingId ? 'Update' : 'Log Time'}
                                         </button>

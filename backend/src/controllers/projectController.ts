@@ -62,7 +62,7 @@ export const updateProject = async (req: AuthRequest, res: Response) => {
 
         const canManage = await ProjectService.canUserManageProject(userId, role, parseInt(id));
         if (!canManage) {
-            return res.status(403).json({ error: 'Access denied: Only the Super Admin can update the project metadata (Name, Description, PM, Status)' });
+            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Project Manager can update the project metadata.' });
         }
 
         const project = await ProjectService.updateProject(parseInt(id), updates, userId);

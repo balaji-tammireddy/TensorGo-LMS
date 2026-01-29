@@ -17,6 +17,8 @@ export interface TimesheetEntry {
     log_status?: string;
     rejection_reason?: string;
     manager_comment?: string;
+    is_late?: boolean;
+    is_resubmission?: boolean;
 }
 
 export class TimesheetService {
@@ -130,6 +132,18 @@ export class TimesheetService {
                 }
             }
 
+            // Validation 4: Max 24 Hours Per Day
+            const dailyTotalRes = await client.query(`
+                SELECT COALESCE(SUM(duration), 0)::float as total
+                FROM project_entries
+                WHERE user_id = $1 AND log_date = $2 AND id != $3
+            `, [userId, entry.log_date, entry.id || -1]);
+
+            const existingDailyTotal = parseFloat(dailyTotalRes.rows[0].total);
+            if (existingDailyTotal + entry.duration > 24) {
+                throw new Error(`Cannot log ${entry.duration} hours. You already have ${existingDailyTotal} hours logged for ${TimesheetService.formatDate(entry.log_date)}. Day total cannot exceed 24 hours.`);
+            }
+
             if (entry.id) {
                 const existingRes = await client.query('SELECT log_status, user_id FROM project_entries WHERE id = $1', [entry.id]);
                 if (existingRes.rows.length === 0) throw new Error("Entry not found");
@@ -234,7 +248,9 @@ export class TimesheetService {
                 COUNT(CASE WHEN pe.log_status = 'approved' THEN 1 END) as approved_count,
                 COUNT(CASE WHEN pe.log_status = 'rejected' THEN 1 END) as rejected_count,
                 COUNT(CASE WHEN pe.log_status = 'submitted' THEN 1 END) as submitted_count,
-                COUNT(CASE WHEN pe.log_status = 'draft' THEN 1 END) as draft_count
+                COUNT(CASE WHEN pe.log_status = 'draft' THEN 1 END) as draft_count,
+                BOOL_OR(pe.is_late) as is_late,
+                BOOL_OR(pe.is_resubmission) as is_resubmission
             FROM users u
             LEFT JOIN project_entries pe ON u.id = pe.user_id 
                 AND pe.log_date >= $1 AND pe.log_date <= $2
@@ -260,7 +276,9 @@ export class TimesheetService {
                 emp_id: row.emp_id,
                 designation: row.designation,
                 total_hours: row.total_hours,
-                status // 'draft', 'submitted', 'approved', 'rejected', 'pending_submission'
+                status, // 'draft', 'submitted', 'approved', 'rejected', 'pending_submission'
+                is_late: row.is_late || false,
+                is_resubmission: row.is_resubmission || false
             };
         });
     }
@@ -453,18 +471,23 @@ export class TimesheetService {
             `, [userId, startStr, endStr]);
 
             const isResubmission = rejectCheck.rows.length > 0;
-            // We'll store metadata in description or a new field? 
-            // Current schema doesn't have metadata field. Using `log_status` logic only.
-            // Requirement said "Flag as Late or Resubmission". 
-            // We can infer this contextually in the UI or backend query, but let's just update status for now.
+
+            // Late Check: If submitting after Monday 00:00 AM of the week following the timesheet week
+            const nextMonday = new Date(endStr);
+            nextMonday.setDate(nextMonday.getDate() + 1);
+            nextMonday.setHours(0, 0, 0, 0);
+            const isLate = today > nextMonday;
 
             await client.query(`
-                UPDATE project_entries
-                SET log_status = 'submitted', updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = $1 
-                  AND log_date >= $2 AND log_date <= $3
-                  AND log_status IN ('draft', 'rejected')
-            `, [userId, startStr, endStr]);
+            UPDATE project_entries
+            SET log_status = 'submitted', 
+                updated_at = CURRENT_TIMESTAMP,
+                is_late = $4,
+                is_resubmission = $5
+            WHERE user_id = $1 
+              AND log_date >= $2 AND log_date <= $3
+              AND log_status IN ('draft', 'rejected')
+        `, [userId, startStr, endStr, isLate, isResubmission]);
 
             await client.query('COMMIT');
 
@@ -478,7 +501,9 @@ export class TimesheetService {
                         employeeName: user.first_name,
                         hoursLogged: total,
                         startDate: startStr,
-                        endDate: endStr
+                        endDate: endStr,
+                        isLate,
+                        isResubmission
                     }).catch(console.error);
                 }
             }

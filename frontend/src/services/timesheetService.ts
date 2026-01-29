@@ -17,6 +17,8 @@ export interface TimesheetEntry {
     activity_name?: string;
     rejection_reason?: string;
     manager_comment?: string;
+    is_late?: boolean;
+    is_resubmission?: boolean;
 }
 
 export const timesheetService = {

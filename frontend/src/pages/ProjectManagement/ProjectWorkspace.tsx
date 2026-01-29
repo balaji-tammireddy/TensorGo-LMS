@@ -28,11 +28,12 @@ const StatusDropdown = React.memo(({
 }) => {
     if (!currentStatus) return null;
 
+    // FIXED: Solid backgrounds with matching borders for clean "pill" look
     const statusOptions = [
-        { value: 'active', label: 'Active', color: '#FFFFFF', bg: '#10B981', border: '#059669' },
-        { value: 'on_hold', label: 'On Hold', color: '#FFFFFF', bg: '#F59E0B', border: '#D97706' },
-        { value: 'completed', label: 'Completed', color: '#FFFFFF', bg: '#6366F1', border: '#4F46E5' },
-        { value: 'archived', label: 'Archived', color: '#FFFFFF', bg: '#64748B', border: '#475569' }
+        { value: 'active', label: 'Active', color: '#FFFFFF', bg: '#10B981', border: '#10B981' }, // Emerald-500
+        { value: 'on_hold', label: 'On Hold', color: '#FFFFFF', bg: '#F59E0B', border: '#F59E0B' }, // Amber-500
+        { value: 'completed', label: 'Completed', color: '#FFFFFF', bg: '#6366F1', border: '#6366F1' }, // Indigo-500
+        { value: 'archived', label: 'Archived', color: '#FFFFFF', bg: '#64748B', border: '#64748B' } // Slate-500
     ];
 
     const current = statusOptions.find(s => s.value === currentStatus) || statusOptions[0];
@@ -178,24 +179,26 @@ export const ProjectWorkspace: React.FC = () => {
     // Permissions Logic
     const isPM = !!project?.is_pm;
     const isSuperAdmin = user?.role === 'super_admin';
+    const isHR = user?.role === 'hr';
 
     // Check if project is in a read-only state
     // Details can be edited ONLY in active state
     const isProjectReadOnly = project?.status !== 'active';
 
-    // 1. Project-level metadata editing (Name, Desc, PM, Status):
-    //    - STRICT: Only Super Admin can edit project metadata
-    const canManageProject = isSuperAdmin && !isProjectReadOnly;
+    //    - STRICT: Super Admin, HR, or the assigned PM can edit project metadata
+    const canManageProject = (isSuperAdmin || isHR || isPM) && !isProjectReadOnly;
 
     // 2. Module/Task/Activity Operational Control:
     //    - STRICT: Only the Project Manager can create/edit/delete/assign
-    const canCreateModule = isPM && !isProjectReadOnly;
-    const canAddTask = isPM && !isProjectReadOnly;
-    const canAddActivity = isPM && !isProjectReadOnly;
+    //    - AND ONLY if project is Active
+    const canManageResources = isPM && !isProjectReadOnly;
+    const canCreateModule = canManageResources;
+    const canAddTask = canManageResources;
+    const canAddActivity = canManageResources;
 
     // 3. Status Management:
-    //    - STRICT: Only Super Admin can change status
-    const canManageStatus = isSuperAdmin;
+    //    - STRICT: Super Admin, HR, or the assigned PM can change status
+    const canManageStatus = isSuperAdmin || isHR || isPM;
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type
@@ -333,6 +336,13 @@ export const ProjectWorkspace: React.FC = () => {
                                     newAssignedUsers = [...newAssignedUsers, candidate];
                                 }
                             }
+                            // Sort: PM first, then alphabetical
+                            const projectPMId = String(project?.project_manager_id);
+                            newAssignedUsers.sort((a: any, b: any) => {
+                                if (String(a.id) === projectPMId) return -1;
+                                if (String(b.id) === projectPMId) return 1;
+                                return (a.name || '').localeCompare(b.name || '');
+                            });
                         }
                         return { ...m, assigned_users: newAssignedUsers };
                     });
@@ -408,6 +418,13 @@ export const ProjectWorkspace: React.FC = () => {
                                     newAssignedUsers = [...newAssignedUsers, candidate];
                                 }
                             }
+                            // Sort: PM first, then alphabetical
+                            const projectPMId = String(project?.project_manager_id);
+                            newAssignedUsers.sort((a: any, b: any) => {
+                                if (String(a.id) === projectPMId) return -1;
+                                if (String(b.id) === projectPMId) return 1;
+                                return (a.name || '').localeCompare(b.name || '');
+                            });
                         }
                         return { ...t, assigned_users: newAssignedUsers };
                     });
@@ -469,6 +486,13 @@ export const ProjectWorkspace: React.FC = () => {
                                     newAssignedUsers = [...newAssignedUsers, candidate];
                                 }
                             }
+                            // Sort: PM first, then alphabetical
+                            const projectPMId = String(project?.project_manager_id);
+                            newAssignedUsers.sort((a: any, b: any) => {
+                                if (String(a.id) === projectPMId) return -1;
+                                if (String(b.id) === projectPMId) return 1;
+                                return (a.name || '').localeCompare(b.name || '');
+                            });
                         }
                         return { ...a, assigned_users: newAssignedUsers };
                     });
@@ -634,25 +658,19 @@ export const ProjectWorkspace: React.FC = () => {
                                     onClick={() => { setSelectedModuleId(module.id); setSelectedTaskId(null); }}
                                     onEdit={() => handleEdit('module', module)}
                                     onDelete={() => handleDeleteModule(module.id)}
-                                    isPM={isPM}
+                                    isPM={canManageResources}
                                     isCompact={true}
-                                    // Pass ALL project members as candidates (Project Team)
                                     availableUsers={(() => {
                                         const candidates = projectMembers || [];
                                         const current = module.assigned_users || [];
-
-                                        // Robust PM ID detection: checking both project metadata and member list flags
                                         const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
-
-                                        // Merge and unique by ID
                                         const uniqueMap = new Map();
                                         [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
-
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== pmId) // Exclude PM
-                                            .map((pm: any) => ({
-                                                ...pm,
-                                                initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                            .filter((u: any) => String(u.id) !== pmId)
+                                            .map((u: any) => ({
+                                                ...u,
+                                                initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                             }));
                                     })()}
                                     onAssignUser={(userId) => {
@@ -660,14 +678,13 @@ export const ProjectWorkspace: React.FC = () => {
                                             const candidates = projectMembers || [];
                                             const current = module.assigned_users || [];
                                             const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
-
                                             const uniqueMap = new Map();
                                             [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             return Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== pmId) // Exclude PM
-                                                .map((pm: any) => ({
-                                                    ...pm,
-                                                    initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                .filter((u: any) => String(u.id) !== pmId)
+                                                .map((u: any) => ({
+                                                    ...u,
+                                                    initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                                 }));
                                         })();
                                         const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
@@ -735,39 +752,32 @@ export const ProjectWorkspace: React.FC = () => {
                                         onClick={() => setSelectedTaskId(task.id)}
                                         onEdit={() => handleEdit('task', task)}
                                         onDelete={() => handleDeleteTask(task.id)}
-                                        isPM={isPM}
+                                        isPM={canManageResources}
                                         isCompact={true}
-                                        // Pass ALL module assignees as candidates
-                                        // Pass ALL module assignees + current task assignees
                                         availableUsers={(() => {
                                             const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
                                             const current = task.assigned_users || [];
-
-                                            // Robust PM ID: try getting from member list, then project (if available)
-                                            // We check detailed projectMembers list if available, otherwise rely on project metatdata
                                             const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
-
                                             const uniqueMap = new Map();
                                             [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             return Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== globalPmId) // Exclude PM
-                                                .map((pm: any) => ({
-                                                    ...pm,
-                                                    initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                .filter((u: any) => String(u.id) !== globalPmId)
+                                                .map((u: any) => ({
+                                                    ...u,
+                                                    initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                                 }));
                                         })()}
                                         onAssignUser={(userId) => {
                                             const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
                                             const current = task.assigned_users || [];
                                             const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
-
                                             const uniqueMap = new Map();
                                             [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                             const availableUsers = Array.from(uniqueMap.values())
                                                 .filter((u: any) => String(u.id) !== globalPmId)
-                                                .map((pm: any) => ({
-                                                    ...pm,
-                                                    initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                .map((u: any) => ({
+                                                    ...u,
+                                                    initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                                 }));
                                             const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
                                             const isAssigned = (task.assigned_users || []).some((u: any) => String(u.id) === String(userId));
@@ -810,25 +820,21 @@ export const ProjectWorkspace: React.FC = () => {
                                     <p className="dashed-desc">
                                         {(isPM || isSuperAdmin) ? "No activities found for this task." : "You haven't been assigned to any activities in this task."}
                                     </p>
-
                                 </div>
                             ) : (
                                 activities?.map(activity => {
                                     const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
-                                    // Pass ALL task members + current activity assignees
                                     const availableUsers = (() => {
                                         const taskMembers = selectedTask?.assigned_users || [];
                                         const current = activity.assigned_users || [];
-
                                         const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
-
                                         const uniqueMap = new Map();
                                         [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                         return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== globalPmId) // Exclude PM
-                                            .map((pm: any) => ({
-                                                ...pm,
-                                                initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                            .filter((u: any) => String(u.id) !== globalPmId)
+                                            .map((u: any) => ({
+                                                ...u,
+                                                initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                             }));
                                     })();
 
@@ -843,27 +849,25 @@ export const ProjectWorkspace: React.FC = () => {
                                             onClick={() => { }}
                                             onEdit={() => handleEdit('activity', activity)}
                                             onDelete={() => handleDeleteActivity(activity.id)}
+                                            isPM={canManageResources}
                                             onAssignUser={(userId) => {
                                                 const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
                                                 const taskMembers = selectedTask?.assigned_users || [];
                                                 const current = activity.assigned_users || [];
-
                                                 const globalPmId = String(project?.project_manager_id || projectMembers?.find((m: any) => m.is_pm)?.id);
-
                                                 const uniqueMap = new Map();
                                                 [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
                                                 const availableUsers = Array.from(uniqueMap.values())
                                                     .filter((u: any) => String(u.id) !== globalPmId)
-                                                    .map((pm: any) => ({
-                                                        ...pm,
-                                                        initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                    .map((u: any) => ({
+                                                        ...u,
+                                                        initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                                     }));
                                                 const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
                                                 const isAssigned = (activity.assigned_users || []).some((u: any) => String(u.id) === String(userId));
                                                 assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
                                             }}
                                             availableUsers={availableUsers}
-                                            isPM={isPM}
                                             isCompact={true}
                                         />
                                     );
@@ -871,7 +875,6 @@ export const ProjectWorkspace: React.FC = () => {
                             )}
                         </div>
                     </div>
-
                 </div>
 
                 {/* Shared Create Modal */}
@@ -885,8 +888,6 @@ export const ProjectWorkspace: React.FC = () => {
                     isEdit={isEdit}
                     projectManagerId={project?.project_manager_id}
                 />
-
-
 
                 <DeleteConfirmModal
                     isOpen={deleteModal.isOpen}

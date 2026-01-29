@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import './DeleteConfirmModal.css';
 
 interface DeleteConfirmModalProps {
@@ -31,7 +30,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
                 <div className="dcm-icon-wrapper">
                     <div className="dcm-icon">
-                        <AlertTriangle size={32} />
+                        <Trash2 size={28} />
                     </div>
                 </div>
 
@@ -42,18 +41,18 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
                 <div className="dcm-footer">
                     <button
-                        className="dcm-cancel-btn"
+                        className="dcm-btn dcm-cancel-btn"
                         onClick={onClose}
                         disabled={isLoading}
                     >
                         Cancel
                     </button>
                     <button
-                        className="dcm-delete-btn"
+                        className="dcm-btn dcm-delete-btn"
                         onClick={onConfirm}
                         disabled={isLoading}
                     >
-                        {isLoading ? 'Deleting...' : 'Delete'}
+                        {isLoading ? 'Deleting...' : 'Delete Forever'}
                     </button>
                 </div>
             </div>
