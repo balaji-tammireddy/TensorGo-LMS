@@ -81,6 +81,9 @@ export const createEmployeeSchema = z.object({
         education: z.array(educationSchema).optional().nullable(),
         status: z.enum(['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive']).optional()
     }).refine(data => {
+        // Only validate if both dates are provided
+        if (!data.dateOfJoining) return true;
+
         const dob = new Date(data.dateOfBirth);
         const doj = new Date(data.dateOfJoining);
         const minDoj = new Date(dob);

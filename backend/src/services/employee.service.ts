@@ -1546,9 +1546,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     for (const [level, prefix] of Object.entries(fields)) {
       const edu = educationMap[level];
       eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
-      eduValues.push(toTitleCase(edu?.groupStream));
+      eduValues.push(edu?.groupStream || null);
       eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
-      eduValues.push(toTitleCase(edu?.collegeUniversity));
+      eduValues.push(edu?.collegeUniversity || null);
       eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
       eduValues.push(edu?.year || null);
       eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);

@@ -267,7 +267,7 @@ const EmployeeDetailsPage: React.FC = () => {
         setIsEditMode(false);
         fetchEmployeeDetails();
       },
-      onError: (err, newItem, context: any) => {
+      onError: (err: any, newItem, context: any) => {
         if (context?.previousEmployees) {
           queryClient.setQueryData<any[]>('employees', context.previousEmployees);
         }
@@ -1140,7 +1140,7 @@ const EmployeeDetailsPage: React.FC = () => {
                         value={edu.groupStream || ''}
                         onChange={(e) => {
                           const next = [...employeeData.education];
-                          next[idx] = { ...edu, groupStream: sanitizeLettersOnly(e.target.value) };
+                          next[idx] = { ...edu, groupStream: e.target.value };
                           setEmployeeData({ ...employeeData, education: next });
                         }}
                         onBlur={() => {
@@ -1163,7 +1163,7 @@ const EmployeeDetailsPage: React.FC = () => {
                         value={edu.collegeUniversity || ''}
                         onChange={(e) => {
                           const next = [...employeeData.education];
-                          next[idx] = { ...edu, collegeUniversity: sanitizeLettersOnly(e.target.value) };
+                          next[idx] = { ...edu, collegeUniversity: e.target.value };
                           setEmployeeData({ ...employeeData, education: next });
                         }}
                         onBlur={() => {
