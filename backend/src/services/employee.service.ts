@@ -1653,9 +1653,22 @@ export const deleteEmployee = async (employeeId: number) => {
     // 4. Update reporting_manager_id in users table to NULL for employees reporting to this user
     await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
 
-    // 6. Update created_by and updated_by references to NULL
-    await client.query('UPDATE users SET created_by = NULL WHERE created_by = $1', [employeeId]);
-    await client.query('UPDATE users SET updated_by = NULL WHERE updated_by = $1', [employeeId]);
+    // 5. Reassign audit references to a system user (first super admin) instead of NULL
+    // This is required because of the NOT NULL constraints added to audit columns in migration 024
+    const saResult = await client.query('SELECT id FROM users WHERE user_role = \'super_admin\' ORDER BY id ASC LIMIT 1');
+    const saId = saResult.rows[0]?.id || 1;
+
+    const auditTables = [
+      'activity_access', 'module_access', 'project_members', 'task_access', 'project_activities',
+      'project_modules', 'project_tasks', 'projects', 'holidays', 'leave_balances',
+      'leave_days', 'leave_policy_configurations', 'leave_requests', 'leave_rules',
+      'leave_types', 'password_reset_otps', 'policies', 'project_entries', 'users'
+    ];
+
+    for (const table of auditTables) {
+      await client.query(`UPDATE ${table} SET created_by = $1 WHERE created_by = $2`, [saId, employeeId]);
+      await client.query(`UPDATE ${table} SET updated_by = $1 WHERE updated_by = $2`, [saId, employeeId]);
+    }
 
     // 7. Finally, delete the user
     logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting user record`);

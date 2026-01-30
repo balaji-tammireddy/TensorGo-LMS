@@ -1455,7 +1455,7 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
     <p>This is to inform you that your profile details have been updated in the <strong>TensorGo Intranet</strong> by <strong>${data.updatedBy}</strong>.</p>
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; margin: 30px 0; border-radius: 6px;">
       <p style="margin: 0; color: #475569; line-height: 1.6;">
-        For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
+        Please log in to the portal to review your updated profiles.
       </p>
     </div>
 
@@ -1481,7 +1481,7 @@ Dear ${data.employeeName},
 
 This is to inform you that your profile details have been updated in the TensorGo Intranet by ${data.updatedBy}.
 
-For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
+Please log in to the portal to review your updated profiles.
 
 
 Best Regards,

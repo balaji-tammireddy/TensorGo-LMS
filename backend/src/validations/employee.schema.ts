@@ -163,9 +163,9 @@ export const addLeavesSchema = z.object({
 export const updateProfileSchema = z.object({
     body: z.object({
         personalInfo: z.object({
-            firstName: nameSchema.optional().nullable(),
+            firstName: nameSchema.optional().nullable().or(z.literal('')),
             middleName: nameSchema.optional().nullable().or(z.literal('')),
-            lastName: nameSchema.optional().nullable(),
+            lastName: nameSchema.optional().nullable().or(z.literal('')),
             contactNumber: phoneSchema.optional().nullable(),
             altContact: phoneSchema.optional().nullable(),
             dateOfBirth: z.string().optional().nullable(),
@@ -179,16 +179,24 @@ export const updateProfileSchema = z.object({
             email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
                 (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
                 { message: 'Only organization mail should be used' }
-            ).optional().nullable()
+            ).optional().nullable(),
+            personalEmail: z.string().email().nullable().optional().or(z.literal(''))
         }).optional().nullable(),
         employmentInfo: z.object({
-            designation: nameSchema.optional().nullable(),
-            department: nameSchema.optional().nullable(),
-            dateOfJoining: z.string().optional().nullable()
+            designation: nameSchema.optional().nullable().or(z.literal('')),
+            department: nameSchema.optional().nullable().or(z.literal('')),
+            dateOfJoining: z.string().optional().nullable(),
+            uanNumber: z.string().max(14).nullable().optional().or(z.literal('')),
+            totalExperience: z.union([z.string(), z.number()]).nullable().optional().or(z.literal(''))
         }).optional().nullable(),
         documents: z.object({
             aadharNumber: aadharSchema.optional().nullable(),
-            panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional().nullable()
+            panNumber: z.union([
+                z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
+                z.string().length(0),
+                z.null(),
+                z.undefined()
+            ]).optional().nullable()
         }).optional().nullable(),
         address: z.object({
             currentAddress: z.string().optional().nullable(),
