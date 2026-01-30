@@ -276,14 +276,10 @@ export const getEmployeeById = async (employeeId: number) => {
 export const createEmployee = async (employeeData: any, requesterRole?: string, requesterId?: number) => {
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
 
-  // Remove leading zeros from empId if it's a numeric ID
+  // Normalize employee ID (trim and uppercase, preserve leading zeros)
+  // Keep employee ID as entered (preserve leading zeros)
   if (employeeData.empId) {
-    const empIdStr = employeeData.empId.toString().trim();
-    // If it's purely numeric, convert to integer and back to remove leading zeros
-    if (/^\d+$/.test(empIdStr)) {
-      employeeData.empId = parseInt(empIdStr, 10).toString();
-    }
-    // Otherwise keep the original value (for alphanumeric IDs like "SA 0001")
+    employeeData.empId = employeeData.empId.toString().trim().toUpperCase();
   }
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}, Requester: ${requesterRole || 'none'}`);
@@ -762,13 +758,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
 
   // Remove leading zeros from empId if it's a numeric ID
+  // Keep employee ID as entered (preserve leading zeros)
   if (employeeData.empId) {
-    const empIdStr = employeeData.empId.toString().trim();
-    // If it's purely numeric, convert to integer and back to remove leading zeros
-    if (/^\d+$/.test(empIdStr)) {
-      employeeData.empId = parseInt(empIdStr, 10).toString();
-    }
-    // Otherwise keep the original value (for alphanumeric IDs like "SA 0001")
+    employeeData.empId = employeeData.empId.toString().trim().toUpperCase();
   }
 
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${employeeId}, Requester Role: ${requesterRole || 'none'}, Requester ID: ${requesterId || 'none'}`);
@@ -1385,18 +1377,18 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
           const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
           const previousManagerName = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
 
+          // Send emails in background (non-blocking)
           for (const sub of subordinatesResult.rows) {
-            try {
-              await sendReportingManagerChangeEmail(sub.email, {
-                employeeName: sub.name,
-                previousManagerName,
-                newManagerName: managerName,
-                newManagerEmpId: managerEmpId
-              });
+            sendReportingManagerChangeEmail(sub.email, {
+              employeeName: sub.name,
+              previousManagerName,
+              newManagerName: managerName,
+              newManagerEmpId: managerEmpId
+            }).then(() => {
               logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassignment email sent to subordinate: ${sub.email}`);
-            } catch (emailError) {
+            }).catch(emailError => {
               logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending reassignment email to ${sub.email}:`, emailError);
-            }
+            });
           }
         } catch (importError) {
           logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error importing email templates for reassignment:`, importError);
@@ -1423,56 +1415,70 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       );
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
         const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
-        await sendReportingManagerChangeEmail(empResult.rows[0].email, {
+        // Send email in background (non-blocking)
+        sendReportingManagerChangeEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           previousManagerName: employeeCheck.rows[0].reporting_manager_name || 'N/A',
           newManagerName: empResult.rows[0].reporting_manager_name || 'New Manager',
           newManagerEmpId: empResult.rows[0].manager_emp_id || ''
+        }).then(() => {
+          logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
+        }).catch(e => {
+          logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending manual manager change notification:`, e);
         });
-        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
     } catch (e) {
-      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending manual manager change notification:`, e);
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error fetching employee data for manager change notification:`, e);
     }
   }
 
   // Item 15: Role changed notification
   if (isRoleChanged) {
     try {
-      const empResult = await pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]);
-      const requesterResult = await pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId]);
+      const [empResult, requesterResult] = await Promise.all([
+        pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]),
+        pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId])
+      ]);
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
         const { sendRoleChangeEmail } = await import('../utils/emailTemplates');
-        await sendRoleChangeEmail(empResult.rows[0].email, {
+        // Send email in background (non-blocking)
+        sendRoleChangeEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newRole,
           updatedBy: requesterName
+        }).catch(e => {
+          logger.error('Error sending role change notification:', e);
         });
       }
     } catch (e) {
-      logger.error('Error sending role change notification:', e);
+      logger.error('Error fetching employee data for role change notification:', e);
     }
   }
 
   // Item 16: Status changed notification
   if (isStatusChanged) {
     try {
-      const empResult = await pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]);
-      const requesterResult = await pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId]);
+      const [empResult, requesterResult] = await Promise.all([
+        pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]),
+        pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId])
+      ]);
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
         const { sendStatusChangeEmail } = await import('../utils/emailTemplates');
-        await sendStatusChangeEmail(empResult.rows[0].email, {
+        // Send email in background (non-blocking)
+        sendStatusChangeEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newStatus,
           updatedBy: requesterName
+        }).catch(e => {
+          logger.error('Error sending status change notification:', e);
         });
       }
     } catch (e) {
-      logger.error('Error sending status change notification:', e);
+      logger.error('Error fetching employee data for status change notification:', e);
     }
   }
 
@@ -1582,16 +1588,20 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       if (employeeResult.rows.length > 0 && employeeResult.rows[0].email) {
         const requesterName = requesterResult.rows.length > 0 ? requesterResult.rows[0].name : (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
-        await emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
+        // Send email in background (non-blocking)
+        emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
           employeeEmpId: employeeResult.rows[0].emp_id || '',
           updatedBy: requesterName
+        }).then(() => {
+          logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
+        }).catch((emailError: any) => {
+          // Log error but don't fail employee update
+          logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending employee details update email:`, emailError);
         });
-        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
       }
-    } catch (emailError: any) {
-      // Log error but don't fail employee update
-      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending employee details update email:`, emailError);
+    } catch (e: any) {
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error fetching employee data for email notification:`, e);
     }
   }
 
