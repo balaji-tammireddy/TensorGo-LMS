@@ -10,21 +10,20 @@ const safeTextSchema = z.string()
     .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;!?@#$%*\[\]{}\n\r]*$/, 'Special characters and emojis are not allowed');
 
 const addressSchema = z.string()
-    .min(1, 'Address is required')
     .max(255, 'Address cannot exceed 255 characters')
-    .regex(/^[a-zA-Z0-9\s\.,\-'()&/#!\n\r]+$/, 'Special characters and emojis are not allowed in address');
+    .regex(/^[a-zA-Z0-9\s\.,\-'()&/#!\n\r]*$/, 'Special characters and emojis are not allowed in address');
 
 const longerTextSchema = z.string()
     .max(100, 'Text cannot exceed 100 characters')
     .regex(/^[a-zA-Z0-9\s\.,\-'()&/+:;]*$/, 'Special characters and emojis are not allowed');
 
 const phoneSchema = z.string()
-    .length(10, 'Phone number must be exactly 10 digits')
-    .regex(/^\d+$/, 'Phone number must contain only digits');
+    .max(10, 'Phone number must be at most 10 digits')
+    .regex(/^\d*$/, 'Phone number must contain only digits');
 
 const aadharSchema = z.string()
-    .length(12, 'Aadhar must be exactly 12 digits')
-    .regex(/^\d+$/, 'Aadhar must contain only digits');
+    .max(12, 'Aadhar must be at most 12 digits')
+    .regex(/^\d*$/, 'Aadhar must contain only digits');
 
 const educationSchema = z.object({
     level: z.string().max(50),
@@ -56,25 +55,30 @@ export const createEmployeeSchema = z.object({
         firstName: nameSchema,
         middleName: nameSchema.nullable().optional().or(z.literal('')),
         lastName: nameSchema,
-        contactNumber: phoneSchema,
-        altContact: phoneSchema,
+        contactNumber: phoneSchema.nullable().optional().or(z.literal('')),
+        altContact: phoneSchema.nullable().optional().or(z.literal('')),
         dateOfBirth: z.string(),
-        gender: z.enum(['Male', 'Female', 'Other']),
-        bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']),
-        maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']),
-        emergencyContactName: nameSchema,
-        emergencyContactNo: phoneSchema,
-        emergencyContactRelation: nameSchema,
-        designation: nameSchema,
-        department: nameSchema,
-        dateOfJoining: z.string(),
-        aadharNumber: aadharSchema,
-        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
-        currentAddress: addressSchema,
-        permanentAddress: addressSchema,
+        gender: z.enum(['Male', 'Female', 'Other', '']).nullable().optional().or(z.literal('')),
+        bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', '']).nullable().optional().or(z.literal('')),
+        maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed', '']).nullable().optional().or(z.literal('')),
+        emergencyContactName: nameSchema.nullable().optional().or(z.literal('')),
+        emergencyContactNo: phoneSchema.nullable().optional().or(z.literal('')),
+        emergencyContactRelation: nameSchema.nullable().optional().or(z.literal('')),
+        designation: nameSchema.nullable().optional().or(z.literal('')),
+        department: nameSchema.nullable().optional().or(z.literal('')),
+        dateOfJoining: z.string().nullable().optional().or(z.literal('')),
+        aadharNumber: aadharSchema.nullable().optional().or(z.literal('')),
+        panNumber: z.union([
+            z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
+            z.string().length(0),
+            z.null(),
+            z.undefined()
+        ]).optional(),
+        currentAddress: addressSchema.nullable().optional().or(z.literal('')),
+        permanentAddress: addressSchema.nullable().optional().or(z.literal('')),
         reportingManagerId: z.number().nullable().optional(),
         reportingManagerName: z.string().max(100).nullable().optional(),
-        education: z.array(educationSchema).min(1, 'Education details are required'),
+        education: z.array(educationSchema).optional().nullable(),
         status: z.enum(['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive']).optional()
     }).refine(data => {
         const dob = new Date(data.dateOfBirth);

@@ -61,7 +61,10 @@ const LoginPage: React.FC = () => {
       const trimmedPassword = password.trim();
 
       const loggedInUser = await login(trimmedEmail, trimmedPassword);
-      if (loggedInUser.role === 'super_admin') {
+
+      if (loggedInUser.mustChangePassword) {
+        navigate('/change-password');
+      } else if (loggedInUser.role === 'super_admin') {
         navigate('/dashboard');
       } else {
         navigate('/leave-apply');

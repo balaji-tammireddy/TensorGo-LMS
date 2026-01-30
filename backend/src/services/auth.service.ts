@@ -15,6 +15,7 @@ export interface LoginResult {
     email: string;
     status: string;
     mustChangePassword: boolean;
+    isProfileUpdated: boolean;
   };
 }
 
@@ -27,7 +28,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
   logger.info(`[AUTH] [LOGIN] Normalized email: ${normalizedEmail}`);
 
   const result = await pool.query(
-    'SELECT id, emp_id, email, password_hash, user_role as role, first_name, last_name, status as status, must_change_password, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
+    'SELECT id, emp_id, email, password_hash, user_role as role, first_name, last_name, status as status, must_change_password, is_profile_updated, token_version FROM users WHERE LOWER(TRIM(email)) = $1',
     [normalizedEmail]
   );
 
@@ -78,7 +79,8 @@ export const login = async (email: string, password: string): Promise<LoginResul
       role: user.role,
       email: user.email,
       status: user.status,
-      mustChangePassword: !!user.must_change_password
+      mustChangePassword: !!user.must_change_password,
+      isProfileUpdated: !!user.is_profile_updated
     }
   };
 
@@ -88,7 +90,7 @@ export const login = async (email: string, password: string): Promise<LoginResul
 
 export const validateUser = async (userId: number) => {
   const result = await pool.query(
-    'SELECT id, emp_id, email, user_role as role, first_name, last_name, status as status, must_change_password, token_version FROM users WHERE id = $1',
+    'SELECT id, emp_id, email, user_role as role, first_name, last_name, status as status, must_change_password, is_profile_updated, token_version FROM users WHERE id = $1',
     [userId]
   );
 
@@ -107,6 +109,7 @@ export const validateUser = async (userId: number) => {
     email: user.email,
     status: user.status,
     mustChangePassword: !!user.must_change_password,
+    isProfileUpdated: !!user.is_profile_updated,
     tokenVersion: user.token_version || 0
   };
 };

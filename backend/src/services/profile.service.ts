@@ -12,6 +12,7 @@ export const getProfile = async (userId: number) => {
 COALESCE(rm.id, sa.sa_id) as reporting_manager_id,
 COALESCE(rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
 COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id,
+u.personal_email,
 c.emp_id as created_by_emp_id,
 up.emp_id as updated_by_emp_id
 FROM users u
@@ -55,6 +56,7 @@ WHERE u.id = $1`,
       lastName: user.last_name,
       empId: user.emp_id,
       email: user.email,
+      personalEmail: user.personal_email,
       contactNumber: user.contact_number,
       altContact: user.alt_contact,
       dateOfBirth: formatDateLocal(user.date_of_birth),
@@ -68,7 +70,9 @@ WHERE u.id = $1`,
     employmentInfo: {
       designation: user.designation,
       department: user.department,
-      dateOfJoining: formatDateLocal(user.date_of_joining)
+      dateOfJoining: formatDateLocal(user.date_of_joining),
+      uanNumber: user.uan_number,
+      totalExperience: user.total_experience
     },
     documents: {
       aadharNumber: user.aadhar_number,
@@ -188,17 +192,21 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     panNumber: 'pan_number',
     currentAddress: 'current_address',
     permanentAddress: 'permanent_address',
-    reportingManagerId: 'reporting_manager_id'
+    reportingManagerId: 'reporting_manager_id',
+    uanNumber: 'uan_number',
+    totalExperience: 'total_experience',
+    personalEmail: 'personal_email'
   };
 
   const allowedPersonalFields = [
     'first_name', 'middle_name', 'last_name', 'contact_number', 'alt_contact',
     'date_of_birth', 'gender', 'blood_group', 'marital_status',
-    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation'
+    'date_of_birth', 'gender', 'blood_group', 'marital_status',
+    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation', 'personal_email'
   ];
 
   const allowedEmploymentFields = [
-    'designation', 'department', 'date_of_joining'
+    'designation', 'department', 'date_of_joining', 'uan_number', 'total_experience'
   ];
 
   // Update personal info
@@ -288,27 +296,18 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
         continue;
       }
 
-      // designation and department are disabled for non-super_admin users in self-update
-      if (key === 'designation') {
-        if (userRole !== 'super_admin' && value && value !== currentValues.rows[0].designation) {
-          throw new Error('Designation cannot be updated by employee');
-        }
-        if (userRole !== 'super_admin') continue;
-      }
-      if (key === 'department') {
-        if (userRole !== 'super_admin' && value && value !== currentValues.rows[0].department) {
-          throw new Error('Department cannot be updated by employee');
-        }
-        if (userRole !== 'super_admin') continue;
-      }
+      // designation and department can now be updated by all users
+      // Role-based restrictions removed as per requirement
 
       if (value !== undefined) {
         let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
 
-        // Apply title case to text fields (designation, department)
+        // Apply title case to text fields (designation, department) - REMOVED per requirement
+        /*
         if (typeof finalValue === 'string') {
           finalValue = toTitleCase(finalValue);
         }
+        */
 
         if (requiredEmploymentInfo.includes(key) && finalValue === null) {
           throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
@@ -410,7 +409,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   if (updates.length > 0) {
     logger.info(`[PROFILE] [UPDATE PROFILE] Updating ${updates.length} fields in database`);
     values.push(userId);
-    const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP, updated_by = $${paramCount} WHERE id = $${paramCount + 1}`;
+    const query = `UPDATE users SET ${updates.join(', ')}, is_profile_updated = TRUE, updated_at = CURRENT_TIMESTAMP, updated_by = $${paramCount} WHERE id = $${paramCount + 1}`;
     values.splice(values.length - 1, 0, requesterId);
     await pool.query(query, values);
     logger.info(`[PROFILE] [UPDATE PROFILE] Database update completed successfully`);

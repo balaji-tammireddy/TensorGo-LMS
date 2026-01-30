@@ -25,6 +25,7 @@ export const getEmployees = async (
     SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
            u.designation as position, u.date_of_joining as joining_date, u.status as status, u.user_role as role,
            u.profile_photo_url as profile_photo_key,
+           u.personal_email,
            c.emp_id as created_by_emp_id,
            up.emp_id as updated_by_emp_id
     FROM users u
@@ -156,6 +157,8 @@ export const getEmployees = async (
       profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/')
         ? row.profile_photo_key
         : null,
+      personalEmail: row.personal_email || null,
+      isProfileUpdated: row.is_profile_updated || false,
       createdBy: row.created_by_emp_id || 'System',
       updatedBy: row.updated_by_emp_id || row.created_by_emp_id || 'System'
     })),
@@ -262,6 +265,9 @@ export const getEmployeeById = async (employeeId: number) => {
     date_of_birth: formatDateLocal(user.date_of_birth),
     date_of_joining: formatDateLocal(user.date_of_joining),
     education: education,
+    isProfileUpdated: user.is_profile_updated || false,
+    uanNumber: user.uan_number || '',
+    totalExperience: user.total_experience || 0,
     createdBy: user.created_by_emp_id || 'System',
     updatedBy: user.updated_by_emp_id || user.created_by_emp_id || 'System'
   };
@@ -288,28 +294,14 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     throw new Error('Only Super Admin can create Super Admin users');
   }
 
-  // Mandatory fields check
+  // Mandatory fields check - RELAXED for Add Employee
   const mandatoryFields = [
-    { key: 'role', label: 'Role' },
+    { key: 'empId', label: 'Employee ID' },
     { key: 'firstName', label: 'First Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'email', label: 'Official Email' },
-    { key: 'contactNumber', label: 'Contact Number' },
-    { key: 'altContact', label: 'Alternate Contact Number' },
     { key: 'dateOfBirth', label: 'Date of Birth' },
-    { key: 'gender', label: 'Gender' },
-    { key: 'bloodGroup', label: 'Blood Group' },
-    { key: 'maritalStatus', label: 'Marital Status' },
-    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactNo', label: 'Emergency Contact Number' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
-    { key: 'designation', label: 'Designation' },
-    { key: 'department', label: 'Department' },
-    { key: 'dateOfJoining', label: 'Date of Joining' },
-    { key: 'aadharNumber', label: 'Aadhar Number' },
-    { key: 'panNumber', label: 'PAN Number' },
-    { key: 'currentAddress', label: 'Current Address' },
-    { key: 'permanentAddress', label: 'Permanent Address' }
+    { key: 'role', label: 'Role' }
   ];
 
   for (const field of mandatoryFields) {
@@ -347,7 +339,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     throw new Error('Reporting Manager is required');
   }
 
-  // Validate phone numbers length and format
+  // Validate phone numbers length and format (ONLY IF PROVIDED)
   const phoneFields = [
     { key: 'contactNumber', label: 'Contact Number' },
     { key: 'altContact', label: 'Alternate Contact Number' },
@@ -356,7 +348,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   for (const field of phoneFields) {
     const val = String(employeeData[field.key] || '').trim();
-    if (val.length !== 10 || !/^\d+$/.test(val)) {
+    if (val && (val.length !== 10 || !/^\d+$/.test(val))) {
       throw new Error(`${field.label} must be exactly 10 digits`);
     }
   }
@@ -367,9 +359,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     { key: 'middleName', label: 'Middle Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
-    { key: 'designation', label: 'Designation' },
-    { key: 'department', label: 'Department' }
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' }
   ];
 
   for (const field of textFields) {
@@ -389,15 +379,17 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     }
   }
 
-  // Education validation
+  // Education validation - RELAXED (Optional during creation)
+  /*
   if (!employeeData.education || !Array.isArray(employeeData.education)) {
     throw new Error('Education details are required');
   }
 
   const eduLevels = employeeData.education.map((e: any) => e.level);
   if (!eduLevels.includes('UG') || !eduLevels.includes('12th')) {
-    throw new Error('UG and 12th education details are mandatory');
+     // throw new Error('UG and 12th education details are mandatory');
   }
+  */
 
   const birthDate = new Date(employeeData.dateOfBirth);
   const birthYear = birthDate.getFullYear();
@@ -408,8 +400,19 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
 
     if (isMandatory || hasAnyField) {
-      if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
-        throw new Error(`Please fill complete details for ${edu.level} education`);
+      // If none of the fields are filled, skip validation (making it optional)
+      if (!edu.groupStream && !edu.collegeUniversity && !edu.year && !edu.scorePercentage) {
+        continue;
+      }
+
+      const missingFields = [];
+      if (!edu.groupStream) missingFields.push('Group/Stream');
+      if (!edu.collegeUniversity) missingFields.push('College/University');
+      if (!edu.year) missingFields.push('Graduation Year');
+      if (!edu.scorePercentage) missingFields.push('Score %');
+
+      if (missingFields.length > 0) {
+        throw new Error(`Please fill complete details for ${edu.level} education (missing: ${missingFields.join(', ')})`);
       }
 
       // Validate for special characters and emojis
@@ -615,9 +618,12 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, status, created_by, updated_by
+      current_address, permanent_address, reporting_manager_id, status, 
+      is_profile_updated, must_change_password, total_experience, uan_number, personal_email,
+      created_by, updated_by
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, 
+      FALSE, TRUE, $26, $27, $30, $28, $29
     ) RETURNING id`,
     [
       empId,
@@ -636,20 +642,17 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.emergencyContactName),
       employeeData.emergencyContactNo || null,
       toTitleCase(employeeData.emergencyContactRelation),
-      toTitleCase(employeeData.designation),
-      toTitleCase(employeeData.department),
+      employeeData.designation,
+      employeeData.department,
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
       (() => {
         if (!employeeData.panNumber) return null;
         const pan = String(employeeData.panNumber).trim().toUpperCase();
-        // Validate PAN format: 5 letters, 4 digits, 1 letter
         if (pan.length !== 10) {
-          throw new Error('PAN number must be exactly 10 characters long');
-        }
-        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-        if (!panRegex.test(pan)) {
-          throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
+          // Relaxed check if empty? No, checking length if present
+          // For now, allow null if not provided in relaxed mode
+          return pan;
         }
         return pan;
       })(),
@@ -657,8 +660,11 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.permanentAddress),
       reportingManagerId,
       employeeData.status || 'active',
+      employeeData.totalExperience || 0,
+      employeeData.uanNumber || null,
       requesterId || null,
-      requesterId || null
+      requesterId || null,
+      employeeData.personalEmail || null
     ]
   );
 
@@ -707,9 +713,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       const prefix = fields[edu.level];
       if (prefix) {
         setClauses.push(`${prefix}_stream = $${eduParamIndex++}`);
-        eduValues.push(toTitleCase(edu.groupStream));
+        eduValues.push(edu.groupStream || null);
         setClauses.push(`${prefix}_college = $${eduParamIndex++}`);
-        eduValues.push(toTitleCase(edu.collegeUniversity));
+        eduValues.push(edu.collegeUniversity || null);
         setClauses.push(`${prefix}_year = $${eduParamIndex++}`);
         eduValues.push(edu.year || null);
         setClauses.push(`${prefix}_percentage = $${eduParamIndex++}`);
@@ -791,9 +797,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     { key: 'middleName', label: 'Middle Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
-    { key: 'designation', label: 'Designation' },
-    { key: 'department', label: 'Department' }
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' }
   ];
 
   for (const field of textFields) {
@@ -810,6 +814,26 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     const aadhar = String(employeeData.aadharNumber).trim();
     if (aadhar.length !== 12 || !/^\d+$/.test(aadhar)) {
       throw new Error('Aadhar must be exactly 12 digits');
+    }
+  }
+
+  // Validate UAN if updated
+  if (employeeData.uanNumber) {
+    const uan = String(employeeData.uanNumber).trim();
+    if (uan.length !== 12 || !/^\d+$/.test(uan)) {
+      throw new Error('UAN must be exactly 12 digits');
+    }
+  }
+
+  // Validate Total Experience (0.5 increments)
+  if (employeeData.totalExperience !== undefined && employeeData.totalExperience !== null) {
+    const exp = Number(employeeData.totalExperience);
+    if (isNaN(exp) || exp < 0) {
+      throw new Error('Total Experience must be a valid non-negative number');
+    }
+    // Check for 0.5 increments: (exp * 2) should be integer
+    if (!Number.isInteger(exp * 2)) {
+      throw new Error('Total Experience must be in 0.5 increments (e.g., 2.5, 3.0)');
     }
   }
 
@@ -936,6 +960,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
 
         // Validate for special characters and emojis
+        // RELAXED VALIDATION: Removed strict regex for Group/Stream and College/University
+        /*
         const nameRegex = /^[a-zA-Z0-9\s.,&()-]+$/;
         if (!nameRegex.test(edu.groupStream)) {
           throw new Error(`Group/Stream for ${edu.level} contains invalid characters or emojis`);
@@ -943,6 +969,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         if (!nameRegex.test(edu.collegeUniversity)) {
           throw new Error(`College/University for ${edu.level} contains invalid characters or emojis`);
         }
+        */
         if (!/^[0-9]{4}$/.test(edu.year)) {
           throw new Error(`Graduation Year for ${edu.level} must be a valid 4-digit year`);
         }
@@ -1108,7 +1135,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation',
     'designation', 'department',
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
-    'reporting_manager_id', 'status'
+    'reporting_manager_id', 'status',
+    'is_profile_updated', 'uan_number', 'total_experience', 'personal_email'
   ];
 
   // HR and Super Admin can update role
@@ -1245,7 +1273,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     status: 'status',
     reportingManagerId: 'reporting_manager_id',
     empId: 'emp_id',
-    role: 'user_role'
+    role: 'user_role',
+    isProfileUpdated: 'is_profile_updated',
+    uanNumber: 'uan_number',
+    totalExperience: 'total_experience',
+    personalEmail: 'personal_email'
   };
 
   const processedKeys = new Set();
@@ -1277,7 +1309,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     updates.push(`${dbKey} = $${paramCount}`);
     processedKeys.add(dbKey);
 
-    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'designation', 'department', 'current_address', 'permanent_address'];
+    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'current_address', 'permanent_address'];
 
     if (dbKey === 'pan_number' && typeof value === 'string') {
       const pan = value.trim().toUpperCase();

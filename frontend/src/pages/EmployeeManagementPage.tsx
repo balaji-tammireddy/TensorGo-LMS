@@ -20,7 +20,7 @@ import * as employeeService from '../services/employeeService';
 import { getReportingManagers } from '../services/profileService';
 import * as leaveService from '../services/leaveService';
 import { format } from 'date-fns';
-import { FaEye, FaPencilAlt, FaTrash, FaCalendarPlus, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaSearch, FaEye, FaPencilAlt, FaTrash, FaSort, FaSortUp, FaSortDown, FaExchangeAlt, FaCalendarPlus } from 'react-icons/fa';
 import EmployeeLeaveDetailsModal from '../components/EmployeeLeaveDetailsModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -43,6 +43,15 @@ const sanitizeAadhaar = (value: string) => {
 
 const formatAadhaar = (value: string) => {
   const digits = sanitizeAadhaar(value);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+};
+
+const sanitizeUAN = (value: string) => {
+  return value.replace(/[^0-9]/g, '').slice(0, 12);
+};
+
+const formatUAN = (value: string) => {
+  const digits = sanitizeUAN(value);
   return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 };
 
@@ -128,6 +137,9 @@ const emptyEmployeeForm = {
   empId: '',
   role: '',
   email: '',
+  personalEmail: '',
+  totalExperience: '',
+  uanNumber: '',
   firstName: '',
   middleName: '',
   lastName: '',
@@ -346,18 +358,72 @@ const EmployeeManagementPage: React.FC = () => {
     (args: { id: number; data: any }) =>
       employeeService.updateEmployee(args.id, args.data),
     {
-      onSuccess: () => {
-        queryClient.invalidateQueries('employees');
-        setIsModalOpen(false);
-        setNewEmployee(emptyEmployeeForm);
-        setIsSameAddress(false);
-        setIsEditMode(false);
-        setEditingEmployeeId(null);
-        showSuccess('Employee updated!');
+      onMutate: async (newItem: { id: number; data: any }) => {
+        // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+        await queryClient.cancelQueries(['employees']);
+
+        // Snapshot the previous values from all employee queries
+        const previousQueries: any[] = [];
+
+        // Update all queries that match ['employees', ...]
+        queryClient.setQueriesData<any>(
+          ['employees'],
+          (old: any) => {
+            if (!old) return old;
+
+            // Store previous state for rollback
+            previousQueries.push({ key: ['employees'], data: old });
+
+            // Check if it's the data structure with employees array
+            if (old.employees && Array.isArray(old.employees)) {
+              return {
+                ...old,
+                employees: old.employees.map((emp: any) =>
+                  emp.id === newItem.id ? { ...emp, ...newItem.data } : emp
+                )
+              };
+            }
+
+            // Fallback for different data structures
+            if (Array.isArray(old)) {
+              return old.map((emp: any) =>
+                emp.id === newItem.id ? { ...emp, ...newItem.data } : emp
+              );
+            }
+
+            return old;
+          }
+        );
+
+        // Return a context object with the snapshotted values
+        return { previousQueries };
       },
-      onError: (error: any) => {
-        showError(error.response?.data?.error?.message || 'Update failed');
-      }
+      onError: (err: any, newItem, context: any) => {
+        // If the mutation fails, roll back all queries
+        if (context?.previousQueries) {
+          context.previousQueries.forEach((query: any) => {
+            queryClient.setQueryData(query.key, query.data);
+          });
+        }
+        showError(err.response?.data?.error?.message || 'Update failed');
+      },
+      onSettled: () => {
+        // Always refetch after error or success:
+        queryClient.invalidateQueries(['employees']);
+      },
+      onSuccess: (data, variables) => {
+        // Only close modal and show success for full employee updates (not status-only changes)
+        const isStatusOnlyUpdate = variables.data && Object.keys(variables.data).length === 1 && 'status' in variables.data;
+
+        if (!isStatusOnlyUpdate) {
+          setIsModalOpen(false);
+          setNewEmployee(emptyEmployeeForm);
+          setIsSameAddress(false);
+          setIsEditMode(false);
+          setEditingEmployeeId(null);
+          showSuccess('Employee updated!');
+        }
+      },
     }
   );
 
@@ -467,8 +533,10 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
 
-    checkField('contactNumber', 'Contact Number');
-    checkField('altContact', 'Alternate Contact Number');
+    // Contact Number is now optional for Add Employee
+    // checkField('contactNumber', 'Contact Number');
+    // Alternate Contact is optional
+    // checkField('altContact', 'Alternate Contact Number');
     checkField('dateOfBirth', 'Date of Birth');
 
     // Validate age - employee must be at least 18 years old
@@ -488,38 +556,23 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
 
-    checkField('gender', 'Gender');
-    checkField('bloodGroup', 'Blood Group');
-    checkField('maritalStatus', 'Marital Status');
-    checkField('emergencyContactName', 'Emergency Contact Name');
-    checkField('emergencyContactNo', 'Emergency Contact Number');
-    checkField('emergencyContactRelation', 'Emergency Contact Relation');
+    // Optional Fields for Creation
+    // checkField('gender', 'Gender');
+    // checkField('bloodGroup', 'Blood Group');
+    // checkField('maritalStatus', 'Marital Status');
+    // checkField('emergencyContactName', 'Emergency Contact Name');
+    // checkField('emergencyContactNo', 'Emergency Contact Number');
+    // checkField('emergencyContactRelation', 'Emergency Contact Relation');
 
     // Employment information
-    checkField('designation', 'Designation');
-    checkField('department', 'Department');
-    checkField('dateOfJoining', 'Date of Joining');
+    // Designation and Department are now optional for creation
+    // checkField('designation', 'Designation');
+    // checkField('department', 'Department');
 
-    // Validate gap between Date of Birth and Date of Joining (min 18 years)
-    if (newEmployee.dateOfBirth && newEmployee.dateOfJoining) {
-      const dob = new Date(newEmployee.dateOfBirth);
-      const doj = new Date(newEmployee.dateOfJoining);
+    // Date of Joining is now optional for Add Employee
+    // checkField('dateOfJoining', 'Date of Joining');
 
-      let workAge = doj.getFullYear() - dob.getFullYear();
-      const monthDiff = doj.getMonth() - dob.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && doj.getDate() < dob.getDate())) {
-        workAge--;
-      }
-
-      if (workAge < 18) {
-        showWarning('Joining Date must be at least 18 years after Date of Birth');
-        fieldErrors['dateOfJoining'] = true;
-        setFormErrors(fieldErrors);
-        return;
-      }
-    }
-
-    // Date of Joining must not be in the future
+    // Date of Joining must not be in the future (only validate if provided)
     if (newEmployee.dateOfJoining) {
       const doj = new Date(newEmployee.dateOfJoining);
       const today = new Date();
@@ -538,12 +591,41 @@ const EmployeeManagementPage: React.FC = () => {
       fieldErrors['reportingManagerId'] = true;
     }
 
-    // Document information
-    checkField('aadharNumber', 'Aadhar Number');
-    if (isEmpty(newEmployee.panNumber)) {
-      missingFields.push('PAN Number');
-      fieldErrors['panNumber'] = true;
-    } else {
+    // Total Experience is now optional for Add Employee (validate only if provided)
+    if (!isEmpty(newEmployee.totalExperience)) {
+      const exp = parseFloat(newEmployee.totalExperience);
+      if (isNaN(exp) || exp < 0) {
+        showWarning('Total Experience must be a valid positive number');
+        fieldErrors['totalExperience'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+      // Check for 0.5 increments
+      if ((exp * 10) % 5 !== 0) {
+        showWarning('Total Experience must be in 0.5 increments (e.g. 1.5, 2.0)');
+        fieldErrors['totalExperience'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
+
+    if (!isEmpty(newEmployee.uanNumber)) {
+      if (!/^\d{12}$/.test(newEmployee.uanNumber)) {
+        showWarning('UAN Number must be exactly 12 digits');
+        fieldErrors['uanNumber'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
+
+    // Optional Fields Validation (Only if filled)
+    if (newEmployee.aadharNumber && newEmployee.aadharNumber.length !== 12) {
+      showWarning('Aadhar must be 12 digits');
+      setFormErrors({ ...fieldErrors, aadharNumber: true });
+      return;
+    }
+
+    if (!isEmpty(newEmployee.panNumber)) {
       const panError = validatePan(newEmployee.panNumber);
       if (panError) {
         showWarning(panError);
@@ -553,9 +635,8 @@ const EmployeeManagementPage: React.FC = () => {
       }
     }
 
-    // Address information
-    checkField('currentAddress', 'Current Address');
-    checkField('permanentAddress', 'Permanent Address');
+    // Address information (Optional for creation)
+    // Removed mandatory check for address
 
     // Education information (PG optional, UG and 12th mandatory)
     if (newEmployee.education && Array.isArray(newEmployee.education)) {
@@ -599,29 +680,15 @@ const EmployeeManagementPage: React.FC = () => {
           return;
         }
 
+        // For creation, education fields are optional if empty
+        /* 
         if (isEmpty(edu.groupStream)) {
           missingFields.push(`${levelLabel} - Group/Stream`);
           fieldErrors[`edu_${index}_groupStream`] = true;
         }
-        if (isEmpty(edu.collegeUniversity)) {
-          missingFields.push(`${levelLabel} - College/University`);
-          fieldErrors[`edu_${index}_collegeUniversity`] = true;
-        }
-        if (isEmpty(edu.year)) {
-          missingFields.push(`${levelLabel} - Graduation Year`);
-          fieldErrors[`edu_${index}_year`] = true;
-        } else {
-          const year = parseInt(edu.year, 10);
-          if (isNaN(year) || year < 1950 || year > maxYear) {
-            yearValidationError = `${levelLabel} Graduation Year: 1950 - ${maxYear}`;
-            fieldErrors[`edu_${index}_year`] = true;
-          }
-        }
-        if (isEmpty(edu.scorePercentage)) {
-          missingFields.push(`${levelLabel} - Score %`);
-          fieldErrors[`edu_${index}_scorePercentage`] = true;
-        }
+        */
       });
+
 
       if (!isPgValid) return;
 
@@ -701,6 +768,7 @@ const EmployeeManagementPage: React.FC = () => {
       return;
     }
 
+    // Phone validation - only check if provided (all contact fields are optional for Add Employee)
     const phoneFields = [
       {
         value: newEmployee.contactNumber,
@@ -721,29 +789,21 @@ const EmployeeManagementPage: React.FC = () => {
 
     for (const field of phoneFields) {
       const v = field.value || '';
-      if (v.length !== 10) {
+      // Only validate if field has a value
+      if (v.length > 0 && v.length !== 10) {
         showWarning(`${field.label} must be 10 digits`);
         setFormErrors({ ...fieldErrors, [field.key]: true });
         return;
       }
     }
 
-    // Check for duplicate phone numbers
-    if (newEmployee.contactNumber === newEmployee.altContact) {
+    // Check for duplicate phone numbers only if they are provided
+    if (newEmployee.contactNumber && newEmployee.altContact && newEmployee.contactNumber === newEmployee.altContact) {
       showWarning('Contact Number and Alternate Contact Number cannot be the same');
       setFormErrors({ ...fieldErrors, altContact: true });
       return;
     }
-    if (newEmployee.altContact === newEmployee.emergencyContactNo) {
-      showWarning('Alternate Contact Number and Emergency Contact Number cannot be the same');
-      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
-      return;
-    }
-    if (newEmployee.contactNumber === newEmployee.emergencyContactNo) {
-      showWarning('Contact Number and Emergency Contact Number cannot be the same');
-      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
-      return;
-    }
+    // Other phone checks removed/relaxed for creation
 
     // Sanitize payload: remove any snake_case keys that might have leaked in
     const sanitizedNewEmployee = Object.keys(newEmployee).reduce((acc: any, key) => {
@@ -1066,7 +1126,7 @@ const EmployeeManagementPage: React.FC = () => {
                   </tr>
                 ) : (
                   sortedEmployees.map((employee) => (
-                    <tr key={employee.id}>
+                    <tr key={employee.id} onClick={() => handleViewEmployee(employee.id)} style={{ cursor: 'pointer' }}>
 
                       <td>{employee.empId}</td>
                       <td>{employee.name}</td>
@@ -1081,15 +1141,32 @@ const EmployeeManagementPage: React.FC = () => {
                               'Inactive'}
                         </span>
                       </td>
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <div className="actions-wrapper">
-                          <button
-                            className="action-btn view-btn"
-                            title="View"
-                            onClick={() => handleViewEmployee(employee.id)}
-                          >
-                            <FaEye />
-                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="action-btn view-btn"
+                                title="Change Status"
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', padding: 0 }}
+                              >
+                                <FaExchangeAlt size={14} />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onSelect={() => updateEmployeeMutation.mutate({ id: employee.id, data: { status: 'active' } })}>
+                                Active
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => updateEmployeeMutation.mutate({ id: employee.id, data: { status: 'on_notice' } })}>
+                                On Notice
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => updateEmployeeMutation.mutate({ id: employee.id, data: { status: 'inactive' } })}>
+                                Inactive
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           {/* Add Leaves button (Always visible, disabled if no permission) */}
                           {employee.role !== 'super_admin' && (
                             <button
@@ -1268,7 +1345,7 @@ const EmployeeManagementPage: React.FC = () => {
                     </div>
                   </>
                 ) : (
-                  <>
+                  <div>
                     <div className="employee-modal-section">
                       <h3>Personal Information</h3>
                       <div className="employee-modal-grid">
@@ -1437,33 +1514,25 @@ const EmployeeManagementPage: React.FC = () => {
                             disabled={isViewMode}
                           />
                         </div>
-                        <div className={`employee-modal-field ${formErrors.email ? 'has-error' : ''}`}>
+                        <div className={`employee-modal-field ${formErrors.personalEmail ? 'has-error' : ''}`}>
                           <label>
-                            Official Email<span className="required-indicator">*</span>
+                            Personal Email
                           </label>
                           <input
                             type="email"
-                            value={newEmployee.email}
+                            value={newEmployee.personalEmail || ''}
                             onChange={(e) =>
-                              setNewEmployee({ ...newEmployee, email: e.target.value })
+                              setNewEmployee({ ...newEmployee, personalEmail: e.target.value })
                             }
                             onBlur={() => {
-                              if (!newEmployee.email || newEmployee.email.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, email: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.email;
-                                  return next;
-                                });
-                              }
+                              // Basic email format check if needed
                             }}
-                            disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
+                            disabled={isViewMode}
                           />
                         </div>
                         <div className={`employee-modal-field ${formErrors.contactNumber ? 'has-error' : ''}`}>
                           <label>
-                            Contact Number<span className="required-indicator">*</span>
+                            Contact Number
                           </label>
                           <input
                             type="text"
@@ -1519,7 +1588,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.altContact ? 'has-error' : ''}`}>
                           <label>
-                            Alternate Contact Number<span className="required-indicator">*</span>
+                            Alternate Contact Number
                           </label>
                           <input
                             type="text"
@@ -1547,11 +1616,19 @@ const EmployeeManagementPage: React.FC = () => {
                             }}
                             onBlur={() => {
                               const val = newEmployee.altContact;
-                              if (!val || val.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, altContact: true }));
-                              } else if (val.length < 10) {
-                                setFormErrors((prev) => ({ ...prev, altContact: true }));
+                              // Only validate if value is provided
+                              if (val && val.trim() !== '') {
+                                if (val.length < 10) {
+                                  setFormErrors((prev) => ({ ...prev, altContact: true }));
+                                } else {
+                                  setFormErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next.altContact;
+                                    return next;
+                                  });
+                                }
                               } else {
+                                // Clear error if field is empty (it's optional)
                                 setFormErrors((prev) => {
                                   const next = { ...prev };
                                   delete next.altContact;
@@ -1565,7 +1642,7 @@ const EmployeeManagementPage: React.FC = () => {
 
                         <div className={`employee-modal-field ${formErrors.gender ? 'has-error' : ''}`}>
                           <label>
-                            Gender<span className="required-indicator">*</span>
+                            Gender
                           </label>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1601,7 +1678,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.bloodGroup ? 'has-error' : ''}`}>
                           <label>
-                            Blood Group<span className="required-indicator">*</span>
+                            Blood Group
                           </label>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1630,7 +1707,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.maritalStatus ? 'has-error' : ''}`}>
                           <label>
-                            Marital Status<span className="required-indicator">*</span>
+                            Marital Status
                           </label>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1672,7 +1749,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.emergencyContactName ? 'has-error' : ''}`}>
                           <label>
-                            Emergency Contact Name<span className="required-indicator">*</span>
+                            Emergency Contact Name
                           </label>
                           <input
                             type="text"
@@ -1699,7 +1776,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.emergencyContactNo ? 'has-error' : ''}`}>
                           <label>
-                            Emergency Contact Number<span className="required-indicator">*</span>
+                            Emergency Contact Number
                           </label>
                           <input
                             type="text"
@@ -1755,7 +1832,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.emergencyContactRelation ? 'has-error' : ''}`}>
                           <label>
-                            Emergency Contact Relation<span className="required-indicator">*</span>
+                            Emergency Contact Relation
                           </label>
                           <input
                             type="text"
@@ -1785,37 +1862,66 @@ const EmployeeManagementPage: React.FC = () => {
 
                     <div className="employee-modal-section">
                       <h3>Employment Information</h3>
+
+
+
                       <div className="employee-modal-grid">
-                        <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
+                        <div className={`employee-modal-field ${formErrors.email ? 'has-error' : ''}`}>
                           <label>
-                            Designation<span className="required-indicator">*</span>
+                            Official Email<span className="required-indicator">*</span>
                           </label>
                           <input
-                            type="text"
-                            value={newEmployee.designation}
+                            type="email"
+                            value={newEmployee.email}
                             onChange={(e) =>
-                              setNewEmployee({
-                                ...newEmployee,
-                                designation: sanitizeName(e.target.value)
-                              })
+                              setNewEmployee({ ...newEmployee, email: e.target.value })
                             }
                             onBlur={() => {
-                              if (!newEmployee.designation || newEmployee.designation.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, designation: true }));
+                              if (!newEmployee.email || newEmployee.email.trim() === '') {
+                                setFormErrors((prev) => ({ ...prev, email: true }));
                               } else {
                                 setFormErrors((prev) => {
                                   const next = { ...prev };
-                                  delete next.designation;
+                                  delete next.email;
                                   return next;
                                 });
                               }
                             }}
-                            disabled={isViewMode}
+                            disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
                           />
+                        </div>
+                        <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
+                          <div className="employee-modal-field">
+                            <label>
+                              Designation{isEditMode && <span className="required-indicator">*</span>}
+                            </label>
+                            <input
+                              type="text"
+                              value={newEmployee.designation}
+                              onChange={(e) =>
+                                setNewEmployee({
+                                  ...newEmployee,
+                                  designation: e.target.value
+                                })
+                              }
+                              onBlur={() => {
+                                if (!newEmployee.designation || newEmployee.designation.trim() === '') {
+                                  setFormErrors((prev) => ({ ...prev, designation: true }));
+                                } else {
+                                  setFormErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next.designation;
+                                    return next;
+                                  });
+                                }
+                              }}
+                              disabled={isViewMode}
+                            />
+                          </div>
                         </div>
                         <div className={`employee-modal-field ${formErrors.department ? 'has-error' : ''}`}>
                           <label>
-                            Department<span className="required-indicator">*</span>
+                            Department{isEditMode && <span className="required-indicator">*</span>}
                           </label>
                           <input
                             type="text"
@@ -1823,7 +1929,7 @@ const EmployeeManagementPage: React.FC = () => {
                             onChange={(e) =>
                               setNewEmployee({
                                 ...newEmployee,
-                                department: sanitizeName(e.target.value)
+                                department: e.target.value
                               })
                             }
                             onBlur={() => {
@@ -1842,7 +1948,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.dateOfJoining ? 'has-error' : ''}`}>
                           <label>
-                            Date of Joining<span className="required-indicator">*</span>
+                            Date of Joining
                           </label>
                           <DatePicker
                             value={newEmployee.dateOfJoining}
@@ -1907,15 +2013,52 @@ const EmployeeManagementPage: React.FC = () => {
                             </DropdownMenu>
                           </div>
                         )}
+
+                        {/* New Fields: Total Experience and UAN */}
+                        <div className={`employee-modal-field ${formErrors.totalExperience ? 'has-error' : ''}`}>
+                          <label>
+                            Total Experience (Years)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={newEmployee.totalExperience}
+                            onChange={(e) => {
+                              setNewEmployee({ ...newEmployee, totalExperience: e.target.value });
+                            }}
+                            onBlur={() => {
+                              if (
+                                newEmployee.totalExperience === undefined ||
+                                newEmployee.totalExperience === null ||
+                                (typeof newEmployee.totalExperience === 'string' && newEmployee.totalExperience.trim() === '')
+                              ) {
+                                setFormErrors((prev) => ({ ...prev, totalExperience: true }));
+                              } else {
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.totalExperience;
+                                  return next;
+                                });
+                              }
+                            }}
+                            disabled={isViewMode}
+                          />
+                          {newEmployee.totalExperience && (parseFloat(newEmployee.totalExperience) * 10) % 5 !== 0 && (
+                            <span style={{ fontSize: '10px', color: 'red' }}>Must be in 0.5 increments</span>
+                          )}
+                        </div>
+
                       </div>
                     </div>
+
 
                     <div className="employee-modal-section">
                       <h3>Document Information</h3>
                       <div className="employee-modal-grid">
                         <div className={`employee-modal-field ${formErrors.aadharNumber ? 'has-error' : ''}`}>
                           <label>
-                            Aadhar Number<span className="required-indicator">*</span>
+                            Aadhar Number
                           </label>
                           <input
                             type="text"
@@ -1943,7 +2086,7 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                         <div className={`employee-modal-field ${formErrors.panNumber ? 'has-error' : ''}`}>
                           <label>
-                            PAN Number<span className="required-indicator">*</span>
+                            PAN Number
                           </label>
                           <input
                             type="text"
@@ -1982,6 +2125,27 @@ const EmployeeManagementPage: React.FC = () => {
                             </span>
                           )}
                         </div>
+
+                        <div className={`employee-modal-field ${formErrors.uanNumber ? 'has-error' : ''}`}>
+                          <label>
+                            UAN Number
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={14}
+                            placeholder="XXXX XXXX XXXX"
+                            value={formatUAN(newEmployee.uanNumber || '')}
+                            onChange={(e) => {
+                              const sanitized = sanitizeUAN(e.target.value);
+                              setNewEmployee({ ...newEmployee, uanNumber: sanitized });
+                            }}
+                            disabled={isViewMode}
+                          />
+                          {newEmployee.uanNumber && newEmployee.uanNumber.length !== 12 && (
+                            <span style={{ fontSize: '10px', color: 'red' }}>Must be 12 digits</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -1989,7 +2153,7 @@ const EmployeeManagementPage: React.FC = () => {
                       <h3>Address Details</h3>
                       <div className={`employee-modal-field full-width ${formErrors.permanentAddress ? 'has-error' : ''}`}>
                         <label>
-                          Permanent Address<span className="required-indicator">*</span>
+                          Permanent Address
                         </label>
                         <textarea
                           rows={3}
@@ -2029,7 +2193,7 @@ const EmployeeManagementPage: React.FC = () => {
                       </div>
                       <div className={`employee-modal-field full-width ${formErrors.currentAddress ? 'has-error' : ''}`}>
                         <label>
-                          Current Address<span className="required-indicator">*</span>
+                          Current Address
                         </label>
                         <textarea
                           rows={3}
@@ -2094,16 +2258,13 @@ const EmployeeManagementPage: React.FC = () => {
                             <tr key={edu.level} className={(formErrors[`edu_${idx}_groupStream`] || formErrors[`edu_${idx}_collegeUniversity`] || formErrors[`edu_${idx}_year`] || formErrors[`edu_${idx}_scorePercentage`]) ? 'has-error' : ''}>
                               <td className="education-level-cell">
                                 {formatEducationLevel(edu.level)}
-                                {(edu.level === 'UG' || edu.level === '12th') && (
-                                  <span className="required-indicator">*</span>
-                                )}
                               </td>
                               <td className={formErrors[`edu_${idx}_groupStream`] ? 'has-error' : ''}>
                                 <input
                                   type="text"
                                   value={edu.groupStream || ''}
                                   onChange={(e) => {
-                                    const value = sanitizeLettersOnly(e.target.value);
+                                    const value = e.target.value;
                                     setNewEmployee((prev: any) => {
                                       const next = [...(prev.education || [])];
                                       next[idx] = { ...edu, groupStream: value };
@@ -2111,15 +2272,8 @@ const EmployeeManagementPage: React.FC = () => {
                                     });
                                   }}
                                   onBlur={() => {
-                                    if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
-                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
-                                    } else {
-                                      setFormErrors((prev) => {
-                                        const next = { ...prev };
-                                        delete next[`edu_${idx}_groupStream`];
-                                        return next;
-                                      });
-                                    }
+                                    // Education fields are now optional for Add Employee
+                                    // Removed mandatory validation for UG and 12th
                                   }}
                                   disabled={isViewMode}
                                 />
@@ -2129,7 +2283,7 @@ const EmployeeManagementPage: React.FC = () => {
                                   type="text"
                                   value={edu.collegeUniversity || ''}
                                   onChange={(e) => {
-                                    const value = sanitizeLettersOnly(e.target.value);
+                                    const value = e.target.value;
                                     setNewEmployee((prev: any) => {
                                       const next = [...(prev.education || [])];
                                       next[idx] = { ...edu, collegeUniversity: value };
@@ -2137,15 +2291,7 @@ const EmployeeManagementPage: React.FC = () => {
                                     });
                                   }}
                                   onBlur={() => {
-                                    if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
-                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
-                                    } else {
-                                      setFormErrors((prev) => {
-                                        const next = { ...prev };
-                                        delete next[`edu_${idx}_collegeUniversity`];
-                                        return next;
-                                      });
-                                    }
+                                    // Education fields are now optional for Add Employee
                                   }}
                                   disabled={isViewMode}
                                 />
@@ -2168,9 +2314,9 @@ const EmployeeManagementPage: React.FC = () => {
                                     const currentYear = new Date().getFullYear();
                                     const maxYear = currentYear + 5;
 
-                                    if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
-                                      setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
-                                    } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
+                                    // Education fields are now optional for Add Employee
+                                    // Only validate format if year is provided
+                                    if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
                                       setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
                                     } else {
                                       setFormErrors((prev) => {
@@ -2390,28 +2536,27 @@ const EmployeeManagementPage: React.FC = () => {
                         </div>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
+
               </div>
 
               <div className="employee-modal-footer">
                 {isViewMode ? (
                   <>
-                    {newEmployee.role !== 'super_admin' && (
-                      <button
-                        type="button"
-                        className="modal-save-button"
-                        onClick={() => {
-                          if (!showLeaveHistory) {
-                            refetchLeaveHistory();
-                            refetchEmployeeBalances();
-                          }
-                          setShowLeaveHistory(!showLeaveHistory);
-                        }}
-                      >
-                        {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="modal-save-button"
+                      onClick={() => {
+                        if (!showLeaveHistory) {
+                          refetchLeaveHistory();
+                          refetchEmployeeBalances();
+                        }
+                        setShowLeaveHistory(!showLeaveHistory);
+                      }}
+                    >
+                      {showLeaveHistory ? 'Back to Details' : 'Leave Details'}
+                    </button>
                     {/* Edit Employee Button (HR/Super Admin only) */}
                     {user && (user.role === 'super_admin' || user.role === 'hr') && (
                       <button
@@ -2487,6 +2632,7 @@ const EmployeeManagementPage: React.FC = () => {
                 )}
               </div>
             </div>
+
           </div>
         )}
       </div>
@@ -2523,7 +2669,7 @@ const EmployeeManagementPage: React.FC = () => {
         leaveRequest={selectedLeaveRequest}
         onClose={() => setIsLeaveDetailsModalOpen(false)}
       />
-    </AppLayout>
+    </AppLayout >
   );
 };
 

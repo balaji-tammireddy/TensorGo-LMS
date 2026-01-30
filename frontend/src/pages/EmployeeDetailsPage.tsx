@@ -38,6 +38,15 @@ const formatAadhaar = (value: string) => {
   return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 };
 
+const sanitizeUAN = (value: string) => {
+  return value.replace(/[^0-9]/g, '').slice(0, 12);
+};
+
+const formatUAN = (value: string) => {
+  const digits = sanitizeUAN(value);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+};
+
 const sanitizePan = (value: string) => {
   let cleaned = value.toUpperCase().replace(/\s+/g, '');
   let formatted = '';
@@ -109,6 +118,9 @@ const emptyEmployeeForm = {
   emergencyContactRelation: '',
   designation: '',
   department: '',
+  personalEmail: '',
+  totalExperience: '',
+  uanNumber: '',
   dateOfJoining: '',
   aadharNumber: '',
   panNumber: '',
@@ -203,7 +215,10 @@ const EmployeeDetailsPage: React.FC = () => {
         education,
         reportingManagerName: employeeDetail.reporting_manager_full_name || employeeDetail.reporting_manager_name || '',
         reportingManagerId: employeeDetail.reporting_manager_id || null,
-        subordinateCount: employeeDetail.subordinate_count ? parseInt(String(employeeDetail.subordinate_count), 10) : 0
+        subordinateCount: employeeDetail.subordinate_count ? parseInt(String(employeeDetail.subordinate_count), 10) : 0,
+        personalEmail: employeeDetail.personal_email || '',
+        totalExperience: employeeDetail.total_experience ? String(employeeDetail.total_experience) : '',
+        uanNumber: employeeDetail.uan_number || ''
       };
 
       setEmployeeData(fetchedEmployee);
@@ -232,14 +247,34 @@ const EmployeeDetailsPage: React.FC = () => {
   const updateEmployeeMutation = useMutation(
     (args: { id: number; data: any }) => employeeService.updateEmployee(args.id, args.data),
     {
+      onMutate: async (newItem: { id: number; data: any }) => {
+        // Optimistic update for the 'employees' list (so the list view is updated immediately)
+        await queryClient.cancelQueries('employees');
+        const previousEmployees = queryClient.getQueryData<any[]>('employees');
+        if (previousEmployees) {
+          queryClient.setQueryData<any[]>('employees', (old) => {
+            return old?.map((emp) =>
+              emp.id === newItem.id ? { ...emp, ...newItem.data } : emp
+            ) || [];
+          });
+        }
+        return { previousEmployees };
+      },
       onSuccess: () => {
+        // Refetch to ensure data consistency
         queryClient.invalidateQueries('employees');
         showSuccess('Employee updated successfully!');
         setIsEditMode(false);
-        fetchEmployeeDetails(); // Refresh data
+        fetchEmployeeDetails();
       },
-      onError: (error: any) => {
-        showError(error.response?.data?.error?.message || 'Update failed');
+      onError: (err, newItem, context: any) => {
+        if (context?.previousEmployees) {
+          queryClient.setQueryData<any[]>('employees', context.previousEmployees);
+        }
+        showError(err.response?.data?.error?.message || 'Update failed');
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries('employees');
       }
     }
   );
@@ -296,7 +331,7 @@ const EmployeeDetailsPage: React.FC = () => {
     }
 
     checkField('contactNumber', 'Contact Number');
-    checkField('altContact', 'Alternate Contact Number');
+    // checkField('altContact', 'Alternate Contact Number');
     checkField('dateOfBirth', 'Date of Birth');
 
     if (employeeData.dateOfBirth) {
@@ -515,11 +550,9 @@ const EmployeeDetailsPage: React.FC = () => {
             {/* View Mode Buttons */}
             {!isEditMode && (
               <>
-                {employeeData.role !== 'super_admin' && (
-                  <Button variant="outline" onClick={() => navigate(`/employee-management/leaves/${id}`)}>
-                    View Leave Details
-                  </Button>
-                )}
+                <Button variant="outline" onClick={() => navigate(`/employee-management/leaves/${id}`)}>
+                  View Leave Details
+                </Button>
                 {(user?.role === 'super_admin' || user?.role === 'hr') && (
                   <Button
                     onClick={() => setIsEditMode(true)}
@@ -650,24 +683,13 @@ const EmployeeDetailsPage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`employee-modal-field ${formErrors.email ? 'has-error' : ''}`}>
-                <label>Official Email<span className="required-indicator">*</span></label>
+              <div className={`employee-modal-field ${formErrors.personalEmail ? 'has-error' : ''}`}>
+                <label>Personal Email<span className="required-indicator">*</span></label>
                 <input
                   type="email"
-                  value={employeeData.email}
-                  onChange={(e) => setEmployeeData({ ...employeeData, email: e.target.value })}
-                  onBlur={() => {
-                    if (!employeeData.email || employeeData.email.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, email: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.email;
-                        return next;
-                      });
-                    }
-                  }}
-                  disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')}
+                  value={employeeData.personalEmail}
+                  onChange={(e) => setEmployeeData({ ...employeeData, personalEmail: e.target.value })}
+                  disabled={!isEditMode}
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.contactNumber ? 'has-error' : ''}`}>
@@ -695,7 +717,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.altContact ? 'has-error' : ''}`}>
-                <label>Alternate Contact<span className="required-indicator">*</span></label>
+                <label>Alternate Contact</label>
                 <input
                   type="text"
                   maxLength={10}
@@ -703,11 +725,19 @@ const EmployeeDetailsPage: React.FC = () => {
                   onChange={(e) => setEmployeeData({ ...employeeData, altContact: sanitizePhone(e.target.value) })}
                   onBlur={() => {
                     const val = employeeData.altContact;
-                    if (!val || val.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, altContact: true }));
-                    } else if (val.length < 10) {
-                      setFormErrors((prev) => ({ ...prev, altContact: true }));
+                    // Only validate if value is provided
+                    if (val && val.trim() !== '') {
+                      if (val.length < 10) {
+                        setFormErrors((prev) => ({ ...prev, altContact: true }));
+                      } else {
+                        setFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.altContact;
+                          return next;
+                        });
+                      }
                     } else {
+                      // Clear error if field is empty (it's optional)
                       setFormErrors((prev) => {
                         const next = { ...prev };
                         delete next.altContact;
@@ -837,12 +867,22 @@ const EmployeeDetailsPage: React.FC = () => {
           <div className="employee-modal-section">
             <h3>Employment Information</h3>
             <div className="employee-modal-grid">
+
+              <div className={`employee-modal-field ${formErrors.email ? 'has-error' : ''}`}>
+                <label>Official Email<span className="required-indicator">*</span></label>
+                <input
+                  type="email"
+                  value={employeeData.email}
+                  onChange={(e) => setEmployeeData({ ...employeeData, email: e.target.value })}
+                  disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')}
+                />
+              </div>
               <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
                 <label>Designation<span className="required-indicator">*</span></label>
                 <input
                   type="text"
                   value={employeeData.designation}
-                  onChange={(e) => setEmployeeData({ ...employeeData, designation: sanitizeName(e.target.value) })}
+                  onChange={(e) => setEmployeeData({ ...employeeData, designation: e.target.value })}
                   onBlur={() => {
                     if (!employeeData.designation || employeeData.designation.trim() === '') {
                       setFormErrors((prev) => ({ ...prev, designation: true }));
@@ -862,7 +902,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 <input
                   type="text"
                   value={employeeData.department}
-                  onChange={(e) => setEmployeeData({ ...employeeData, department: sanitizeName(e.target.value) })}
+                  onChange={(e) => setEmployeeData({ ...employeeData, department: e.target.value })}
                   onBlur={() => {
                     if (!employeeData.department || employeeData.department.trim() === '') {
                       setFormErrors((prev) => ({ ...prev, department: true }));
@@ -905,6 +945,20 @@ const EmployeeDetailsPage: React.FC = () => {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+              <div className={`employee-modal-field ${formErrors.totalExperience ? 'has-error' : ''}`}>
+                <label>Total Experience (Years)<span className="required-indicator">*</span></label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={employeeData.totalExperience}
+                  onChange={(e) => setEmployeeData({ ...employeeData, totalExperience: e.target.value })}
+                  disabled={!isEditMode}
+                />
+                {employeeData.totalExperience && (parseFloat(employeeData.totalExperience) * 10) % 5 !== 0 && (
+                  <span style={{ fontSize: '10px', color: 'red' }}>Must be in 0.5 increments</span>
+                )}
               </div>
             </div>
           </div>
@@ -959,6 +1013,24 @@ const EmployeeDetailsPage: React.FC = () => {
                   }}
                   disabled={!isEditMode}
                 />
+              </div>
+              <div className={`employee-modal-field ${formErrors.uanNumber ? 'has-error' : ''}`}>
+                <label>UAN Number</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="XXXX XXXX XXXX"
+                  value={formatUAN(employeeData.uanNumber || '')}
+                  onChange={(e) => {
+                    const sanitized = sanitizeUAN(e.target.value);
+                    setEmployeeData({ ...employeeData, uanNumber: sanitized });
+                  }}
+                  disabled={!isEditMode}
+                />
+                {employeeData.uanNumber && employeeData.uanNumber.length !== 12 && (
+                  <span style={{ fontSize: '10px', color: 'red' }}>Must be 12 digits</span>
+                )}
               </div>
             </div>
           </div>
