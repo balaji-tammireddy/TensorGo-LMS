@@ -103,13 +103,13 @@ export const updateEmployeeSchema = z.object({
         firstName: nameSchema.optional(),
         middleName: nameSchema.nullable().optional().or(z.literal('')),
         lastName: nameSchema.optional(),
-        contactNumber: phoneSchema.optional(),
-        altContact: phoneSchema.optional(),
-        emergencyContactName: nameSchema.optional(),
-        emergencyContactNo: phoneSchema.optional(),
-        emergencyContactRelation: nameSchema.optional(),
-        designation: nameSchema.optional(),
-        department: nameSchema.optional(),
+        contactNumber: phoneSchema.nullable().optional().or(z.literal('')),
+        altContact: phoneSchema.nullable().optional().or(z.literal('')),
+        emergencyContactName: nameSchema.nullable().optional().or(z.literal('')),
+        emergencyContactNo: phoneSchema.nullable().optional().or(z.literal('')),
+        emergencyContactRelation: nameSchema.nullable().optional().or(z.literal('')),
+        designation: nameSchema.nullable().optional().or(z.literal('')),
+        department: nameSchema.nullable().optional().or(z.literal('')),
         status: z.enum(['active', 'on_leave', 'on_notice', 'resigned', 'terminated', 'inactive']).optional(),
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']).optional(),
         reportingManagerId: z.number().nullable().optional(),
@@ -120,15 +120,20 @@ export const updateEmployeeSchema = z.object({
             (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
             { message: 'Only organization mail should be used' }
         ).optional(),
-        gender: z.enum(['Male', 'Female', 'Other']).optional(),
-        bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional(),
-        maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional(),
-        aadharNumber: aadharSchema.optional(),
-        panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional(),
+        gender: z.enum(['Male', 'Female', 'Other', '']).nullable().optional().or(z.literal('')),
+        bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', '']).nullable().optional().or(z.literal('')),
+        maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed', '']).nullable().optional().or(z.literal('')),
+        aadharNumber: aadharSchema.nullable().optional().or(z.literal('')),
+        panNumber: z.union([
+            z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
+            z.string().length(0),
+            z.null(),
+            z.undefined()
+        ]).optional(),
         dateOfBirth: z.string().optional(),
-        dateOfJoining: z.string().optional(),
-        currentAddress: addressSchema.optional(),
-        permanentAddress: addressSchema.optional()
+        dateOfJoining: z.string().nullable().optional().or(z.literal('')),
+        currentAddress: addressSchema.nullable().optional().or(z.literal('')),
+        permanentAddress: addressSchema.nullable().optional().or(z.literal(''))
     }).refine(data => {
         if (data.dateOfBirth && data.dateOfJoining) {
             const dob = new Date(data.dateOfBirth);

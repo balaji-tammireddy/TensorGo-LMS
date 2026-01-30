@@ -943,25 +943,13 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     if (employeeCheck.rows[0].twelveth_year) educationYears['12th'] = parseInt(employeeCheck.rows[0].twelveth_year, 10);
 
     for (const edu of employeeData.education) {
-      const isMandatory = ['UG', '12th'].includes(edu.level);
       const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
 
-      if (isMandatory || hasAnyField) {
+      if (hasAnyField) {
         if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
           throw new Error(`Please fill complete details for ${edu.level} education`);
         }
 
-        // Validate for special characters and emojis
-        // RELAXED VALIDATION: Removed strict regex for Group/Stream and College/University
-        /*
-        const nameRegex = /^[a-zA-Z0-9\s.,&()-]+$/;
-        if (!nameRegex.test(edu.groupStream)) {
-          throw new Error(`Group/Stream for ${edu.level} contains invalid characters or emojis`);
-        }
-        if (!nameRegex.test(edu.collegeUniversity)) {
-          throw new Error(`College/University for ${edu.level} contains invalid characters or emojis`);
-        }
-        */
         if (!/^[0-9]{4}$/.test(edu.year)) {
           throw new Error(`Graduation Year for ${edu.level} must be a valid 4-digit year`);
         }
@@ -983,6 +971,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
 
         educationYears[edu.level] = gradYear;
+      } else {
+        // If a level is completely cleared, remove it from year map for gap validations
+        delete educationYears[edu.level];
       }
     }
 

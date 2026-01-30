@@ -330,7 +330,8 @@ const EmployeeDetailsPage: React.FC = () => {
       }
     }
 
-    checkField('contactNumber', 'Contact Number');
+    // Contact Number, Alternate Contact - both optional now
+    // checkField('contactNumber', 'Contact Number');
     // checkField('altContact', 'Alternate Contact Number');
     checkField('dateOfBirth', 'Date of Birth');
 
@@ -348,15 +349,16 @@ const EmployeeDetailsPage: React.FC = () => {
       }
     }
 
-    checkField('gender', 'Gender');
-    checkField('bloodGroup', 'Blood Group');
-    checkField('maritalStatus', 'Marital Status');
-    checkField('emergencyContactName', 'Emergency Contact Name');
-    checkField('emergencyContactNo', 'Emergency Contact Number');
-    checkField('emergencyContactRelation', 'Emergency Contact Relation');
-    checkField('designation', 'Designation');
-    checkField('department', 'Department');
-    checkField('dateOfJoining', 'Date of Joining');
+    // Optional fields - not required for Edit Employee (matching Add Employee)
+    // checkField('gender', 'Gender');
+    // checkField('bloodGroup', 'Blood Group');
+    // checkField('maritalStatus', 'Marital Status');
+    // checkField('emergencyContactName', 'Emergency Contact Name');
+    // checkField('emergencyContactNo', 'Emergency Contact Number');
+    // checkField('emergencyContactRelation', 'Emergency Contact Relation');
+    // checkField('designation', 'Designation');
+    // checkField('department', 'Department');
+    // checkField('dateOfJoining', 'Date of Joining');
 
     if (employeeData.dateOfBirth && employeeData.dateOfJoining) {
       const dob = new Date(employeeData.dateOfBirth);
@@ -378,11 +380,10 @@ const EmployeeDetailsPage: React.FC = () => {
       fieldErrors['reportingManagerId'] = true;
     }
 
-    checkField('aadharNumber', 'Aadhar Number');
-    if (isEmpty(employeeData.panNumber)) {
-      missingFields.push('PAN Number');
-      fieldErrors['panNumber'] = true;
-    } else {
+    // Optional: Aadhar Number, PAN Number, Addresses
+    // checkField('aadharNumber', 'Aadhar Number');
+    // Validate PAN format only if provided
+    if (!isEmpty(employeeData.panNumber)) {
       const panError = validatePan(employeeData.panNumber);
       if (panError) {
         showWarning(panError);
@@ -392,8 +393,8 @@ const EmployeeDetailsPage: React.FC = () => {
       }
     }
 
-    checkField('currentAddress', 'Current Address');
-    checkField('permanentAddress', 'Permanent Address');
+    // checkField('currentAddress', 'Current Address');
+    // checkField('permanentAddress', 'Permanent Address');
 
     // Education Validation
     if (employeeData.education && Array.isArray(employeeData.education)) {
@@ -404,54 +405,32 @@ const EmployeeDetailsPage: React.FC = () => {
 
       employeeData.education.forEach((edu: any, index: number) => {
         const levelLabel = edu.level || 'Education';
-        if (levelLabel === 'PG') {
-          const pgFields = [
-            { value: edu.groupStream, label: 'Group/Stream', key: 'groupStream' },
-            { value: edu.collegeUniversity, label: 'College/University', key: 'collegeUniversity' },
-            { value: edu.year, label: 'Graduation Year', key: 'year' },
-            { value: edu.scorePercentage, label: 'Score %', key: 'scorePercentage' }
-          ];
-          const filledFields = pgFields.filter(f => !isEmpty(f.value));
-          if (filledFields.length > 0 && filledFields.length < pgFields.length) {
-            showWarning('Please fill complete details if you want to add PG details');
-            pgFields.forEach(f => {
-              if (isEmpty(f.value)) fieldErrors[`edu_${index}_${f.key}`] = true;
-            });
-            setFormErrors(fieldErrors);
-            isPgValid = false;
-            return;
-          }
-          if (!isEmpty(edu.year)) {
-            const year = parseInt(edu.year, 10);
-            if (isNaN(year) || year < 1950 || year > maxYear) {
-              yearValidationError = `PG Graduation Year: 1950 - ${maxYear}`;
-              fieldErrors[`edu_${index}_year`] = true;
-            }
-          }
+        const eduFields = [
+          { value: edu.groupStream, label: 'Group/Stream', key: 'groupStream' },
+          { value: edu.collegeUniversity, label: 'College/University', key: 'collegeUniversity' },
+          { value: edu.year, label: 'Graduation Year', key: 'year' },
+          { value: edu.scorePercentage, label: 'Score %', key: 'scorePercentage' }
+        ];
+
+        const filledFields = eduFields.filter(f => !isEmpty(f.value));
+
+        // All-or-nothing logic for all education levels
+        if (filledFields.length > 0 && filledFields.length < eduFields.length) {
+          showWarning(`Please fill complete details for ${levelLabel} education`);
+          eduFields.forEach(f => {
+            if (isEmpty(f.value)) fieldErrors[`edu_${index}_${f.key}`] = true;
+          });
+          setFormErrors(fieldErrors);
+          isPgValid = false; // Using this as a general education validity flag
           return;
         }
 
-        if (isEmpty(edu.groupStream)) {
-          missingFields.push(`${levelLabel} - Group/Stream`);
-          fieldErrors[`edu_${index}_groupStream`] = true;
-        }
-        if (isEmpty(edu.collegeUniversity)) {
-          missingFields.push(`${levelLabel} - College/University`);
-          fieldErrors[`edu_${index}_collegeUniversity`] = true;
-        }
-        if (isEmpty(edu.year)) {
-          missingFields.push(`${levelLabel} - Graduation Year`);
-          fieldErrors[`edu_${index}_year`] = true;
-        } else {
+        if (!isEmpty(edu.year)) {
           const year = parseInt(edu.year, 10);
           if (isNaN(year) || year < 1950 || year > maxYear) {
             yearValidationError = `${levelLabel} Graduation Year: 1950 - ${maxYear}`;
             fieldErrors[`edu_${index}_year`] = true;
           }
-        }
-        if (isEmpty(edu.scorePercentage)) {
-          missingFields.push(`${levelLabel} - Score %`);
-          fieldErrors[`edu_${index}_scorePercentage`] = true;
         }
       });
 
@@ -684,7 +663,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.personalEmail ? 'has-error' : ''}`}>
-                <label>Personal Email<span className="required-indicator">*</span></label>
+                <label>Personal Email</label>
                 <input
                   type="email"
                   value={employeeData.personalEmail}
@@ -693,7 +672,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.contactNumber ? 'has-error' : ''}`}>
-                <label>Contact Number<span className="required-indicator">*</span></label>
+                <label>Contact Number</label>
                 <input
                   type="text"
                   maxLength={10}
@@ -749,7 +728,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.gender ? 'has-error' : ''}`}>
-                <label>Gender<span className="required-indicator">*</span></label>
+                <label>Gender</label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="leave-type-dropdown-trigger" disabled={!isEditMode}>
@@ -765,7 +744,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 </DropdownMenu>
               </div>
               <div className={`employee-modal-field ${formErrors.bloodGroup ? 'has-error' : ''}`}>
-                <label>Blood Group<span className="required-indicator">*</span></label>
+                <label>Blood Group</label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="leave-type-dropdown-trigger" disabled={!isEditMode}>
@@ -781,7 +760,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 </DropdownMenu>
               </div>
               <div className={`employee-modal-field ${formErrors.maritalStatus ? 'has-error' : ''}`}>
-                <label>Marital Status<span className="required-indicator">*</span></label>
+                <label>Marital Status</label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="leave-type-dropdown-trigger" disabled={!isEditMode}>
@@ -797,7 +776,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 </DropdownMenu>
               </div>
               <div className={`employee-modal-field ${formErrors.emergencyContactName ? 'has-error' : ''}`}>
-                <label>Emergency Contact Name<span className="required-indicator">*</span></label>
+                <label>Emergency Contact Name</label>
                 <input
                   type="text"
                   value={employeeData.emergencyContactName}
@@ -817,7 +796,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.emergencyContactNo ? 'has-error' : ''}`}>
-                <label>Emergency Contact No<span className="required-indicator">*</span></label>
+                <label>Emergency Contact No</label>
                 <input
                   type="text"
                   maxLength={10}
@@ -841,7 +820,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.emergencyContactRelation ? 'has-error' : ''}`}>
-                <label>Relation<span className="required-indicator">*</span></label>
+                <label>Relation</label>
                 <input
                   type="text"
                   value={employeeData.emergencyContactRelation}
@@ -878,7 +857,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
-                <label>Designation<span className="required-indicator">*</span></label>
+                <label>Designation</label>
                 <input
                   type="text"
                   value={employeeData.designation}
@@ -898,7 +877,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.department ? 'has-error' : ''}`}>
-                <label>Department<span className="required-indicator">*</span></label>
+                <label>Department</label>
                 <input
                   type="text"
                   value={employeeData.department}
@@ -918,7 +897,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.dateOfJoining ? 'has-error' : ''}`}>
-                <label>Date of Joining<span className="required-indicator">*</span></label>
+                <label>Date of Joining</label>
                 <DatePicker
                   value={employeeData.dateOfJoining}
                   onChange={(date) => setEmployeeData({ ...employeeData, dateOfJoining: date })}
@@ -947,7 +926,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 </DropdownMenu>
               </div>
               <div className={`employee-modal-field ${formErrors.totalExperience ? 'has-error' : ''}`}>
-                <label>Total Experience (Years)<span className="required-indicator">*</span></label>
+                <label>Total Experience (Years)</label>
                 <input
                   type="number"
                   step="0.5"
@@ -968,7 +947,7 @@ const EmployeeDetailsPage: React.FC = () => {
             <h3>Document Information</h3>
             <div className="employee-modal-grid">
               <div className={`employee-modal-field ${formErrors.aadharNumber ? 'has-error' : ''}`}>
-                <label>Aadhar Number<span className="required-indicator">*</span></label>
+                <label>Aadhar Number</label>
                 <input
                   type="text"
                   value={formatAadhaar(employeeData.aadharNumber)}
@@ -988,7 +967,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.panNumber ? 'has-error' : ''}`}>
-                <label>PAN Number<span className="required-indicator">*</span></label>
+                <label>PAN Number</label>
                 <input
                   type="text"
                   maxLength={10}
@@ -1039,7 +1018,7 @@ const EmployeeDetailsPage: React.FC = () => {
           <div className="employee-modal-section">
             <h3>Address Details</h3>
             <div className={`employee-modal-field full-width ${formErrors.permanentAddress ? 'has-error' : ''}`}>
-              <label>Permanent Address<span className="required-indicator">*</span></label>
+              <label>Permanent Address</label>
               <textarea
                 rows={3}
                 value={employeeData.permanentAddress}
@@ -1075,7 +1054,7 @@ const EmployeeDetailsPage: React.FC = () => {
               />
             </div>
             <div className={`employee-modal-field full-width ${formErrors.currentAddress ? 'has-error' : ''}`}>
-              <label>Current Address<span className="required-indicator">*</span></label>
+              <label>Current Address</label>
               <textarea
                 rows={3}
                 value={employeeData.currentAddress}
@@ -1132,7 +1111,6 @@ const EmployeeDetailsPage: React.FC = () => {
                   <tr key={edu.level} className={(formErrors[`edu_${idx}_groupStream`] || formErrors[`edu_${idx}_collegeUniversity`] || formErrors[`edu_${idx}_year`] || formErrors[`edu_${idx}_scorePercentage`]) ? 'has-error' : ''}>
                     <td className="education-level-cell">
                       {formatEducationLevel(edu.level)}
-                      {(edu.level === 'UG' || edu.level === '12th') && <span className="required-indicator">*</span>}
                     </td>
                     <td>
                       <input
