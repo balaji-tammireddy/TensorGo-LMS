@@ -1003,13 +1003,33 @@ export const TimesheetPage: React.FC = () => {
                                                             <div className="entry-inner">
                                                                 <div className="entry-header">
                                                                     <div className="entry-path">
-                                                                        <strong>{entry.project_name}</strong>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.module_name}</span>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.task_name}</span>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.activity_name}</span>
+                                                                        {entry.is_system || entry.project_name?.includes('System') ? (
+                                                                            <strong>System log</strong>
+                                                                        ) : entry.work_status === 'On Leave' || entry.project_name === 'Leave' ? (
+                                                                            <strong>On Leave</strong>
+                                                                        ) : (
+                                                                            <>
+                                                                                <strong>{entry.project_name}</strong>
+                                                                                {entry.module_name && entry.module_name !== entry.project_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.module_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {entry.task_name && entry.task_name !== entry.module_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.task_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {entry.activity_name && entry.activity_name !== entry.task_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.activity_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                     <div className="duration-label">
                                                                         {parseFloat(String(entry.duration)).toFixed(2)} hrs

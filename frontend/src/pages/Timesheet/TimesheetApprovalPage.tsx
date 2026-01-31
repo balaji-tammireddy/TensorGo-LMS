@@ -106,12 +106,9 @@ export const TimesheetApprovalPage: React.FC = () => {
     const [rejectionReason, setRejectionReason] = useState('');
 
     const [reportModalOpen, setReportModalOpen] = useState(false);
-    const [reportFilters, setReportFilters] = useState({
-        startDate: formatDate(weekRange.start),
-        endDate: formatDate(weekRange.end),
-        projectId: '',
-        moduleId: ''
-    });
+    // reportFilters state variable is not used for the download logic,
+    // as the TimesheetReportModal handles its own filters.
+    // The handleDownloadReport function is also removed as it's now handled by the modal.
 
     // -- Effects --
     useEffect(() => {
@@ -238,38 +235,6 @@ export const TimesheetApprovalPage: React.FC = () => {
         newDate.setDate(newDate.getDate() + (offset * 7));
         setCurrentDate(newDate);
     };
-
-    const handleDownloadReport = async () => {
-        try {
-            const data = await timesheetService.downloadReport(reportFilters);
-            // Convert JSON to CSV
-            if (!data || data.length === 0) {
-                showError('No data found for criteria');
-                return;
-            }
-
-            const headers = Object.keys(data[0]).join(',');
-            const rows = data.map((row: any) => Object.values(row).map(v => `"${v}"`).join(',')).join('\n');
-            const csvContent = `data:text/csv;charset=utf-8,${headers}\n${rows}`;
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `timesheet_report_${formatDate(new Date())}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            setReportModalOpen(false);
-            showSuccess('Report downloaded');
-        } catch (err) {
-            showError('Failed to generate report');
-        }
-    };
-
-
-
-
 
     // -- Grouping --
     const getEntriesForDay = (dateStr: string) => {
@@ -599,15 +564,24 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                     const allApproved = dayEntries.every(e => e.log_status === 'approved');
 
                                                                     return (
-                                                                        <div className="day-actions" style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
-                                                                            {/* Only show Approve/Reject if there are pending non-system entries */}
-                                                                            {hasPendingNonSystem && (
+                                                                        <div className="day-actions" style={{ display: 'flex', gap: '8px', marginLeft: '12px', alignItems: 'center' }}>
+                                                                            {allApproved ? (
+                                                                                <CheckCircle className="text-success" size={20} />
+                                                                            ) : (
                                                                                 <>
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
                                                                                         title="Approve Day"
-                                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#10b981', padding: '4px' }}
+                                                                                        style={{
+                                                                                            background: 'none',
+                                                                                            border: 'none',
+                                                                                            padding: '4px',
+                                                                                            cursor: hasPendingNonSystem ? 'pointer' : 'not-allowed',
+                                                                                            color: hasPendingNonSystem ? '#10b981' : '#cbd5e1',
+                                                                                            transition: 'all 0.2s'
+                                                                                        }}
+                                                                                        disabled={!hasPendingNonSystem}
                                                                                     >
                                                                                         <CheckCircle size={20} />
                                                                                     </button>
@@ -615,16 +589,19 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                                         type="button"
                                                                                         onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
                                                                                         title="Reject Day"
-                                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                                                                                        style={{
+                                                                                            background: 'none',
+                                                                                            border: 'none',
+                                                                                            padding: '4px',
+                                                                                            cursor: hasPendingNonSystem ? 'pointer' : 'not-allowed',
+                                                                                            color: hasPendingNonSystem ? '#ef4444' : '#cbd5e1',
+                                                                                            transition: 'all 0.2s'
+                                                                                        }}
+                                                                                        disabled={!hasPendingNonSystem}
                                                                                     >
                                                                                         <XCircle size={20} />
                                                                                     </button>
                                                                                 </>
-                                                                            )}
-
-                                                                            {/* Show Green Tick if all entries approved */}
-                                                                            {allApproved && (
-                                                                                <CheckCircle size={20} color="#10b981" fill="#ecfdf5" />
                                                                             )}
                                                                         </div>
                                                                     );
@@ -648,11 +625,27 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                 <div className="entry-inner">
                                                                     <div className="entry-header">
                                                                         <div className="entry-path">
-                                                                            <strong>{entry.project_name}</strong>
-                                                                            <span className="path-sep">&gt;</span>
-                                                                            <span>{entry.module_name}</span>
-                                                                            <span className="path-sep">&gt;</span>
-                                                                            <span>{entry.task_name}</span>
+                                                                            {entry.project_name?.includes('System') ? (
+                                                                                <strong>System log</strong>
+                                                                            ) : entry.work_status === 'On Leave' || entry.project_name === 'Leave' ? (
+                                                                                <strong>On Leave</strong>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <strong>{entry.project_name}</strong>
+                                                                                    {entry.module_name && entry.module_name !== entry.project_name && (
+                                                                                        <>
+                                                                                            <span className="path-sep">&gt;</span>
+                                                                                            <span>{entry.module_name}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                    {entry.task_name && entry.task_name !== entry.module_name && (
+                                                                                        <>
+                                                                                            <span className="path-sep">&gt;</span>
+                                                                                            <span>{entry.task_name}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                </>
+                                                                            )}
                                                                         </div>
                                                                         <span className="duration-label">{Number(entry.duration).toFixed(2)}h</span>
                                                                     </div>
