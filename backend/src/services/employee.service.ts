@@ -1458,6 +1458,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     } catch (e) {
       logger.error('Error sending status change notification:', e);
     }
+
+    // Reactivation Sync: If employee status changed to active, sync their projects
+    if (newStatus === 'active' && dbReportingManagerId) {
+      try {
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Syncing project membership for reactivated user ${employeeId} with manager ${dbReportingManagerId}`);
+        await ProjectService.syncUserToManagerProjects(employeeId, dbReportingManagerId);
+      } catch (syncError) {
+        logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error syncing project membership during reactivation:`, syncError);
+      }
+    }
   }
 
   // If joining date was updated, recalculate leave balances (skip for super_admin)
@@ -1583,7 +1593,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   return { message: 'Employee updated successfully' };
 };
 
-export const deleteEmployee = async (employeeId: number) => {
+export const deleteEmployee = async (employeeId: number, requesterId: number) => {
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${employeeId}`);
 
@@ -1636,9 +1646,11 @@ export const deleteEmployee = async (employeeId: number) => {
     // 4. Update reporting_manager_id in users table to NULL for employees reporting to this user
     await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
 
-    // 6. Update created_by and updated_by references to NULL
-    await client.query('UPDATE users SET created_by = NULL WHERE created_by = $1', [employeeId]);
-    await client.query('UPDATE users SET updated_by = NULL WHERE updated_by = $1', [employeeId]);
+    // 5. Reassign audit fields to the requester instead of setting to NULL (violates NOT NULL constraints)
+    await client.query('UPDATE users SET created_by = $1 WHERE created_by = $2', [requesterId, employeeId]);
+    await client.query('UPDATE users SET updated_by = $1 WHERE updated_by = $2', [requesterId, employeeId]);
+    await client.query('UPDATE leave_requests SET created_by = $1 WHERE created_by = $2', [requesterId, employeeId]);
+    await client.query('UPDATE leave_requests SET updated_by = $1 WHERE updated_by = $2', [requesterId, employeeId]);
 
     // 7. Finally, delete the user
     logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting user record`);
