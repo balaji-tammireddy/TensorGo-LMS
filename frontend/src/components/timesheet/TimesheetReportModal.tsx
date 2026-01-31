@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { timesheetService } from '../../services/timesheetService';
 import { projectService, Project, ProjectModule, ProjectTask, ProjectActivity } from '../../services/projectService';
 import { DatePicker } from '../../components/ui/date-picker';
+import { Modal } from '../../components/ui/modal';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -162,6 +163,13 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
 
             const blob = await timesheetService.generatePDFReport(reportFilters);
 
+            // Check if the blob is actually a JSON error (happens with responseType: 'blob')
+            if (blob.type === 'application/json') {
+                const text = await blob.text();
+                const errorData = JSON.parse(text);
+                throw new Error(errorData.error || 'Failed to generate PDF report');
+            }
+
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -175,7 +183,21 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
             onClose();
         } catch (error: any) {
             console.error('Failed to generate PDF:', error);
-            showError(error.response?.data?.error || 'Failed to generate PDF report');
+            let errorMessage = 'Failed to generate PDF report';
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.response?.data instanceof Blob) {
+                try {
+                    const text = await error.response.data.text();
+                    const errorData = JSON.parse(text);
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    console.error('Failed to parse error blob:', e);
+                }
+            } else if (error.response?.data?.error) {
+                errorMessage = error.response.data.error;
+            }
+            showError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -231,296 +253,13 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
         a.name.toLowerCase().includes(activitySearch.toLowerCase())
     );
 
-    if (!isOpen) return null;
-
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content report-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>Generate Timesheet Report</h2>
-                    <button className="close-btn" onClick={onClose}>
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <div className="modal-body">
-                    <div className="filter-grid">
-                        {/* Employee Filter - Only for HR/Super Admin */}
-                        {isHROrAdmin && (
-                            <div className="ts-form-group">
-                                <label className="ts-form-label">Employee</label>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="ts-dropdown-trigger">
-                                            <span>
-                                                {filters.employeeId
-                                                    ? getEmployeeName(employees.find(e => String(e.id) === filters.employeeId)!)
-                                                    : 'All Employees'}
-                                            </span>
-                                            <ChevronDown size={14} />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                        <div className="dropdown-search">
-                                            <Search size={14} />
-                                            <input
-                                                type="text"
-                                                placeholder="Search employees..."
-                                                value={employeeSearch}
-                                                onChange={(e) => setEmployeeSearch(e.target.value)}
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        </div>
-                                        <div className="dropdown-items">
-                                            <DropdownMenuItem onClick={() => { setFilters({ ...filters, employeeId: '' }); setEmployeeSearch(''); }}>
-                                                All Employees
-                                            </DropdownMenuItem>
-                                            {filteredEmployees.map(emp => (
-                                                <DropdownMenuItem
-                                                    key={emp.id}
-                                                    onClick={() => { setFilters({ ...filters, employeeId: String(emp.id) }); setEmployeeSearch(''); }}
-                                                >
-                                                    {getEmployeeName(emp)}
-                                                </DropdownMenuItem>
-                                            ))}
-                                            {filteredEmployees.length === 0 && employeeSearch && (
-                                                <div className="dropdown-empty">No employees found</div>
-                                            )}
-                                        </div>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        )}
-
-                        {/* Project Filter */}
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Project</label>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="ts-dropdown-trigger">
-                                        <span>
-                                            {projects.find(p => String(p.id) === filters.projectId)?.name || 'All Projects'}
-                                        </span>
-                                        <ChevronDown size={14} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                    <div className="dropdown-search">
-                                        <Search size={14} />
-                                        <input
-                                            type="text"
-                                            placeholder="Search projects..."
-                                            value={projectSearch}
-                                            onChange={(e) => setProjectSearch(e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                        {projectSearch && (
-                                            <button
-                                                className="search-clear-btn"
-                                                onClick={(e) => { e.stopPropagation(); setProjectSearch(''); }}
-                                                type="button"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="dropdown-items">
-                                        <DropdownMenuItem onClick={() => { handleProjectChange(''); setProjectSearch(''); }}>
-                                            All Projects
-                                        </DropdownMenuItem>
-                                        {filteredProjects.map(proj => (
-                                            <DropdownMenuItem
-                                                key={proj.id}
-                                                onClick={() => { handleProjectChange(String(proj.id)); setProjectSearch(''); }}
-                                            >
-                                                {proj.name}
-                                            </DropdownMenuItem>
-                                        ))}
-                                        {filteredProjects.length === 0 && projectSearch && (
-                                            <div className="dropdown-empty">No projects found</div>
-                                        )}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        {/* Module Filter */}
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Module</label>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="ts-dropdown-trigger" disabled={!filters.projectId}>
-                                        <span>
-                                            {modules.find(m => String(m.id) === filters.moduleId)?.name || 'All Modules'}
-                                        </span>
-                                        <ChevronDown size={14} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                    <div className="dropdown-search">
-                                        <Search size={14} />
-                                        <input
-                                            type="text"
-                                            placeholder="Search modules..."
-                                            value={moduleSearch}
-                                            onChange={(e) => setModuleSearch(e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                        {moduleSearch && (
-                                            <button
-                                                className="search-clear-btn"
-                                                onClick={(e) => { e.stopPropagation(); setModuleSearch(''); }}
-                                                type="button"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="dropdown-items">
-                                        <DropdownMenuItem onClick={() => { handleModuleChange(''); setModuleSearch(''); }}>
-                                            All Modules
-                                        </DropdownMenuItem>
-                                        {filteredModules.map(mod => (
-                                            <DropdownMenuItem
-                                                key={mod.id}
-                                                onClick={() => { handleModuleChange(String(mod.id)); setModuleSearch(''); }}
-                                            >
-                                                {mod.name}
-                                            </DropdownMenuItem>
-                                        ))}
-                                        {filteredModules.length === 0 && moduleSearch && (
-                                            <div className="dropdown-empty">No modules found</div>
-                                        )}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        {/* Task Filter */}
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Task</label>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="ts-dropdown-trigger" disabled={!filters.moduleId}>
-                                        <span>
-                                            {tasks.find(t => String(t.id) === filters.taskId)?.name || 'All Tasks'}
-                                        </span>
-                                        <ChevronDown size={14} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                    <div className="dropdown-search">
-                                        <Search size={14} />
-                                        <input
-                                            type="text"
-                                            placeholder="Search tasks..."
-                                            value={taskSearch}
-                                            onChange={(e) => setTaskSearch(e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                        {taskSearch && (
-                                            <button
-                                                className="search-clear-btn"
-                                                onClick={(e) => { e.stopPropagation(); setTaskSearch(''); }}
-                                                type="button"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="dropdown-items">
-                                        <DropdownMenuItem onClick={() => { handleTaskChange(''); setTaskSearch(''); }}>
-                                            All Tasks
-                                        </DropdownMenuItem>
-                                        {filteredTasks.map(task => (
-                                            <DropdownMenuItem
-                                                key={task.id}
-                                                onClick={() => { handleTaskChange(String(task.id)); setTaskSearch(''); }}
-                                            >
-                                                {task.name}
-                                            </DropdownMenuItem>
-                                        ))}
-                                        {filteredTasks.length === 0 && taskSearch && (
-                                            <div className="dropdown-empty">No tasks found</div>
-                                        )}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        {/* Activity Filter */}
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Activity</label>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="ts-dropdown-trigger" disabled={!filters.taskId}>
-                                        <span>
-                                            {activities.find(a => String(a.id) === filters.activityId)?.name || 'All Activities'}
-                                        </span>
-                                        <ChevronDown size={14} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                    <div className="dropdown-search">
-                                        <Search size={14} />
-                                        <input
-                                            type="text"
-                                            placeholder="Search activities..."
-                                            value={activitySearch}
-                                            onChange={(e) => setActivitySearch(e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                        {activitySearch && (
-                                            <button
-                                                className="search-clear-btn"
-                                                onClick={(e) => { e.stopPropagation(); setActivitySearch(''); }}
-                                                type="button"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="dropdown-items">
-                                        <DropdownMenuItem onClick={() => { setFilters({ ...filters, activityId: '' }); setActivitySearch(''); }}>
-                                            All Activities
-                                        </DropdownMenuItem>
-                                        {filteredActivities.map(act => (
-                                            <DropdownMenuItem
-                                                key={act.id}
-                                                onClick={() => { setFilters({ ...filters, activityId: String(act.id) }); setActivitySearch(''); }}
-                                            >
-                                                {act.name}
-                                            </DropdownMenuItem>
-                                        ))}
-                                        {filteredActivities.length === 0 && activitySearch && (
-                                            <div className="dropdown-empty">No activities found</div>
-                                        )}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        {/* Date Range */}
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Start Date</label>
-                            <DatePicker
-                                value={filters.startDate}
-                                onChange={(value) => setFilters({ ...filters, startDate: value })}
-                            />
-                        </div>
-
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">End Date</label>
-                            <DatePicker
-                                value={filters.endDate}
-                                onChange={(value) => setFilters({ ...filters, endDate: value })}
-                                min={filters.startDate}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="modal-footer">
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Generate Timesheet Report"
+            footer={
+                <div className="modal-footer-actions">
                     <button className="btn-secondary" onClick={handleReset}>
                         Reset Filters
                     </button>
@@ -542,7 +281,293 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
                         )}
                     </button>
                 </div>
+            }
+        >
+            <div className="report-modal-content">
+
+                <div className="modal-body">
+                    <div className="filter-grid">
+                        {/* Row 1: Employee & Project */}
+                        <div className="grid-row">
+                            {isHROrAdmin && (
+                                <div className="ts-form-group">
+                                    <label className="ts-form-label">Employee</label>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" className="ts-dropdown-trigger">
+                                                <span>
+                                                    {filters.employeeId
+                                                        ? getEmployeeName(employees.find(e => String(e.id) === filters.employeeId)!)
+                                                        : 'All Employees'}
+                                                </span>
+                                                <ChevronDown size={14} />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                            <div className="dropdown-search">
+                                                <Search size={14} />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search employees..."
+                                                    value={employeeSearch}
+                                                    onChange={(e) => setEmployeeSearch(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </div>
+                                            <div className="dropdown-items">
+                                                <DropdownMenuItem onClick={() => { setFilters({ ...filters, employeeId: '' }); setEmployeeSearch(''); }}>
+                                                    All Employees
+                                                </DropdownMenuItem>
+                                                {filteredEmployees.map(emp => (
+                                                    <DropdownMenuItem
+                                                        key={emp.id}
+                                                        onClick={() => { setFilters({ ...filters, employeeId: String(emp.id) }); setEmployeeSearch(''); }}
+                                                    >
+                                                        {getEmployeeName(emp)}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                                {filteredEmployees.length === 0 && employeeSearch && (
+                                                    <div className="dropdown-empty">No employees found</div>
+                                                )}
+                                            </div>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            )}
+
+                            <div className="ts-form-group">
+                                <label className="ts-form-label">Project</label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="ts-dropdown-trigger">
+                                            <span>
+                                                {projects.find(p => String(p.id) === filters.projectId)?.name || 'All Projects'}
+                                            </span>
+                                            <ChevronDown size={14} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                        <div className="dropdown-search">
+                                            <Search size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search projects..."
+                                                value={projectSearch}
+                                                onChange={(e) => setProjectSearch(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            {projectSearch && (
+                                                <button
+                                                    className="search-clear-btn"
+                                                    onClick={(e) => { e.stopPropagation(); setProjectSearch(''); }}
+                                                    type="button"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="dropdown-items">
+                                            <DropdownMenuItem onClick={() => { handleProjectChange(''); setProjectSearch(''); }}>
+                                                All Projects
+                                            </DropdownMenuItem>
+                                            {filteredProjects.map(proj => (
+                                                <DropdownMenuItem
+                                                    key={proj.id}
+                                                    onClick={() => { handleProjectChange(String(proj.id)); setProjectSearch(''); }}
+                                                >
+                                                    {proj.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                            {filteredProjects.length === 0 && projectSearch && (
+                                                <div className="dropdown-empty">No projects found</div>
+                                            )}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </div>
+
+                        {/* Row 2: Module & Task */}
+                        <div className="grid-row">
+                            <div className="ts-form-group">
+                                <label className="ts-form-label">Module</label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="ts-dropdown-trigger" disabled={!filters.projectId}>
+                                            <span>
+                                                {modules.find(m => String(m.id) === filters.moduleId)?.name || 'All Modules'}
+                                            </span>
+                                            <ChevronDown size={14} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                        <div className="dropdown-search">
+                                            <Search size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search modules..."
+                                                value={moduleSearch}
+                                                onChange={(e) => setModuleSearch(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            {moduleSearch && (
+                                                <button
+                                                    className="search-clear-btn"
+                                                    onClick={(e) => { e.stopPropagation(); setModuleSearch(''); }}
+                                                    type="button"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="dropdown-items">
+                                            <DropdownMenuItem onClick={() => { handleModuleChange(''); setModuleSearch(''); }}>
+                                                All Modules
+                                            </DropdownMenuItem>
+                                            {filteredModules.map(mod => (
+                                                <DropdownMenuItem
+                                                    key={mod.id}
+                                                    onClick={() => { handleModuleChange(String(mod.id)); setModuleSearch(''); }}
+                                                >
+                                                    {mod.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                            {filteredModules.length === 0 && moduleSearch && (
+                                                <div className="dropdown-empty">No modules found</div>
+                                            )}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+
+                            <div className="ts-form-group">
+                                <label className="ts-form-label">Task</label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="ts-dropdown-trigger" disabled={!filters.moduleId}>
+                                            <span>
+                                                {tasks.find(t => String(t.id) === filters.taskId)?.name || 'All Tasks'}
+                                            </span>
+                                            <ChevronDown size={14} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                        <div className="dropdown-search">
+                                            <Search size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search tasks..."
+                                                value={taskSearch}
+                                                onChange={(e) => setTaskSearch(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            {taskSearch && (
+                                                <button
+                                                    className="search-clear-btn"
+                                                    onClick={(e) => { e.stopPropagation(); setTaskSearch(''); }}
+                                                    type="button"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="dropdown-items">
+                                            <DropdownMenuItem onClick={() => { handleTaskChange(''); setTaskSearch(''); }}>
+                                                All Tasks
+                                            </DropdownMenuItem>
+                                            {filteredTasks.map(task => (
+                                                <DropdownMenuItem
+                                                    key={task.id}
+                                                    onClick={() => { handleTaskChange(String(task.id)); setTaskSearch(''); }}
+                                                >
+                                                    {task.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                            {filteredTasks.length === 0 && taskSearch && (
+                                                <div className="dropdown-empty">No tasks found</div>
+                                            )}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </div>
+
+                        {/* Row 3: Activity & Empty (or expand Activity) */}
+                        <div className="grid-row">
+                            <div className="ts-form-group">
+                                <label className="ts-form-label">Activity</label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="ts-dropdown-trigger" disabled={!filters.taskId}>
+                                            <span>
+                                                {activities.find(a => String(a.id) === filters.activityId)?.name || 'All Activities'}
+                                            </span>
+                                            <ChevronDown size={14} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="ts-dropdown-content searchable-dropdown" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+                                        <div className="dropdown-search">
+                                            <Search size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search activities..."
+                                                value={activitySearch}
+                                                onChange={(e) => setActivitySearch(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            {activitySearch && (
+                                                <button
+                                                    className="search-clear-btn"
+                                                    onClick={(e) => { e.stopPropagation(); setActivitySearch(''); }}
+                                                    type="button"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="dropdown-items">
+                                            <DropdownMenuItem onClick={() => { setFilters({ ...filters, activityId: '' }); setActivitySearch(''); }}>
+                                                All Activities
+                                            </DropdownMenuItem>
+                                            {filteredActivities.map(act => (
+                                                <DropdownMenuItem
+                                                    key={act.id}
+                                                    onClick={() => { setFilters({ ...filters, activityId: String(act.id) }); setActivitySearch(''); }}
+                                                >
+                                                    {act.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                            {filteredActivities.length === 0 && activitySearch && (
+                                                <div className="dropdown-empty">No activities found</div>
+                                            )}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </div>
+
+                        {/* Row 4: Date Range */}
+                        <div className="grid-row date-range-row">
+                            <div className="ts-form-group">
+                                <label className="ts-form-label">Start Date</label>
+                                <DatePicker
+                                    value={filters.startDate}
+                                    onChange={(value) => setFilters({ ...filters, startDate: value })}
+                                />
+                            </div>
+
+                            <div className="ts-form-group">
+                                <label className="ts-form-label">End Date</label>
+                                <DatePicker
+                                    value={filters.endDate}
+                                    onChange={(value) => setFilters({ ...filters, endDate: value })}
+                                    min={filters.startDate}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+        </Modal>
     );
 };

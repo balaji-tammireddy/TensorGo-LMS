@@ -104,6 +104,7 @@ export const TimesheetApprovalPage: React.FC = () => {
     const [entryToReject, setEntryToReject] = useState<number | null>(null);
     const [rejectDateStr, setRejectDateStr] = useState<string | null>(null); // For day-wise rejection
     const [rejectionReason, setRejectionReason] = useState('');
+    const [processingAction, setProcessingAction] = useState(false);
 
     const [reportModalOpen, setReportModalOpen] = useState(false);
     // reportFilters state variable is not used for the download logic,
@@ -177,7 +178,16 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     // -- Handlers --
     const handleApproveWeek = async () => {
-        if (!selectedMemberId) return;
+        if (!selectedMemberId || processingAction) return;
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        const previousMembers = [...teamMembers];
+
+        setMemberEntries(prev => prev.map(e => ({ ...e, log_status: 'approved' })));
+        setTeamMembers(prev => prev.map(m => m.id === selectedMemberId ? { ...m, status: 'approved' } : m));
+
+        setProcessingAction(true);
         try {
             const startStr = formatDate(weekRange.start);
             const endStr = formatDate(weekRange.end);
@@ -186,19 +196,36 @@ export const TimesheetApprovalPage: React.FC = () => {
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
+            // Rollback on error
+            setMemberEntries(previousEntries);
+            setTeamMembers(previousMembers);
             showError(err.response?.data?.error || err.message || 'Failed to approve');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
     const handleApproveDay = async (dateStr: string) => {
-        if (!selectedMemberId) return;
+        if (!selectedMemberId || processingAction) return;
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        setMemberEntries(prev => prev.map(e =>
+            formatDate(new Date(e.log_date)) === dateStr ? { ...e, log_status: 'approved' } : e
+        ));
+
+        setProcessingAction(true);
         try {
             await timesheetService.approveTimesheet(selectedMemberId, dateStr, dateStr);
             showSuccess(`Timesheet for ${dateStr} approved`);
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
+            // Rollback
+            setMemberEntries(previousEntries);
             showError(err.response?.data?.error || err.message || 'Failed to approve day');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -210,10 +237,20 @@ export const TimesheetApprovalPage: React.FC = () => {
     };
 
     const confirmReject = async () => {
-        if ((!entryToReject && !rejectDateStr) || !rejectionReason.trim()) {
-            showError('Please provide a reason');
+        if ((!entryToReject && !rejectDateStr) || !rejectionReason.trim() || processingAction) {
+            if (!rejectionReason.trim()) showError('Please provide a reason');
             return;
         }
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        if (entryToReject) {
+            setMemberEntries(prev => prev.map(e => e.id === entryToReject ? { ...e, log_status: 'rejected', rejection_reason: rejectionReason } : e));
+        } else if (rejectDateStr) {
+            setMemberEntries(prev => prev.map(e => formatDate(new Date(e.log_date)) === rejectDateStr ? { ...e, log_status: 'rejected', rejection_reason: rejectionReason } : e));
+        }
+
+        setProcessingAction(true);
         try {
             if (entryToReject) {
                 await timesheetService.rejectEntry(entryToReject, rejectionReason);
@@ -226,7 +263,11 @@ export const TimesheetApprovalPage: React.FC = () => {
             if (selectedMemberId) fetchMemberEntries(selectedMemberId);
             fetchTeamStatus();
         } catch (err: any) {
+            // Rollback
+            setMemberEntries(previousEntries);
             showError(err.response?.data?.error || err.message || 'Failed to reject');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -426,9 +467,17 @@ export const TimesheetApprovalPage: React.FC = () => {
                                         const hasPending = memberEntries.some(e => e.log_status !== 'approved');
                                         if (hasPending) {
                                             return (
-                                                <button className="bulk-approve-btn" onClick={handleApproveWeek}>
-                                                    <CheckCircle size={16} />
-                                                    Approve Week
+                                                <button
+                                                    className="bulk-approve-btn"
+                                                    onClick={handleApproveWeek}
+                                                    disabled={processingAction}
+                                                >
+                                                    {processingAction ? (
+                                                        <Clock size={16} className="animate-spin" />
+                                                    ) : (
+                                                        <CheckCircle size={16} />
+                                                    )}
+                                                    {processingAction ? 'Processing...' : 'Approve Week'}
                                                 </button>
                                             );
                                         } else if (memberEntries.length > 0) {
@@ -558,37 +607,45 @@ export const TimesheetApprovalPage: React.FC = () => {
 
                                                                 {/* Day Actions */}
                                                                 {isReportingManager && dayEntries.length > 0 && (() => {
-                                                                    // Check if there are any non-system entries that need approval
                                                                     const nonSystemEntries = dayEntries.filter(e => !e.project_name?.includes('System'));
-                                                                    const hasPendingNonSystem = nonSystemEntries.some(e => e.log_status !== 'approved');
-                                                                    const allApproved = dayEntries.every(e => e.log_status === 'approved');
+                                                                    const hasActionable = nonSystemEntries.some(e => e.log_status === 'submitted');
+                                                                    const allApproved = nonSystemEntries.length > 0 && nonSystemEntries.every(e => e.log_status === 'approved');
+                                                                    const anyRejected = nonSystemEntries.some(e => e.log_status === 'rejected');
 
                                                                     return (
                                                                         <div className="day-actions" style={{ display: 'flex', gap: '8px', marginLeft: '12px', alignItems: 'center' }}>
-                                                                            {allApproved ? (
-                                                                                <div className="status-approved-badge">
-                                                                                    <CheckCircle size={14} /> Approved
-                                                                                </div>
-                                                                            ) : (
+                                                                            {hasActionable ? (
                                                                                 <>
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
                                                                                         className="day-action-btn approve"
-                                                                                        disabled={!hasPendingNonSystem}
+                                                                                        disabled={processingAction}
                                                                                     >
-                                                                                        Approve Day
+                                                                                        {processingAction ? 'Wait...' : 'Approve Day'}
                                                                                     </button>
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
                                                                                         className="day-action-btn reject"
-                                                                                        disabled={!hasPendingNonSystem}
+                                                                                        disabled={processingAction}
                                                                                     >
-                                                                                        Reject Day
+                                                                                        {processingAction ? 'Wait...' : 'Reject Day'}
                                                                                     </button>
                                                                                 </>
-                                                                            )}
+                                                                            ) : allApproved ? (
+                                                                                <div className="status-approved-badge">
+                                                                                    <CheckCircle size={14} /> Approved
+                                                                                </div>
+                                                                            ) : anyRejected ? (
+                                                                                <div className="status-rejected-badge">
+                                                                                    <XCircle size={14} /> Rejected
+                                                                                </div>
+                                                                            ) : (nonSystemEntries.some(e => e.log_status === 'draft')) ? (
+                                                                                <div className="status-submitted-badge" style={{ background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0' }}>
+                                                                                    <Clock size={14} /> Draft
+                                                                                </div>
+                                                                            ) : null}
                                                                         </div>
                                                                     );
                                                                 })()}
@@ -673,8 +730,10 @@ export const TimesheetApprovalPage: React.FC = () => {
                     title="Reject Entry"
                     footer={
                         <>
-                            <button className="modal-btn secondary" onClick={() => setRejectModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn danger" onClick={confirmReject}>Reject</button>
+                            <button className="modal-btn secondary" onClick={() => setRejectModalOpen(false)} disabled={processingAction}>Cancel</button>
+                            <button className="modal-btn danger" onClick={confirmReject} disabled={processingAction}>
+                                {processingAction ? 'Rejecting...' : 'Reject'}
+                            </button>
                         </>
                     }
                 >

@@ -259,38 +259,49 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
 
 export const generatePDFReport = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
-        const userName = req.user?.name;
-        const role = req.user?.role;
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        const { id: userId, role, name: userName } = req.user!;
+        const queryParams = { ...req.query } as any;
 
-        const { projectId, moduleId, taskId, activityId, startDate, endDate, targetUserId } = req.query;
+        logger.info(`[Timesheet Report] Generating PDF report. User: ${userId}, Role: ${role}, Filters: ${JSON.stringify(queryParams)}`);
 
         const filters: any = {
-            startDate: startDate ? String(startDate) : undefined,
-            endDate: endDate ? String(endDate) : undefined,
-            projectId: projectId ? parseInt(String(projectId)) : undefined,
-            moduleId: moduleId ? parseInt(String(moduleId)) : undefined,
-            taskId: taskId ? parseInt(String(taskId)) : undefined,
-            activityId: activityId ? parseInt(String(activityId)) : undefined,
-            userId: targetUserId ? parseInt(String(targetUserId)) : undefined
+            startDate: queryParams.startDate ? String(queryParams.startDate) : undefined,
+            endDate: queryParams.endDate ? String(queryParams.endDate) : undefined,
+            projectId: queryParams.projectId ? parseInt(String(queryParams.projectId)) : undefined,
+            moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
+            taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
+            activityId: queryParams.activityId ? parseInt(String(queryParams.activityId)) : undefined,
+            userId: queryParams.employeeId ? parseInt(String(queryParams.employeeId)) : undefined
         };
 
-        // Scope enforcement
         if (role !== 'super_admin' && role !== 'hr') {
-            filters.managerScopeId = userId; // Limit to reportees
+            filters.managerScopeId = userId;
+            logger.info(`[Timesheet Report] Limiting scope to manager: ${userId}`);
         }
 
-        const entries = await TimesheetService.getReportData(filters);
+        const filterNames: any = {
+            startDate: filters.startDate,
+            endDate: filters.endDate
+        };
 
-        // Get filter names for display
-        const filterNames: any = {};
         if (filters.userId) {
-            const userRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [filters.userId]);
-            if (userRes.rows.length > 0) {
-                filterNames.employeeName = `${userRes.rows[0].first_name} ${userRes.rows[0].last_name || ''}`.trim();
+            const userRes = await pool.query('SELECT first_name, last_name, official_email FROM users WHERE id = $1', [filters.userId]);
+            if (userRes.rows.length === 0) {
+                logger.warn(`[Timesheet Report] Target user ${filters.userId} not found`);
+                return res.status(404).json({ error: 'Target user not found' });
             }
+            filterNames.employeeName = `${userRes.rows[0].first_name} ${userRes.rows[0].last_name}`;
+            logger.info(`[Timesheet Report] Generating report for user: ${filterNames.employeeName}`);
         }
+
+        const reportData = await TimesheetService.getReportData(filters);
+        logger.info(`[Timesheet Report] Data fetched. Rows: ${reportData.length}`);
+
+        if (reportData.length === 0) {
+            logger.warn('[Timesheet Report] No entries found for selected filters');
+            return res.status(404).json({ error: 'No timesheet entries found for the selected criteria' });
+        }
+
         if (filters.projectId) {
             const projRes = await pool.query('SELECT name FROM projects WHERE id = $1', [filters.projectId]);
             if (projRes.rows.length > 0) filterNames.projectName = projRes.rows[0].name;
@@ -307,26 +318,25 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
             const actRes = await pool.query('SELECT name FROM project_activities WHERE id = $1', [filters.activityId]);
             if (actRes.rows.length > 0) filterNames.activityName = actRes.rows[0].name;
         }
-        if (filters.startDate) filterNames.startDate = filters.startDate;
-        if (filters.endDate) filterNames.endDate = filters.endDate;
 
-        // Generate PDF
         const { generateTimesheetPDF } = await import('../utils/pdfGenerator');
+
         const pdfBuffer = await generateTimesheetPDF({
-            entries,
+            entries: reportData,
             filters: filterNames,
-            generatedBy: userName || 'Unknown User',
+            generatedBy: userName || 'Manager',
             generatedAt: new Date().toISOString()
         });
 
-        // Set response headers for PDF download
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=timesheet-report-${new Date().toISOString().split('T')[0]}.pdf`);
         res.setHeader('Content-Length', pdfBuffer.length);
 
         res.send(pdfBuffer);
+        logger.info('[Timesheet Report] PDF report sent to client');
+
     } catch (error: any) {
-        logger.error('[TimeSheet] PDF Report Error:', error);
+        logger.error('[Timesheet Report] Controller Error:', error);
         res.status(500).json({ error: error.message });
     }
 };

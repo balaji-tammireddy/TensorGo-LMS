@@ -486,15 +486,15 @@ export class TimesheetService {
                   AND log_status != 'approved'
             `, [approverId, targetUserId, startDateStr, endDateStr]);
 
-            // Notify User
+            // Notify User (Non-blocking)
             const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [targetUserId]);
             if (userRes.rows.length > 0) {
-                await sendTimesheetStatusEmail(userRes.rows[0].email, {
+                sendTimesheetStatusEmail(userRes.rows[0].email, {
                     employeeName: userRes.rows[0].first_name,
                     status: 'approved',
                     startDate: startDateStr,
                     endDate: endDateStr
-                });
+                }).catch(err => logger.error('[TimesheetEmail] Error sending approval email:', err));
             }
 
             await client.query('COMMIT');
@@ -574,12 +574,12 @@ export class TimesheetService {
                 // Notify User
                 const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [user_id]);
                 if (userRes.rows.length > 0) {
-                    await sendTimesheetStatusEmail(userRes.rows[0].email, {
+                    sendTimesheetStatusEmail(userRes.rows[0].email, {
                         employeeName: userRes.rows[0].first_name,
                         status: 'rejected',
                         logDate: this.formatDate(log_date),
                         reason: reason
-                    });
+                    }).catch(err => logger.error('[TimesheetEmail] Error sending rejection email:', err));
                 }
             }
 

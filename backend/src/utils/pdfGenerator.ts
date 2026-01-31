@@ -88,24 +88,39 @@ export class PDFGenerator {
     }
 
     private addHeader() {
+        // Background for header
+        this.doc
+            .rect(0, 0, this.pageWidth, 120)
+            .fill('#f8fafc');
+
         // Add logo
         const logoPath = path.join(__dirname, '../assets/logo.png');
         try {
-            this.doc.image(logoPath, this.margin, this.yPosition, { width: 120 });
+            this.doc.image(logoPath, this.margin, this.margin - 10, { width: 100 });
         } catch (error) {
             logger.warn('[PDFGenerator] Logo not found, skipping');
         }
 
         // Add title
         this.doc
-            .fontSize(24)
+            .fontSize(22)
             .font('Helvetica-Bold')
-            .fillColor('#1e40af')
-            .text('Timesheet Report', this.margin + 140, this.yPosition + 10, {
-                width: this.contentWidth - 140
+            .fillColor('#1e3a8a')
+            .text('TIMESHEET LOG REPORT', this.margin + 120, this.margin, {
+                width: this.contentWidth - 120,
+                align: 'right'
             });
 
-        this.yPosition += 60;
+        this.doc
+            .fontSize(10)
+            .font('Helvetica')
+            .fillColor('#64748b')
+            .text('Official Attendance & Activity Record', this.margin + 120, this.margin + 30, {
+                width: this.contentWidth - 120,
+                align: 'right'
+            });
+
+        this.yPosition = 120 + 20;
         this.addHorizontalLine();
         this.yPosition += 20;
     }
@@ -138,7 +153,7 @@ export class PDFGenerator {
             { label: 'Task', value: filters.taskName },
             { label: 'Activity', value: filters.activityName },
             { label: 'Date Range', value: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : filters.startDate || filters.endDate }
-        ].filter(f => f.value);
+        ];
 
         filterEntries.forEach(filter => {
             this.doc
@@ -148,7 +163,7 @@ export class PDFGenerator {
                 .text(`• ${filter.label}: `, this.margin + 10, this.yPosition, { continued: true })
                 .font('Helvetica-Bold')
                 .fillColor('#1e293b')
-                .text(filter.value || '');
+                .text(filter.value || 'NA');
             this.yPosition += 18;
         });
 
@@ -208,13 +223,13 @@ export class PDFGenerator {
 
         // Table configuration
         const columns = [
-            { label: 'Date', width: 70 },
-            { label: 'Employee', width: 90 },
-            { label: 'Project', width: 80 },
-            { label: 'Task', width: 80 },
-            { label: 'Activity', width: 80 },
-            { label: 'Hours', width: 45 },
-            { label: 'Status', width: 50 }
+            { label: 'Date', width: 65 },
+            { label: 'Employee', width: 85 },
+            { label: 'Project', width: 75 },
+            { label: 'Task', width: 70 },
+            { label: 'Activity', width: 70 },
+            { label: 'Hours', width: 50 },
+            { label: 'Status', width: 75 }
         ];
 
         // Table header
@@ -226,12 +241,15 @@ export class PDFGenerator {
             .fillAndStroke('#1e40af', '#1e40af');
 
         let xPos = this.margin + 5;
-        columns.forEach(col => {
+        columns.forEach((col, i) => {
             this.doc
                 .fontSize(9)
                 .font('Helvetica-Bold')
                 .fillColor('#ffffff')
-                .text(col.label, xPos, headerY + 8, { width: col.width, align: 'left' });
+                .text(col.label, xPos, headerY + 8, {
+                    width: col.width - 10,
+                    align: i === 5 ? 'center' : 'left'
+                });
             xPos += col.width;
         });
 
@@ -265,9 +283,9 @@ export class PDFGenerator {
                     .fontSize(8)
                     .font('Helvetica')
                     .fillColor('#334155')
-                    .text(this.truncateText(data, columns[i].width - 5), xPos, rowY + 8, {
-                        width: columns[i].width,
-                        align: i === 5 ? 'right' : 'left'
+                    .text(this.truncateText(data, columns[i].width - 10), xPos, rowY + 8, {
+                        width: columns[i].width - 10,
+                        align: i === 5 ? 'center' : 'left'
                     });
                 xPos += columns[i].width;
             });

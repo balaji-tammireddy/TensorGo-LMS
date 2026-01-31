@@ -1,79 +1,13 @@
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
+.report-modal-content .modal-body {
+  padding: 12px 20px;
 }
 
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  max-width: 800px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: slideIn 0.3s ease-out;
-  position: relative;
-  z-index: 1001;
-  pointer-events: auto;
+.report-modal-content .modal-header {
+  padding: 14px 20px;
 }
 
-.report-modal {
-  max-width: 900px;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #64748b;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background-color: #f1f5f9;
-  color: #1e293b;
-}
-
-.modal-body {
-  padding: 24px 28px;
+.report-modal-content .modal-footer {
+  padding: 12px 20px;
 }
 
 .modal-description {
@@ -83,26 +17,42 @@
 }
 
 .filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.filter-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.filter-group label {
-  font-size: 13px;
+.grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.grid-row:has(.ts-form-group:only-child) {
+  grid-template-columns: 1fr;
+}
+
+.filter-group,
+.ts-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filter-group label,
+.ts-form-label {
+  font-size: 12px;
   font-weight: 500;
-  color: #475569;
+  color: #64748b;
+  margin-bottom: 2px;
 }
 
 .filter-select,
-.filter-input {
-  padding: 10px 12px;
+.filter-input,
+.ts-dropdown-trigger {
+  padding: 8px 12px;
+  height: 38px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font-size: 14px;
@@ -140,12 +90,11 @@
   opacity: 0.6;
 }
 
-.modal-footer {
+.modal-footer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 20px 28px;
-  border-top: 1px solid #e2e8f0;
+  width: 100%;
 }
 
 .btn-primary,
