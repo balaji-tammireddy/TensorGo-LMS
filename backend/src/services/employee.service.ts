@@ -5,6 +5,7 @@ import { formatDateLocal } from '../utils/dateCalculator';
 import * as emailTemplates from '../utils/emailTemplates';
 import { calculateAllLeaveCredits } from '../utils/leaveCredit';
 import { toTitleCase } from '../utils/stringUtils';
+import { ProjectService } from './projectService';
 
 
 export const getEmployees = async (
@@ -747,6 +748,16 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Error sending new employee credentials email:`, emailError);
   }
 
+  // Sync Project Team Membership from Manager
+  if (reportingManagerId) {
+    try {
+      await ProjectService.syncUserToManagerProjects(userId, reportingManagerId);
+    } catch (syncError) {
+      logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Error syncing project membership:`, syncError);
+      // Don't fail the whole creation for this
+    }
+  }
+
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee creation completed successfully - User ID: ${userId}, Emp ID: ${empId}`);
   return { employeeId: userId, message: 'Employee created successfully' };
 };
@@ -1398,8 +1409,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
+
+      // Sync Project Team Membership for the new manager
+      if (newManagerId) {
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Syncing project membership for user ${employeeId} with new manager ${newManagerId}`);
+        await ProjectService.syncUserToManagerProjects(employeeId, newManagerId);
+      }
     } catch (e) {
-      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending manual manager change notification:`, e);
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error handling manager change (email/sync):`, e);
     }
   }
 

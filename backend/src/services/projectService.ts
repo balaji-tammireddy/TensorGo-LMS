@@ -286,6 +286,32 @@ export class ProjectService {
     `, [projectId, managerId]);
   }
 
+  /**
+   * Automatically adds a user (and their subtree if they are a manager) 
+   * to all projects their reporting manager is already a member of.
+   */
+  static async syncUserToManagerProjects(userId: number, managerId: number, clientOrPool: any = pool) {
+    console.log(`[ProjectService] syncUserToManagerProjects: userId=${userId}, managerId=${managerId}`);
+
+    // 1. Find all projects the manager is a member of OR the Project Manager (PM) of
+    const res = await clientOrPool.query(
+      `SELECT DISTINCT project_id FROM (
+        SELECT project_id FROM project_members WHERE user_id = $1
+        UNION
+        SELECT id AS project_id FROM projects WHERE project_manager_id = $1
+      ) as combined_projects`,
+      [managerId]
+    );
+
+    const projectIds = res.rows.map((row: any) => row.project_id);
+    console.log(`[ProjectService] Inheriting ${projectIds.length} projects from manager ${managerId}`);
+
+    // 2. For each project, sync the user's subtree (handles both single employees and managers with teams)
+    for (const projectId of projectIds) {
+      await this.syncProjectTeam(projectId, userId, clientOrPool, managerId);
+    }
+  }
+
   // NEW: Reset all resource access when PM changes
   static async resetProjectResourcesToNewManager(projectId: number, newManagerId: number, client: any) {
     console.log(`[ProjectService] Resetting resources for Project ${projectId} to New Manager ${newManagerId}`);
