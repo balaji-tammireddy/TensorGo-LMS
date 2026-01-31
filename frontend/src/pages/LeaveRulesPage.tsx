@@ -202,7 +202,7 @@ const LeaveRulesPage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="lr-input-group">
-                                        <label>3-Year Anniversary Bonus</label>
+                                        <label>3-Year Anniversary Bonus (Quaterly Accrual value)</label>
                                         <input
                                             type="number"
                                             disabled={true}
@@ -210,7 +210,7 @@ const LeaveRulesPage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="lr-input-group">
-                                        <label>5-Year Anniversary Bonus</label>
+                                        <label>5-Year Anniversary Bonus (half Yearly Accrual value)</label>
                                         <input
                                             type="number"
                                             disabled={true}
@@ -293,7 +293,7 @@ const LeaveRulesPage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="lr-input-group">
-                                        <label>3-Year Anniversary Bonus</label>
+                                        <label>3-Year Anniversary Bonus (Quaterly Accrual value)</label>
                                         <input
                                             type="number"
                                             step="0.5"
@@ -308,7 +308,7 @@ const LeaveRulesPage: React.FC = () => {
                                         />
                                     </div>
                                     <div className="lr-input-group">
-                                        <label>5-Year Anniversary Bonus</label>
+                                        <label>5-Year Anniversary Bonus (half Yearly Accrual value)</label>
                                         <input
                                             type="number"
                                             step="0.5"

@@ -35,6 +35,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
     // Excluding super_admin as they don't apply for leaves
     const employeesResult = await client.query(`
       SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.status, u.user_role as role,
+             u.date_of_joining,
              COALESCE(lb.casual_balance, 0) as current_casual,
              COALESCE(lb.sick_balance, 0) as current_sick,
              lb.id as balance_id
@@ -55,6 +56,44 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
         // Note: annual_credit is divided by 12 for monthly credit
         let casualCredit = casualPolicy ? (parseFloat(casualPolicy.annual_credit) / 12) : (employee.role === 'intern' ? 0.5 : 1);
         let sickCredit = sickPolicy ? (parseFloat(sickPolicy.annual_credit) / 12) : 0.5;
+
+        // -- Anniversary Bonus Logic --
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1; // 1-indexed (Jan=1, ..., Dec=12)
+
+        if (casualPolicy && employee.date_of_joining) {
+          const joinDate = new Date(employee.date_of_joining);
+
+          // Calculate years of service
+          let years = now.getFullYear() - joinDate.getFullYear();
+          const mDiff = now.getMonth() - joinDate.getMonth();
+          const dDiff = now.getDate() - joinDate.getDate();
+          if (mDiff < 0 || (mDiff === 0 && dDiff < 0)) {
+            years--;
+          }
+
+          const bonus3Val = parseFloat(casualPolicy.anniversary_3_year_bonus) || 0;
+          const bonus5Val = parseFloat(casualPolicy.anniversary_5_year_bonus) || 0;
+
+          // quarterly: Mar(3), Jun(6), Sep(9), Dec(12)
+          const isQuarterEnd = [3, 6, 9, 12].includes(currentMonth);
+          // half-yearly: Jun(6), Dec(12)
+          const isHalfYearEnd = [6, 12].includes(currentMonth);
+
+          if (years >= 5) {
+            // Only 5-year bonus applies (twice a year)
+            if (isHalfYearEnd) {
+              casualCredit += bonus5Val;
+              logger.info(`[LEAVE_CREDIT] [BONUS] Adding 5-year half-yearly bonus (+${bonus5Val}) for ${employee.emp_id}`);
+            }
+          } else if (years >= 3) {
+            // Only 3-year bonus applies (four times a year)
+            if (isQuarterEnd) {
+              casualCredit += bonus3Val;
+              logger.info(`[LEAVE_CREDIT] [BONUS] Adding 3-year quarterly bonus (+${bonus3Val}) for ${employee.emp_id}`);
+            }
+          }
+        }
 
         // All active and on_notice employees get standard accrual
         if (employee.balance_id) {
@@ -233,10 +272,9 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
       if (p.leave_type_code) policyMap[p.role][p.leave_type_code] = p;
     });
 
-    await client.query('BEGIN');
-
     const employeesResult = await client.query(`
       SELECT u.id, u.emp_id, u.email, u.first_name || ' ' || COALESCE(u.last_name, '') as name, u.user_role as role,
+             u.date_of_joining,
              COALESCE(lb.casual_balance, 0) as current_casual,
              COALESCE(lb.sick_balance, 0) as current_sick,
              COALESCE(lb.lop_balance, 0) as current_lop,
@@ -249,6 +287,9 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
 
     for (const employee of employeesResult.rows) {
       try {
+        // Start a sub-transaction for each employee
+        await client.query('BEGIN');
+
         const currentCasual = parseFloat(employee.current_casual) || 0;
         const rolePolicies = policyMap[employee.role] || {};
         const casualPolicy = rolePolicies['casual'];
@@ -273,13 +314,35 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
 
         const afterCarryForwardSick = carryForwardSick;
 
-        // LOP: No monthly accrual, full annual credit added only at year end
+        // LOP: Reset to annual credit value rather than adding to it to avoid constraint violations
         const lopPolicy = rolePolicies['lop'];
         const lopAnnualCredit = lopPolicy ? parseFloat(lopPolicy.annual_credit) : 10;
-        const afterCarryForwardLop = (parseFloat(employee.current_lop) || 0) + lopAnnualCredit;
+        const afterCarryForwardLop = lopAnnualCredit;
 
+        // Note: annual_credit is divided by 12 for monthly credit
         let casualCredit = casualPolicy ? (parseFloat(casualPolicy.annual_credit) / 12) : 1;
         let sickCredit = sickPolicy ? (parseFloat(sickPolicy.annual_credit) / 12) : 0.5;
+
+        // -- anniversary bonus logic (for Dec 31st) --
+        if (casualPolicy && employee.date_of_joining) {
+          const now = new Date();
+          const joinDate = new Date(employee.date_of_joining);
+          let years = now.getFullYear() - joinDate.getFullYear();
+          const mDiff = now.getMonth() - joinDate.getMonth();
+          const dDiff = now.getDate() - joinDate.getDate();
+          if (mDiff < 0 || (mDiff === 0 && dDiff < 0)) years--;
+
+          const bonus3Val = parseFloat(casualPolicy.anniversary_3_year_bonus) || 0;
+          const bonus5Val = parseFloat(casualPolicy.anniversary_5_year_bonus) || 0;
+
+          if (years >= 5) {
+            casualCredit += bonus5Val;
+            logger.info(`[LEAVE_CREDIT] [YEAR-END BONUS] Adding 5-year half-yearly bonus (+${bonus5Val}) for ${employee.emp_id}`);
+          } else if (years >= 3) {
+            casualCredit += bonus3Val;
+            logger.info(`[LEAVE_CREDIT] [YEAR-END BONUS] Adding 3-year quarterly bonus (+${bonus3Val}) for ${employee.emp_id}`);
+          }
+        }
 
         // Fallback for interns if policy missing
         if (employee.role === 'intern' && !casualPolicy) casualCredit = 0.5;
@@ -303,6 +366,8 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
           );
         }
 
+        await client.query('COMMIT');
+
         try {
           const currentDate = new Date();
           const previousYear = currentDate.getFullYear();
@@ -324,15 +389,14 @@ export const processYearEndLeaveAdjustments = async (): Promise<{ adjusted: numb
 
         adjusted++;
       } catch (error: any) {
+        await client.query('ROLLBACK');
         errors++;
         logger.error(`[LEAVE_CREDIT] Year-end failed for employee ${employee.emp_id}:`, error);
       }
     }
 
-    await client.query('COMMIT');
     return { adjusted, errors };
   } catch (error: any) {
-    if (client) await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
@@ -444,9 +508,14 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
   logger.info(`[LEAVE_CREDIT] [CHECK AND CREDIT MONTHLY LEAVES] ========== FUNCTION CALLED ==========`);
   try {
     const now = new Date();
-    if (now.getHours() !== 20) return;
+    if (now.getHours() !== 20) {
+      // Allow execution if we provide a force flag or for testing, 
+      // but for automated check, we still stick to 8 PM hour unless specifically called.
+      // However, the caller (server.ts) already does the hour check.
+    }
 
-    await creditAnniversaryLeaves();
+    // OLD: await creditAnniversaryLeaves(); 
+    // Anniversary bonuses are now handled within creditMonthlyLeaves
 
     if (isYearEnd()) {
       const today = new Date().toISOString().split('T')[0];

@@ -181,25 +181,56 @@ export function calculateAllLeaveCredits(joinDate: string | Date, checkDate: Dat
       }
     }
 
-    // Add anniversary credits if they occurred this year
-    // Use original join date for anniversary calculations
-    const threeYearAnniversary = new Date(originalJoinYear + 3, originalJoinMonth - 1, originalJoinDay);
-    if (year === originalJoinYear + 3 && threeYearAnniversary <= today && threeYearAnniversary >= systemStartDate) {
-      // Check if anniversary date is within this year and after system start
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year, 11, 31);
-      if (threeYearAnniversary >= yearStart && threeYearAnniversary <= yearEnd) {
-        yearCasual += 3; // 3-year anniversary bonus
-      }
-    }
+    // -- Anniversary Bonus Logic (New Recurring Policy) --
+    // Quarterly: Mar(3), Jun(6), Sep(9), Dec(12)
+    // Half-yearly: Jun(6), Dec(12)
 
-    const fiveYearAnniversary = new Date(originalJoinYear + 5, originalJoinMonth - 1, originalJoinDay);
-    if (year === originalJoinYear + 5 && fiveYearAnniversary <= today && fiveYearAnniversary >= systemStartDate) {
-      // Check if anniversary date is within this year and after system start
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year, 11, 31);
-      if (fiveYearAnniversary >= yearStart && fiveYearAnniversary <= yearEnd) {
-        yearCasual += 5; // 5-year anniversary bonus
+    // Process month by month to apply bonuses in specific months
+    for (let month = 1; month <= 12; month++) {
+      // Skip if this month hasn't been processed in the monthly credit loop above 
+      // OR if it's the current year and the month is in the future.
+      // However, the loop above (lines 135-182) handles monthly credits.
+      // Anniversary bonuses are added ON TOP of those credits in specific months.
+
+      // We need to know if the month 'month' in year 'year' has passed.
+      const isPastMonth = !isCurrentYear || (month < today.getMonth() + 1);
+      const isCurrentMonth = isCurrentYear && (month === today.getMonth() + 1);
+
+      if (isPastMonth || isCurrentMonth) {
+        // Special case for current month: check if it's the last working day
+        if (isCurrentMonth) {
+          const lastWorkingDay = getLastWorkingDayOfMonth(year, month);
+          if (today < lastWorkingDay) continue; // Not yet credited
+        }
+
+        // Calculate years of service at that point in time
+        // For simplicity, we check if they have completed X years by the end of that month
+        const endOfMonth = new Date(year, month, 0);
+        let yearsAtMonthEnd = endOfMonth.getFullYear() - originalJoinYear;
+        const mDiff = endOfMonth.getMonth() - (originalJoinMonth - 1);
+        const dDiff = endOfMonth.getDate() - originalJoinDay;
+        if (mDiff < 0 || (mDiff === 0 && dDiff < 0)) {
+          yearsAtMonthEnd--;
+        }
+
+        const isQuarterEnd = [3, 6, 9, 12].includes(month);
+        const isHalfYearEnd = [6, 12].includes(month);
+
+        // We need the bonus values from policy, but this utility (calculateAllLeaveCredits) 
+        // currently uses hardcoded defaults (3 and 5). 
+        // I will keep these defaults but use the new logic.
+        const bonus3 = 3;
+        const bonus5 = 5;
+
+        if (yearsAtMonthEnd >= 5) {
+          if (isHalfYearEnd) {
+            yearCasual += bonus5;
+          }
+        } else if (yearsAtMonthEnd >= 3) {
+          if (isQuarterEnd) {
+            yearCasual += bonus3;
+          }
+        }
       }
     }
 
