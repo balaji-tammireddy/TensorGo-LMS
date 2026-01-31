@@ -541,6 +541,15 @@
     transition: background 0.2s;
 }
 
+.premium-card.status-rejected,
+.premium-card.status-approved,
+.premium-card.status-submitted,
+.premium-card.status-draft {
+    background: #ffffff !important;
+    border: 1px solid #f1f5f9 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
 .premium-card.status-draft::before {
     background: #94a3b8;
 }
@@ -563,8 +572,8 @@
 
 .premium-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    border-color: #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+    border-color: #e2e8f0 !important;
 }
 
 .entry-inner {

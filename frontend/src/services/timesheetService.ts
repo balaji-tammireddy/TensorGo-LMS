@@ -55,12 +55,12 @@ export const timesheetService = {
     },
 
     rejectEntry: async (entryId: number, reason: string) => {
-        const response = await api.post('/timesheets/reject', { entryId, reason });
+        const response = await api.post('/timesheets/reject-entry', { entryId, reason });
         return response.data;
     },
 
     rejectTimesheet: async (targetUserId: number, startDate: string, endDate: string, reason: string) => {
-        const response = await api.post('/timesheets/reject-bulk', { targetUserId, start_date: startDate, end_date: endDate, reason });
+        const response = await api.post('/timesheets/reject', { targetUserId, start_date: startDate, end_date: endDate, reason });
         return response.data;
     },
 

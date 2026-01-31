@@ -566,40 +566,26 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                     return (
                                                                         <div className="day-actions" style={{ display: 'flex', gap: '8px', marginLeft: '12px', alignItems: 'center' }}>
                                                                             {allApproved ? (
-                                                                                <CheckCircle className="text-success" size={20} />
+                                                                                <div className="status-approved-badge">
+                                                                                    <CheckCircle size={14} /> Approved
+                                                                                </div>
                                                                             ) : (
                                                                                 <>
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
-                                                                                        title="Approve Day"
-                                                                                        style={{
-                                                                                            background: 'none',
-                                                                                            border: 'none',
-                                                                                            padding: '4px',
-                                                                                            cursor: hasPendingNonSystem ? 'pointer' : 'not-allowed',
-                                                                                            color: hasPendingNonSystem ? '#10b981' : '#cbd5e1',
-                                                                                            transition: 'all 0.2s'
-                                                                                        }}
+                                                                                        className="day-action-btn approve"
                                                                                         disabled={!hasPendingNonSystem}
                                                                                     >
-                                                                                        <CheckCircle size={20} />
+                                                                                        Approve Day
                                                                                     </button>
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
-                                                                                        title="Reject Day"
-                                                                                        style={{
-                                                                                            background: 'none',
-                                                                                            border: 'none',
-                                                                                            padding: '4px',
-                                                                                            cursor: hasPendingNonSystem ? 'pointer' : 'not-allowed',
-                                                                                            color: hasPendingNonSystem ? '#ef4444' : '#cbd5e1',
-                                                                                            transition: 'all 0.2s'
-                                                                                        }}
+                                                                                        className="day-action-btn reject"
                                                                                         disabled={!hasPendingNonSystem}
                                                                                     >
-                                                                                        <XCircle size={20} />
+                                                                                        Reject Day
                                                                                     </button>
                                                                                 </>
                                                                             )}
