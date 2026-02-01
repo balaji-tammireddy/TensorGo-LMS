@@ -99,37 +99,43 @@ export const getMemberWeeklyEntries = async (req: AuthRequest, res: Response) =>
     try {
         const approverId = req.user?.id;
         const approverRole = req.user?.role;
-        const { targetUserId } = req.params;
+        const { targetUserId: targetUserIdStr } = req.params;
         const { start_date, end_date } = req.query;
 
         if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
 
-        // Allow HR and Super Admin to view their own timesheets
-        const isSelf = approverId === parseInt(targetUserId);
+        const targetUserId = parseInt(targetUserIdStr);
+        if (isNaN(targetUserId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        // --- Permissions ---
+        // 1. Always allow viewing your own timesheet
+        const isSelf = approverId === targetUserId;
+        if (isSelf) {
+            const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
+            return res.json(entries);
+        }
+
+        // 2. HR and Super Admin can view all users' timesheets
         const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin';
-
-        if (isSelf && isHROrAdmin) {
-            // HR/Super Admin viewing their own timesheet - allow it
-            const entries = await TimesheetService.getEntriesForWeek(parseInt(targetUserId), String(start_date), String(end_date));
-            return res.json(entries);
-        }
-
-        // Check Permissions for viewing other users
-        // HR and Super Admin can VIEW all users' timesheets (but can only APPROVE their reportees)
         if (isHROrAdmin) {
-            const entries = await TimesheetService.getEntriesForWeek(parseInt(targetUserId), String(start_date), String(end_date));
+            const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
             return res.json(entries);
         }
 
-        // For Managers: Check if they manage this user
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, parseInt(targetUserId));
-        if (!isAllowed) return res.status(403).json({ error: 'You are not authorized to view this user\'s timesheet' });
+        // 3. Managers: Check if they manage this user
+        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, targetUserId);
+        if (!isAllowed) {
+            logger.warn(`[TimeSheet] Unauthorized view attempt by user ${approverId} for member ${targetUserId}`);
+            return res.status(403).json({ error: 'You are not authorized to view this user\'s timesheet' });
+        }
 
-        const entries = await TimesheetService.getEntriesForWeek(parseInt(targetUserId), String(start_date), String(end_date));
+        const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
         res.json(entries);
     } catch (error: any) {
         logger.error('[TimeSheet] Member Entries Error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 };
 

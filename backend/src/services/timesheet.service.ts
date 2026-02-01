@@ -93,15 +93,41 @@ export class TimesheetService {
                 throw new Error("Cannot log time for future dates");
             }
 
-            // Validation 2: Current Week and One Previous Week Only
-            const { start, end } = this.getCurrentWeekRange();
+            // Validation 2: Current Week and One Previous
+            // Validation 2: Current Week and One Previous
+            const { start, end } = TimesheetService.getCurrentWeekRange();
             const previousWeekStart = new Date(start);
-            previousWeekStart.setDate(previousWeekStart.getDate() - 7); // One week before current week Monday
+            previousWeekStart.setDate(previousWeekStart.getDate() - 7);
 
             // Relax validation for Updates (to allow fixing rejected logs from older weeks)
             // Allow logging from previous week Monday to today
             if (!entry.id && (logDateOnly < previousWeekStart || logDateOnly > today)) {
                 throw new Error("Can only log time for the current week or previous week");
+            }
+
+            // Validation 3: Past Week Submission Restriction
+            // If the date being logged is before the current week, check if that week is already submitted or approved
+            if (logDateOnly < start) {
+                const logDay = logDateOnly.getDay();
+                const logDiff = logDateOnly.getDate() - logDay + (logDay === 0 ? -6 : 1);
+                const logMonday = new Date(logDateOnly);
+                logMonday.setDate(logDiff);
+                logMonday.setHours(0, 0, 0, 0);
+                const logSunday = new Date(logMonday);
+                logSunday.setDate(logMonday.getDate() + 6);
+                logSunday.setHours(23, 59, 59, 999);
+
+                const lockCheck = await client.query(`
+                    SELECT 1 FROM project_entries 
+                    WHERE user_id = $1 
+                      AND log_date >= $2 AND log_date <= $3
+                      AND log_status IN ('submitted', 'approved')
+                    LIMIT 1
+                `, [userId, logMonday.toISOString().split('T')[0], logSunday.toISOString().split('T')[0]]);
+
+                if (lockCheck.rows.length > 0) {
+                    throw new Error("Cannot add or modify logs for a week that is already submitted or approved.");
+                }
             }
 
             if (entry.id) {
@@ -561,9 +587,9 @@ export class TimesheetService {
     // 3. Friday Validation (4 PM)
     static async processFridayValidation() {
         logger.info('[Timesheet] Processing Friday Validation...');
-        const { start, end } = this.getCurrentWeekRange();
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
+        const { start, end } = TimesheetService.getCurrentWeekRange();
+        const startStr = TimesheetService.formatDate(start);
+        const endStr = TimesheetService.formatDate(end);
 
         // Find users with < 32 hours logged
         const res = await pool.query(`
@@ -588,30 +614,36 @@ export class TimesheetService {
     // 4. Sunday Submission (9 PM)
     static async processWeeklySubmission() {
         logger.info('[Timesheet] Processing Weekly Submission...');
-        const client = await pool.connect();
-        const { start, end } = this.getCurrentWeekRange();
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
-
+        let client;
         try {
+            client = await pool.connect();
+            const { start, end } = TimesheetService.getCurrentWeekRange();
+
+            const startStr = TimesheetService.formatDate(start);
+            const endStr = TimesheetService.formatDate(end);
+
             await client.query('BEGIN');
 
-            // Get hours per user
             const res = await client.query(`
                 SELECT u.id, u.email, u.first_name, u.reporting_manager_id, 
+                       mgr.email as manager_email, mgr.first_name as manager_name,
                        COALESCE(SUM(pe.duration), 0) as total_hours
                 FROM users u
+                LEFT JOIN users mgr ON u.reporting_manager_id = mgr.id
                 LEFT JOIN project_entries pe ON u.id = pe.user_id 
                     AND pe.log_date >= $1 AND pe.log_date <= $2
                 WHERE u.status = 'active' AND u.user_role != 'super_admin'
-                GROUP BY u.id
+                GROUP BY u.id, mgr.email, mgr.first_name
             `, [startStr, endStr]);
+
+            // Map to store summary data per manager: managerEmail -> { name, submissions: [], failures: [] }
+            const managerSummaries = new Map<string, any>();
 
             for (const u of res.rows) {
                 const hours = parseFloat(u.total_hours);
+                const employeeInfo = { name: u.first_name, hours };
 
                 if (hours >= 40) {
-                    // Criteria Met: Submit
                     await client.query(`
                         UPDATE project_entries 
                         SET log_status = 'submitted', updated_at = CURRENT_TIMESTAMP
@@ -620,36 +652,49 @@ export class TimesheetService {
 
                     logger.info(`[Timesheet] User ${u.id} Auto-Submitted (${hours} hrs)`);
 
-                    // Notify Manager
-                    if (u.reporting_manager_id) {
-                        const mgrRes = await client.query('SELECT email FROM users WHERE id = $1', [u.reporting_manager_id]);
-                        if (mgrRes.rows.length > 0) {
-                            await sendTimesheetSubmissionEmail(mgrRes.rows[0].email, {
-                                employeeName: u.first_name,
-                                hoursLogged: hours,
-                                startDate: startStr,
-                                endDate: endStr
-                            });
+                    if (u.manager_email) {
+                        if (!managerSummaries.has(u.manager_email)) {
+                            managerSummaries.set(u.manager_email, { name: u.manager_name, submissions: [], failures: [] });
                         }
+                        managerSummaries.get(u.manager_email).submissions.push(employeeInfo);
                     }
-
                 } else {
-                    // Criteria Not Met: Warn User
                     await sendTimesheetReminderEmail(u.email, {
                         employeeName: u.first_name,
                         reminderType: 'criteria_not_met',
                         hoursLogged: hours
                     });
                     logger.info(`[Timesheet] User ${u.id} Not Submitted (<40h). Warning sent.`);
+
+                    if (u.manager_email) {
+                        if (!managerSummaries.has(u.manager_email)) {
+                            managerSummaries.set(u.manager_email, { name: u.manager_name, submissions: [], failures: [] });
+                        }
+                        managerSummaries.get(u.manager_email).failures.push(employeeInfo);
+                    }
                 }
             }
 
-            await client.query('COMMIT');
+            // Send consolidated emails to managers
+            for (const [email, data] of managerSummaries.entries()) {
+                await import('../utils/emailTemplates').then(m =>
+                    m.sendTimesheetSummaryEmail(email, {
+                        managerName: data.name,
+                        startDate: startStr,
+                        endDate: endStr,
+                        submissions: data.submissions,
+                        failures: data.failures
+                    })
+                );
+                logger.info(`[Timesheet] Summary email sent to manager: ${email}`);
+            }
+
+            if (client) await client.query('COMMIT');
         } catch (e) {
-            await client.query('ROLLBACK');
+            if (client) await client.query('ROLLBACK');
             logger.error('[Timesheet] Submission Error', e);
         } finally {
-            client.release();
+            if (client) client.release();
         }
     }
 

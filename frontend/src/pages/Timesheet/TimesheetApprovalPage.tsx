@@ -23,12 +23,22 @@ export const TimesheetApprovalPage: React.FC = () => {
     const { showSuccess, showError } = useToast();
 
     // -- Date Logic --
-    // Default to previous week (Managers only see past/submitted weeks)
+    // Default week logic:
+    // Before Sunday 9 PM -> Default to Previous Week
+    // After Sunday 9 PM -> Default to Current Week (just submitted)
     const [currentDate, setCurrentDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - 7);
+        const now = new Date();
+        const day = now.getDay(); // 0 = Sunday
+        const hour = now.getHours();
+
+        const d = new Date(now);
+        // If it's NOT Sunday, or it IS Sunday but before 9 PM (21:00)
+        if (day !== 0 || hour < 21) {
+            d.setDate(d.getDate() - 7); // Show previous week
+        }
         return d;
     });
+
     // Initialize selectedDate to today's string format
     const [selectedDate, setSelectedDate] = useState(() => {
         const d = new Date();
@@ -149,8 +159,17 @@ export const TimesheetApprovalPage: React.FC = () => {
             const data = await timesheetService.getMemberEntries(userId, startStr, endStr);
             setMemberEntries(data);
         } catch (err: any) {
-            showError('Failed to load user timesheet');
-            setSelectedMemberId(null); // Reset selection on error
+            console.error('[ApprovalPage] Fetch Member error:', err);
+            const status = err.response?.status;
+            if (status === 401) {
+                showError('Your session has expired. Please log in again.');
+            } else if (status === 403) {
+                showError('You are not authorized to view this user\'s timesheet.');
+            } else {
+                showError('Unable to load member timesheet. Please try again.');
+            }
+            // Keep the selection but clear entries to show empty/error state
+            setMemberEntries([]);
         } finally {
             setLoadingEntries(false);
         }
@@ -293,15 +312,27 @@ export const TimesheetApprovalPage: React.FC = () => {
                                 className="nav-btn"
                                 onClick={() => changeWeek(1)}
                                 disabled={(() => {
-                                    const nextWeekEnd = new Date(weekRange.end);
-                                    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-                                    return nextWeekEnd >= new Date();
+                                    const today = new Date();
+                                    const { start: currentWeekStart } = getWeekRange(today);
+                                    currentWeekStart.setHours(0, 0, 0, 0);
+
+                                    const viewWeekStart = new Date(weekDays[0]);
+                                    viewWeekStart.setDate(viewWeekStart.getDate() + 7); // Start of NEXT week
+                                    viewWeekStart.setHours(0, 0, 0, 0);
+
+                                    return viewWeekStart > today;
                                 })()}
                                 style={{
                                     opacity: (() => {
-                                        const nextWeekEnd = new Date(weekRange.end);
-                                        nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-                                        return nextWeekEnd >= new Date();
+                                        const today = new Date();
+                                        const { start: currentWeekStart } = getWeekRange(today);
+                                        currentWeekStart.setHours(0, 0, 0, 0);
+
+                                        const viewWeekStart = new Date(weekDays[0]);
+                                        viewWeekStart.setDate(viewWeekStart.getDate() + 7);
+                                        viewWeekStart.setHours(0, 0, 0, 0);
+
+                                        return viewWeekStart > today;
                                     })() ? 0.3 : 1, cursor: 'pointer'
                                 }}
                             >

@@ -61,10 +61,25 @@ export const TimesheetPage: React.FC = () => {
         const viewWeekStart = new Date(weekRange.start);
         viewWeekStart.setHours(0, 0, 0, 0);
 
-        // Strict: Only Current Week (or future, effectively limited by max date)
-        // Previous weeks are locked for NEW logs.
-        return viewWeekStart.getTime() >= currentWeekStart.getTime();
+        const prevWeekStart = new Date(currentWeekStart);
+        prevWeekStart.setDate(currentWeekStart.getDate() - 7);
+
+        // Allow Current Week AND the immediately preceding week (Past 1 week)
+        return viewWeekStart.getTime() >= prevWeekStart.getTime();
     }, [weekRange]);
+
+    const isWeekLocked = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPastWeek = weekRange.end < today;
+
+        if (!isPastWeek) return false;
+
+        // Check if any entry for the week is submitted or approved
+        // This ensures if the user manually submitted, they can't add more logs
+        // unless it was rejected (in which case status = 'rejected')
+        return entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
+    }, [weekRange, entries]);
 
     // Form State
     const initialFormState = {
@@ -333,6 +348,20 @@ export const TimesheetPage: React.FC = () => {
 
 
 
+    // Validation for Form Completion
+    const isFormValid = useMemo(() => {
+        return (
+            formData.project_id !== '' &&
+            formData.module_id !== '' &&
+            formData.task_id !== '' &&
+            formData.activity_id !== '' &&
+            formData.duration !== '' &&
+            parseFloat(formData.duration) > 0 &&
+            formData.work_status !== '' &&
+            formData.description.trim() !== ''
+        );
+    }, [formData]);
+
     // Dropdown Empty State Component
     const DropdownEmptyState = ({ message }: { message: string }) => (
         <div className="ts-dropdown-empty-state">
@@ -432,7 +461,24 @@ export const TimesheetPage: React.FC = () => {
                                 </div>
                                 {!isWeekEditable && !editingId && <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Locked</span>}
                             </div>
-                            <fieldset disabled={!isWeekEditable && !editingId} style={{ border: 'none', padding: 0, margin: 0 }}>
+                            <fieldset disabled={(!isWeekEditable && !editingId) || (isWeekLocked && !editingId)} style={{ border: 'none', padding: 0, margin: 0 }}>
+                                {isWeekLocked && !editingId && (
+                                    <div className="ts-form-locked-banner" style={{
+                                        fontSize: '12px',
+                                        color: '#b45309',
+                                        backgroundColor: '#fffbeb',
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #fde68a',
+                                        marginBottom: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <Clock size={14} />
+                                        This week's timesheet is already submitted or approved.
+                                    </div>
+                                )}
                                 <form onSubmit={handleSubmit}>
                                     {/* Date */}
                                     <div className="ts-form-group">
@@ -506,6 +552,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {modules.find(m => String(m.id) === formData.module_id)?.name || 'Select Module'}
@@ -540,6 +599,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {tasks.find(t => String(t.id) === formData.task_id)?.name || 'Select Task'}
@@ -574,6 +646,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {activities.find(a => String(a.id) === formData.activity_id)?.name || 'Select Activity'}
@@ -623,6 +708,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {formData.work_status === 'in_progress' ? 'In Progress' :
@@ -681,7 +779,7 @@ export const TimesheetPage: React.FC = () => {
                                                 Cancel Edit
                                             </button>
                                         )}
-                                        <button type="submit" className="ts-submit-btn" disabled={loading || (!isWeekEditable && !editingId)}>
+                                        <button type="submit" className="ts-submit-btn" disabled={loading || (!isWeekEditable && !editingId) || !isFormValid}>
                                             <Save size={18} />
                                             {editingId ? 'Update' : 'Log Time'}
                                         </button>

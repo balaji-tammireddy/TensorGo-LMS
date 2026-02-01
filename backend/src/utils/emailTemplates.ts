@@ -2054,3 +2054,76 @@ export const sendTimesheetSubmissionEmail = async (
   });
 };
 
+export interface TimesheetSummaryEmailData {
+  managerName: string;
+  startDate: string;
+  endDate: string;
+  submissions: Array<{ name: string; hours: number }>;
+  failures: Array<{ name: string; hours: number }>;
+}
+
+/**
+ * Send Timesheet Summary Email (to Manager)
+ */
+export const sendTimesheetSummaryEmail = async (
+  managerEmail: string,
+  data: TimesheetSummaryEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const title = 'Weekly Timesheet Summary';
+
+  const submissionRows = data.submissions.length > 0
+    ? data.submissions.map(s => `<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${s.name}</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${s.hours}h</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #166534; font-weight: bold; text-align: right;">SUBMITTED</td></tr>`).join('')
+    : '<tr><td colspan="3" style="padding: 12px; color: #64748b; text-align: center;">No auto-submissions</td></tr>';
+
+  const failureRows = data.failures.length > 0
+    ? data.failures.map(f => `<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${f.name}</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.hours}h</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #991b1b; font-weight: bold; text-align: right;">FAILED</td></tr>`).join('')
+    : '<tr><td colspan="3" style="padding: 12px; color: #64748b; text-align: center;">None</td></tr>';
+
+  const content = `
+    <p>Dear ${data.managerName || 'Manager'},</p>
+    <p>Here is the weekly timesheet status summary for your team for the period <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong>.</p>
+    
+    <h3 style="margin: 30px 0 10px 0; font-size: 16px; color: #1e3a8a;">Auto-Submissions (Confirmed)</h3>
+    <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #f8fafc;">
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: left;">Employee</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Hours</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${submissionRows}
+      </tbody>
+    </table>
+
+    <h3 style="margin: 30px 0 10px 0; font-size: 16px; color: #991b1b;">Missed Submissions (Action Required)</h3>
+    <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #f8fafc;">
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: left;">Employee</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Hours</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${failureRows}
+      </tbody>
+    </table>
+
+    <p style="margin-top: 30px;">Please log in to the portal to review the submitted timesheets or follow up with employees who missed the deadline.</p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
+  `;
+
+  return await sendEmail({
+    to: managerEmail,
+    subject: `Weekly Timesheet Summary [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, 'Weekly timesheet submission summary for your team'),
+    text: `Weekly Timesheet Summary\n\nPeriod: ${data.startDate} to ${data.endDate}\n\nSubmissions:\n${data.submissions.map(s => `${s.name}: ${s.hours}h (SUBMITTED)`).join('\n')}\n\nFailures:\n${data.failures.map(f => `${f.name}: ${f.hours}h (FAILED)`).join('\n')}`
+  });
+};
+
