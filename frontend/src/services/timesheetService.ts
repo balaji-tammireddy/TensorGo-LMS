@@ -19,6 +19,7 @@ export interface TimesheetEntry {
     manager_comment?: string;
     is_late?: boolean;
     is_resubmission?: boolean;
+    is_system?: boolean;
 }
 
 export const timesheetService = {

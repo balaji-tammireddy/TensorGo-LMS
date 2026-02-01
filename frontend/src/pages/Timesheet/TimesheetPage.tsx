@@ -1,6 +1,17 @@
 /* v1.0.1 - Corrected Holiday Date Logic & Premium Cards */
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Save, Trash2, Edit2, Clock, FileText, ChevronDown } from 'lucide-react';
+import {
+    Clock,
+    ChevronLeft,
+    ChevronRight,
+    Save,
+    FileText,
+    Edit2,
+    Trash2,
+    ChevronDown,
+    Lock // Added Lock
+} from 'lucide-react';
+
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetEntry } from '../../services/timesheetService';
@@ -96,6 +107,12 @@ export const TimesheetPage: React.FC = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+
+    // Helper to check if project is active
+    const isActiveProject = (projectId: number) => {
+        const proj = projects.find(p => p.id === projectId);
+        return proj ? proj.status === 'active' : true;
+    };
 
     // Initial Load
     useEffect(() => {
@@ -908,9 +925,6 @@ export const TimesheetPage: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 dayEntries.map(entry => {
-                                                    const isEditable = !entry.project_name?.includes('System') && (
-                                                        entry.log_status === 'rejected' || (isWeekEditable && entry.log_status === 'draft')
-                                                    );
                                                     const formattedDesc = entry.description?.length > 100
                                                         ? entry.description.substring(0, 100) + '...'
                                                         : entry.description;
@@ -951,30 +965,36 @@ export const TimesheetPage: React.FC = () => {
                                                                     <div className="status-pill pill-progress">
                                                                         {entry.work_status.replace('_', ' ')}
                                                                     </div>
-                                                                    <div className={`status-pill pill-status status-${entry.log_status || 'draft'}`}>
-                                                                        {entry.log_status || 'draft'}
-                                                                    </div>
+                                                                    <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
+                                                                    {/* Show Lock Icon for System Entries */}
+                                                                    {entry.project_name?.includes('System') && (
+                                                                        <span className="status-pill info" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>
+                                                                            <Lock size={12} /> System
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
-                                                            <div className="entry-actions-sidebar">
-                                                                <button
-                                                                    className="action-btn-styled edit"
-                                                                    onClick={() => handleEdit(entry)}
-                                                                    disabled={!isEditable}
-                                                                    title={isEditable ? "Edit Entry" : "Status doesn't allow editing"}
-                                                                >
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button
-                                                                    className="action-btn-styled delete"
-                                                                    onClick={() => handleDeleteClick(entry.id!)}
-                                                                    disabled={!isEditable}
-                                                                    title={isEditable ? "Delete Entry" : "Status doesn't allow deleting"}
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
+                                                            {/* Only show actions if NOT System/Holiday and not approved (unless re-opening logic exists) */}
+                                                            {!entry.is_system && !entry.project_name?.includes('System') && entry.log_status !== 'approved' && entry.log_status !== 'rejected' && (
+                                                                <div className="entry-actions-sidebar">
+                                                                    <button
+                                                                        className="action-btn-styled edit"
+                                                                        onClick={() => handleEdit(entry)}
+                                                                        title="Edit"
+                                                                        disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0} // 0 is system, but we hide it anyway
+                                                                    >
+                                                                        <Edit2 size={16} />
+                                                                    </button>
+                                                                    <button
+                                                                        className="action-btn-styled delete"
+                                                                        onClick={() => handleDeleteClick(entry.id!)}
+                                                                        title="Delete"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })

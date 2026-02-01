@@ -14,6 +14,7 @@ interface TeamMemberStatus {
     name: string;
     emp_id: string;
     designation: string;
+    reporting_manager_id: number;
     total_hours: number;
     status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'pending_submission';
     is_late: boolean;
@@ -211,13 +212,6 @@ export const TimesheetApprovalPage: React.FC = () => {
         setRejectModalOpen(true);
     };
 
-    const handleRejectClick = (entryId: number) => {
-        setEntryToReject(entryId);
-        setRejectDateStr(null);
-        setRejectionReason('');
-        setRejectModalOpen(true);
-    };
-
     const confirmReject = async () => {
         if ((!entryToReject && !rejectDateStr) || !rejectionReason.trim()) {
             showError('Please provide a reason');
@@ -286,6 +280,7 @@ export const TimesheetApprovalPage: React.FC = () => {
     };
 
     const selectedMember = teamMembers.find(m => m.id === selectedMemberId);
+    const isReportingManager = selectedMember && String(selectedMember.reporting_manager_id) === String(user?.id);
 
     return (
         <AppLayout>
@@ -459,6 +454,10 @@ export const TimesheetApprovalPage: React.FC = () => {
                                             return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>No Logs</div>;
                                         }
 
+                                        if (!isReportingManager) {
+                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>Read Only Mode</div>;
+                                        }
+
                                         const hasPending = memberEntries.some(e => e.log_status !== 'approved');
                                         if (hasPending) {
                                             return (
@@ -593,7 +592,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                 {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
 
                                                                 {/* Day Actions */}
-                                                                {selectedMemberId !== user?.id && dayEntries.length > 0 && (
+                                                                {isReportingManager && dayEntries.length > 0 && (
                                                                     <div className="day-actions" style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
                                                                         {/* Only show Approve/Reject if there are pending entries and NOT only system entries */}
                                                                         {dayEntries.some(e => e.log_status !== 'approved' && !e.project_name?.includes('System')) && (
@@ -662,20 +661,6 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                         {entry.is_resubmission && <span className="status-pill info" style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>Resubmission</span>}
                                                                     </div>
                                                                 </div>
-                                                                {entry.log_status !== 'approved' && entry.log_status !== 'rejected' && !entry.project_name?.includes('System') && (
-                                                                    <div className="entry-actions-sidebar">
-                                                                        {/* Removed Individual Approval as per plan */}
-                                                                        <button
-                                                                            className="action-btn-styled delete"
-                                                                            title="Reject"
-                                                                            onClick={() => {
-                                                                                if (entry.id) handleRejectClick(entry.id);
-                                                                            }}
-                                                                        >
-                                                                            <XCircle size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         ))
                                                     )}
@@ -707,7 +692,6 @@ export const TimesheetApprovalPage: React.FC = () => {
                             style={{ minHeight: '80px' }}
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
-                            placeholder="e.g. Invalid task allocation"
                         />
                     </div>
                 </Modal>

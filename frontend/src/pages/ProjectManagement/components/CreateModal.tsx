@@ -19,7 +19,7 @@ interface CreateModalProps {
     onClose: () => void;
     type: 'project' | 'module' | 'task' | 'activity';
     parentId?: number;
-    onSuccess: () => void;
+    onSuccess: (data?: any) => void;
     initialData?: any;
     isEdit?: boolean;
     projectManagerId?: number;
@@ -119,17 +119,24 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
+
+        // Strict Validation for Project Creation
+        if (type === 'project' && !formData.project_manager_id) {
+            showError('Please select a Project Manager');
+            return;
+        }
 
         try {
+            setLoading(true);
+            let result: any;
+
             // Sanitize payload: Remove empty strings for optional fields like due_date to prevent DB errors
-            const payload: any = { ...formData };
-            if (payload.due_date === '') payload.due_date = undefined;
+            const basePayload: any = { ...formData };
+            if (basePayload.due_date === '') basePayload.due_date = undefined;
 
             if (type === 'project') {
-                if (!payload.project_manager_id) {
-                    throw new Error('Please select a Project Manager');
-                }
+                const payload = { ...basePayload }; // Use basePayload for project specific modifications
+                // The previous check `if (!payload.project_manager_id)` is now handled by the strict validation above.
 
                 if (isEdit && initialData?.id) {
                     // STRICT: Only Super Admin can edit project metadata
@@ -143,9 +150,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         project_manager_id: parseInt(payload.project_manager_id)
                     };
 
-                    await projectService.updateProject(initialData.id, updateData);
+                    result = await projectService.updateProject(initialData.id, updateData);
                 } else {
-                    await projectService.createProject({
+                    result = await projectService.createProject({
                         ...payload,
                         project_manager_id: parseInt(payload.project_manager_id),
                         start_date: undefined,
@@ -153,51 +160,54 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     });
                 }
             } else if (type === 'module' && parentId) {
+                const payload = { ...basePayload };
                 // STRICT: Only Project Manager can add/edit modules
                 const isPM = projectManagerId === user?.id;
                 if (!isPM) throw new Error('Only the Project Manager can manage modules');
 
                 if (isEdit && initialData?.id) {
                     // Omit assigneeIds to prevent updating access
-                    await projectService.updateModule(initialData.id, {
+                    result = await projectService.updateModule(initialData.id, {
                         ...payload,
                         assigneeIds: undefined
                     });
                 } else {
-                    await projectService.createModule(parentId, {
+                    result = await projectService.createModule(parentId, {
                         ...payload,
                         assigneeIds: undefined
                     });
                 }
             } else if (type === 'task' && parentId) {
+                const payload = { ...basePayload };
                 // STRICT: Only Project Manager can add/edit tasks
                 const isPM = projectManagerId === user?.id;
                 if (!isPM) throw new Error('Only the Project Manager can manage tasks');
 
                 if (isEdit && initialData?.id) {
                     // Payload sanitization ensures due_date is undefined if empty, preventing 500 error
-                    await projectService.updateTask(initialData.id, {
+                    result = await projectService.updateTask(initialData.id, {
                         ...payload,
                         assigneeIds: undefined
                     });
                 } else {
-                    await projectService.createTask(parentId, {
+                    result = await projectService.createTask(parentId, {
                         ...payload,
                         assigneeIds: undefined
                     });
                 }
             } else if (type === 'activity' && (parentId || initialData?.id)) {
+                const payload = { ...basePayload };
                 // STRICT: Only Project Manager can add/edit activities
                 const isPM = projectManagerId === user?.id;
                 if (!isPM) throw new Error('Only the Project Manager can manage activities');
 
                 if (isEdit && initialData?.id) {
-                    await projectService.updateActivity(initialData.id, {
+                    result = await projectService.updateActivity(initialData.id, {
                         ...payload,
                         assigneeIds: undefined
                     });
                 } else {
-                    await projectService.createActivity(parentId!, {
+                    result = await projectService.createActivity(parentId!, {
                         ...payload,
                         assigneeIds: undefined
                     });
@@ -205,7 +215,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             }
 
             showSuccess(`${type.charAt(0).toUpperCase() + type.slice(1)} ${isEdit ? 'updated' : 'created'} successfully`);
-            onSuccess();
+            onSuccess(result);
             onClose();
         } catch (err: any) {
             showError(err.message || 'Failed to save item');
@@ -240,7 +250,13 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     const NAME_LIMIT = 20;
     const DESC_LIMIT = 200;
 
-    // Helper for Title Case
+    // Helper for Sentence Case (First letter capitalized)
+    const toSentenceCase = (str: string) => {
+        if (!str) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+
+    // Helper for Title Case (kept for Name/other fields)
     const toTitleCase = (str: string) => {
         return str.replace(/\b\w/g, (char) => char.toUpperCase());
     };
@@ -253,6 +269,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             default: return role;
         }
     };
+
+    // ... (rest of the file)
+
 
     const filteredManagers = managers.filter(m =>
         m.name.toLowerCase().includes(managerSearch.toLowerCase()) ||
@@ -322,8 +341,10 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                 rows={5}
                                 value={formData.description}
                                 onChange={e => {
-                                    if (e.target.value.length <= DESC_LIMIT) {
-                                        setFormData({ ...formData, description: toTitleCase(e.target.value) });
+                                    const val = e.target.value;
+                                    if (val.length <= DESC_LIMIT) {
+                                        // Only enforce sentence case (first letter capital)
+                                        setFormData({ ...formData, description: toSentenceCase(val) });
                                     }
                                 }}
                                 disabled={isEdit && type === 'project' && !canEditMetadata}
