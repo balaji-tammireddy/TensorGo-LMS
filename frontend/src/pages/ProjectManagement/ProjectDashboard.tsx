@@ -102,6 +102,13 @@ const ProjectListSection = ({
                             ))}
                         </div>
                     )}
+                    {projects.length > 0 && (
+                        <div className="section-footer-row">
+                            <span className="project-count-badge">
+                                {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

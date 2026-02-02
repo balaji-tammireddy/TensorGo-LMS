@@ -881,14 +881,8 @@ export class ProjectService {
     `;
 
     if (!isGlobalViewer) {
-      // For PM/Members, ensure they have access (matching getProjectsForUser dynamic visibility)
+      // STRICT: Only the Project Manager or a direct Team Member can access
       queryStr = `
-        WITH RECURSIVE reporting_path AS (
-          SELECT id, reporting_manager_id FROM users WHERE id = $1
-          UNION ALL
-          SELECT u.id, u.reporting_manager_id FROM users u
-          JOIN reporting_path rp ON u.id = rp.reporting_manager_id
-        )
         SELECT p.*, 
                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
                (p.project_manager_id = $1) as is_pm,
@@ -897,13 +891,8 @@ export class ProjectService {
         LEFT JOIN users u ON p.project_manager_id = u.id
         WHERE p.id = $2
         AND (
-          p.project_manager_id IN (SELECT id FROM reporting_path)
-          OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id IN (SELECT id FROM reporting_path))
-          OR EXISTS (
-            SELECT 1 FROM project_modules m 
-            JOIN module_access ma ON m.id = ma.module_id 
-            WHERE m.project_id = p.id AND ma.user_id IN (SELECT id FROM reporting_path)
-          )
+          p.project_manager_id = $1
+          OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1)
         )
       `;
     }
@@ -928,53 +917,20 @@ export class ProjectService {
       );
     }
 
-    // PM and Members: Show projects where they OR their reporting managers OR their subordinates have access
-    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing dynamic inheritance query`);
+    // PM and Members: Show ONLY projects where they are the PM or are added as a member
+    // Note: Subordinates are automatically added as members via syncAllProjectTeams, 
+    // but higher authorities are not, correctly excluding them from the "My Projects" list.
+    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing strict PM/Member visibility query`);
     const res = await query(
-      `WITH RECURSIVE upward AS (
-          SELECT id, reporting_manager_id FROM users WHERE id = $1
-          UNION ALL
-          SELECT u.id, u.reporting_manager_id FROM users u
-          JOIN upward ON u.id = upward.reporting_manager_id
-       ),
-       downward AS (
-          SELECT id, reporting_manager_id FROM users WHERE id = $1
-          UNION ALL
-          SELECT u.id, u.reporting_manager_id FROM users u
-          JOIN downward ON u.reporting_manager_id = downward.id
-       ),
-       hierarchy AS (
-          SELECT id FROM upward
-          UNION
-          SELECT id FROM downward
-       )
-       SELECT DISTINCT p.*, 
-                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
-                (p.project_manager_id = $1) as is_pm,
-                EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+      `SELECT p.*, 
+              COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
+              (p.project_manager_id = $1) as is_pm,
+              EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
        FROM projects p
        LEFT JOIN users u ON p.project_manager_id = u.id
        WHERE 
-          p.project_manager_id IN (SELECT id FROM hierarchy)
-          OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id IN (SELECT id FROM hierarchy))
-          OR EXISTS (
-            SELECT 1 FROM project_modules m 
-            JOIN module_access ma ON m.id = ma.module_id 
-            WHERE m.project_id = p.id AND ma.user_id IN (SELECT id FROM hierarchy)
-          )
-          OR EXISTS (
-            SELECT 1 FROM project_modules m 
-            JOIN project_tasks t ON m.id = t.module_id
-            JOIN task_access ta ON t.id = ta.task_id
-            WHERE m.project_id = p.id AND ta.user_id IN (SELECT id FROM hierarchy)
-          )
-          OR EXISTS (
-            SELECT 1 FROM project_modules m 
-            JOIN project_tasks t ON m.id = t.module_id
-            JOIN project_activities a ON t.id = a.task_id
-            JOIN activity_access aa ON a.id = aa.activity_id
-            WHERE m.project_id = p.id AND aa.user_id IN (SELECT id FROM hierarchy)
-          )
+          p.project_manager_id = $1
+          OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $1)
        ORDER BY p.created_at DESC`,
       [userId]
     );
@@ -983,317 +939,207 @@ export class ProjectService {
   }
 
   static async getModulesForProject(projectId: number, userId: number, role: string) {
-    // 1. Check if user OR their subordinates are PM of this project
-    const projectCheck = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
-      SELECT 1 FROM projects WHERE id = $2 AND project_manager_id IN (SELECT id FROM hierarchy)
-    `, [userId, projectId]);
-
-    const isInheritedPM = projectCheck.rows.length > 0;
     const isGlobal = role === 'super_admin';
 
-    if (isInheritedPM || isGlobal) {
-      return query(`
-        SELECT m.*, 
-               (SELECT json_agg(u_agg) FROM (
-                  SELECT u.id, 
-                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM module_access ma 
-                  JOIN users u ON ma.user_id = u.id 
-                  JOIN project_modules pm2 ON ma.module_id = pm2.id
-                  JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE ma.module_id = m.id
-                  UNION
-                  SELECT u3.id, 
-                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
-                         0 as sort_order
-                  FROM projects p3
-                  JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE p3.id = m.project_id
-                  ORDER BY sort_order, name
-                ) u_agg) as assigned_users
-        FROM project_modules m 
-        WHERE m.project_id = $1 
-        ORDER BY m.custom_id`, [projectId]);
+    // 1. Check if user is the PM or a member of the project
+    const projectCheck = await query(`
+    SELECT 1 FROM projects p
+    WHERE p.id = $1 AND (
+      p.project_manager_id = $2
+      OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $2)
+    )
+  `, [projectId, userId]);
+
+    const hasProjectAccess = projectCheck.rows.length > 0;
+
+    if (!hasProjectAccess && !isGlobal) {
+      throw new Error('Access denied: You are not a member of this project');
     }
 
-    // Regular Members: Show ONLY modules they have access to (including inherited)
+    // Common user aggregator for both branches
+    const assignedUsersSubquery = `
+    (SELECT json_agg(u_agg) FROM (
+      SELECT u.id, 
+             COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+             UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
+             CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+      FROM module_access ma 
+      JOIN users u ON ma.user_id = u.id 
+      JOIN project_modules pm2 ON ma.module_id = pm2.id
+      JOIN projects p2 ON pm2.project_id = p2.id
+      WHERE ma.module_id = m.id
+      UNION
+      SELECT u3.id, 
+             COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+             UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
+             0 as sort_order
+      FROM projects p3
+      JOIN users u3 ON p3.project_manager_id = u3.id
+      WHERE p3.id = m.project_id
+      ORDER BY sort_order, name
+    ) u_agg) as assigned_users
+  `;
+
+    // PM and Admins see ALL modules in the project
+    const isPM = await query(`SELECT 1 FROM projects WHERE id = $1 AND project_manager_id = $2`, [projectId, userId]);
+
+    if (isPM.rows.length > 0 || isGlobal) {
+      return query(`
+      SELECT m.*, ${assignedUsersSubquery}
+      FROM project_modules m 
+      WHERE m.project_id = $1 
+      ORDER BY m.custom_id`, [projectId]
+      );
+    }
+
+    // Regular Members: Show ONLY modules they have explicit access to
     return query(
-      `SELECT m.*, 
-              (SELECT json_agg(u_agg) FROM (
-                  SELECT u.id, 
-                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM module_access ma2
-                  JOIN users u ON ma2.user_id = u.id 
-                  JOIN project_modules pm2 ON ma2.module_id = pm2.id
-                  JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE ma2.module_id = m.id
-                  UNION
-                  SELECT u3.id, 
-                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
-                         0 as sort_order
-                  FROM projects p3
-                  JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE p3.id = m.project_id
-                  ORDER BY sort_order, name
-                ) u_agg) as assigned_users
-       FROM project_modules m
-       LEFT JOIN module_access ma ON m.id = ma.module_id
-       WHERE m.project_id = $1 
-       AND (
-         ma.user_id IN (
-            WITH RECURSIVE hierarchy AS (
-              SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
-              UNION ALL
-              SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
-              UNION ALL
-              SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
-            )
-            SELECT id FROM hierarchy
-         )
-         OR EXISTS (
-            SELECT 1 FROM projects p 
-            WHERE p.id = $1 AND p.project_manager_id IN (
-              WITH RECURSIVE hierarchy AS (
-                SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
-                UNION ALL
-                SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
-                UNION ALL
-                SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
-              )
-              SELECT id FROM hierarchy
-            )
-         )
-       )
-       ORDER BY m.custom_id`,
+      `SELECT m.*, ${assignedUsersSubquery}
+     FROM project_modules m
+     JOIN module_access ma ON m.id = ma.module_id
+     WHERE m.project_id = $1 
+     AND ma.user_id = $2
+     ORDER BY m.custom_id`,
       [projectId, userId]
     );
   }
 
-  static async getTasksForModule(moduleId: number, userId: number, role: string) {
-    // 1. Check if user OR their subordinates are PM of the parent project
-    const projectCheck = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
-      SELECT 1 FROM projects p
-      JOIN project_modules m ON p.id = m.project_id
-      WHERE m.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy)
-    `, [userId, moduleId]);
 
-    const isInheritedPM = projectCheck.rows.length > 0;
+  static async getTasksForModule(moduleId: number, userId: number, role: string) {
     const isGlobal = role === 'super_admin';
 
-    if (isInheritedPM || isGlobal) {
-      return query(
-        `SELECT t.*, 
-                EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2) as is_assigned,
-                (SELECT json_agg(u_agg) FROM (
-                  SELECT u.id, 
-                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM task_access ta2
-                  JOIN users u ON ta2.user_id = u.id 
-                  JOIN project_tasks pt2 ON ta2.task_id = pt2.id
-                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
-                  JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE ta2.task_id = t.id
-                  UNION
-                  SELECT u3.id, 
-                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
-                         0 as sort_order
-                  FROM project_modules pm3
-                  JOIN projects p3 ON pm3.project_id = p3.id
-                  JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE pm3.id = t.module_id
-                  ORDER BY sort_order, name
-                ) u_agg) as assigned_users
-         FROM project_tasks t 
-         WHERE t.module_id = $1 
-         ORDER BY t.custom_id`,
-        [moduleId, userId]
+    // 1. Get the parent project ID and check if user is PM or Member
+    const projectCheck = await query(`
+      SELECT p.id, p.project_manager_id FROM projects p
+      JOIN project_modules m ON p.id = m.project_id
+      WHERE m.id = $1 
+      AND (
+        p.project_manager_id = $2
+        OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $2)
+        OR $3 = true
+      )
+    `, [moduleId, userId, isGlobal]);
+
+    if (projectCheck.rows.length === 0) {
+      throw new Error('Access denied: You do not have access to this project');
+    }
+
+    const { project_manager_id } = projectCheck.rows[0];
+    const isPM = project_manager_id === userId || isGlobal;
+
+    // Common user aggregator
+    const assignedUsersSubquery = `
+      (SELECT json_agg(u_agg) FROM (
+        SELECT u.id, 
+               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+               UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
+               CASE WHEN u.id = $3 THEN 0 ELSE 1 END as sort_order
+        FROM task_access ta2
+        JOIN users u ON ta2.user_id = u.id 
+        WHERE ta2.task_id = t.id
+        UNION
+        SELECT u3.id, 
+               COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+               UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
+               0 as sort_order
+        FROM users u3
+        WHERE u3.id = $3
+        ORDER BY sort_order, name
+      ) u_agg) as assigned_users
+    `;
+
+    if (isPM) {
+      // PMs and Super Admins see ALL tasks in the module
+      return query(`
+        SELECT t.*, 
+               EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2) as is_assigned,
+               ${assignedUsersSubquery}
+        FROM project_tasks t 
+        WHERE t.module_id = $1 
+        ORDER BY t.custom_id`,
+        [moduleId, userId, project_manager_id]
       );
     }
 
-    // 2. Regular Members: Show ONLY tasks they have access to (including inherited)
+    // Regular Members: Show ONLY tasks they have explicit access to
     return query(
       `SELECT t.*, true as is_assigned,
-              (SELECT json_agg(u_agg) FROM (
-                  SELECT u.id, 
-                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM task_access ta2
-                  JOIN users u ON ta2.user_id = u.id 
-                  JOIN project_tasks pt2 ON ta2.task_id = pt2.id
-                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
-                  JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE ta2.task_id = t.id
-                  UNION
-                  SELECT u3.id, 
-                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
-                         0 as sort_order
-                  FROM project_modules pm3
-                  JOIN projects p3 ON pm3.project_id = p3.id
-                  JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE pm3.id = t.module_id
-                  ORDER BY sort_order, name
-                ) u_agg) as assigned_users
+              ${assignedUsersSubquery}
        FROM project_tasks t
-       LEFT JOIN task_access ta ON t.id = ta.task_id
+       JOIN task_access ta ON t.id = ta.task_id
        WHERE t.module_id = $1
-       AND (
-         ta.user_id IN (
-            WITH RECURSIVE hierarchy AS (
-              SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
-              UNION ALL
-              SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
-              UNION ALL
-              SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
-            )
-            SELECT id FROM hierarchy
-         )
-         OR EXISTS (
-            SELECT 1 FROM projects p
-            JOIN project_modules m ON p.id = m.project_id
-            WHERE m.id = $1 AND p.project_manager_id IN (
-              WITH RECURSIVE hierarchy AS (
-                SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
-                UNION ALL
-                SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
-                UNION ALL
-                SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
-              )
-              SELECT id FROM hierarchy
-            )
-         )
-       )
+       AND ta.user_id = $2
        ORDER BY t.custom_id`,
-      [moduleId, userId]
+      [moduleId, userId, project_manager_id]
     );
   }
 
   static async getActivitiesForTask(taskId: number, userId: number, role: string) {
-    // 1. Check if user OR their subordinates are PM of the parent project
-    const projectCheck = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
-      SELECT 1 FROM projects p
-      JOIN project_modules m ON p.id = m.project_id
-      JOIN project_tasks t ON m.id = t.module_id
-      WHERE t.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy)
-    `, [userId, taskId]);
-
-    const isInheritedPM = projectCheck.rows.length > 0;
     const isGlobal = role === 'super_admin';
 
-    if (isInheritedPM || isGlobal) {
-      return query(`
-        SELECT a.*,
-               (SELECT json_agg(u_agg) FROM (
-                  SELECT u.id, 
-                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM activity_access aa2
-                  JOIN users u ON aa2.user_id = u.id 
-                  JOIN project_activities pa2 ON aa2.activity_id = pa2.id
-                  JOIN project_tasks pt2 ON pa2.task_id = pt2.id
-                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
-                  JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE aa2.activity_id = a.id
-                  UNION
-                  SELECT u3.id, 
-                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
-                         0 as sort_order
-                  FROM project_modules pm3
-                  JOIN projects p3 ON pm3.project_id = p3.id
-                  JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE pm3.id = (SELECT module_id FROM project_tasks WHERE id = a.task_id)
-                  ORDER BY sort_order, name
-                ) u_agg) as assigned_users
-        FROM project_activities a
-        WHERE a.task_id = $1
-        ORDER BY a.custom_id`, [taskId]);
+    // 1. Get the parent project ID and check if user is PM or Member
+    const projectCheck = await query(`
+      SELECT p.id, p.project_manager_id FROM projects p
+      JOIN project_modules m ON p.id = m.project_id
+      JOIN project_tasks t ON m.id = t.module_id
+      WHERE t.id = $1 
+      AND (
+        p.project_manager_id = $2
+        OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $2)
+        OR $3 = true
+      )
+    `, [taskId, userId, isGlobal]);
+
+    if (projectCheck.rows.length === 0) {
+      throw new Error('Access denied: You do not have access to this project');
     }
 
-    // 2. Regular Members: Show ONLY activities they have access to (including inherited)
+    const { project_manager_id } = projectCheck.rows[0];
+    const isPM = project_manager_id === userId || isGlobal;
+
+    // Common user aggregator
+    const assignedUsersSubquery = `
+      (SELECT json_agg(u_agg) FROM (
+        SELECT u.id, 
+               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
+               UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
+               CASE WHEN u.id = $3 THEN 0 ELSE 1 END as sort_order
+        FROM activity_access aa2
+        JOIN users u ON aa2.user_id = u.id 
+        WHERE aa2.activity_id = a.id
+        UNION
+        SELECT u3.id, 
+               COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
+               UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
+               0 as sort_order
+        FROM users u3
+        WHERE u3.id = $3
+        ORDER BY sort_order, name
+      ) u_agg) as assigned_users
+    `;
+
+    if (isPM) {
+      // PMs and Super Admins see ALL activities in the task
+      return query(`
+        SELECT a.*,
+               ${assignedUsersSubquery}
+        FROM project_activities a
+        WHERE a.task_id = $1
+        ORDER BY a.custom_id`,
+        [taskId, userId, project_manager_id]
+      );
+    }
+
+    // Regular Members: Show ONLY activities they have explicit access to
     return query(`
        SELECT a.*,
-              (SELECT json_agg(u_agg) FROM (
-                  SELECT u.id, 
-                         COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-                         CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM activity_access aa2
-                  JOIN users u ON aa2.user_id = u.id 
-                  JOIN project_activities pa2 ON aa2.activity_id = pa2.id
-                  JOIN project_tasks pt2 ON pa2.task_id = pt2.id
-                  JOIN project_modules pm2 ON pt2.module_id = pm2.id
-                  JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE aa2.activity_id = a.id
-                  UNION
-                  SELECT u3.id, 
-                         COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
-                         UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
-                         0 as sort_order
-                  FROM project_modules pm3
-                  JOIN projects p3 ON pm3.project_id = p3.id
-                  JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE pm3.id = (SELECT module_id FROM project_tasks WHERE id = a.task_id)
-                  ORDER BY sort_order, name
-                ) u_agg) as assigned_users
+              ${assignedUsersSubquery}
        FROM project_activities a
-       LEFT JOIN activity_access aa ON a.id = aa.activity_id
+       JOIN activity_access aa ON a.id = aa.activity_id
        WHERE a.task_id = $1
-       AND (
-         aa.user_id IN (
-            WITH RECURSIVE hierarchy AS (
-              SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
-              UNION ALL
-              SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
-              UNION ALL
-              SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
-            )
-            SELECT id FROM hierarchy
-         )
-         OR EXISTS (
-            SELECT 1 FROM projects p
-            JOIN project_modules m ON p.id = m.project_id
-            JOIN project_tasks t ON m.id = t.module_id
-            WHERE t.id = $1 AND p.project_manager_id IN (
-              WITH RECURSIVE hierarchy AS (
-                SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
-                UNION ALL
-                SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
-                UNION ALL
-                SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
-              )
-              SELECT id FROM hierarchy
-            )
-         )
-       )
+       AND aa.user_id = $2
        ORDER BY a.custom_id`,
-      [taskId, userId]
+      [taskId, userId, project_manager_id]
     );
   }
 
@@ -1616,14 +1462,14 @@ export class ProjectService {
 
   static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
     if (role === 'super_admin') return true;
+
+    // STRICT: Only the Project Manager assigned to THIS project can manage modules/tasks
     const res = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
-      SELECT 1 FROM projects WHERE id = $2 AND project_manager_id IN (SELECT id FROM hierarchy) AND status = 'active'
+      SELECT 1 FROM projects 
+      WHERE id = $2 AND project_manager_id = $1 
+      AND status = 'active'
     `, [userId, projectId]);
+
     return res.rows.length > 0;
   }
 
