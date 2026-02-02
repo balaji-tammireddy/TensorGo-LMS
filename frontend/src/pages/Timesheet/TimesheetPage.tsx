@@ -1048,7 +1048,7 @@ export const TimesheetPage: React.FC = () => {
                                                                 )}
 
                                                                 {entry.log_status === 'rejected' && entry.rejection_reason && (
-                                                                    <div style={{ marginTop: '8px', padding: '8px', background: '#fee2e2', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '13px', color: '#b91c1c' }}>
+                                                                    <div className="rejection-box">
                                                                         <strong>Rejection:</strong> {entry.rejection_reason}
                                                                     </div>
                                                                 )}

@@ -941,19 +941,19 @@ export class ProjectService {
   static async getModulesForProject(projectId: number, userId: number, role: string) {
     const isGlobal = role === 'super_admin';
 
-    // 1. Check if user is the PM or a member of the project
+    // 1. Check basic access (PM, Member, or logged time)
     const projectCheck = await query(`
-    SELECT 1 FROM projects p
-    WHERE p.id = $1 AND (
-      p.project_manager_id = $2
-      OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $2)
-    )
-  `, [projectId, userId]);
+      SELECT 1 FROM projects p
+      WHERE p.id = $1::integer AND (
+        p.project_manager_id = $2::integer
+        OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id::integer AND pm.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.project_id = p.id::integer AND te.user_id = $2::integer)
+        OR $3::boolean = true
+      )
+    `, [projectId, userId, isGlobal]);
 
-    const hasProjectAccess = projectCheck.rows.length > 0;
-
-    if (!hasProjectAccess && !isGlobal) {
-      throw new Error('Access denied: You are not a member of this project');
+    if (projectCheck.rows.length === 0 && !isGlobal) {
+      throw new Error('Access denied: You do not have access to this project');
     }
 
     // Common user aggregator for both branches
@@ -962,7 +962,7 @@ export class ProjectService {
       SELECT u.id, 
              COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
              UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-             CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
+             CASE WHEN u.id::integer = p2.project_manager_id::integer THEN 0 ELSE 1 END as sort_order
       FROM module_access ma 
       JOIN users u ON ma.user_id = u.id 
       JOIN project_modules pm2 ON ma.module_id = pm2.id
@@ -981,25 +981,27 @@ export class ProjectService {
   `;
 
     // PM and Admins see ALL modules in the project
-    const isPM = await query(`SELECT 1 FROM projects WHERE id = $1 AND project_manager_id = $2`, [projectId, userId]);
+    const isPMCount = await query(`SELECT 1 FROM projects WHERE id = $1 AND project_manager_id = $2`, [projectId, userId]);
+    const isPM = isPMCount.rows.length > 0 || isGlobal;
 
-    if (isPM.rows.length > 0 || isGlobal) {
+    if (isPM) {
       return query(`
       SELECT m.*, ${assignedUsersSubquery}
       FROM project_modules m 
-      WHERE m.project_id = $1 
+      WHERE m.project_id = $1::integer 
       ORDER BY m.custom_id`, [projectId]
       );
     }
 
-    // Regular Members: Show ONLY modules they have explicit access to
+    // Regular Members: Show modules they have explicit access to OR have logged time to
     return query(
-      `SELECT m.*, ${assignedUsersSubquery}
-     FROM project_modules m
-     JOIN module_access ma ON m.id = ma.module_id
-     WHERE m.project_id = $1 
-     AND ma.user_id = $2
-     ORDER BY m.custom_id`,
+      `SELECT DISTINCT m.id, m.project_id, m.custom_id, m.name, m.description, m.status, m.created_at, m.updated_at, ${assignedUsersSubquery}
+       FROM project_modules m
+       LEFT JOIN module_access ma ON m.id = ma.module_id
+       LEFT JOIN timesheet_entries te ON m.id = te.module_id
+       WHERE m.project_id = $1::integer 
+       AND (ma.user_id = $2::integer OR te.user_id = $2::integer)
+       ORDER BY m.custom_id`,
       [projectId, userId]
     );
   }
@@ -1008,23 +1010,35 @@ export class ProjectService {
   static async getTasksForModule(moduleId: number, userId: number, role: string) {
     const isGlobal = role === 'super_admin';
 
-    // 1. Get the parent project ID and check if user is PM or Member
-    const projectCheck = await query(`
-      SELECT p.id, p.project_manager_id FROM projects p
+    // 1. Get the parent project ID and PM ID
+    const projectInfo = await query(`
+      SELECT p.id as project_id, p.project_manager_id FROM projects p
       JOIN project_modules m ON p.id = m.project_id
-      WHERE m.id = $1 
-      AND (
-        p.project_manager_id = $2
-        OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $2)
-        OR $3 = true
-      )
-    `, [moduleId, userId, isGlobal]);
+      WHERE m.id = $1
+    `, [moduleId]);
 
-    if (projectCheck.rows.length === 0) {
+    if (projectInfo.rows.length === 0) {
+      // If module doesn't exist, return empty (prevents crashing edit form)
+      return { rows: [] };
+    }
+
+    const { project_id, project_manager_id } = projectInfo.rows[0];
+
+    // 2. Check access
+    const hasAccess = await query(`
+      SELECT 1 FROM projects p
+      WHERE p.id = $1::integer AND (
+        p.project_manager_id = $2::integer
+        OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.module_id = $3::integer AND te.user_id = $2::integer)
+        OR $4::boolean = true
+      )
+    `, [project_id, userId, moduleId, isGlobal]);
+
+    if (hasAccess.rows.length === 0 && !isGlobal) {
       throw new Error('Access denied: You do not have access to this project');
     }
 
-    const { project_manager_id } = projectCheck.rows[0];
     const isPM = project_manager_id === userId || isGlobal;
 
     // Common user aggregator
@@ -1033,7 +1047,7 @@ export class ProjectService {
         SELECT u.id, 
                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
                UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-               CASE WHEN u.id = $3 THEN 0 ELSE 1 END as sort_order
+               CASE WHEN u.id::integer = $3::integer THEN 0 ELSE 1 END as sort_order
         FROM task_access ta2
         JOIN users u ON ta2.user_id = u.id 
         WHERE ta2.task_id = t.id
@@ -1043,32 +1057,32 @@ export class ProjectService {
                UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                0 as sort_order
         FROM users u3
-        WHERE u3.id = $3
+        WHERE u3.id::integer = $3::integer
         ORDER BY sort_order, name
       ) u_agg) as assigned_users
     `;
 
     if (isPM) {
-      // PMs and Super Admins see ALL tasks in the module
       return query(`
         SELECT t.*, 
-               EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2) as is_assigned,
+               EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2::integer) as is_assigned,
                ${assignedUsersSubquery}
         FROM project_tasks t 
-        WHERE t.module_id = $1 
+        WHERE t.module_id = $1::integer
         ORDER BY t.custom_id`,
         [moduleId, userId, project_manager_id]
       );
     }
 
-    // Regular Members: Show ONLY tasks they have explicit access to
+    // Regular Members: Show tasks they have access to OR have logged time to
     return query(
-      `SELECT t.*, true as is_assigned,
+      `SELECT DISTINCT t.id, t.module_id, t.custom_id, t.name, t.description, t.status, t.due_date, t.created_at, t.updated_at, true as is_assigned,
               ${assignedUsersSubquery}
        FROM project_tasks t
-       JOIN task_access ta ON t.id = ta.task_id
-       WHERE t.module_id = $1
-       AND ta.user_id = $2
+       LEFT JOIN task_access ta ON t.id = ta.task_id
+       LEFT JOIN timesheet_entries te ON t.id = te.task_id
+       WHERE t.module_id = $1::integer
+       AND (ta.user_id = $2::integer OR te.user_id = $2::integer)
        ORDER BY t.custom_id`,
       [moduleId, userId, project_manager_id]
     );
@@ -1077,24 +1091,35 @@ export class ProjectService {
   static async getActivitiesForTask(taskId: number, userId: number, role: string) {
     const isGlobal = role === 'super_admin';
 
-    // 1. Get the parent project ID and check if user is PM or Member
-    const projectCheck = await query(`
-      SELECT p.id, p.project_manager_id FROM projects p
+    // 1. Get parent info
+    const projectInfo = await query(`
+      SELECT p.id as project_id, p.project_manager_id FROM projects p
       JOIN project_modules m ON p.id = m.project_id
       JOIN project_tasks t ON m.id = t.module_id
-      WHERE t.id = $1 
-      AND (
-        p.project_manager_id = $2
-        OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $2)
-        OR $3 = true
-      )
-    `, [taskId, userId, isGlobal]);
+      WHERE t.id = $1
+    `, [taskId]);
 
-    if (projectCheck.rows.length === 0) {
+    if (projectInfo.rows.length === 0) {
+      return { rows: [] };
+    }
+
+    const { project_id, project_manager_id } = projectInfo.rows[0];
+
+    // 2. Check access
+    const hasAccess = await query(`
+      SELECT 1 FROM projects p
+      WHERE p.id = $1::integer AND (
+        p.project_manager_id = $2::integer
+        OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.task_id = $3::integer AND te.user_id = $2::integer)
+        OR $4::boolean = true
+      )
+    `, [project_id, userId, taskId, isGlobal]);
+
+    if (hasAccess.rows.length === 0 && !isGlobal) {
       throw new Error('Access denied: You do not have access to this project');
     }
 
-    const { project_manager_id } = projectCheck.rows[0];
     const isPM = project_manager_id === userId || isGlobal;
 
     // Common user aggregator
@@ -1103,7 +1128,7 @@ export class ProjectService {
         SELECT u.id, 
                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
                UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
-               CASE WHEN u.id = $3 THEN 0 ELSE 1 END as sort_order
+               CASE WHEN u.id::integer = $3::integer THEN 0 ELSE 1 END as sort_order
         FROM activity_access aa2
         JOIN users u ON aa2.user_id = u.id 
         WHERE aa2.activity_id = a.id
@@ -1113,31 +1138,32 @@ export class ProjectService {
                UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                0 as sort_order
         FROM users u3
-        WHERE u3.id = $3
+        WHERE u3.id::integer = $3::integer
         ORDER BY sort_order, name
       ) u_agg) as assigned_users
     `;
 
     if (isPM) {
-      // PMs and Super Admins see ALL activities in the task
       return query(`
         SELECT a.*,
+               EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = a.id AND aa.user_id = $2::integer) as is_assigned,
                ${assignedUsersSubquery}
         FROM project_activities a
-        WHERE a.task_id = $1
+        WHERE a.task_id = $1::integer
         ORDER BY a.custom_id`,
         [taskId, userId, project_manager_id]
       );
     }
 
-    // Regular Members: Show ONLY activities they have explicit access to
+    // Regular Members: Show activities they have access to OR have logged time to
     return query(`
-       SELECT a.*,
+       SELECT DISTINCT a.id, a.task_id, a.custom_id, a.name, a.description, a.status, a.created_at, a.updated_at,
               ${assignedUsersSubquery}
        FROM project_activities a
-       JOIN activity_access aa ON a.id = aa.activity_id
-       WHERE a.task_id = $1
-       AND aa.user_id = $2
+       LEFT JOIN activity_access aa ON a.id = aa.activity_id
+       LEFT JOIN timesheet_entries te ON a.id = te.activity_id
+       WHERE a.task_id = $1::integer
+       AND (aa.user_id = $2::integer OR te.user_id = $2::integer)
        ORDER BY a.custom_id`,
       [taskId, userId, project_manager_id]
     );
