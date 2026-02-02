@@ -995,12 +995,13 @@ export class ProjectService {
 
     // Regular Members: Show modules they have explicit access to OR have logged time to
     return query(
-      `SELECT DISTINCT m.id, m.project_id, m.custom_id, m.name, m.description, m.status, m.created_at, m.updated_at, ${assignedUsersSubquery}
+      `SELECT m.id, m.project_id, m.custom_id, m.name, m.description, m.status, m.created_at, m.updated_at, ${assignedUsersSubquery}
        FROM project_modules m
-       LEFT JOIN module_access ma ON m.id = ma.module_id
-       LEFT JOIN timesheet_entries te ON m.id = te.module_id
        WHERE m.project_id = $1::integer 
-       AND (ma.user_id = $2::integer OR te.user_id = $2::integer)
+       AND (
+         EXISTS (SELECT 1 FROM module_access ma WHERE ma.module_id = m.id AND ma.user_id = $2::integer)
+         OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.module_id = m.id AND te.user_id = $2::integer)
+       )
        ORDER BY m.custom_id`,
       [projectId, userId]
     );
@@ -1076,13 +1077,14 @@ export class ProjectService {
 
     // Regular Members: Show tasks they have access to OR have logged time to
     return query(
-      `SELECT DISTINCT t.id, t.module_id, t.custom_id, t.name, t.description, t.status, t.due_date, t.created_at, t.updated_at, true as is_assigned,
+      `SELECT t.id, t.module_id, t.custom_id, t.name, t.description, t.status, t.due_date, t.created_at, t.updated_at, true as is_assigned,
               ${assignedUsersSubquery}
        FROM project_tasks t
-       LEFT JOIN task_access ta ON t.id = ta.task_id
-       LEFT JOIN timesheet_entries te ON t.id = te.task_id
        WHERE t.module_id = $1::integer
-       AND (ta.user_id = $2::integer OR te.user_id = $2::integer)
+       AND (
+         EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2::integer)
+         OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.task_id = t.id AND te.user_id = $2::integer)
+       )
        ORDER BY t.custom_id`,
       [moduleId, userId, project_manager_id]
     );
@@ -1145,10 +1147,10 @@ export class ProjectService {
 
     if (isPM) {
       return query(`
-        SELECT a.*,
+        SELECT a.*, 
                EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = a.id AND aa.user_id = $2::integer) as is_assigned,
                ${assignedUsersSubquery}
-        FROM project_activities a
+        FROM project_activities a 
         WHERE a.task_id = $1::integer
         ORDER BY a.custom_id`,
         [taskId, userId, project_manager_id]
@@ -1156,14 +1158,15 @@ export class ProjectService {
     }
 
     // Regular Members: Show activities they have access to OR have logged time to
-    return query(`
-       SELECT DISTINCT a.id, a.task_id, a.custom_id, a.name, a.description, a.status, a.created_at, a.updated_at,
+    return query(
+      `SELECT a.id, a.task_id, a.custom_id, a.name, a.description, a.status, a.created_at, a.updated_at, true as is_assigned,
               ${assignedUsersSubquery}
        FROM project_activities a
-       LEFT JOIN activity_access aa ON a.id = aa.activity_id
-       LEFT JOIN timesheet_entries te ON a.id = te.activity_id
        WHERE a.task_id = $1::integer
-       AND (aa.user_id = $2::integer OR te.user_id = $2::integer)
+       AND (
+         EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = a.id AND aa.user_id = $2::integer)
+         OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.activity_id = a.id AND te.user_id = $2::integer)
+       )
        ORDER BY a.custom_id`,
       [taskId, userId, project_manager_id]
     );

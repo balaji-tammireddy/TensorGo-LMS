@@ -151,29 +151,45 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     // Queries
-    const { data: modules, refetch: refetchModules } = useQuery(
+    const { data: projectMembers, refetch: refetchProjectMembers } = useQuery(
+        ['project-members', projectId],
+        () => projectService.getProjectMembers(projectId),
+        { enabled: !!projectId }
+    );
+
+    // Queries with loading states
+    const {
+        data: modules,
+        refetch: refetchModules,
+        isLoading: modulesLoading,
+        isError: modulesError
+    } = useQuery(
         ['modules', projectId],
         () => projectService.getModules(projectId),
         { enabled: !!projectId }
     );
 
-    const { data: tasks, refetch: refetchTasks } = useQuery(
+    const {
+        data: tasks,
+        refetch: refetchTasks,
+        isLoading: tasksLoading,
+        isError: tasksError
+    } = useQuery(
         ['tasks', selectedModuleId],
         () => projectService.getTasks(selectedModuleId!),
         { enabled: !!selectedModuleId }
     );
 
     // Activities Logic
-    const { data: activities, refetch: refetchActivities } = useQuery(
+    const {
+        data: activities,
+        refetch: refetchActivities,
+        isLoading: activitiesLoading,
+        isError: activitiesError
+    } = useQuery(
         ['activities', selectedTaskId],
         () => projectService.getActivities(selectedTaskId!),
         { enabled: !!selectedTaskId }
-    );
-
-    const { data: projectMembers, refetch: refetchProjectMembers } = useQuery(
-        ['project-members', projectId],
-        () => projectService.getProjectMembers(projectId),
-        { enabled: !!projectId }
     );
 
     // Permissions Logic
@@ -645,35 +661,40 @@ export const ProjectWorkspace: React.FC = () => {
                             )}
                         </div>
                         <div className="ws-column-body">
-                            {modules?.map(module => (
-                                <WorkspaceCard
-                                    key={module.id}
-                                    id={module.id}
-                                    customId={module.custom_id}
-                                    name={module.name}
-                                    description={module.description}
-                                    assignedUsers={module.assigned_users || []}
-                                    isSelected={selectedModuleId === module.id}
-                                    onClick={() => { setSelectedModuleId(module.id); setSelectedTaskId(null); }}
-                                    onEdit={() => handleEdit('module', module)}
-                                    onDelete={() => handleDeleteModule(module.id)}
-                                    isPM={canManageResources}
-                                    isCompact={true}
-                                    availableUsers={(() => {
-                                        const candidates = projectMembers || [];
-                                        const current = module.assigned_users || [];
-                                        const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
-                                        const uniqueMap = new Map();
-                                        [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
-                                        return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== pmId)
-                                            .map((u: any) => ({
-                                                ...u,
-                                                initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
-                                            }));
-                                    })()}
-                                    onAssignUser={(userId) => {
-                                        const availableUsers = (() => {
+                            {modulesLoading ? (
+                                <div className="ws-empty-dashed">
+                                    <p className="dashed-title">Loading Modules...</p>
+                                </div>
+                            ) : modulesError ? (
+                                <div className="ws-empty-dashed">
+                                    <p className="dashed-title text-danger">Error Loading Modules</p>
+                                </div>
+                            ) : modules?.length === 0 ? (
+                                <div className="ws-empty-dashed">
+                                    <div className="dashed-icon"><Layers size={24} /></div>
+                                    <p className="dashed-title">
+                                        {(isPM || isSuperAdmin) ? "No Modules Found" : "No Modules Assigned"}
+                                    </p>
+                                    <p className="dashed-desc">
+                                        {(isPM || isSuperAdmin) ? "Create a module to start organizing tasks." : "You haven't been assigned to any modules in this project."}
+                                    </p>
+                                </div>
+                            ) : (
+                                modules?.map(module => (
+                                    <WorkspaceCard
+                                        key={module.id}
+                                        id={module.id}
+                                        customId={module.custom_id}
+                                        name={module.name}
+                                        description={module.description}
+                                        assignedUsers={module.assigned_users || []}
+                                        isSelected={selectedModuleId === module.id}
+                                        onClick={() => { setSelectedModuleId(module.id); setSelectedTaskId(null); }}
+                                        onEdit={() => handleEdit('module', module)}
+                                        onDelete={() => handleDeleteModule(module.id)}
+                                        isPM={canManageResources}
+                                        isCompact={true}
+                                        availableUsers={(() => {
                                             const candidates = projectMembers || [];
                                             const current = module.assigned_users || [];
                                             const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
@@ -685,23 +706,27 @@ export const ProjectWorkspace: React.FC = () => {
                                                     ...u,
                                                     initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
                                                 }));
-                                        })();
-                                        const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
-                                        const isAssigned = (module.assigned_users || []).some((u: any) => String(u.id) === String(userId));
-                                        assignModuleUserMutation.mutate({ moduleId: module.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
-                                    }}
-                                />
-                            ))}
-                            {modules?.length === 0 && (
-                                <div className="ws-empty-dashed">
-                                    <div className="dashed-icon"><Layers size={24} /></div>
-                                    <p className="dashed-title">
-                                        {(isPM || isSuperAdmin) ? "No Modules Found" : "No Modules Assigned"}
-                                    </p>
-                                    <p className="dashed-desc">
-                                        {(isPM || isSuperAdmin) ? "Create a module to start organizing tasks." : "You haven't been assigned to any modules in this project."}
-                                    </p>
-                                </div>
+                                        })()}
+                                        onAssignUser={(userId) => {
+                                            const availableUsers = (() => {
+                                                const candidates = projectMembers || [];
+                                                const current = module.assigned_users || [];
+                                                const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
+                                                const uniqueMap = new Map();
+                                                [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+                                                return Array.from(uniqueMap.values())
+                                                    .filter((u: any) => String(u.id) !== pmId)
+                                                    .map((u: any) => ({
+                                                        ...u,
+                                                        initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                                    }));
+                                            })();
+                                            const userObj = availableUsers.find((u: any) => String(u.id) === String(userId));
+                                            const isAssigned = (module.assigned_users || []).some((u: any) => String(u.id) === String(userId));
+                                            assignModuleUserMutation.mutate({ moduleId: module.id, userId, action: isAssigned ? 'remove' : 'add', userObj });
+                                        }}
+                                    />
+                                ))
                             )}
                         </div>
                     </div>
@@ -727,6 +752,14 @@ export const ProjectWorkspace: React.FC = () => {
                                     <div className="dashed-icon"><ClipboardList size={24} /></div>
                                     <p className="dashed-title">No Tasks Found</p>
                                     <p className="dashed-desc">Assign and track tasks within this module.</p>
+                                </div>
+                            ) : tasksLoading ? (
+                                <div className="ws-empty-dashed">
+                                    <p className="dashed-title">Loading Tasks...</p>
+                                </div>
+                            ) : tasksError ? (
+                                <div className="ws-empty-dashed">
+                                    <p className="dashed-title text-danger">Error Loading Tasks</p>
                                 </div>
                             ) : tasks?.length === 0 ? (
                                 <div className="ws-empty-dashed">
@@ -809,6 +842,14 @@ export const ProjectWorkspace: React.FC = () => {
                                     <div className="dashed-icon"><ClipboardList size={24} /></div>
                                     <p className="dashed-title">Select a Task</p>
                                     <p className="dashed-desc">Choose a task to view its detailed activity trail.</p>
+                                </div>
+                            ) : activitiesLoading ? (
+                                <div className="ws-empty-dashed">
+                                    <p className="dashed-title">Loading Activities...</p>
+                                </div>
+                            ) : activitiesError ? (
+                                <div className="ws-empty-dashed">
+                                    <p className="dashed-title text-danger">Error Loading Activities</p>
                                 </div>
                             ) : activities?.length === 0 ? (
                                 <div className="ws-empty-dashed">
