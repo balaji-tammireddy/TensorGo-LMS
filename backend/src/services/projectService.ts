@@ -1487,9 +1487,8 @@ export class ProjectService {
   }
 
   static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
-    if (role === 'super_admin') return true;
-
     // STRICT: Only the Project Manager assigned to THIS project can manage modules/tasks
+    // removed super_admin bypass
     const res = await query(`
       SELECT 1 FROM projects 
       WHERE id = $2 AND project_manager_id = $1 
@@ -1500,7 +1499,7 @@ export class ProjectService {
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
-    if (role === 'super_admin') return true;
+    // removed super_admin bypass
     const res = await query(`
       WITH RECURSIVE hierarchy AS (
         SELECT id FROM users WHERE id = $1
@@ -1514,7 +1513,7 @@ export class ProjectService {
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
-    if (role === 'super_admin') return true;
+    // removed super_admin bypass
     const res = await query(`
       WITH RECURSIVE hierarchy AS (
         SELECT id FROM users WHERE id = $1
@@ -1528,7 +1527,7 @@ export class ProjectService {
   }
 
   static async canUserManageActivity(userId: number, role: string, activityId: number): Promise<boolean> {
-    if (role === 'super_admin') return true;
+    // removed super_admin bypass
     const res = await query(`
       WITH RECURSIVE hierarchy AS (
         SELECT id FROM users WHERE id = $1

@@ -188,9 +188,9 @@ export const ProjectWorkspace: React.FC = () => {
     const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
 
     // 2. Module/Task/Activity Operational Control:
-    //    - STRICT: Only the Project Manager (or Super Admin) can create/edit/delete/assign
+    //    - STRICT: Only the Project Manager can create/edit/delete/assign (User Request)
     //    - AND ONLY if project is Active
-    const canManageResources = (isPM || isSuperAdmin) && !isProjectReadOnly;
+    const canManageResources = isPM && !isProjectReadOnly;
     const canCreateModule = canManageResources;
     const canAddTask = canManageResources;
     const canAddActivity = canManageResources;

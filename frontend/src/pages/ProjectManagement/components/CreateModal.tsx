@@ -139,16 +139,28 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 // The previous check `if (!payload.project_manager_id)` is now handled by the strict validation above.
 
                 if (isEdit && initialData?.id) {
-                    // STRICT: Only Super Admin can edit project metadata
-                    if (user?.role !== 'super_admin') {
-                        throw new Error('Only Super Admin can edit project details');
+                    // STRICT: Super Admin OR Project Manager can edit details
+                    // But PM cannot change the manager
+                    const isGlobalAdmin = user?.role === 'super_admin';
+                    const isPM = String(initialData.project_manager_id) === String(user?.id);
+
+                    if (!isGlobalAdmin && !isPM) {
+                        throw new Error('You do not have permission to edit this project');
                     }
 
                     const updateData: any = {
                         name: payload.name,
                         description: payload.description,
-                        project_manager_id: parseInt(payload.project_manager_id)
+                        // project_manager_id: ... // Conditional below
                     };
+
+                    // Only Admin can change the Project Manager
+                    if (isGlobalAdmin) {
+                        updateData.project_manager_id = parseInt(payload.project_manager_id);
+                    } else {
+                        // For PM, ensure we don't accidentally send a changed ID (UI should block it, but backend safety)
+                        // We do NOT send project_manager_id so backend keeps existing
+                    }
 
                     result = await projectService.updateProject(initialData.id, updateData);
                 } else {

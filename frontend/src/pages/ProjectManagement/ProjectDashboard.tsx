@@ -230,12 +230,12 @@ export const ProjectDashboard: React.FC = () => {
                         {isGlobalAdmin && (
                             <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
                                 {(() => {
-                                    // Show projects that are NOT in "My Projects"
-                                    const allOtherProjects = (projects || []).filter(p => !p.is_pm && !p.is_member);
+                                    // Show ALL projects (user request: "all project should show all of them")
+                                    const allProjects = projects || [];
                                     return (
                                         <ProjectListSection
                                             title="All Projects"
-                                            projects={allOtherProjects}
+                                            projects={allProjects}
                                             emptyMsg="No global projects to display."
                                             isOpen={openSection === 'all-projects'}
                                             onToggle={() => handleToggleSection('all-projects')}
