@@ -273,8 +273,9 @@ export const TimesheetApprovalPage: React.FC = () => {
         return memberEntries.filter(e => {
             const eDate = new Date(e.log_date);
             const matchesDate = formatDate(eDate) === dateStr;
-            // Hide Draft logs from managers/approvers
-            return matchesDate && e.log_status !== 'draft';
+            // Hide Draft logs from managers/approvers UNLESS it's a resubmission (fixing a rejection)
+            // We want the manager to see that a log exists there, even if it's currently being edited.
+            return matchesDate && (e.log_status !== 'draft' || e.is_resubmission);
         });
     };
 
@@ -357,7 +358,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                     </div>
                                     <div className="emp-status">
                                         <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                                            {member.is_late && <span style={{ fontSize: '9px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fee2e2', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>LATE</span>}
+                                            {member.is_late && !member.is_resubmission && <span style={{ fontSize: '9px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fee2e2', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>LATE</span>}
                                             {member.is_resubmission && <span style={{ fontSize: '9px', background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>RESUB</span>}
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -442,38 +443,43 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                         }
 
                                                         // If no logs, or only drafts, or criteria not met -> Criteria Not Met
-                                                        if (memberEntries.length === 0 || allDraft || !criteriaMet) {
-                                                            return <div className="logged-hours-badge danger">Criteria Not Met</div>;
+                                                        if (memberEntries.length === 0) {
+                                                            return <div className="logged-hours-badge neutral">No Logs</div>;
                                                         }
 
-                                                        if (!isReportingManager) {
-                                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>Read Only Mode</div>;
+                                                        // New Logic: If > 40 hours, but still has drafts/rejections -> Action Required (by user), not "Criteria Not Met"
+                                                        if (criteriaMet) {
+                                                            if (hasActionable) {
+                                                                return (
+                                                                    <button
+                                                                        className="bulk-approve-btn"
+                                                                        onClick={handleApproveWeek}
+                                                                        disabled={processingAction}
+                                                                    >
+                                                                        {processingAction ? (
+                                                                            <Clock size={16} className="animate-spin" />
+                                                                        ) : (
+                                                                            <CheckCircle size={16} />
+                                                                        )}
+                                                                        {processingAction ? 'Processing...' : 'Approve Week'}
+                                                                    </button>
+                                                                );
+                                                            }
+
+                                                            if (allApproved) {
+                                                                return (
+                                                                    <div className="logged-hours-badge success">
+                                                                        <CheckCircle size={14} style={{ marginRight: 4 }} />
+                                                                        Processed
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            // If 40+ hours but has pending drafts/rejections that aren't submitted yet
+                                                            return <div className="logged-hours-badge warning">Pending Resubmission</div>;
                                                         }
 
-                                                        if (hasActionable) {
-                                                            return (
-                                                                <button
-                                                                    className="bulk-approve-btn"
-                                                                    onClick={handleApproveWeek}
-                                                                    disabled={processingAction}
-                                                                >
-                                                                    {processingAction ? (
-                                                                        <Clock size={16} className="animate-spin" />
-                                                                    ) : (
-                                                                        <CheckCircle size={16} />
-                                                                    )}
-                                                                    {processingAction ? 'Processing...' : 'Approve Week'}
-                                                                </button>
-                                                            );
-                                                        } else if (allApproved) {
-                                                            return (
-                                                                <div className="logged-hours-badge success">
-                                                                    <CheckCircle size={14} style={{ marginRight: 4 }} />
-                                                                    Processed
-                                                                </div>
-                                                            );
-                                                        }
-
+                                                        // Default fallback if < 40 hours
                                                         return <div className="logged-hours-badge danger">Criteria Not Met</div>;
                                                     })()}
                                                 </div>
@@ -483,7 +489,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                             {(() => {
                                                 // Only show if it's a past week AND (criteria failed OR not submitted) AND it's not the user themselves
                                                 // AND hide it if we have actionable (submitted) logs or everything is already processed
-                                                if (weekRange.end < new Date() && (isNotSubmitted || !criteriaMet) && selectedMemberId !== user?.id && !hasActionable && !allApproved) {
+                                                if (weekRange.end < new Date() && !criteriaMet && selectedMemberId !== user?.id && !hasActionable && !allApproved) {
                                                     return (
                                                         <div style={{
                                                             marginBottom: '20px',
@@ -688,7 +694,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                     {!entry.project_name?.includes('System') && (
                                                                         <div className="description-text">{entry.description}</div>
                                                                     )}
-                                                                    {entry.rejection_reason && (
+                                                                    {entry.rejection_reason && entry.log_status !== 'approved' && (
                                                                         <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '4px' }}>
                                                                             <strong>Rejection Reason:</strong> {entry.rejection_reason}
                                                                         </div>

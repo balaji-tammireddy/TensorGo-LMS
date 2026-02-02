@@ -478,8 +478,9 @@ export const TimesheetPage: React.FC = () => {
                                 // Check if already submitted/approved
                                 const isSubmitted = entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
                                 const hasRejected = entries.some(e => e.log_status === 'rejected');
+                                const hasDrafts = entries.some(e => e.log_status === 'draft' && !e.is_system);
 
-                                if (!isSubmitted || hasRejected) {
+                                if (!isSubmitted || hasRejected || hasDrafts) {
                                     return (
                                         <Button
                                             className="btn-primary"
@@ -506,7 +507,7 @@ export const TimesheetPage: React.FC = () => {
                                             }}
                                         >
                                             <Save size={16} />
-                                            {hasRejected ? 'Resubmit Timesheet' : 'Submit Timesheet'}
+                                            {(hasRejected || (isSubmitted && hasDrafts)) ? 'Resubmit Timesheet' : 'Submit Timesheet'}
                                         </Button>
                                     )
                                 } else {
@@ -546,7 +547,7 @@ export const TimesheetPage: React.FC = () => {
                                 (isWeekLocked && !editingId) ||
                                 isDateBlocked(selectedDate).blocked // Always disable for blocked dates, even when editing
                             } style={{ border: 'none', padding: 0, margin: 0 }}>
-                                {isWeekLocked && !editingId && (
+                                {isWeekLocked && !editingId && !entries.some(e => e.log_status === 'rejected') && (
                                     <div className="ts-form-locked-banner" style={{
                                         fontSize: '12px',
                                         color: '#b45309',

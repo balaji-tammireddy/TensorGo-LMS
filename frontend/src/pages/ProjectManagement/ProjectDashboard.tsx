@@ -206,7 +206,9 @@ export const ProjectDashboard: React.FC = () => {
                         {/* 1. SECTION: My Projects */}
                         <div className={`dashboard-section ${(!isGlobalAdmin || openSection === 'my-projects') ? 'open' : 'collapsed'}`}>
                             {(() => {
-                                const myProjectsList = projects || [];
+                                const myProjectsList = isGlobalAdmin
+                                    ? (projects || []).filter(p => p.is_pm || p.is_member)
+                                    : (projects || []);
 
                                 return (
                                     <ProjectListSection
@@ -228,7 +230,8 @@ export const ProjectDashboard: React.FC = () => {
                         {isGlobalAdmin && (
                             <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
                                 {(() => {
-                                    const allOtherProjects = projects || [];
+                                    // Show projects that are NOT in "My Projects"
+                                    const allOtherProjects = (projects || []).filter(p => !p.is_pm && !p.is_member);
                                     return (
                                         <ProjectListSection
                                             title="All Projects"

@@ -225,3 +225,23 @@
     border-radius: 20px;
     border: 1px solid #dbeafe;
 }
+
+/* Fix for entry cards collapsing */
+.entry-item {
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    height: 100%;
+    min-height: 120px;
+    /* Ensure minimum height for rejected cards */
+    width: 100%;
+    /* Fix for width issue */
+    box-sizing: border-box;
+    transition: all 0.2s ease-in-out;
+}
+
+.entry-item .entry-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}

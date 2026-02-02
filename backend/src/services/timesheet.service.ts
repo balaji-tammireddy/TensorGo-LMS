@@ -249,16 +249,27 @@ export class TimesheetService {
                 logSunday.setDate(logMonday.getDate() + 6);
                 logSunday.setHours(23, 59, 59, 999);
 
-                const lockCheck = await client.query(`
-                    SELECT 1 FROM project_entries 
-                    WHERE user_id = $1 
-                      AND log_date >= $2 AND log_date <= $3
-                      AND log_status IN ('submitted', 'approved')
-                    LIMIT 1
-                `, [userId, logMonday.toISOString().split('T')[0], logSunday.toISOString().split('T')[0]]);
+                // Check if we are updating a rejected entry - if so, allow it even if the week is locked
+                let isFixingRejected = false;
+                if (entry.id) {
+                    const currentEntry = await client.query('SELECT log_status FROM project_entries WHERE id = $1', [entry.id]);
+                    if (currentEntry.rows.length > 0 && currentEntry.rows[0].log_status === 'rejected') {
+                        isFixingRejected = true;
+                    }
+                }
 
-                if (lockCheck.rows.length > 0) {
-                    throw new Error("Cannot add or modify logs for a week that is already submitted or approved.");
+                if (!isFixingRejected) {
+                    const lockCheck = await client.query(`
+                        SELECT 1 FROM project_entries 
+                        WHERE user_id = $1 
+                          AND log_date >= $2 AND log_date <= $3
+                          AND log_status IN ('submitted', 'approved')
+                        LIMIT 1
+                    `, [userId, logMonday.toISOString().split('T')[0], logSunday.toISOString().split('T')[0]]);
+
+                    if (lockCheck.rows.length > 0) {
+                        throw new Error("Cannot add or modify logs for a week that is already submitted or approved.");
+                    }
                 }
             }
 
@@ -333,7 +344,10 @@ export class TimesheetService {
                     UPDATE project_entries 
                     SET project_id=$1, module_id=$2, task_id=$3, activity_id=$4, 
                         log_date=$5, duration=$6, description=$7, work_status=$8,
-                        log_status = 'draft',
+                        log_status = CASE 
+                            WHEN log_status = 'rejected' THEN 'rejected' 
+                            ELSE 'draft' 
+                        END,
                         updated_by = $9, updated_at = CURRENT_TIMESTAMP
                     WHERE id=$10
                     RETURNING *
