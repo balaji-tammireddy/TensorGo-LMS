@@ -70,7 +70,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 custom_id: '',
                 name: '',
                 description: '',
-                project_manager_id: (type === 'project' && user?.role === 'manager') ? String(user.id) : '',
+                project_manager_id: (type === 'project' && user?.role !== 'super_admin') ? String(user.id) : '',
                 due_date: '',
                 assignee_ids: []
             });
@@ -89,7 +89,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }]);
             }
 
-            if (['super_admin', 'hr'].includes(user.role)) {
+            if (user.role === 'super_admin') {
                 employeeService.getEmployees(1, 1000).then(res => {
                     const eligibleManagers = res.employees.filter((emp: any) =>
                         ['super_admin', 'hr', 'manager'].includes(emp.role) &&
@@ -256,7 +256,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     };
 
     const canEditMetadata = type === 'project' && isEdit && user?.role === 'super_admin';
-    const isManagerSelectDisabled = !['super_admin', 'hr'].includes(user?.role || '') || (type === 'project' && isEdit && user?.role !== 'super_admin');
+    const isManagerSelectDisabled = user?.role !== 'super_admin';
 
     // Character limits
     const NAME_LIMIT = 20;
@@ -292,8 +292,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     const getSelectedManagerLabel = () => {
         if (formData.project_manager_id) {
-            if (!['super_admin', 'hr'].includes(user?.role || '') && formData.project_manager_id === String(user?.id)) {
-                return `${toTitleCase((user as any).name || 'Me')} (${user?.empId})`;
+            if (user?.role !== 'super_admin' && formData.project_manager_id === String(user?.id)) {
+                return `${toTitleCase((user as any).name || 'Me')}${user?.empId ? ` (${user.empId})` : ''}`;
             }
             const selected = managers.find(m => String(m.id) === formData.project_manager_id);
             if (selected) {
