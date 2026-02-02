@@ -472,8 +472,19 @@ export const TimesheetPage: React.FC = () => {
                         {(() => {
                             const today = new Date();
                             today.setHours(0, 0, 0, 0);
-                            // Only show for PAST weeks
-                            if (weekRange.end < today) {
+
+                            // Calculate Sunday 12 AM of the following week (Start of submission window)
+                            const submissionStart = new Date(weekRange.end);
+                            submissionStart.setDate(submissionStart.getDate() + 1);
+                            submissionStart.setHours(0, 0, 0, 0);
+
+                            // Calculate Sunday 12 AM of the week after (End of submission window)
+                            const submissionEnd = new Date(submissionStart);
+                            submissionEnd.setDate(submissionStart.getDate() + 7);
+                            submissionEnd.setHours(0, 0, 0, 0);
+
+                            // Only show if today is within the 1-week window (Sunday to Sunday)
+                            if (today >= submissionStart && today < submissionEnd) {
                                 const th = parseFloat(String(totalHours));
                                 // Check if already submitted/approved
                                 const isSubmitted = entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
@@ -1068,29 +1079,31 @@ export const TimesheetPage: React.FC = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Only show actions if NOT System/Holiday and not approved (unless re-opening logic exists) */}
-                                                            {!entry.is_system && !entry.project_name?.includes('System') && entry.log_status !== 'approved' && (
-                                                                <div className="entry-actions-sidebar">
-                                                                    <button
-                                                                        className="action-btn-styled edit"
-                                                                        onClick={() => handleEdit(entry)}
-                                                                        title="Edit"
-                                                                        disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0} // 0 is system, but we hide it anyway
-                                                                    >
-                                                                        <Edit2 size={16} />
-                                                                    </button>
-                                                                    {entry.log_status !== 'rejected' && (
+                                                            {/* Only show actions if NOT System/Holiday and not approved/submitted (unless re-opening logic exists) */}
+                                                            {!entry.is_system && !entry.project_name?.includes('System') &&
+                                                                entry.log_status !== 'approved' &&
+                                                                entry.log_status !== 'submitted' && (
+                                                                    <div className="entry-actions-sidebar">
                                                                         <button
-                                                                            className="action-btn-styled delete"
-                                                                            onClick={() => handleDeleteClick(entry.id!)}
-                                                                            title="Delete"
-                                                                            disabled={!!editingId}
+                                                                            className="action-btn-styled edit"
+                                                                            onClick={() => handleEdit(entry)}
+                                                                            title="Edit"
+                                                                            disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0} // 0 is system, but we hide it anyway
                                                                         >
-                                                                            <Trash2 size={16} />
+                                                                            <Edit2 size={16} />
                                                                         </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                                                        {entry.log_status !== 'rejected' && (
+                                                                            <button
+                                                                                className="action-btn-styled delete"
+                                                                                onClick={() => handleDeleteClick(entry.id!)}
+                                                                                title="Delete"
+                                                                                disabled={!!editingId}
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                         </div>
                                                     );
                                                 })
