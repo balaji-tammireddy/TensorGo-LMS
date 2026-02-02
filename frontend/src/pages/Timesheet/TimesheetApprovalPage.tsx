@@ -682,6 +682,12 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                                             <span>{entry.task_name}</span>
                                                                                         </>
                                                                                     )}
+                                                                                    {entry.activity_name && entry.activity_name !== entry.task_name && (
+                                                                                        <>
+                                                                                            <span className="path-sep">&gt;</span>
+                                                                                            <span>{entry.activity_name}</span>
+                                                                                        </>
+                                                                                    )}
                                                                                 </>
                                                                             )}
                                                                         </div>
