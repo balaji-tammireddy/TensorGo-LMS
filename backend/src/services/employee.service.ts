@@ -748,14 +748,12 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Error sending new employee credentials email:`, emailError);
   }
 
-  // Sync Project Team Membership from Manager
-  if (reportingManagerId) {
-    try {
-      await ProjectService.syncUserToManagerProjects(userId, reportingManagerId);
-    } catch (syncError) {
-      logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Error syncing project membership:`, syncError);
-      // Don't fail the whole creation for this
-    }
+
+  // Trigger global project sync to inherit projects from manager
+  try {
+    await ProjectService.syncAllProjectTeams();
+  } catch (syncError) {
+    logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Global project sync failed:`, syncError);
   }
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee creation completed successfully - User ID: ${userId}, Emp ID: ${empId}`);
@@ -1410,11 +1408,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
 
-      // Sync Project Team Membership for the new manager
-      if (newManagerId) {
-        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Syncing project membership for user ${employeeId} with new manager ${newManagerId}`);
-        await ProjectService.syncUserToManagerProjects(employeeId, newManagerId);
-      }
     } catch (e) {
       logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error handling manager change (email/sync):`, e);
     }
@@ -1459,15 +1452,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       logger.error('Error sending status change notification:', e);
     }
 
-    // Reactivation Sync: If employee status changed to active, sync their projects
-    if (newStatus === 'active' && dbReportingManagerId) {
-      try {
-        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Syncing project membership for reactivated user ${employeeId} with manager ${dbReportingManagerId}`);
-        await ProjectService.syncUserToManagerProjects(employeeId, dbReportingManagerId);
-      } catch (syncError) {
-        logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error syncing project membership during reactivation:`, syncError);
-      }
-    }
   }
 
   // If joining date was updated, recalculate leave balances (skip for super_admin)
@@ -1586,6 +1570,15 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     } catch (emailError: any) {
       // Log error but don't fail employee update
       logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending employee details update email:`, emailError);
+    }
+  }
+
+  // Trigger global project sync for hierarchy changes
+  if (isManagerChanged || isStatusChanged || isRoleChanged) {
+    try {
+      await ProjectService.syncAllProjectTeams();
+    } catch (syncError) {
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Global project sync failed:`, syncError);
     }
   }
 

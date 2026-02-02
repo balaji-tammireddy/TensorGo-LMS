@@ -199,10 +199,7 @@ export const ProjectDashboard: React.FC = () => {
                         {/* 1. SECTION: My Projects */}
                         <div className={`dashboard-section ${(!isGlobalAdmin || openSection === 'my-projects') ? 'open' : 'collapsed'}`}>
                             {(() => {
-                                const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
-                                const myProjectsList = (projects || []).filter((p: Project) =>
-                                    isPMView ? (p.is_pm || p.is_member) : p.is_member
-                                );
+                                const myProjectsList = projects || [];
 
                                 return (
                                     <ProjectListSection

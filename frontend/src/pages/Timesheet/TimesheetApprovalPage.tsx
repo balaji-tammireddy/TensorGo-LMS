@@ -31,14 +31,9 @@ export const TimesheetApprovalPage: React.FC = () => {
     // After Sunday 9 PM -> Default to Current Week (just submitted)
     const [currentDate, setCurrentDate] = useState(() => {
         const now = new Date();
-        const day = now.getDay(); // 0 = Sunday
-        const hour = now.getHours();
-
         const d = new Date(now);
-        // If it's NOT Sunday, or it IS Sunday but before 9 PM (21:00)
-        if (day !== 0 || hour < 21) {
-            d.setDate(d.getDate() - 7); // Show previous week
-        }
+        // Strictly show previous week for approvals
+        d.setDate(d.getDate() - 7);
         return d;
     });
 
@@ -97,7 +92,6 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
     const [memberEntries, setMemberEntries] = useState<TimesheetEntry[]>([]);
-    const [loadingEntries, setLoadingEntries] = useState(false);
 
     // -- Actions State --
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -153,7 +147,6 @@ export const TimesheetApprovalPage: React.FC = () => {
     };
 
     const fetchMemberEntries = async (userId: number) => {
-        setLoadingEntries(true);
         try {
             const startStr = formatDate(weekRange.start);
             const endStr = formatDate(weekRange.end);
@@ -171,8 +164,6 @@ export const TimesheetApprovalPage: React.FC = () => {
             }
             // Keep the selection but clear entries to show empty/error state
             setMemberEntries([]);
-        } finally {
-            setLoadingEntries(false);
         }
     };
 
@@ -281,7 +272,9 @@ export const TimesheetApprovalPage: React.FC = () => {
     const getEntriesForDay = (dateStr: string) => {
         return memberEntries.filter(e => {
             const eDate = new Date(e.log_date);
-            return formatDate(eDate) === dateStr;
+            const matchesDate = formatDate(eDate) === dateStr;
+            // Hide Draft logs from managers/approvers
+            return matchesDate && e.log_status !== 'draft';
         });
     };
 
@@ -315,27 +308,18 @@ export const TimesheetApprovalPage: React.FC = () => {
                                 className="nav-btn"
                                 onClick={() => changeWeek(1)}
                                 disabled={(() => {
-                                    const today = new Date();
-                                    const { start: currentWeekStart } = getWeekRange(today);
-                                    currentWeekStart.setHours(0, 0, 0, 0);
+                                    const { start: todayWeekStart } = getWeekRange(new Date());
+                                    const { start: viewWeekStart } = getWeekRange(currentDate);
 
-                                    const viewWeekStart = new Date(weekDays[0]);
-                                    viewWeekStart.setDate(viewWeekStart.getDate() + 7); // Start of NEXT week
-                                    viewWeekStart.setHours(0, 0, 0, 0);
-
-                                    return viewWeekStart > today;
+                                    // Disable "Next" if current view is already the previous week
+                                    // (i.e., we don't want them to reach or see the current active week)
+                                    return viewWeekStart >= new Date(todayWeekStart.setDate(todayWeekStart.getDate() - 7));
                                 })()}
                                 style={{
                                     opacity: (() => {
-                                        const today = new Date();
-                                        const { start: currentWeekStart } = getWeekRange(today);
-                                        currentWeekStart.setHours(0, 0, 0, 0);
-
-                                        const viewWeekStart = new Date(weekDays[0]);
-                                        viewWeekStart.setDate(viewWeekStart.getDate() + 7);
-                                        viewWeekStart.setHours(0, 0, 0, 0);
-
-                                        return viewWeekStart > today;
+                                        const { start: todayWeekStart } = getWeekRange(new Date());
+                                        const { start: viewWeekStart } = getWeekRange(currentDate);
+                                        return viewWeekStart >= new Date(todayWeekStart.setDate(todayWeekStart.getDate() - 7));
                                     })() ? 0.3 : 1, cursor: 'pointer'
                                 }}
                             >
@@ -429,109 +413,114 @@ export const TimesheetApprovalPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
-                                <div style={{ paddingBottom: '20px', borderBottom: '1px solid #f1f5f9', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
-                                            {selectedMember?.name}
-                                        </h2>
-                                        <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                            {selectedMember?.emp_id} • {selectedMember?.total_hours.toFixed(2)} Hrs Logged
-                                        </div>
-                                    </div>
-
-                                    {/* Action Bar */}
-                                    {(() => {
-                                        if (selectedMemberId === user?.id) {
-                                            return <div className="logged-hours-badge warning">Self Approval Disabled</div>;
-                                        }
-
-                                        // Criteria Check (Past Weeks Only)
-                                        const isPastWeek = weekRange.end < new Date();
-                                        const totalHours = selectedMember?.total_hours || 0;
-                                        const criteriaMet = totalHours >= 40;
-
-                                        if (isPastWeek && !criteriaMet) {
-                                            // Show nothing in action bar or show disabled state? 
-                                            // We show banner below instead.
-                                            return <div className="logged-hours-badge danger">Criteria Not Met</div>;
-                                        }
-
-                                        if (memberEntries.length === 0 && !loadingEntries) {
-                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>No Logs</div>;
-                                        }
-
-                                        if (!isReportingManager) {
-                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>Read Only Mode</div>;
-                                        }
-
-                                        const hasPending = memberEntries.some(e => e.log_status !== 'approved');
-                                        if (hasPending) {
-                                            return (
-                                                <button
-                                                    className="bulk-approve-btn"
-                                                    onClick={handleApproveWeek}
-                                                    disabled={processingAction}
-                                                >
-                                                    {processingAction ? (
-                                                        <Clock size={16} className="animate-spin" />
-                                                    ) : (
-                                                        <CheckCircle size={16} />
-                                                    )}
-                                                    {processingAction ? 'Processing...' : 'Approve Week'}
-                                                </button>
-                                            );
-                                        } else if (memberEntries.length > 0) {
-                                            return (
-                                                <div className="logged-hours-badge success">
-                                                    <CheckCircle size={14} style={{ marginRight: 4 }} />
-                                                    Approved
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </div>
-
-                                {/* Criteria Error Banner */}
                                 {(() => {
-                                    const isPastWeek = weekRange.end < new Date();
+                                    // Common Status Calculations
                                     const totalHours = selectedMember?.total_hours || 0;
                                     const criteriaMet = totalHours >= 40;
+                                    const hasActionable = memberEntries.some(e => e.log_status === 'submitted');
+                                    const allApproved = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'approved' || e.log_status === 'rejected');
+                                    const allDraft = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'draft');
+                                    const isNotSubmitted = selectedMember?.status === 'draft' || selectedMember?.status === 'pending_submission';
 
-                                    // Only show if it's a past week AND criteria failed AND it's not the user themselves
-                                    if (isPastWeek && !criteriaMet && selectedMemberId !== user?.id) {
-                                        return (
-                                            <div style={{
-                                                marginBottom: '20px',
-                                                padding: '16px',
-                                                borderRadius: '12px',
-                                                background: '#fef2f2',
-                                                border: '1px solid #fee2e2',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                color: '#b91c1c',
-                                                animation: 'fadeIn 0.5s ease-out'
-                                            }}>
-                                                <style>
-                                                    {`
-                                                        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-                                                        @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-                                                    `}
-                                                </style>
-                                                <div style={{ padding: '8px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', animation: 'pulse-red 2s infinite' }}>
-                                                    <XCircle size={24} color="#ef4444" />
-                                                </div>
+                                    return (
+                                        <>
+                                            {/* Action Bar */}
+                                            <div style={{ paddingBottom: '20px', borderBottom: '1px solid #f1f5f9', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div>
-                                                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 600 }}>Submission Criteria Not Met</h3>
-                                                    <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
-                                                        This user has logged fewer than 40 hours.
-                                                    </p>
+                                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                                                        {selectedMember?.name}
+                                                    </h2>
+                                                    <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                                                        {selectedMember?.emp_id} • {selectedMember?.total_hours.toFixed(2)} Hrs Logged
+                                                    </div>
+                                                </div>
+
+                                                <div className="action-bar-badge-container">
+                                                    {(() => {
+                                                        if (selectedMemberId === user?.id) {
+                                                            return <div className="logged-hours-badge warning">Self Approval Disabled</div>;
+                                                        }
+
+                                                        // If no logs, or only drafts, or criteria not met -> Criteria Not Met
+                                                        if (memberEntries.length === 0 || allDraft || !criteriaMet) {
+                                                            return <div className="logged-hours-badge danger">Criteria Not Met</div>;
+                                                        }
+
+                                                        if (!isReportingManager) {
+                                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>Read Only Mode</div>;
+                                                        }
+
+                                                        if (hasActionable) {
+                                                            return (
+                                                                <button
+                                                                    className="bulk-approve-btn"
+                                                                    onClick={handleApproveWeek}
+                                                                    disabled={processingAction}
+                                                                >
+                                                                    {processingAction ? (
+                                                                        <Clock size={16} className="animate-spin" />
+                                                                    ) : (
+                                                                        <CheckCircle size={16} />
+                                                                    )}
+                                                                    {processingAction ? 'Processing...' : 'Approve Week'}
+                                                                </button>
+                                                            );
+                                                        } else if (allApproved) {
+                                                            return (
+                                                                <div className="logged-hours-badge success">
+                                                                    <CheckCircle size={14} style={{ marginRight: 4 }} />
+                                                                    Processed
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return <div className="logged-hours-badge danger">Criteria Not Met</div>;
+                                                    })()}
                                                 </div>
                                             </div>
-                                        )
-                                    }
-                                    return null;
+
+                                            {/* Status Banner */}
+                                            {(() => {
+                                                // Only show if it's a past week AND (criteria failed OR not submitted) AND it's not the user themselves
+                                                // AND hide it if we have actionable (submitted) logs or everything is already processed
+                                                if (weekRange.end < new Date() && (isNotSubmitted || !criteriaMet) && selectedMemberId !== user?.id && !hasActionable && !allApproved) {
+                                                    return (
+                                                        <div style={{
+                                                            marginBottom: '20px',
+                                                            padding: '16px',
+                                                            borderRadius: '12px',
+                                                            background: '#fef2f2',
+                                                            border: '1px solid #fee2e2',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '12px',
+                                                            color: '#b91c1c',
+                                                            animation: 'fadeIn 0.5s ease-out'
+                                                        }}>
+                                                            <style>
+                                                                {`
+                                                                        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+                                                                        @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+                                                                    `}
+                                                            </style>
+                                                            <div style={{ padding: '8px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', animation: 'pulse-red 2s infinite' }}>
+                                                                <XCircle size={24} color="#ef4444" />
+                                                            </div>
+                                                            <div>
+                                                                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 600 }}>
+                                                                    Submission Criteria Not Met
+                                                                </h3>
+                                                                <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
+                                                                    This user has logged fewer than 40 hours ({totalHours.toFixed(1)}h).
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                }
+                                                return null;
+                                            })()}
+                                        </>
+                                    );
                                 })()}
 
                                 {/* Week Days Navigation */}

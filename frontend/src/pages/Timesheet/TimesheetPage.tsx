@@ -261,8 +261,8 @@ export const TimesheetPage: React.FC = () => {
         }
 
         const dur = parseFloat(formData.duration);
-        if (isNaN(dur) || dur <= 0 || dur > 24) {
-            showError("Invalid duration (0.5 - 24 hours)");
+        if (isNaN(dur) || dur <= 0 || dur > 12) {
+            showError("Invalid duration (0.5 - 12 hours)");
             return;
         }
 
@@ -796,10 +796,11 @@ export const TimesheetPage: React.FC = () => {
                                             type="number"
                                             step="0.5"
                                             min="0.5"
-                                            max="24"
+                                            max="12"
                                             className="ts-form-input"
                                             value={formData.duration}
                                             onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                                            placeholder="e.g. 8.5"
                                             onWheel={(e) => e.currentTarget.blur()}
                                             required
                                         />
@@ -1067,7 +1068,7 @@ export const TimesheetPage: React.FC = () => {
                                                             </div>
 
                                                             {/* Only show actions if NOT System/Holiday and not approved (unless re-opening logic exists) */}
-                                                            {!entry.is_system && !entry.project_name?.includes('System') && entry.log_status !== 'approved' && entry.log_status !== 'rejected' && (
+                                                            {!entry.is_system && !entry.project_name?.includes('System') && entry.log_status !== 'approved' && (
                                                                 <div className="entry-actions-sidebar">
                                                                     <button
                                                                         className="action-btn-styled edit"
@@ -1077,13 +1078,16 @@ export const TimesheetPage: React.FC = () => {
                                                                     >
                                                                         <Edit2 size={16} />
                                                                     </button>
-                                                                    <button
-                                                                        className="action-btn-styled delete"
-                                                                        onClick={() => handleDeleteClick(entry.id!)}
-                                                                        title="Delete"
-                                                                    >
-                                                                        <Trash2 size={16} />
-                                                                    </button>
+                                                                    {entry.log_status !== 'rejected' && (
+                                                                        <button
+                                                                            className="action-btn-styled delete"
+                                                                            onClick={() => handleDeleteClick(entry.id!)}
+                                                                            title="Delete"
+                                                                            disabled={!!editingId}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>

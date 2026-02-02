@@ -255,8 +255,12 @@ export class ProjectService {
     `, [projectId, managerId]);
   }
 
-  // Recursive "Tree" Algorithm
+  // --- Recursive Hierarchy Sync Logic ---
   static async syncProjectTeam(projectId: number, managerId: number, clientOrPool: any = pool, createdBy?: number) {
+    if (!projectId || !managerId) return;
+
+    console.log(`[ProjectService] syncProjectTeam: Syncing Project ${projectId} with PM ${managerId}`);
+
     // 1. Fetch subtree and update members in ONE query using Recursive CTE
     await clientOrPool.query(`
       WITH RECURSIVE subordinates AS (
@@ -270,7 +274,7 @@ export class ProjectService {
       ON CONFLICT (project_id, user_id) DO NOTHING
     `, [projectId, managerId, createdBy || managerId]);
 
-    // 2. Remove users who are no longer in the subtree (if PM changed)
+    // 2. Remove users who are no longer in the subtree (if hierarchy changed)
     await clientOrPool.query(`
       DELETE FROM project_members 
       WHERE project_id = $1 
@@ -284,31 +288,59 @@ export class ProjectService {
         SELECT id FROM subordinates
       )
     `, [projectId, managerId]);
+
+    // 3. Cascade Revocation: Remove resource access for anyone no longer in the project
+    // This strictly enforces the rule: Project Team = PM Subordinates Only
+    const projectMemberFilter = `SELECT user_id FROM project_members WHERE project_id = $1`;
+
+    await clientOrPool.query(`
+      DELETE FROM activity_access 
+      WHERE activity_id IN (
+        SELECT a.id FROM project_activities a
+        JOIN project_tasks t ON a.task_id = t.id
+        JOIN project_modules m ON t.module_id = m.id
+        WHERE m.project_id = $1
+      )
+      AND user_id NOT IN (${projectMemberFilter})
+    `, [projectId]);
+
+    await clientOrPool.query(`
+      DELETE FROM task_access 
+      WHERE task_id IN (
+        SELECT t.id FROM project_tasks t
+        JOIN project_modules m ON t.module_id = m.id
+        WHERE m.project_id = $1
+      )
+      AND user_id NOT IN (${projectMemberFilter})
+    `, [projectId]);
+
+    await clientOrPool.query(`
+      DELETE FROM module_access 
+      WHERE module_id IN (SELECT id FROM project_modules WHERE project_id = $1)
+      AND user_id NOT IN (${projectMemberFilter})
+    `, [projectId]);
   }
 
   /**
-   * Automatically adds a user (and their subtree if they are a manager) 
-   * to all projects their reporting manager is already a member of.
+   * Global Sync: Re-runs project team gathering for ALL active projects.
+   * This ensures the project_members table and all access tables accurately 
+   * reflect the reporting hierarchy, self-healing any missed inheritance.
    */
-  static async syncUserToManagerProjects(userId: number, managerId: number, clientOrPool: any = pool) {
-    console.log(`[ProjectService] syncUserToManagerProjects: userId=${userId}, managerId=${managerId}`);
+  static async syncAllProjectTeams(clientOrPool: any = pool) {
+    console.log(`[ProjectService] syncAllProjectTeams: Starting global re-sync for all active projects...`);
+    try {
+      const res = await clientOrPool.query("SELECT id, project_manager_id FROM projects WHERE status = 'active'");
+      console.log(`[ProjectService] syncAllProjectTeams: Found ${res.rows.length} projects to sync.`);
 
-    // 1. Find all projects the manager is a member of OR the Project Manager (PM) of
-    const res = await clientOrPool.query(
-      `SELECT DISTINCT project_id FROM (
-        SELECT project_id FROM project_members WHERE user_id = $1
-        UNION
-        SELECT id AS project_id FROM projects WHERE project_manager_id = $1
-      ) as combined_projects`,
-      [managerId]
-    );
-
-    const projectIds = res.rows.map((row: any) => row.project_id);
-    console.log(`[ProjectService] Inheriting ${projectIds.length} projects from manager ${managerId}`);
-
-    // 2. For each project, sync the user's subtree (handles both single employees and managers with teams)
-    for (const projectId of projectIds) {
-      await this.syncProjectTeam(projectId, userId, clientOrPool, managerId);
+      for (const project of res.rows) {
+        if (project.project_manager_id) {
+          await this.syncProjectTeam(project.id, project.project_manager_id, clientOrPool);
+        }
+      }
+      console.log(`[ProjectService] syncAllProjectTeams: Global re-sync completed.`);
+    } catch (error) {
+      console.error(`[ProjectService] syncAllProjectTeams: Error:`, error);
+      throw error;
     }
   }
 
@@ -849,15 +881,28 @@ export class ProjectService {
     `;
 
     if (!isGlobalViewer) {
-      // For PM/Members, ensure they have access (matching getProjectsForUser visibility)
-      queryStr += `
+      // For PM/Members, ensure they have access (matching getProjectsForUser dynamic visibility)
+      queryStr = `
+        WITH RECURSIVE reporting_path AS (
+          SELECT id, reporting_manager_id FROM users WHERE id = $1
+          UNION ALL
+          SELECT u.id, u.reporting_manager_id FROM users u
+          JOIN reporting_path rp ON u.id = rp.reporting_manager_id
+        )
+        SELECT p.*, 
+               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
+               (p.project_manager_id = $1) as is_pm,
+               EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+        FROM projects p 
+        LEFT JOIN users u ON p.project_manager_id = u.id
+        WHERE p.id = $2
         AND (
-          p.project_manager_id = $1 
-          OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1)
+          p.project_manager_id IN (SELECT id FROM reporting_path)
+          OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id IN (SELECT id FROM reporting_path))
           OR EXISTS (
             SELECT 1 FROM project_modules m 
             JOIN module_access ma ON m.id = ma.module_id 
-            WHERE m.project_id = p.id AND ma.user_id = $1
+            WHERE m.project_id = p.id AND ma.user_id IN (SELECT id FROM reporting_path)
           )
         )
       `;
@@ -883,36 +928,52 @@ export class ProjectService {
       );
     }
 
-    // PM and Members: Show projects where they are manager OR member OR have nested access (Module/Task/Activity)
-    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing complex visibility query`);
+    // PM and Members: Show projects where they OR their reporting managers OR their subordinates have access
+    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing dynamic inheritance query`);
     const res = await query(
-      `SELECT DISTINCT p.*, 
-               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
-               (p.project_manager_id = $1) as is_pm,
-               EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+      `WITH RECURSIVE upward AS (
+          SELECT id, reporting_manager_id FROM users WHERE id = $1
+          UNION ALL
+          SELECT u.id, u.reporting_manager_id FROM users u
+          JOIN upward ON u.id = upward.reporting_manager_id
+       ),
+       downward AS (
+          SELECT id, reporting_manager_id FROM users WHERE id = $1
+          UNION ALL
+          SELECT u.id, u.reporting_manager_id FROM users u
+          JOIN downward ON u.reporting_manager_id = downward.id
+       ),
+       hierarchy AS (
+          SELECT id FROM upward
+          UNION
+          SELECT id FROM downward
+       )
+       SELECT DISTINCT p.*, 
+                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
+                (p.project_manager_id = $1) as is_pm,
+                EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
        FROM projects p
        LEFT JOIN users u ON p.project_manager_id = u.id
-       LEFT JOIN project_members pm ON p.id = pm.project_id
        WHERE 
-          p.project_manager_id = $1 
-          OR pm.user_id = $1
+          p.project_manager_id IN (SELECT id FROM hierarchy)
+          OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id IN (SELECT id FROM hierarchy))
           OR EXISTS (
             SELECT 1 FROM project_modules m 
             JOIN module_access ma ON m.id = ma.module_id 
-            WHERE m.project_id = p.id AND ma.user_id = $1
+            WHERE m.project_id = p.id AND ma.user_id IN (SELECT id FROM hierarchy)
           )
           OR EXISTS (
             SELECT 1 FROM project_modules m 
             JOIN project_tasks t ON m.id = t.module_id
             JOIN task_access ta ON t.id = ta.task_id
-            WHERE m.project_id = p.id AND ta.user_id = $1
+            WHERE m.project_id = p.id AND ta.user_id IN (SELECT id FROM hierarchy)
           )
           OR EXISTS (
             SELECT 1 FROM project_modules m 
             JOIN project_tasks t ON m.id = t.module_id
             JOIN project_activities a ON t.id = a.task_id
             JOIN activity_access aa ON a.id = aa.activity_id
-            WHERE m.project_id = p.id AND aa.user_id = $1
+            WHERE m.project_id = p.id AND aa.user_id IN (SELECT id FROM hierarchy)
           )
        ORDER BY p.created_at DESC`,
       [userId]
@@ -922,12 +983,20 @@ export class ProjectService {
   }
 
   static async getModulesForProject(projectId: number, userId: number, role: string) {
-    // 1. Check if user is PM of this specific project
-    const projectCheck = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
-    const isPM = projectCheck.rows[0]?.project_manager_id === userId;
+    // 1. Check if user OR their subordinates are PM of this project
+    const projectCheck = await query(`
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM projects WHERE id = $2 AND project_manager_id IN (SELECT id FROM hierarchy)
+    `, [userId, projectId]);
+
+    const isInheritedPM = projectCheck.rows.length > 0;
     const isGlobal = role === 'super_admin';
 
-    if (isPM || isGlobal) {
+    if (isInheritedPM || isGlobal) {
       return query(`
         SELECT m.*, 
                (SELECT json_agg(u_agg) FROM (
@@ -955,7 +1024,7 @@ export class ProjectService {
         ORDER BY m.custom_id`, [projectId]);
     }
 
-    // Regular Members: Only see what is in module_access
+    // Regular Members: Show ONLY modules they have access to (including inherited)
     return query(
       `SELECT m.*, 
               (SELECT json_agg(u_agg) FROM (
@@ -979,25 +1048,55 @@ export class ProjectService {
                   ORDER BY sort_order, name
                 ) u_agg) as assigned_users
        FROM project_modules m
-       JOIN module_access ma ON m.id = ma.module_id
-       WHERE m.project_id = $1 AND ma.user_id = $2
+       LEFT JOIN module_access ma ON m.id = ma.module_id
+       WHERE m.project_id = $1 
+       AND (
+         ma.user_id IN (
+            WITH RECURSIVE hierarchy AS (
+              SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
+              UNION ALL
+              SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
+              UNION ALL
+              SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
+            )
+            SELECT id FROM hierarchy
+         )
+         OR EXISTS (
+            SELECT 1 FROM projects p 
+            WHERE p.id = $1 AND p.project_manager_id IN (
+              WITH RECURSIVE hierarchy AS (
+                SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
+                UNION ALL
+                SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
+                UNION ALL
+                SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
+              )
+              SELECT id FROM hierarchy
+            )
+         )
+       )
        ORDER BY m.custom_id`,
       [projectId, userId]
     );
   }
 
   static async getTasksForModule(moduleId: number, userId: number, role: string) {
-    // 1. Get Project Manager of the parent project
-    const moduleRes = await query(`
-      SELECT p.project_manager_id 
-      FROM project_modules m
-      JOIN projects p ON m.project_id = p.id
-      WHERE m.id = $1`, [moduleId]);
-    if (moduleRes.rows.length === 0) return { rows: [] };
-    const isPM = moduleRes.rows[0].project_manager_id === userId;
+    // 1. Check if user OR their subordinates are PM of the parent project
+    const projectCheck = await query(`
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM projects p
+      JOIN project_modules m ON p.id = m.project_id
+      WHERE m.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy)
+    `, [userId, moduleId]);
+
+    const isInheritedPM = projectCheck.rows.length > 0;
     const isGlobal = role === 'super_admin';
 
-    if (isPM || isGlobal) {
+    if (isInheritedPM || isGlobal) {
       return query(
         `SELECT t.*, 
                 EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2) as is_assigned,
@@ -1030,7 +1129,7 @@ export class ProjectService {
       );
     }
 
-    // 2. Regular Members: Show ONLY tasks they have explicit access to
+    // 2. Regular Members: Show ONLY tasks they have access to (including inherited)
     return query(
       `SELECT t.*, true as is_assigned,
               (SELECT json_agg(u_agg) FROM (
@@ -1056,26 +1155,57 @@ export class ProjectService {
                   ORDER BY sort_order, name
                 ) u_agg) as assigned_users
        FROM project_tasks t
-       JOIN task_access ta ON t.id = ta.task_id
-       WHERE t.module_id = $1 AND ta.user_id = $2
+       LEFT JOIN task_access ta ON t.id = ta.task_id
+       WHERE t.module_id = $1
+       AND (
+         ta.user_id IN (
+            WITH RECURSIVE hierarchy AS (
+              SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
+              UNION ALL
+              SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
+              UNION ALL
+              SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
+            )
+            SELECT id FROM hierarchy
+         )
+         OR EXISTS (
+            SELECT 1 FROM projects p
+            JOIN project_modules m ON p.id = m.project_id
+            WHERE m.id = $1 AND p.project_manager_id IN (
+              WITH RECURSIVE hierarchy AS (
+                SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
+                UNION ALL
+                SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
+                UNION ALL
+                SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
+              )
+              SELECT id FROM hierarchy
+            )
+         )
+       )
        ORDER BY t.custom_id`,
       [moduleId, userId]
     );
   }
 
   static async getActivitiesForTask(taskId: number, userId: number, role: string) {
-    // 1. Get Project Manager of the parent project
-    const taskRes = await query(`
-      SELECT p.project_manager_id 
-      FROM project_tasks t
-      JOIN project_modules m ON t.module_id = m.id
-      JOIN projects p ON m.project_id = p.id
-      WHERE t.id = $1`, [taskId]);
-    if (taskRes.rows.length === 0) return { rows: [] };
-    const isPM = taskRes.rows[0].project_manager_id === userId;
+    // 1. Check if user OR their subordinates are PM of the parent project
+    const projectCheck = await query(`
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM projects p
+      JOIN project_modules m ON p.id = m.project_id
+      JOIN project_tasks t ON m.id = t.module_id
+      WHERE t.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy)
+    `, [userId, taskId]);
+
+    const isInheritedPM = projectCheck.rows.length > 0;
     const isGlobal = role === 'super_admin';
 
-    if (isPM || isGlobal) {
+    if (isInheritedPM || isGlobal) {
       return query(`
         SELECT a.*,
                (SELECT json_agg(u_agg) FROM (
@@ -1083,33 +1213,32 @@ export class ProjectService {
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
                          UPPER(LEFT(COALESCE(u.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u.last_name, ''), 1)) as initials,
                          CASE WHEN u.id = p2.project_manager_id THEN 0 ELSE 1 END as sort_order
-                  FROM activity_access aa 
-                  JOIN users u ON aa.user_id = u.id 
-                  JOIN project_activities pa2 ON aa.activity_id = pa2.id
+                  FROM activity_access aa2
+                  JOIN users u ON aa2.user_id = u.id 
+                  JOIN project_activities pa2 ON aa2.activity_id = pa2.id
                   JOIN project_tasks pt2 ON pa2.task_id = pt2.id
                   JOIN project_modules pm2 ON pt2.module_id = pm2.id
                   JOIN projects p2 ON pm2.project_id = p2.id
-                  WHERE aa.activity_id = a.id
+                  WHERE aa2.activity_id = a.id
                   UNION
                   SELECT u3.id, 
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
                          UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
-                  FROM project_tasks pt3
-                  JOIN project_modules pm3 ON pt3.module_id = pm3.id
+                  FROM project_modules pm3
                   JOIN projects p3 ON pm3.project_id = p3.id
                   JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE pt3.id = a.task_id
+                  WHERE pm3.id = (SELECT module_id FROM project_tasks WHERE id = a.task_id)
                   ORDER BY sort_order, name
                 ) u_agg) as assigned_users
-        FROM project_activities a 
-        WHERE a.task_id = $1 
+        FROM project_activities a
+        WHERE a.task_id = $1
         ORDER BY a.custom_id`, [taskId]);
     }
 
-    // 2. Regular Members: Show ONLY activities they have explicit access to
-    return query(
-      `SELECT a.*,
+    // 2. Regular Members: Show ONLY activities they have access to (including inherited)
+    return query(`
+       SELECT a.*,
               (SELECT json_agg(u_agg) FROM (
                   SELECT u.id, 
                          COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name,
@@ -1127,16 +1256,42 @@ export class ProjectService {
                          COALESCE(u3.first_name, '') || ' ' || COALESCE(u3.last_name, '') as name,
                          UPPER(LEFT(COALESCE(u3.first_name, ''), 1)) || UPPER(LEFT(COALESCE(u3.last_name, ''), 1)) as initials,
                          0 as sort_order
-                  FROM project_tasks pt3
-                  JOIN project_modules pm3 ON pt3.module_id = pm3.id
+                  FROM project_modules pm3
                   JOIN projects p3 ON pm3.project_id = p3.id
                   JOIN users u3 ON p3.project_manager_id = u3.id
-                  WHERE pt3.id = a.task_id
+                  WHERE pm3.id = (SELECT module_id FROM project_tasks WHERE id = a.task_id)
                   ORDER BY sort_order, name
                 ) u_agg) as assigned_users
        FROM project_activities a
-       JOIN activity_access aa ON a.id = aa.activity_id
-       WHERE a.task_id = $1 AND aa.user_id = $2
+       LEFT JOIN activity_access aa ON a.id = aa.activity_id
+       WHERE a.task_id = $1
+       AND (
+         aa.user_id IN (
+            WITH RECURSIVE hierarchy AS (
+              SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
+              UNION ALL
+              SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
+              UNION ALL
+              SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
+            )
+            SELECT id FROM hierarchy
+         )
+         OR EXISTS (
+            SELECT 1 FROM projects p
+            JOIN project_modules m ON p.id = m.project_id
+            JOIN project_tasks t ON m.id = t.module_id
+            WHERE t.id = $1 AND p.project_manager_id IN (
+              WITH RECURSIVE hierarchy AS (
+                SELECT id, reporting_manager_id, 'up' as direction FROM users WHERE id = $2
+                UNION ALL
+                SELECT u.id, u.reporting_manager_id, 'up' FROM users u JOIN hierarchy h ON u.id = h.reporting_manager_id WHERE h.direction = 'up'
+                UNION ALL
+                SELECT u.id, u.reporting_manager_id, 'down' FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id WHERE h.direction IN ('up', 'down')
+              )
+              SELECT id FROM hierarchy
+            )
+         )
+       )
        ORDER BY a.custom_id`,
       [taskId, userId]
     );
@@ -1144,7 +1299,7 @@ export class ProjectService {
 
   // --- 5. Access List Getters (for Dropdowns) ---
 
-  static async getAccessList(level: 'project' | 'module' | 'task', id: number) {
+  static async getAccessList(level: 'project' | 'module' | 'task' | 'activity', id: number) {
     if (level === 'project') {
       // Robust Team Retrieval: Project Members Table + Current PM (safety fallback)
       // This ensures that anyone added to the project (manually or via hierarchy) is visible
@@ -1196,7 +1351,7 @@ export class ProjectService {
         FROM module_access ma
         JOIN users u ON ma.user_id = u.id
         WHERE ma.module_id = $1
-      `, [id]);
+        ORDER BY name`, [id]);
       return res.rows;
     } else if (level === 'task') {
       // Cascade Rule: For a TASK, show only users who have access to the parent MODULE
@@ -1282,8 +1437,8 @@ export class ProjectService {
         console.log(`[ACCESS_TRACE] Adding ${uId} to ${table} for ${idColumn}=${tId}`);
         const result = await client.query(
           `INSERT INTO ${table} (${idColumn}, user_id, granted_by, created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (${idColumn}, user_id) DO NOTHING`,
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (${idColumn}, user_id) DO NOTHING`,
           [tId, uId, requestedBy, requestedBy, requestedBy]
         );
         console.log(`[ACCESS_TRACE] Add result:`, result.rowCount);
@@ -1447,62 +1602,72 @@ export class ProjectService {
 
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
-    // Super Admin and HR can manage any project
     if (role === 'super_admin') return true;
-
-    // Project Manager can manage their own project
-    const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
-    if (res.rows.length === 0) return false;
-    // Fix: Use string comparison to handle potential type discrepancies (string vs number)
-    return String(res.rows[0].project_manager_id) === String(userId);
+    const res = await query(`
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM projects WHERE id = $2 AND project_manager_id IN (SELECT id FROM hierarchy)
+    `, [userId, projectId]);
+    return res.rows.length > 0;
   }
 
   static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
-    // STRICT: Only the Project Manager can add/edit modules, tasks, activities
-    // AND ONLY if the project is ACTIVE
-    const res = await query(`SELECT project_manager_id, status FROM projects WHERE id = $1`, [projectId]);
-    if (res.rows.length === 0) return false;
-    const project = res.rows[0];
-    return project.project_manager_id === userId && project.status === 'active';
+    if (role === 'super_admin') return true;
+    const res = await query(`
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM projects WHERE id = $2 AND project_manager_id IN (SELECT id FROM hierarchy) AND status = 'active'
+    `, [userId, projectId]);
+    return res.rows.length > 0;
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
+    if (role === 'super_admin') return true;
     const res = await query(`
-      SELECT p.project_manager_id, p.status
-      FROM project_modules m
-      JOIN projects p ON m.project_id = p.id
-      WHERE m.id = $1`, [moduleId]);
-
-    if (res.rows.length === 0) return false;
-    const project = res.rows[0];
-    return project.project_manager_id === userId && project.status === 'active';
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM project_modules m JOIN projects p ON m.project_id = p.id
+      WHERE m.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy) AND p.status = 'active'
+    `, [userId, moduleId]);
+    return res.rows.length > 0;
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
+    if (role === 'super_admin') return true;
     const res = await query(`
-      SELECT p.project_manager_id, p.status
-      FROM project_tasks t
-      JOIN project_modules m ON t.module_id = m.id
-      JOIN projects p ON m.project_id = p.id
-      WHERE t.id = $1`, [taskId]);
-
-    if (res.rows.length === 0) return false;
-    const project = res.rows[0];
-    return project.project_manager_id === userId && project.status === 'active';
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM project_tasks t JOIN project_modules m ON t.module_id = m.id JOIN projects p ON m.project_id = p.id
+      WHERE t.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy) AND p.status = 'active'
+    `, [userId, taskId]);
+    return res.rows.length > 0;
   }
 
   static async canUserManageActivity(userId: number, role: string, activityId: number): Promise<boolean> {
+    if (role === 'super_admin') return true;
     const res = await query(`
-      SELECT p.project_manager_id, p.status
-      FROM project_activities a
-      JOIN project_tasks t ON a.task_id = t.id
-      JOIN project_modules m ON t.module_id = m.id
-      JOIN projects p ON m.project_id = p.id
-      WHERE a.id = $1`, [activityId]);
-
-    if (res.rows.length === 0) return false;
-    const project = res.rows[0];
-    return project.project_manager_id === userId && project.status === 'active';
+      WITH RECURSIVE hierarchy AS (
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
+      )
+      SELECT 1 FROM project_activities a JOIN project_tasks t ON a.task_id = t.id
+      JOIN project_modules m ON t.module_id = m.id JOIN projects p ON m.project_id = p.id
+      WHERE a.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy) AND p.status = 'active'
+    `, [userId, activityId]);
+    return res.rows.length > 0;
   }
 
   static async deleteTask(id: number) {
