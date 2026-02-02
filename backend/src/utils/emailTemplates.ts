@@ -1949,6 +1949,8 @@ export const sendTimesheetStatusEmail = async (
   } else {
     if (data.logDate) {
       mainMessage += `Your timesheet entry for <strong>${data.logDate}</strong> has been <strong>rejected</strong>.`;
+    } else if (data.startDate === data.endDate) {
+      mainMessage += `Your timesheet entries for <strong>${data.startDate}</strong> have been <strong>rejected</strong>.`;
     } else {
       mainMessage += `Your timesheet entries for <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong> have been <strong>rejected</strong>.`;
     }
@@ -1956,7 +1958,11 @@ export const sendTimesheetStatusEmail = async (
 
   const detailsTable = generateDetailsTable([
     { label: 'Status:', value: data.status.toUpperCase(), isBold: true },
-    ...(data.startDate ? [{ label: 'Period:', value: `${data.startDate} to ${data.endDate}` }] : []),
+    ...(data.startDate ? [
+      data.startDate === data.endDate
+        ? { label: 'Date:', value: data.startDate }
+        : { label: 'Period:', value: `${data.startDate} to ${data.endDate}` }
+    ] : []),
     ...(data.logDate ? [{ label: 'Date:', value: data.logDate }] : []),
     ...(data.reason ? [{ label: 'Reason:', value: data.reason }] : []),
     ...(data.approverName ? [{ label: 'Action By:', value: data.approverName }] : []),
