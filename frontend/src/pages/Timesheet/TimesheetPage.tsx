@@ -536,7 +536,15 @@ export const TimesheetPage: React.FC = () => {
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
                             <span className="current-week-display">
-                                {weekRange.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - {weekRange.end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {(() => {
+                                    const d1 = String(weekRange.start.getDate()).padStart(2, '0');
+                                    const m1 = String(weekRange.start.getMonth() + 1).padStart(2, '0');
+                                    const y1 = weekRange.start.getFullYear();
+                                    const d2 = String(weekRange.end.getDate()).padStart(2, '0');
+                                    const m2 = String(weekRange.end.getMonth() + 1).padStart(2, '0');
+                                    const y2 = weekRange.end.getFullYear();
+                                    return `${d1}-${m1}-${y1} - ${d2}-${m2}-${y2}`;
+                                })()}
                             </span>
                             <button className="nav-btn" onClick={() => changeWeek(1)}><ChevronRight size={20} /></button>
                         </div>
@@ -987,13 +995,21 @@ export const TimesheetPage: React.FC = () => {
 
                                 return (
                                     <div key={dateStr} className="day-group" style={{ opacity: 0, animation: 'fadeIn 0.5s ease-out forwards' }}>
-                                        <div className="day-header">
-                                            <div className="day-title-group">
-                                                <span className="day-title">
-                                                    {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                        <div className="day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                            <div className="day-title-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span className="day-title" style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                                                    {day.toLocaleDateString('en-GB', { weekday: 'long' })}
+                                                </span>
+                                                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>
+                                                    {(() => {
+                                                        const d = String(day.getDate()).padStart(2, '0');
+                                                        const m = String(day.getMonth() + 1).padStart(2, '0');
+                                                        const y = day.getFullYear();
+                                                        return `${d}-${m}-${y}`;
+                                                    })()}
                                                 </span>
                                             </div>
-                                            <span className="day-total">{dayTotal.toFixed(2)} Hrs</span>
+                                            <span className="day-total" style={{ fontWeight: 600, color: '#475569' }}>{dayTotal.toFixed(2)} Hrs</span>
                                         </div>
 
                                         <div className="entries-grid" style={{ marginTop: '20px' }}>
