@@ -548,7 +548,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   const mandatoryFields = [
     'first_name', 'last_name', 'contact_number', 'date_of_birth', 'gender', 'blood_group', 'marital_status',
     'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation', 'personal_email',
-    'designation', 'department', 'date_of_joining', 'uan_number', 'total_experience',
+    'designation', 'department', 'date_of_joining', 'total_experience',
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
     'twelveth_stream', 'twelveth_college', 'twelveth_year', 'twelveth_percentage',
     'ug_stream', 'ug_college', 'ug_year', 'ug_percentage'
