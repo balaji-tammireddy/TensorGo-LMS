@@ -230,6 +230,12 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+        // Security: Block employees and interns from accessing reports
+        if (role === 'employee' || role === 'intern') {
+            logger.warn(`[TimeSheet Report] Unauthorized access attempt by user ${userId} (${role})`);
+            return res.status(403).json({ error: 'Access denied. Only Managers and HR/Admins can generate reports.' });
+        }
+
         const { projectId, moduleId, taskId, activityId, startDate, endDate, targetUserId } = req.query;
 
         const filters: any = {
@@ -260,6 +266,13 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
 export const generatePDFReport = async (req: AuthRequest, res: Response) => {
     try {
         const { id: userId, role, name: userName } = req.user!;
+
+        // Security: Block employees and interns from accessing reports
+        if (role === 'employee' || role === 'intern') {
+            logger.warn(`[Timesheet PDF Report] Unauthorized access attempt by user ${userId} (${role})`);
+            return res.status(403).json({ error: 'Access denied. Only Managers and HR/Admins can generate reports.' });
+        }
+
         const queryParams = { ...req.query } as any;
 
         logger.info(`[Timesheet Report] Generating PDF report. User: ${userId}, Role: ${role}, Filters: ${JSON.stringify(queryParams)}`);
@@ -271,12 +284,14 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
             moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
             taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
             activityId: queryParams.activityId ? parseInt(String(queryParams.activityId)) : undefined,
-            userId: queryParams.employeeId ? parseInt(String(queryParams.employeeId)) : undefined
+            userId: queryParams.targetUserId ? parseInt(String(queryParams.targetUserId)) : undefined
         };
 
+        // Scope enforcement
         if (role !== 'super_admin' && role !== 'hr') {
+            // Managers see their reportees; Employees see themselves
             filters.managerScopeId = userId;
-            logger.info(`[Timesheet Report] Limiting scope to manager: ${userId}`);
+            logger.info(`[Timesheet Report] Applying visibility scope for user: ${userId} (${role})`);
         }
 
         const filterNames: any = {
@@ -285,7 +300,7 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
         };
 
         if (filters.userId) {
-            const userRes = await pool.query('SELECT first_name, last_name, official_email FROM users WHERE id = $1', [filters.userId]);
+            const userRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [filters.userId]);
             if (userRes.rows.length === 0) {
                 logger.warn(`[Timesheet Report] Target user ${filters.userId} not found`);
                 return res.status(404).json({ error: 'Target user not found' });

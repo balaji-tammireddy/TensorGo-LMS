@@ -45,6 +45,7 @@ export class PDFGenerator {
     constructor() {
         this.doc = new PDFDocument({
             size: 'A4',
+            layout: 'landscape',
             margins: {
                 top: this.margin,
                 bottom: this.margin + 30, // Extra space for footer
@@ -53,6 +54,9 @@ export class PDFGenerator {
             },
             bufferPages: true
         });
+        // A4 Landscape dimensions are 841.89 x 595.28
+        this.pageWidth = 841.89;
+        this.pageHeight = 595.28;
         this.contentWidth = this.pageWidth - (2 * this.margin);
         this.yPosition = this.margin;
     }
@@ -90,39 +94,37 @@ export class PDFGenerator {
     private addHeader() {
         // Background for header
         this.doc
-            .rect(0, 0, this.pageWidth, 120)
-            .fill('#f8fafc');
+            .rect(0, 0, this.pageWidth, 100)
+            .fill('#f1f5f9');
 
-        // Add logo
+        // Add logo (optional)
         const logoPath = path.join(__dirname, '../assets/logo.png');
         try {
-            this.doc.image(logoPath, this.margin, this.margin - 10, { width: 100 });
+            this.doc.image(logoPath, this.margin, this.margin - 10, { width: 80 });
         } catch (error) {
-            logger.warn('[PDFGenerator] Logo not found, skipping');
+            // Skip logo if not found
         }
 
         // Add title
         this.doc
-            .fontSize(22)
+            .fontSize(24)
             .font('Helvetica-Bold')
-            .fillColor('#1e3a8a')
-            .text('TIMESHEET LOG REPORT', this.margin + 120, this.margin, {
-                width: this.contentWidth - 120,
-                align: 'right'
+            .fillColor('#0f172a')
+            .text('TIMESHEET LOG REPORT', 0, this.margin, {
+                align: 'center',
+                width: this.pageWidth
             });
 
         this.doc
             .fontSize(10)
             .font('Helvetica')
             .fillColor('#64748b')
-            .text('Official Attendance & Activity Record', this.margin + 120, this.margin + 30, {
-                width: this.contentWidth - 120,
-                align: 'right'
+            .text('Official Attendance & Activity Record', 0, this.margin + 30, {
+                align: 'center',
+                width: this.pageWidth
             });
 
-        this.yPosition = 120 + 20;
-        this.addHorizontalLine();
-        this.yPosition += 20;
+        this.yPosition = 120;
     }
 
     private addFiltersSection(filters: TimesheetReportFilters) {
@@ -134,17 +136,17 @@ export class PDFGenerator {
                 .font('Helvetica')
                 .fillColor('#64748b')
                 .text('Filters: All Records', this.margin, this.yPosition);
-            this.yPosition += 30;
+            this.yPosition += 25;
             return;
         }
 
         this.doc
-            .fontSize(12)
+            .fontSize(11)
             .font('Helvetica-Bold')
             .fillColor('#334155')
             .text('Filters Applied:', this.margin, this.yPosition);
 
-        this.yPosition += 20;
+        this.yPosition += 15;
 
         const filterEntries = [
             { label: 'Employee', value: filters.employeeName },
@@ -153,21 +155,21 @@ export class PDFGenerator {
             { label: 'Task', value: filters.taskName },
             { label: 'Activity', value: filters.activityName },
             { label: 'Date Range', value: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : filters.startDate || filters.endDate }
-        ];
+        ].filter(f => f.value);
 
         filterEntries.forEach(filter => {
             this.doc
-                .fontSize(10)
+                .fontSize(9)
                 .font('Helvetica')
                 .fillColor('#475569')
-                .text(`• ${filter.label}: `, this.margin + 10, this.yPosition, { continued: true })
+                .text(`${filter.label}: `, this.margin, this.yPosition, { continued: true })
                 .font('Helvetica-Bold')
                 .fillColor('#1e293b')
-                .text(filter.value || 'NA');
-            this.yPosition += 18;
+                .text(filter.value || 'All');
+            this.yPosition += 14;
         });
 
-        this.yPosition += 10;
+        this.yPosition += 15;
     }
 
     private addSummarySection(entries: TimesheetReportEntry[]) {
@@ -178,32 +180,33 @@ export class PDFGenerator {
         // Summary box
         const boxY = this.yPosition;
         this.doc
-            .rect(this.margin, boxY, this.contentWidth, 60)
+            .rect(this.margin, boxY, this.contentWidth, 50)
             .fillAndStroke('#eff6ff', '#3b82f6');
+
+        this.yPosition += 12;
+
+        const colWidth = this.contentWidth / 3;
+        const col1X = this.margin;
+        const col2X = this.margin + colWidth;
+        const col3X = this.margin + (colWidth * 2);
+
+        this.doc
+            .fontSize(9)
+            .font('Helvetica')
+            .fillColor('#1e40af')
+            .text('Total Hours', col1X, this.yPosition, { align: 'center', width: colWidth })
+            .text('Total Entries', col2X, this.yPosition, { align: 'center', width: colWidth })
+            .text('Employees', col3X, this.yPosition, { align: 'center', width: colWidth });
 
         this.yPosition += 15;
 
-        const col1X = this.margin + 20;
-        const col2X = this.margin + (this.contentWidth / 3);
-        const col3X = this.margin + (2 * this.contentWidth / 3);
-
         this.doc
-            .fontSize(10)
-            .font('Helvetica')
-            .fillColor('#1e40af')
-            .text('Total Hours', col1X, this.yPosition)
-            .text('Total Entries', col2X, this.yPosition)
-            .text('Employees', col3X, this.yPosition);
-
-        this.yPosition += 18;
-
-        this.doc
-            .fontSize(16)
+            .fontSize(14)
             .font('Helvetica-Bold')
             .fillColor('#1e3a8a')
-            .text(totalHours.toFixed(2), col1X, this.yPosition)
-            .text(totalEntries.toString(), col2X, this.yPosition)
-            .text(uniqueEmployees.toString(), col3X, this.yPosition);
+            .text(totalHours.toFixed(2), col1X, this.yPosition, { align: 'center', width: colWidth })
+            .text(totalEntries.toString(), col2X, this.yPosition, { align: 'center', width: colWidth })
+            .text(uniqueEmployees.toString(), col3X, this.yPosition, { align: 'center', width: colWidth });
 
         this.yPosition += 40;
     }
@@ -221,15 +224,17 @@ export class PDFGenerator {
             return;
         }
 
-        // Table configuration
+        // Table configuration - Optimized for Landscape (Total Width: ~740)
         const columns = [
             { label: 'Date', width: 65 },
-            { label: 'Employee', width: 85 },
-            { label: 'Project', width: 75 },
-            { label: 'Task', width: 70 },
-            { label: 'Activity', width: 70 },
-            { label: 'Hours', width: 50 },
-            { label: 'Status', width: 75 }
+            { label: 'Employee', width: 90 },
+            { label: 'Project', width: 85 },
+            { label: 'Module', width: 85 },
+            { label: 'Task', width: 80 },
+            { label: 'Activity', width: 80 },
+            { label: 'Hours', width: 45 },
+            { label: 'Status', width: 60 },
+            { label: 'Description', width: 150 }
         ];
 
         // Table header
@@ -248,12 +253,12 @@ export class PDFGenerator {
                 .fillColor('#ffffff')
                 .text(col.label, xPos, headerY + 8, {
                     width: col.width - 10,
-                    align: i === 5 ? 'center' : 'left'
+                    align: i === 6 ? 'center' : 'left'
                 });
             xPos += col.width;
         });
 
-        this.yPosition += 30;
+        this.yPosition += 25;
 
         // Table rows
         entries.forEach((entry, index) => {
@@ -269,13 +274,15 @@ export class PDFGenerator {
             xPos = this.margin + 5;
 
             const rowData = [
-                new Date(entry.log_date).toLocaleDateString('en-GB'),
+                entry.log_date ? new Date(entry.log_date).toLocaleDateString('en-GB') : '',
                 entry.employee_name,
                 entry.project_name,
+                entry.module_name,
                 entry.task_name,
                 entry.activity_name,
-                entry.duration.toFixed(1),
-                entry.log_status
+                (entry.duration || 0).toFixed(1),
+                (entry.log_status || '').toUpperCase(),
+                entry.description
             ];
 
             rowData.forEach((data, i) => {
@@ -283,9 +290,9 @@ export class PDFGenerator {
                     .fontSize(8)
                     .font('Helvetica')
                     .fillColor('#334155')
-                    .text(this.truncateText(data, columns[i].width - 10), xPos, rowY + 8, {
+                    .text(this.truncateText(String(data || ''), columns[i].width - 10), xPos, rowY + 8, {
                         width: columns[i].width - 10,
-                        align: i === 5 ? 'center' : 'left'
+                        align: i === 6 ? 'center' : 'left'
                     });
                 xPos += columns[i].width;
             });
@@ -295,7 +302,7 @@ export class PDFGenerator {
     }
 
     private addFooter(generatedBy: string, generatedAt: string) {
-        const footerY = this.pageHeight - this.margin;
+        const footerY = this.pageHeight - this.margin + 10;
 
         this.doc
             .fontSize(8)
@@ -313,7 +320,7 @@ export class PDFGenerator {
         const range = this.doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
             this.doc.switchToPage(i);
-            const footerY = this.pageHeight - this.margin;
+            const footerY = this.pageHeight - this.margin + 10;
 
             this.doc
                 .fontSize(8)
@@ -338,7 +345,7 @@ export class PDFGenerator {
     }
 
     private checkPageBreak(requiredSpace: number) {
-        if (this.yPosition + requiredSpace > this.pageHeight - this.margin - 40) {
+        if (this.yPosition + requiredSpace > this.pageHeight - this.margin - 20) {
             this.doc.addPage();
             this.yPosition = this.margin;
             this.pageNumber++;
@@ -346,10 +353,11 @@ export class PDFGenerator {
     }
 
     private truncateText(text: string, maxWidth: number): string {
-        // Rough estimation: 1 char ≈ 5 points at font size 8
+        if (!text) return '';
+        // Rough estimation: 1 char ≈ 4 points at font size 8
         const maxChars = Math.floor(maxWidth / 4);
         if (text.length > maxChars) {
-            return text.substring(0, maxChars - 3) + '...';
+            return text.substring(0, Math.max(0, maxChars - 3)) + '...';
         }
         return text;
     }

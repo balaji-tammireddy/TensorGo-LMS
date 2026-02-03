@@ -291,14 +291,16 @@ export const TimesheetApprovalPage: React.FC = () => {
                     </div>
 
                     <div className="header-actions">
-                        <Button
-                            variant="outline"
-                            onClick={() => setReportModalOpen(true)}
-                            style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
-                        >
-                            <Download size={16} />
-                            Reports
-                        </Button>
+                        {['manager', 'hr', 'super_admin'].includes(user?.role || '') && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setReportModalOpen(true)}
+                                style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                            >
+                                <Download size={16} />
+                                Reports
+                            </Button>
+                        )}
 
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
@@ -420,8 +422,6 @@ export const TimesheetApprovalPage: React.FC = () => {
                                     const criteriaMet = totalHours >= 40;
                                     const hasActionable = memberEntries.some(e => e.log_status === 'submitted');
                                     const allApproved = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'approved' || e.log_status === 'rejected');
-                                    const allDraft = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'draft');
-                                    const isNotSubmitted = selectedMember?.status === 'draft' || selectedMember?.status === 'pending_submission';
 
                                     return (
                                         <>

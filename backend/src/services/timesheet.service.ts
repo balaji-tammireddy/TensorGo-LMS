@@ -1222,7 +1222,7 @@ export class TimesheetService {
             LEFT JOIN project_modules m ON pe.module_id = m.id
             LEFT JOIN project_tasks t ON pe.task_id = t.id
             LEFT JOIN project_activities a ON pe.activity_id = a.id
-            WHERE pe.log_status = 'approved'
+            WHERE pe.log_status IN ('approved', 'submitted')
         `;
         const params: any[] = [];
         let pIdx = 1;
@@ -1236,9 +1236,12 @@ export class TimesheetService {
         if (filters.taskId) { query += ` AND pe.task_id = $${pIdx++}`; params.push(filters.taskId); }
         if (filters.activityId) { query += ` AND pe.activity_id = $${pIdx++}`; params.push(filters.activityId); }
 
-        // Scope Filter (Manager sees only reportees)
+        // Scope Filter
         if (filters.managerScopeId) {
-            query += ` AND (u.reporting_manager_id = $${pIdx++})`; params.push(filters.managerScopeId);
+            // Manager sees their reportees OR themselves (for self-reports)
+            query += ` AND (u.reporting_manager_id = $${pIdx} OR pe.user_id = $${pIdx})`;
+            params.push(filters.managerScopeId);
+            pIdx++;
         }
 
         query += ` ORDER BY pe.log_date DESC, u.first_name ASC`;
