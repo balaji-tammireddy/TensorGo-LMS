@@ -33,7 +33,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     onSuccess,
     initialData,
     isEdit = false,
-    // projectManagerId
+    projectManagerId
 }) => {
     const { showSuccess, showError } = useToast();
     const { user } = useAuth();
@@ -70,7 +70,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 custom_id: '',
                 name: '',
                 description: '',
-                project_manager_id: (type === 'project' && user?.role !== 'super_admin') ? String(user.id) : '',
+                project_manager_id: (type === 'project' && user?.role !== 'super_admin') ? String(user?.id || '') : '',
                 due_date: '',
                 assignee_ids: []
             });

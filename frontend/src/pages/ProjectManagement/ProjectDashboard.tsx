@@ -238,7 +238,6 @@ export const ProjectDashboard: React.FC = () => {
                                             title="All Projects"
                                             projects={allProjects}
                                             emptyMsg="No global projects to display."
-                                            sectionId="all-projects"
                                             isOpen={openSection === 'all-projects'}
                                             onToggle={() => handleToggleSection('all-projects')}
                                             navigate={navigate}

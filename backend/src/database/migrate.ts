@@ -116,15 +116,7 @@ async function migrate() {
       ON CONFLICT (holiday_date) DO NOTHING
     `);
 
-    // Update existing employees' casual and sick leave balances to 0 (remove defaults)
-    const updateResult = await pool.query(`
-      UPDATE leave_balances
-      SET casual_balance = 0,
-          sick_balance = 0,
-          last_updated = CURRENT_TIMESTAMP
-      WHERE casual_balance != 0 OR sick_balance != 0
-    `);
-    console.log(`Updated ${updateResult.rowCount} employee leave balance records (casual and sick set to 0)`);
+
 
     // Run password reset OTP migration
     try {
