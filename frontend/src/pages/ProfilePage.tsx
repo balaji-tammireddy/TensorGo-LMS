@@ -16,7 +16,9 @@ import {
 import { Button } from '../components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import * as profileService from '../services/profileService';
+import './EmployeeManagementPage.css'; // Use same styles as EmployeeDetailsPage
 import './ProfilePage.css';
+
 
 // Helper function to format education level display
 const formatEducationLevel = (level: string): React.ReactNode => {
@@ -27,7 +29,7 @@ const formatEducationLevel = (level: string): React.ReactNode => {
 };
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const { showSuccess, showError, showWarning } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
@@ -106,6 +108,15 @@ const ProfilePage: React.FC = () => {
     }
 
     return null;
+  };
+
+  const sanitizeUAN = (value: string) => {
+    return value.replace(/[^0-9]/g, '').slice(0, 12);
+  };
+
+  const formatUAN = (value: string) => {
+    const digits = sanitizeUAN(value);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
   };
   const sanitizeLettersOnly = (value: string) => {
     const sanitized = value.replace(/[^a-zA-Z\s]/g, '');
@@ -307,27 +318,12 @@ const ProfilePage: React.FC = () => {
   const handleSave = async () => {
     if (!isEditMode || !initialFormData) return;
 
-    const missingFields: string[] = [];
     const fieldErrors: Record<string, boolean> = {};
 
     const isEmpty = (value: any) =>
       value === undefined ||
       value === null ||
       (typeof value === 'string' && value.trim() === '');
-
-    const checkField = (obj: any, field: string, label: string) => {
-      if (isEmpty(obj?.[field])) {
-        missingFields.push(label);
-        fieldErrors[field] = true;
-      }
-    };
-
-    // Personal Info
-    checkField(formData.personalInfo, 'firstName', 'First Name');
-    checkField(formData.personalInfo, 'lastName', 'Last Name');
-    checkField(formData.personalInfo, 'contactNumber', 'Contact Number');
-    checkField(formData.personalInfo, 'altContact', 'Alternate Contact Number');
-    checkField(formData.personalInfo, 'dateOfBirth', 'Date of Birth');
 
     // Age validation
     if (formData.personalInfo?.dateOfBirth) {
@@ -365,112 +361,77 @@ const ProfilePage: React.FC = () => {
       }
     }
 
-    checkField(formData.personalInfo, 'gender', 'Gender');
-    checkField(formData.personalInfo, 'bloodGroup', 'Blood Group');
-    checkField(formData.personalInfo, 'maritalStatus', 'Marital Status');
-    checkField(formData.personalInfo, 'emergencyContactName', 'Emergency Contact Name');
-    checkField(formData.personalInfo, 'emergencyContactNo', 'Emergency Contact Number');
-    checkField(formData.personalInfo, 'emergencyContactRelation', 'Emergency Contact Relation');
-
-    // Employment Info
-    checkField(formData.employmentInfo, 'designation', 'Designation');
-    checkField(formData.employmentInfo, 'department', 'Department');
-    checkField(formData.employmentInfo, 'dateOfJoining', 'Date of Joining');
-
-    // Document Info
-    checkField(formData.documents, 'aadharNumber', 'Aadhar Number');
-    if (isEmpty(formData.documents?.panNumber)) {
-      missingFields.push('PAN Number');
-      fieldErrors['panNumber'] = true;
-    } else {
-      const panError = validatePan(formData.documents.panNumber);
-      if (panError) {
-        showWarning(panError);
-        fieldErrors['panNumber'] = true;
+    // New Fields Validation
+    if (!isEmpty(formData.employmentInfo?.totalExperience)) {
+      const exp = parseFloat(formData.employmentInfo.totalExperience);
+      if (isNaN(exp) || exp < 0) {
+        showWarning('Total Experience must be a valid positive number');
+        fieldErrors['totalExperience'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      } else if ((exp * 10) % 5 !== 0) {
+        showWarning('Total Experience must be in 0.5 increments (e.g. 1.5, 2.0)');
+        fieldErrors['totalExperience'] = true;
         setFormErrors(fieldErrors);
         return;
       }
     }
 
-    // Address Info
-    checkField(formData.address, 'currentAddress', 'Current Address');
-    checkField(formData.address, 'permanentAddress', 'Permanent Address');
+    if (!isEmpty(formData.employmentInfo?.uanNumber)) {
+      if (!/^\d{12}$/.test(formData.employmentInfo.uanNumber)) {
+        showWarning('UAN Number must be exactly 12 digits');
+        fieldErrors['uanNumber'] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
 
-    // Education Info
+    // Education
     if (formData.education && Array.isArray(formData.education)) {
       const currentYear = new Date().getFullYear();
       const maxYear = currentYear + 5;
       let yearValidationError: string | null = null;
+      let isEducationValid = true;
 
-      let isPgValid = true;
       formData.education.forEach((edu: any, index: number) => {
         const levelLabel = edu.level || 'Education';
 
-        if (levelLabel === 'PG') {
-          const pgFields = [
-            { value: edu.groupStream, label: 'Group/Stream', key: 'groupStream' },
-            { value: edu.collegeUniversity, label: 'College/University', key: 'collegeUniversity' },
-            { value: edu.year, label: 'Graduation Year', key: 'year' },
-            { value: edu.scorePercentage, label: 'Score %', key: 'scorePercentage' }
-          ];
+        const eduFields = [
+          { value: edu.groupStream, label: 'Group/Stream', key: 'groupStream' },
+          { value: edu.collegeUniversity, label: 'College/University', key: 'collegeUniversity' },
+          { value: edu.year, label: 'Graduation Year', key: 'year' },
+          { value: edu.scorePercentage, label: 'Score %', key: 'scorePercentage' }
+        ];
 
-          const filledFields = pgFields.filter(f => !isEmpty(f.value));
+        const filledFields = eduFields.filter(f => !isEmpty(f.value));
 
-          if (filledFields.length > 0 && filledFields.length < pgFields.length) {
-            showWarning('Please fill complete details if you want to add PG details');
-            pgFields.forEach(f => {
-              if (isEmpty(f.value)) {
-                fieldErrors[`edu_${index}_${f.key}`] = true;
-              }
-            });
-            setFormErrors(fieldErrors);
-            isPgValid = false;
-            return;
-          }
-
-          if (!isEmpty(edu.year)) {
-            const year = parseInt(edu.year, 10);
-            if (isNaN(year) || year < 1950 || year > maxYear) {
-              yearValidationError = `PG Graduation Year: 1950 - ${maxYear}`;
-              fieldErrors[`edu_${index}_year`] = true;
-            }
-          }
-          return;
+        // All-or-nothing logic for education levels (including PG if provided)
+        if (filledFields.length > 0 && filledFields.length < eduFields.length) {
+          showWarning(`Please fill complete details for ${levelLabel} education`);
+          eduFields.forEach(f => {
+            if (isEmpty(f.value)) fieldErrors[`edu_${index}_${f.key}`] = true;
+          });
+          setFormErrors(fieldErrors);
+          isEducationValid = false;
         }
 
-        if (isEmpty(edu.groupStream)) {
-          missingFields.push(`${levelLabel} - Group/Stream`);
-          fieldErrors[`edu_${index}_groupStream`] = true;
-        }
-        if (isEmpty(edu.collegeUniversity)) {
-          missingFields.push(`${levelLabel} - College/University`);
-          fieldErrors[`edu_${index}_collegeUniversity`] = true;
-        }
-        if (isEmpty(edu.year)) {
-          missingFields.push(`${levelLabel} - Graduation Year`);
-          fieldErrors[`edu_${index}_year`] = true;
-        } else {
+        if (!isEmpty(edu.year)) {
           const year = parseInt(edu.year, 10);
           if (isNaN(year) || year < 1950 || year > maxYear) {
             yearValidationError = `${levelLabel} Graduation Year: 1950 - ${maxYear}`;
             fieldErrors[`edu_${index}_year`] = true;
           }
         }
-        if (isEmpty(edu.scorePercentage)) {
-          missingFields.push(`${levelLabel} - Score %`);
-          fieldErrors[`edu_${index}_scorePercentage`] = true;
-        }
       });
 
-      if (!isPgValid) return;
-
+      if (!isEducationValid) return;
       if (yearValidationError) {
         showWarning(yearValidationError);
         setFormErrors(fieldErrors);
         return;
       }
 
-      // Chronological validation: 12th < UG < PG
+      // Chronological validation
       const pgYear = parseInt(formData.education.find((e: any) => e.level === 'PG')?.year, 10);
       const ugYear = parseInt(formData.education.find((e: any) => e.level === 'UG')?.year, 10);
       const hscYear = parseInt(formData.education.find((e: any) => e.level === '12th')?.year, 10);
@@ -478,16 +439,10 @@ const ProfilePage: React.FC = () => {
       if (!isNaN(ugYear) && !isNaN(hscYear)) {
         if (hscYear >= ugYear) {
           showWarning('12th Graduation Year must be before UG Graduation Year');
-          const hscIndex = formData.education.findIndex((e: any) => e.level === '12th');
-          fieldErrors[`edu_${hscIndex}_year`] = true;
-          setFormErrors(fieldErrors);
           return;
         }
         if (ugYear - hscYear < 3) {
-          showWarning(`Minimum 3 years gap required between 12th (${hscYear}) and UG (${ugYear}) Graduation Year`);
-          const ugIndex = formData.education.findIndex((e: any) => e.level === 'UG');
-          fieldErrors[`edu_${ugIndex}_year`] = true;
-          setFormErrors(fieldErrors);
+          showWarning(`Minimum 3 years gap required between 12th and UG Graduation Year`);
           return;
         }
       }
@@ -495,96 +450,69 @@ const ProfilePage: React.FC = () => {
       if (!isNaN(pgYear) && !isNaN(ugYear)) {
         if (ugYear >= pgYear) {
           showWarning('UG Graduation Year must be before PG Graduation Year');
-          const ugIndex = formData.education.findIndex((e: any) => e.level === 'UG');
-          fieldErrors[`edu_${ugIndex}_year`] = true;
-          setFormErrors(fieldErrors);
           return;
         }
         if (pgYear - ugYear < 2) {
-          showWarning(`Minimum 2 years gap required between UG (${ugYear}) and PG (${pgYear}) Graduation Year`);
-          const pgIndex = formData.education.findIndex((e: any) => e.level === 'PG');
-          fieldErrors[`edu_${pgIndex}_year`] = true;
-          setFormErrors(fieldErrors);
+          showWarning(`Minimum 2 years gap required between UG and PG Graduation Year`);
           return;
         }
       }
     }
 
-    setFormErrors(fieldErrors);
-
-    if (missingFields.length > 0) {
-      // Check if Date of Birth is missing but specifically because of invalid input (caught by onBlur or manual check)
-      if (missingFields.includes('Date of Birth')) {
-        // If formErrors has dateOfBirth, it means it's invalid, not just empty
-        if (fieldErrors['dateOfBirth'] || formErrors.dateOfBirth) {
-          showWarning('Invalid Date of Birth');
-          return;
-        }
-      }
-      showWarning('Please Fill All Mandatory Details');
-      return;
-    }
-
-    const aadhar = formData.documents?.aadharNumber as string | undefined;
-    if (aadhar && aadhar.length !== 12) {
+    const aadhar = formData.documents?.aadharNumber;
+    if (aadhar && String(aadhar).length !== 12) {
       showWarning('Aadhar must be 12 digits');
-      setFormErrors({ ...fieldErrors, aadharNumber: true });
+      fieldErrors['aadharNumber'] = true;
+      setFormErrors(fieldErrors);
       return;
     }
 
-    const phoneFields = [
-      {
-        value: formData.personalInfo?.contactNumber as string | undefined,
-        label: 'Contact Number',
-        key: 'contactNumber'
-      },
-      {
-        value: formData.personalInfo?.altContact as string | undefined,
-        label: 'Alternate Contact Number',
-        key: 'altContact'
-      },
-      {
-        value: formData.personalInfo?.emergencyContactNo as string | undefined,
-        label: 'Emergency Contact Number',
-        key: 'emergencyContactNo'
-      }
-    ];
-
-    for (const field of phoneFields) {
-      const v = field.value || '';
-      if (v.length !== 10) {
-        showWarning(`${field.label} must be 10 digits`);
-        setFormErrors({ ...fieldErrors, [field.key]: true });
+    const pan = formData.documents?.panNumber;
+    if (pan && String(pan).trim() !== '') {
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(String(pan).toUpperCase())) {
+        showWarning('Invalid PAN format');
+        fieldErrors['panNumber'] = true;
+        setFormErrors(fieldErrors);
         return;
       }
     }
 
-    // Check for duplicate phone numbers
+    const phoneFields = [
+      { value: formData.personalInfo?.contactNumber, label: 'Contact Number', key: 'contactNumber' },
+      { value: formData.personalInfo?.emergencyContactNo, label: 'Emergency Contact Number', key: 'emergencyContactNo' },
+      { value: formData.personalInfo?.altContact, label: 'Alternate Contact Number', key: 'altContact' }
+    ];
+
+    for (const field of phoneFields) {
+      if (field.value && String(field.value).length !== 10) {
+        showWarning(`${field.label} must be 10 digits`);
+        fieldErrors[field.key] = true;
+        setFormErrors(fieldErrors);
+        return;
+      }
+    }
+
     const contactNo = formData.personalInfo?.contactNumber;
-    const altNo = formData.personalInfo?.altContact;
     const emergencyNo = formData.personalInfo?.emergencyContactNo;
+    const altNo = formData.personalInfo?.altContact;
 
-    if (contactNo === altNo) {
+    if (altNo && contactNo === altNo) {
       showWarning('Contact Number and Alternate Contact Number cannot be the same');
-      setFormErrors({ ...fieldErrors, altContact: true });
       return;
     }
-    if (altNo === emergencyNo) {
+    if (altNo && altNo === emergencyNo) {
       showWarning('Alternate Contact Number and Emergency Contact Number cannot be the same');
-      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
       return;
     }
-    if (contactNo === emergencyNo) {
+    if (contactNo === emergencyNo && contactNo) {
       showWarning('Contact Number and Emergency Contact Number cannot be the same');
-      setFormErrors({ ...fieldErrors, emergencyContactNo: true });
       return;
     }
 
-    // Exclude reportingManagerId from the payload - it cannot be updated via Profile page
     const { reportingManagerId, ...submissionData } = formData;
     const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData);
 
-    // Parallelize mutations
     const mutationPromises = [];
 
     if (pendingPhotoAction) {
@@ -599,7 +527,6 @@ const ProfilePage: React.FC = () => {
       mutationPromises.push(updateMutation.mutateAsync(submissionData));
     }
 
-    // If nothing changed, just exit edit mode
     if (mutationPromises.length === 0) {
       setIsEditMode(false);
       return;
@@ -607,22 +534,15 @@ const ProfilePage: React.FC = () => {
 
     try {
       await Promise.all(mutationPromises);
-
-      // Clear pending photo actions
       setPendingPhotoAction(null);
       setPendingPhotoPreview(null);
       setIsEditMode(false);
-
-      // Invalidate query to refresh all profile data including photo
       queryClient.invalidateQueries('profile');
-
-      // If we only updated photo (no hasChanges), we need to show success here 
-      // because updateMutation.onSuccess won't trigger
+      await refreshUser();
       if (!hasChanges) {
         showSuccess('Profile updated successfully!');
       }
     } catch (error) {
-      // Errors are handled by individual mutation onError handlers
       console.error('Error saving profile:', error);
     }
   };
@@ -884,13 +804,13 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="profile-section">
-            <h2>Personal Information</h2>
-            <div className="form-grid">
-              <div className={`form-group ${formErrors.firstName ? 'has-error' : ''}`}>
+          <div className="employee-modal-section">
+            <h3>Personal Information</h3>
+            <div className="employee-modal-grid">
+              <div className={`employee-modal-field ${formErrors.firstName ? 'has-error' : ''}`}>
                 <label>
                   First Name
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -917,7 +837,7 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className="form-group">
+              <div className="employee-modal-field">
                 <label>Middle Name</label>
                 <input
                   type="text"
@@ -933,10 +853,10 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.lastName ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.lastName ? 'has-error' : ''}`}>
                 <label>
                   Last Name
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -963,24 +883,34 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className="form-group">
+              <div className="employee-modal-field">
                 <label>
                   Employee ID
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input type="text" value={formData.personalInfo?.empId || ''} disabled />
               </div>
-              <div className="form-group">
+              <div className={`employee-modal-field ${formErrors.personalEmail ? 'has-error' : ''}`}>
                 <label>
-                  Official Email
-                  {isEditMode && <span className="required-indicator">*</span>}
+                  Personal Email
+
                 </label>
-                <input type="email" value={formData.personalInfo?.email || ''} disabled />
+                <input
+                  type="email"
+                  value={formData.personalInfo?.personalEmail || ''}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      personalInfo: { ...formData.personalInfo, personalEmail: e.target.value }
+                    });
+                  }}
+                  disabled={!isEditMode}
+                />
               </div>
-              <div className={`form-group ${formErrors.contactNumber ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.contactNumber ? 'has-error' : ''}`}>
                 <label>
                   Contact Number
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -1034,10 +964,9 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.altContact ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.altContact ? 'has-error' : ''}`}>
                 <label>
                   Alternate Contact Number
-                  {isEditMode && <span className="required-indicator">*</span>}
                 </label>
                 <input
                   type="text"
@@ -1076,11 +1005,19 @@ const ProfilePage: React.FC = () => {
                   }}
                   onBlur={() => {
                     const val = formData.personalInfo?.altContact;
-                    if (!val || val.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, altContact: true }));
-                    } else if (val.length < 10) {
-                      setFormErrors((prev) => ({ ...prev, altContact: true }));
+                    // Only validate if value is provided
+                    if (val && val.trim() !== '') {
+                      if (val.length < 10) {
+                        setFormErrors((prev) => ({ ...prev, altContact: true }));
+                      } else {
+                        setFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.altContact;
+                          return next;
+                        });
+                      }
                     } else {
+                      // Clear error if field is empty (it's optional)
                       setFormErrors((prev) => {
                         const next = { ...prev };
                         delete next.altContact;
@@ -1091,10 +1028,10 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.dateOfBirth ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.dateOfBirth ? 'has-error' : ''}`}>
                 <label>
                   Date of Birth
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <DatePicker
                   value={formData.personalInfo?.dateOfBirth || ''}
@@ -1162,16 +1099,13 @@ const ProfilePage: React.FC = () => {
                   allowManualEntry={true}
                 />
               </div>
-              <div className={`form-group ${formErrors.gender ? 'has-error' : ''}`}>
-                <label>
-                  Gender
-                  {isEditMode && <span className="required-indicator">*</span>}
-                </label>
+              <div className={`employee-modal-field ${formErrors.gender ? 'has-error' : ''}`}>
+                <label>Gender</label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="profile-field-trigger"
+                      className="leave-type-dropdown-trigger"
                       disabled={!isEditMode}
                     >
                       <span>{formData.personalInfo?.gender || ''}</span>
@@ -1208,16 +1142,16 @@ const ProfilePage: React.FC = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <div className={`form-group ${formErrors.bloodGroup ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.bloodGroup ? 'has-error' : ''}`}>
                 <label>
                   Blood Group
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="profile-field-trigger"
+                      className="leave-type-dropdown-trigger"
                       disabled={!isEditMode}
                     >
                       <span>{formData.personalInfo?.bloodGroup || ''}</span>
@@ -1241,16 +1175,16 @@ const ProfilePage: React.FC = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <div className={`form-group ${formErrors.maritalStatus ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.maritalStatus ? 'has-error' : ''}`}>
                 <label>
                   Marital Status
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="profile-field-trigger"
+                      className="leave-type-dropdown-trigger"
                       disabled={!isEditMode}
                     >
                       <span>{formData.personalInfo?.maritalStatus || ''}</span>
@@ -1296,10 +1230,10 @@ const ProfilePage: React.FC = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <div className={`form-group ${formErrors.emergencyContactName ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.emergencyContactName ? 'has-error' : ''}`}>
                 <label>
                   Emergency Contact Name
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -1326,10 +1260,10 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.emergencyContactNo ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.emergencyContactNo ? 'has-error' : ''}`}>
                 <label>
                   Emergency Contact Number
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -1383,10 +1317,10 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.emergencyContactRelation ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.emergencyContactRelation ? 'has-error' : ''}`}>
                 <label>
                   Emergency Contact Relation
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -1416,19 +1350,32 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="profile-section">
-            <h2>Employment Information</h2>
-            <div className="form-grid">
-              <div className={`form-group ${formErrors.designation ? 'has-error' : ''}`}>
+          <div className="employee-modal-section">
+            <h3>Employment Information</h3>
+
+
+
+            <div className="employee-modal-grid">
+              <div className="employee-modal-field">
+                <label>
+                  Official Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.personalInfo?.email || ''}
+                  disabled
+                />
+              </div>
+              <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
                 <label>
                   Designation
                 </label>
                 <input
                   type="text"
-                  maxLength={25}
+                  maxLength={50}
                   value={formData.employmentInfo?.designation || ''}
                   onChange={(e) => {
-                    const value = sanitizeName(e.target.value);
+                    const value = e.target.value;
                     setFormData({
                       ...formData,
                       employmentInfo: { ...formData.employmentInfo, designation: value }
@@ -1445,19 +1392,19 @@ const ProfilePage: React.FC = () => {
                       });
                     }
                   }}
-                  disabled={true}
+                  disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.department ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.department ? 'has-error' : ''}`}>
                 <label>
                   Department
                 </label>
                 <input
                   type="text"
-                  maxLength={25}
+                  maxLength={50}
                   value={formData.employmentInfo?.department || ''}
                   onChange={(e) => {
-                    const value = sanitizeName(e.target.value);
+                    const value = e.target.value;
                     setFormData({
                       ...formData,
                       employmentInfo: { ...formData.employmentInfo, department: value }
@@ -1474,13 +1421,13 @@ const ProfilePage: React.FC = () => {
                       });
                     }
                   }}
-                  disabled={true}
+                  disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.dateOfJoining ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.dateOfJoining ? 'has-error' : ''}`}>
                 <label>
                   Date of Joining
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <DatePicker
                   value={formData.employmentInfo?.dateOfJoining || ''}
@@ -1493,16 +1440,54 @@ const ProfilePage: React.FC = () => {
                   isEmployeeVariant={true}
                 />
               </div>
+
+              {/* New Fields */}
+              <div className={`employee-modal-field ${formErrors.totalExperience ? 'has-error' : ''}`}>
+                <label>
+                  Total Experience (Years)
+
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={formData.employmentInfo?.totalExperience || ''}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      employmentInfo: { ...formData.employmentInfo, totalExperience: e.target.value }
+                    });
+                    // Clear error
+                    if (e.target.value) {
+                      setFormErrors(prev => {
+                        const next = { ...prev };
+                        delete next.totalExperience;
+                        return next;
+                      })
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!e.target.value) {
+                      setFormErrors(prev => ({ ...prev, totalExperience: true }));
+                    }
+                  }}
+                  disabled={!isEditMode}
+                />
+                {formData.employmentInfo?.totalExperience && (parseFloat(formData.employmentInfo.totalExperience) * 10) % 5 !== 0 && (
+                  <span style={{ fontSize: '11px', color: 'red', display: 'block', marginTop: '4px' }}>Must be in 0.5 increments</span>
+                )}
+              </div>
+
             </div>
           </div>
 
-          <div className="profile-section">
-            <h2>Document Information</h2>
-            <div className="form-grid">
-              <div className={`form-group ${formErrors.aadharNumber ? 'has-error' : ''}`}>
+          <div className="employee-modal-section">
+            <h3>Document Information</h3>
+            <div className="employee-modal-grid">
+              <div className={`employee-modal-field ${formErrors.aadharNumber ? 'has-error' : ''}`}>
                 <label>
                   Aadhar Number
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -1534,10 +1519,10 @@ const ProfilePage: React.FC = () => {
                   disabled={!isEditMode}
                 />
               </div>
-              <div className={`form-group ${formErrors.panNumber ? 'has-error' : ''}`}>
+              <div className={`employee-modal-field ${formErrors.panNumber ? 'has-error' : ''}`}>
                 <label>
                   PAN Number
-                  {isEditMode && <span className="required-indicator">*</span>}
+
                 </label>
                 <input
                   type="text"
@@ -1576,16 +1561,37 @@ const ProfilePage: React.FC = () => {
                   </span>
                 )}
               </div>
+
+              <div className={`employee-modal-field ${formErrors.uanNumber ? 'has-error' : ''}`}>
+                <label>
+                  UAN Number
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={14}
+                  value={formatUAN(formData.employmentInfo?.uanNumber || '')}
+                  onChange={(e) => {
+                    const sanitized = sanitizeUAN(e.target.value);
+                    setFormData({
+                      ...formData,
+                      employmentInfo: { ...formData.employmentInfo, uanNumber: sanitized }
+                    });
+                  }}
+                  disabled={!isEditMode}
+                  placeholder="XXXX XXXX XXXX"
+                />
+                {formData.employmentInfo?.uanNumber && formData.employmentInfo.uanNumber.length !== 12 && (
+                  <span style={{ fontSize: '11px', color: 'red', display: 'block', marginTop: '4px' }}>Must be 12 digits</span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="profile-section">
-            <h2>Address Details</h2>
-            <div className={`form-group address-current ${formErrors.permanentAddress ? 'has-error' : ''}`}>
-              <label>
-                Permanent Address
-                {isEditMode && <span className="required-indicator">*</span>}
-              </label>
+          <div className="employee-modal-section">
+            <h3>Address Details</h3>
+            <div className={`employee-modal-field address-current ${formErrors.permanentAddress ? 'has-error' : ''}`}>
+              <label>Permanent Address</label>
               <textarea
                 value={formData.address?.permanentAddress || ''}
                 onChange={(e) => {
@@ -1623,11 +1629,8 @@ const ProfilePage: React.FC = () => {
                 rows={4}
               />
             </div>
-            <div className={`form-group ${formErrors.currentAddress ? 'has-error' : ''}`}>
-              <label>
-                Current Address
-                {isEditMode && <span className="required-indicator">*</span>}
-              </label>
+            <div className={`employee-modal-field ${formErrors.currentAddress ? 'has-error' : ''}`}>
+              <label>Current Address</label>
               <textarea
                 value={formData.address?.currentAddress || ''}
                 onChange={(e) => {
@@ -1664,8 +1667,8 @@ const ProfilePage: React.FC = () => {
           </div>
 
           {user?.role !== 'super_admin' && user?.role !== 'hr' && (
-            <div className="profile-section">
-              <h2>Education Information</h2>
+            <div className="employee-modal-section">
+              <h3>Education Information</h3>
               <table className="education-table">
                 <thead>
                   <tr>
@@ -1681,16 +1684,13 @@ const ProfilePage: React.FC = () => {
                     <tr key={edu.level} className={(formErrors[`edu_${idx}_groupStream`] || formErrors[`edu_${idx}_collegeUniversity`] || formErrors[`edu_${idx}_year`] || formErrors[`edu_${idx}_scorePercentage`]) ? 'has-error' : ''}>
                       <td className="education-level-cell">
                         {formatEducationLevel(edu.level)}
-                        {(edu.level === 'UG' || edu.level === '12th') && (
-                          <span className="required-indicator">*</span>
-                        )}
                       </td>
                       <td className={formErrors[`edu_${idx}_groupStream`] ? 'has-error' : ''}>
                         <input
                           type="text"
                           value={edu.groupStream || ''}
                           onChange={(e) => {
-                            const value = sanitizeLettersOnly(e.target.value);
+                            const value = e.target.value;
                             const newEducation = [...formData.education];
                             newEducation[idx] = { ...edu, groupStream: value };
                             setFormData({ ...formData, education: newEducation });
@@ -1714,7 +1714,7 @@ const ProfilePage: React.FC = () => {
                           type="text"
                           value={edu.collegeUniversity || ''}
                           onChange={(e) => {
-                            const value = sanitizeLettersOnly(e.target.value);
+                            const value = e.target.value;
                             const newEducation = [...formData.education];
                             newEducation[idx] = { ...edu, collegeUniversity: value };
                             setFormData({ ...formData, education: newEducation });
@@ -1825,9 +1825,9 @@ const ProfilePage: React.FC = () => {
           )}
 
           {user?.role !== 'super_admin' && (
-            <div className="profile-section">
-              <h2>Reporting Hierarchy</h2>
-              <div className="form-group">
+            <div className="employee-modal-section">
+              <h3>Reporting Hierarchy</h3>
+              <div className="employee-modal-field">
                 <label>Reporting Manager</label>
                 <input
                   type="text"
@@ -1838,7 +1838,7 @@ const ProfilePage: React.FC = () => {
             </div>
           )}
         </div>
-      </AppLayout>
+      </AppLayout >
       <ConfirmationDialog
         isOpen={deletePhotoConfirmOpen}
         title="Delete Profile Photo"
@@ -1850,14 +1850,16 @@ const ProfilePage: React.FC = () => {
         onConfirm={confirmDeletePhoto}
         onCancel={() => setDeletePhotoConfirmOpen(false)}
       />
-      {showImagePopup && photoSignedUrl && (
-        <div className="image-popup-overlay" onClick={() => setShowImagePopup(false)}>
-          <div className="image-popup-content" onClick={(e) => e.stopPropagation()}>
-            <button className="image-popup-close" onClick={() => setShowImagePopup(false)}>×</button>
-            <img src={photoSignedUrl} alt="Profile" className="image-popup-image" />
+      {
+        showImagePopup && photoSignedUrl && (
+          <div className="image-popup-overlay" onClick={() => setShowImagePopup(false)}>
+            <div className="image-popup-content" onClick={(e) => e.stopPropagation()}>
+              <button className="image-popup-close" onClick={() => setShowImagePopup(false)}>×</button>
+              <img src={photoSignedUrl} alt="Profile" className="image-popup-image" />
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </>
   );
 };

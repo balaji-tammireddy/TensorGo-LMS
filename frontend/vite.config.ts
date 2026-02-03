@@ -6,6 +6,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    allowedHosts: [
+      'intra.tensorgo.com'
+    ],
     proxy: {
       '/api': {
         target: "http://localhost:5002",
@@ -36,4 +39,3 @@ export default defineConfig({
     include: ['react', 'react-dom', 'react-router-dom', 'react-query']
   }
 });
-

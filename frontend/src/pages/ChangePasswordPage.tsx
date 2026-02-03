@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
@@ -6,8 +7,9 @@ import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import './LoginPage.css';
 
 const ChangePasswordPage: React.FC = () => {
-  const { logout } = useAuth();
+  const { user, login } = useAuth();
   const { showSuccess, showError, showWarning } = useToast();
+  const navigate = useNavigate();
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -42,10 +44,16 @@ const ChangePasswordPage: React.FC = () => {
       setNewPassword('');
       setConfirmPassword('');
 
-      // Force re-login so new token & flags are picked up
-      setTimeout(() => {
-        logout();
-      }, 1500);
+      // Auto-login with new password and redirect to profile
+      if (user?.email) {
+        await login(user.email, newPassword);
+        // Force refresh of user data is handled by login
+        showSuccess('Password updated. Redirecting to profile...');
+        navigate('/profile');
+      } else {
+        // Fallback if email missing (shouldn't happen)
+        navigate('/login');
+      }
     } catch (err: any) {
       const message =
         err.response?.data?.error?.message || err.message || 'Update failed.';
