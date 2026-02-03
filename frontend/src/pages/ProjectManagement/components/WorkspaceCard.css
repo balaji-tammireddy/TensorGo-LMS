@@ -357,4 +357,57 @@
 .ws-item-icon {
     opacity: 1 !important;
     /* Force visibility */
+}/* Empty State Styles */
+.ws-dropdown-empty-state {
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    color: #9CA3AF;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.empty-state-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #F3F4F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #D1D5DB;
+    margin-bottom: 4px;
+    transition: transform 0.2s ease;
+}
+
+.ws-dropdown-empty-state:hover .empty-state-icon {
+    transform: scale(1.1) rotate(-5deg);
+    background-color: #EFF6FF;
+    color: #3B82F6;
+}
+
+.empty-state-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.empty-state-subtext {
+    font-size: 10px;
+    color: #9CA3AF;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

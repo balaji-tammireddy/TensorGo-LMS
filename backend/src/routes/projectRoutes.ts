@@ -18,6 +18,12 @@ router.get(
     projectController.getProjects
 );
 
+router.get(
+    '/:id',
+    authenticateToken,
+    projectController.getProject
+);
+
 router.put(
     '/:id',
     authenticateToken,

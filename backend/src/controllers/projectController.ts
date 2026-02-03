@@ -23,7 +23,7 @@ export const createProject = async (req: AuthRequest, res: Response) => {
             start_date,
             end_date,
             created_by: userId
-        });
+        }, req.user?.role || '');
 
         res.status(201).json(project);
     } catch (error: any) {
@@ -37,14 +37,33 @@ export const createProject = async (req: AuthRequest, res: Response) => {
 }
 
 
+export const getProject = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.id;
+        const role = req.user?.role || '';
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const project = await ProjectService.getProject(parseInt(id), userId, role);
+        res.json(project);
+    } catch (error: any) {
+        console.error('[PROJECT] Get One Error:', error);
+        res.status(error.message.includes('not found') ? 404 : 500).json({ error: error.message });
+    }
+};
+
 export const updateProject = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
         const updates = req.body;
         const userId = req.user?.id;
+        const role = req.user?.role || '';
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        // Basic validation or permission check
-        // In a real app we might check if user is manager or admin here
+        const canManage = await ProjectService.canUserManageProject(userId, role, parseInt(id));
+        if (!canManage) {
+            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Project Manager can update the project metadata.' });
+        }
 
         const project = await ProjectService.updateProject(parseInt(id), updates, userId);
         res.json(project);
@@ -79,7 +98,7 @@ export const createModule = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ error: 'Missing required fields: name' });
         }
 
-        const canManage = await ProjectService.canUserManageProject(userId, req.user?.role || '', parseInt(projectId));
+        const canManage = await ProjectService.canUserManageResources(userId, req.user?.role || '', parseInt(projectId));
         if (!canManage) {
             return res.status(403).json({ error: 'Access denied: Only the Project Manager can add modules' });
         }
@@ -119,6 +138,9 @@ export const updateModule = async (req: AuthRequest, res: Response) => {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+        const canManage = await ProjectService.canUserManageModule(userId, req.user?.role || '', parseInt(moduleId));
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can update modules' });
+
         const result = await ProjectService.updateModule(parseInt(moduleId), req.body, userId);
         res.json(result);
     } catch (error: any) {
@@ -129,7 +151,14 @@ export const updateModule = async (req: AuthRequest, res: Response) => {
 
 export const deleteModule = async (req: AuthRequest, res: Response) => {
     try {
+        const userId = req.user?.id;
+        const role = req.user?.role || '';
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
         const { moduleId } = req.params;
+        const canManage = await ProjectService.canUserManageModule(userId, role, parseInt(moduleId));
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can delete modules' });
+
         const result = await ProjectService.deleteModule(parseInt(moduleId));
         res.json(result);
     } catch (error: any) {
@@ -205,6 +234,9 @@ export const updateActivity = async (req: AuthRequest, res: Response) => {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+        const canManage = await ProjectService.canUserManageActivity(userId, req.user?.role || '', parseInt(activityId));
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can update activities' });
+
         const result = await ProjectService.updateActivity(parseInt(activityId), req.body, userId);
         res.json(result);
     } catch (error: any) {
@@ -218,6 +250,9 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
         const { taskId } = req.params;
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const canManage = await ProjectService.canUserManageTask(userId, req.user?.role || '', parseInt(taskId));
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can update tasks' });
 
         const result = await ProjectService.updateTask(parseInt(taskId), req.body, userId);
         res.json(result);
@@ -335,7 +370,8 @@ export const toggleAccess = async (req: AuthRequest, res: Response) => {
 
 export const getAccessList = async (req: AuthRequest, res: Response) => {
     try {
-        const { level, id } = req.params;
+        const { id } = req.params;
+        const level = (req.params.level || req.query.level) as string;
         // level: 'project' | 'module' | 'task'
         // id: ID of the scope
 
@@ -356,6 +392,13 @@ export const getAccessList = async (req: AuthRequest, res: Response) => {
 export const deleteTask = async (req: AuthRequest, res: Response) => {
     try {
         const { taskId } = req.params;
+        const userId = req.user?.id;
+        const role = req.user?.role || '';
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const canManage = await ProjectService.canUserManageTask(userId, role, parseInt(taskId));
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can delete tasks' });
+
         const result = await ProjectService.deleteTask(parseInt(taskId));
         res.json(result);
     } catch (error: any) {
@@ -367,6 +410,12 @@ export const deleteTask = async (req: AuthRequest, res: Response) => {
 export const deleteActivity = async (req: AuthRequest, res: Response) => {
     try {
         const { activityId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const canManage = await ProjectService.canUserManageActivity(userId, req.user?.role || '', parseInt(activityId));
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can delete activities' });
+
         const result = await ProjectService.deleteActivity(parseInt(activityId));
         res.json(result);
     } catch (error: any) {

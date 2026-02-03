@@ -54,11 +54,11 @@ app.use(
         'https://intra.tensorgo.com'
       ];
 
-      if (origin === allowedOrigins[0] || origin === 'http://51.15.227.10:3000' || origin === 'http://intra.tensorgo.com' || origin === 'https://intra.tensorgo.com') {
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      logger.warn(`Blocked by CORS: Origin '${origin}' does not match allowed origin '${allowedOrigins[0]}'`);
+      logger.warn(`Blocked by CORS: Origin '${origin}' not found in allowed origins: ${JSON.stringify(allowedOrigins)}`);
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -146,58 +146,49 @@ app.listen(PORT, () => {
 // IMPORTANT: Leaves are ONLY credited at 8 PM, never before
 const scheduleLeaveCreditCheck = () => {
   // Calculate milliseconds until next 8 PM
-  const getMillisecondsUntil8PM = () => {
+  const getMillisecondsUntilNext8PM = () => {
     const now = new Date();
     const eightPM = new Date(now);
-    eightPM.setHours(20, 0, 0, 0); // 8 PM today (20:00)
-    eightPM.setMinutes(0);
-    eightPM.setSeconds(0);
-    eightPM.setMilliseconds(0);
+    eightPM.setHours(20, 0, 0, 0); // 8 PM today
 
     // If 8 PM has already passed today, schedule for tomorrow 8 PM
     if (now >= eightPM) {
       eightPM.setDate(eightPM.getDate() + 1);
     }
 
-    const msUntil8PM = eightPM.getTime() - now.getTime();
-    logger.info(`Next leave credit check scheduled for ${eightPM.toISOString()} (in ${Math.round(msUntil8PM / 1000 / 60)} minutes)`);
-    return msUntil8PM;
+    return eightPM.getTime() - now.getTime();
   };
 
-  // Schedule first check at 8 PM
   const scheduleNextCheck = () => {
-    const msUntil8PM = getMillisecondsUntil8PM();
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    // 🔹 If the server starts during the 8 PM hour, try running immediately
+    if (currentHour === 20) {
+      logger.info(`Server started during 8 PM hour. Triggering immediate leave credit check...`);
+      checkAndCreditMonthlyLeaves().catch(err => {
+        logger.error('Startup leave credit check failed:', err);
+      });
+    }
+
+    const msUntil8PM = getMillisecondsUntilNext8PM();
+    const nextExecution = new Date(Date.now() + msUntil8PM);
+    logger.info(`Next scheduled leave credit check: ${nextExecution.toISOString()}`);
 
     setTimeout(() => {
-      // Verify it's actually 8 PM before processing
-      const now = new Date();
-      const currentHour = now.getHours();
-
-      if (currentHour === 20) {
-        // It's 8 PM, check if today is the last working day
-        logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
-        checkAndCreditMonthlyLeaves().catch(err => {
-          logger.error('Daily leave credit check failed:', err);
-        });
-      } else {
-        logger.warn(`Scheduled check triggered at hour ${currentHour} (not 8 PM). Skipping leave credit.`);
-      }
-
-      // Then check every 24 hours (once per day at 8 PM)
-      setInterval(() => {
+      // Trigger and then setup interval
+      const runCheck = () => {
         const checkTime = new Date();
-        const checkHour = checkTime.getHours();
-
-        if (checkHour === 20) {
-          // It's 8 PM, check if today is the last working day
-          logger.info(`8 PM detected. Checking if today is the last working day for leave credit...`);
+        if (checkTime.getHours() === 20) {
+          logger.info(`8 PM detected. Checking for leave credit...`);
           checkAndCreditMonthlyLeaves().catch(err => {
-            logger.error('Daily leave credit check failed:', err);
+            logger.error('Scheduled leave credit check failed:', err);
           });
-        } else {
-          logger.warn(`Scheduled check triggered at hour ${checkHour} (not 8 PM). Skipping leave credit.`);
         }
-      }, 24 * 60 * 60 * 1000); // Check every 24 hours (once per day)
+      };
+
+      runCheck();
+      setInterval(runCheck, 24 * 60 * 60 * 1000); // Repeat every 24 hours
     }, msUntil8PM);
   };
 

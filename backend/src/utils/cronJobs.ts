@@ -523,10 +523,10 @@ export const initializeCronJobs = () => {
   });
   logger.info('✅ Cron job scheduled: Timesheet Friday Validation (4 PM)');
 
-  // 4. Weekly Auto-Processing: Sunday 9 PM
-  cron.schedule('0 21 * * 0', TimesheetService.processWeeklySubmission, {
+  // 4. Weekly Auto-Processing: Sunday 11:59 PM
+  cron.schedule('59 23 * * 0', TimesheetService.processWeeklySubmission, {
     timezone: 'Asia/Kolkata'
   });
-  logger.info('✅ Cron job scheduled: Timesheet Weekly Processing (Sun 9 PM)');
+  logger.info('✅ Cron job scheduled: Timesheet Weekly Processing (Sun 11:59 PM)');
 };
 

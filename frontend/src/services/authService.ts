@@ -13,6 +13,7 @@ export interface User {
   email: string;
   status: string;
   mustChangePassword?: boolean;
+  isProfileUpdated?: boolean;
 }
 
 export interface LoginResponse {

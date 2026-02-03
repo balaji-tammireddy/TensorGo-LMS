@@ -448,6 +448,34 @@ async function migrate() {
       console.warn('Fix projects migration warning:', fixProjectsError.message);
     }
 
+    // Run add employee profile fields migration (026)
+    try {
+      const addProfileFieldsFile = readFileSync(
+        join(__dirname, 'migrations', '026_add_employee_profile_fields.sql'),
+        'utf-8'
+      );
+      await pool.query(addProfileFieldsFile);
+      console.log('Add employee profile fields migration (026) completed');
+    } catch (profileFieldsError: any) {
+      if (!profileFieldsError.message.includes('already exists') && !profileFieldsError.message.includes('duplicate')) {
+        console.warn('Add employee profile fields migration warning:', profileFieldsError.message);
+      }
+    }
+
+    // Run add personal email migration (027)
+    try {
+      const addPersonalEmailFile = readFileSync(
+        join(__dirname, 'migrations', '027_add_personal_email.sql'),
+        'utf-8'
+      );
+      await pool.query(addPersonalEmailFile);
+      console.log('Add personal email migration (027) completed');
+    } catch (personalEmailError: any) {
+      if (!personalEmailError.message.includes('already exists') && !personalEmailError.message.includes('duplicate')) {
+        console.warn('Add personal email migration warning:', personalEmailError.message);
+      }
+    }
+
     console.log('Default data inserted');
   } catch (error) {
     console.error('Migration failed:', error);

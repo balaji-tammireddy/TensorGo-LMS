@@ -1,6 +1,19 @@
 /* v1.0.1 - Corrected Holiday Date Logic & Premium Cards */
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Save, Trash2, Edit2, Clock, FileText, ChevronDown } from 'lucide-react';
+import {
+    Clock,
+    ChevronLeft,
+    ChevronRight,
+    Save,
+    FileText,
+    Edit2,
+    Trash2,
+    ChevronDown,
+    Lock,
+    Repeat,
+    AlertCircle
+} from 'lucide-react';
+
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetEntry } from '../../services/timesheetService';
@@ -32,17 +45,19 @@ export const TimesheetPage: React.FC = () => {
 
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
         const monday = new Date(date);
         monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 5); // Monday to Saturday
+        return { start: monday, end: saturday };
     };
 
     // Date State
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isEditHighlight, setIsEditHighlight] = useState(false);
+    const [originalEntry, setOriginalEntry] = useState<TimesheetEntry | null>(null);
 
     // Data State
     const [entries, setEntries] = useState<TimesheetEntry[]>([]);
@@ -61,10 +76,25 @@ export const TimesheetPage: React.FC = () => {
         const viewWeekStart = new Date(weekRange.start);
         viewWeekStart.setHours(0, 0, 0, 0);
 
-        // Strict: Only Current Week (or future, effectively limited by max date)
-        // Previous weeks are locked for NEW logs.
-        return viewWeekStart.getTime() >= currentWeekStart.getTime();
+        const prevWeekStart = new Date(currentWeekStart);
+        prevWeekStart.setDate(currentWeekStart.getDate() - 7);
+
+        // Allow Current Week AND the immediately preceding week (Past 1 week)
+        return viewWeekStart.getTime() >= prevWeekStart.getTime();
     }, [weekRange]);
+
+    const isWeekLocked = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPastWeek = weekRange.end < today;
+
+        if (!isPastWeek) return false;
+
+        // Check if any entry for the week is submitted or approved
+        // This ensures if the user manually submitted, they can't add more logs
+        // unless it was rejected (in which case status = 'rejected')
+        return entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
+    }, [weekRange, entries]);
 
     // Form State
     const initialFormState = {
@@ -79,6 +109,12 @@ export const TimesheetPage: React.FC = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+
+    // Helper to check if project is active
+    const isActiveProject = (projectId: number) => {
+        const proj = projects.find(p => p.id === projectId);
+        return proj ? proj.status === 'active' : true;
+    };
 
     // Initial Load
     useEffect(() => {
@@ -135,7 +171,7 @@ export const TimesheetPage: React.FC = () => {
     const weekDays = useMemo(() => {
         const days = [];
         const { start } = weekRange;
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 6; i++) { // Only 6 days: Mon - Sat
             const d = new Date(start);
             d.setDate(start.getDate() + i);
             days.push(d);
@@ -208,6 +244,8 @@ export const TimesheetPage: React.FC = () => {
     // Modal State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+    const [isLeaveActionModalOpen, setIsLeaveActionModalOpen] = useState(false);
+    const [leaveActionData, setLeaveActionData] = useState<{ entry: TimesheetEntry, action: 'half_day' | 'delete' } | null>(null);
 
     // Form Submission
     const handleSubmit = async (e: React.FormEvent) => {
@@ -219,9 +257,16 @@ export const TimesheetPage: React.FC = () => {
             return;
         }
 
+        // Block Sunday entries
+        const dateObj = new Date(selectedDate);
+        if (dateObj.getDay() === 0) {
+            showError("Sunday is a non-working day. Entries cannot be logged.");
+            return;
+        }
+
         const dur = parseFloat(formData.duration);
-        if (isNaN(dur) || dur <= 0 || dur > 24) {
-            showError("Invalid duration (0.5 - 24 hours)");
+        if (isNaN(dur) || dur <= 0 || dur > 12) {
+            showError("Invalid duration (0.5 - 12 hours)");
             return;
         }
 
@@ -247,9 +292,10 @@ export const TimesheetPage: React.FC = () => {
             showSuccess(editingId ? "Entry updated" : "Time logged successfully");
             setFormData(initialFormState);
             setEditingId(null);
+            setOriginalEntry(null);
             fetchEntries();
         } catch (err: any) {
-            showError(err.message || 'Failed to save entry');
+            showError(err.response?.data?.error || err.message || 'Failed to save entry');
         } finally {
             setLoading(false);
         }
@@ -267,17 +313,23 @@ export const TimesheetPage: React.FC = () => {
         setCurrentDate(eDate); // Ensure weekly view switches to the entry's week
         setEditingId(entry.id!);
 
+        // Scroll to top smoothly as requested
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Trigger pulse animation
+        setIsEditHighlight(true);
+        setTimeout(() => setIsEditHighlight(false), 1500);
+
         try {
-            setFormData(prev => ({ ...prev, project_id: String(entry.project_id) }));
-            const mods = await projectService.getModules(entry.project_id);
+            // Fetch all dependent data in parallel for speed
+            const [mods, tsks, acts] = await Promise.all([
+                projectService.getModules(entry.project_id),
+                projectService.getTasks(entry.module_id),
+                projectService.getActivities(entry.task_id)
+            ]);
+
             setModules(mods);
-
-            setFormData(prev => ({ ...prev, module_id: String(entry.module_id) }));
-            const tsks = await projectService.getTasks(entry.module_id);
             setTasks(tsks);
-
-            setFormData(prev => ({ ...prev, task_id: String(entry.task_id) }));
-            const acts = await projectService.getActivities(entry.task_id);
             setActivities(acts);
 
             setFormData({
@@ -289,6 +341,7 @@ export const TimesheetPage: React.FC = () => {
                 work_status: entry.work_status,
                 description: entry.description
             });
+            setOriginalEntry(entry);
 
         } catch (e) {
             console.error("Error populating edit form", e);
@@ -304,7 +357,7 @@ export const TimesheetPage: React.FC = () => {
             showSuccess("Entry deleted successfully");
             fetchEntries();
         } catch (err: any) {
-            showError(err.message || "Failed to delete");
+            showError(err.response?.data?.error || err.message || "Failed to delete");
         } finally {
             setIsDeleteModalOpen(false);
             setEntryToDelete(null);
@@ -314,6 +367,28 @@ export const TimesheetPage: React.FC = () => {
     const handleDeleteClick = (id: number) => {
         setEntryToDelete(id);
         setIsDeleteModalOpen(true);
+    };
+
+    const handleLeaveActionClick = (entry: TimesheetEntry, action: 'half_day' | 'delete') => {
+        setLeaveActionData({ entry, action });
+        setIsLeaveActionModalOpen(true);
+    };
+
+    const confirmLeaveAction = async () => {
+        if (!leaveActionData) return;
+        const { entry, action } = leaveActionData;
+        setLoading(true);
+        try {
+            await timesheetService.updateLeaveLog(entry.id!, entry.log_date, action);
+            showSuccess(action === 'half_day' ? "Leave updated to half day" : "Leave log removed");
+            fetchEntries();
+        } catch (err: any) {
+            showError(err.response?.data?.error || err.message || "Action failed");
+        } finally {
+            setLoading(false);
+            setIsLeaveActionModalOpen(false);
+            setLeaveActionData(null);
+        }
     };
 
     const changeWeek = (offset: number) => {
@@ -327,11 +402,71 @@ export const TimesheetPage: React.FC = () => {
         return entries.filter(e => {
             // Normalize log_date (which might be ISO string) to local YYYY-MM-DD
             const eDate = new Date(e.log_date);
-            return formatDate(eDate) === dateStr;
+            const local = new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate());
+            const compare = formatDate(local);
+            return compare === dateStr;
         });
     };
 
+    // Check if date is blocked for logging (holidays or approved full-day leaves)
+    const isDateBlocked = (dateStr: string): { blocked: boolean; reason: string } => {
+        const dayEntries = getEntriesForDay(dateStr);
 
+        // Check for holidays (System + Holiday module)
+        const holiday = dayEntries.find(e =>
+            e.project_name?.includes('System') &&
+            e.module_name === 'Holiday'
+        );
+
+        if (holiday) {
+            return { blocked: true, reason: `Holiday - ${holiday.description || 'Day Off'}` };
+        }
+
+        // Check for approved full-day leaves (System + Leave module with 8+ hours)
+        const fullDayLeave = dayEntries.find(e =>
+            e.project_name?.includes('System') &&
+            e.module_name === 'Leave' &&
+            e.duration >= 8 // Full day = 8 hours
+        );
+
+        if (fullDayLeave) {
+            return { blocked: true, reason: `Full-Day Leave` };
+        }
+
+        return { blocked: false, reason: '' };
+    };
+
+
+    // Validation for Form Completion
+    const isFormValid = useMemo(() => {
+        return (
+            formData.project_id !== '' &&
+            formData.module_id !== '' &&
+            formData.task_id !== '' &&
+            formData.activity_id !== '' &&
+            formData.duration !== '' &&
+            parseFloat(formData.duration) > 0 &&
+            formData.work_status !== '' &&
+            formData.description.trim() !== ''
+        );
+    }, [formData]);
+
+    const isFormChanged = useMemo(() => {
+        if (!editingId || !originalEntry) return true;
+        const eDate = new Date(originalEntry.log_date);
+        const originalDateStr = formatDate(eDate);
+
+        return (
+            formData.project_id !== String(originalEntry.project_id) ||
+            formData.module_id !== String(originalEntry.module_id) ||
+            formData.task_id !== String(originalEntry.task_id) ||
+            formData.activity_id !== String(originalEntry.activity_id) ||
+            formData.duration !== String(originalEntry.duration) ||
+            formData.work_status !== originalEntry.work_status ||
+            formData.description !== originalEntry.description ||
+            selectedDate !== originalDateStr
+        );
+    }, [formData, selectedDate, editingId, originalEntry]);
 
     // Dropdown Empty State Component
     const DropdownEmptyState = ({ message }: { message: string }) => (
@@ -359,10 +494,83 @@ export const TimesheetPage: React.FC = () => {
                             <span>{totalHours} hours logged this week</span>
                         </div>
 
+                        {/* Submit Button (Manual - Past Weeks) */}
+                        {(() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+
+                            // Calculate Monday 12 AM of the following week (Start of manual submission window)
+                            // This opens after the Sunday 11:59 PM auto-submission has run.
+                            const submissionStart = new Date(weekRange.end);
+                            submissionStart.setDate(submissionStart.getDate() + 2); // Sat + 2 = Monday
+                            submissionStart.setHours(0, 0, 0, 0);
+
+                            // Calculate Sunday 12 AM of the week after (End of submission window)
+                            const submissionEnd = new Date(submissionStart);
+                            submissionEnd.setDate(submissionStart.getDate() + 7); // Next Sunday
+                            submissionEnd.setHours(0, 0, 0, 0);
+
+                            // Only show if today is within the 1-week window (Monday to Sunday)
+                            if (today >= submissionStart && today < submissionEnd) {
+                                const th = parseFloat(String(totalHours));
+                                // Check if already submitted/approved
+                                const isSubmitted = entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
+                                const hasRejected = entries.some(e => e.log_status === 'rejected');
+                                const hasDrafts = entries.some(e => e.log_status === 'draft' && !e.is_system);
+
+                                if (!isSubmitted || hasRejected || hasDrafts) {
+                                    return (
+                                        <Button
+                                            className="btn-primary"
+                                            style={{ height: '36px', gap: '8px', backgroundColor: hasRejected ? '#dc2626' : undefined }}
+                                            disabled={th < 40 || loading}
+                                            onClick={async () => {
+                                                if (th < 40) {
+                                                    showError('You need at least 40 hours to submit.');
+                                                    return;
+                                                }
+                                                try {
+                                                    setLoading(true);
+                                                    await timesheetService.submitTimesheet(
+                                                        formatDate(weekRange.start),
+                                                        formatDate(weekRange.end)
+                                                    );
+                                                    showSuccess('Timesheet submitted successfully');
+                                                    fetchEntries();
+                                                } catch (e: any) {
+                                                    showError(e.message || 'Submission failed');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            <Save size={16} />
+                                            {(hasRejected || (isSubmitted && hasDrafts)) ? 'Resubmit Timesheet' : 'Submit Timesheet'}
+                                        </Button>
+                                    )
+                                } else {
+                                    return (
+                                        <div className="logged-hours-badge success">
+                                            <span>Submitted</span>
+                                        </div>
+                                    )
+                                }
+                            }
+                            return null;
+                        })()}
+
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
                             <span className="current-week-display">
-                                {weekRange.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - {weekRange.end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {(() => {
+                                    const d1 = String(weekRange.start.getDate()).padStart(2, '0');
+                                    const m1 = String(weekRange.start.getMonth() + 1).padStart(2, '0');
+                                    const y1 = weekRange.start.getFullYear();
+                                    const d2 = String(weekRange.end.getDate()).padStart(2, '0');
+                                    const m2 = String(weekRange.end.getMonth() + 1).padStart(2, '0');
+                                    const y2 = weekRange.end.getFullYear();
+                                    return `${d1}-${m1}-${y1} - ${d2}-${m2}-${y2}`;
+                                })()}
                             </span>
                             <button className="nav-btn" onClick={() => changeWeek(1)}><ChevronRight size={20} /></button>
                         </div>
@@ -372,7 +580,7 @@ export const TimesheetPage: React.FC = () => {
                 <div className="timesheet-layout">
                     {/* Left Column: Form */}
                     <div className="form-column">
-                        <div className="log-form-card">
+                        <div className={`log-form-card ${isEditHighlight ? 'edit-highlight' : ''}`}>
                             <div className="form-title" style={{ justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Clock size={18} />
@@ -380,7 +588,48 @@ export const TimesheetPage: React.FC = () => {
                                 </div>
                                 {!isWeekEditable && !editingId && <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Locked</span>}
                             </div>
-                            <fieldset disabled={!isWeekEditable && !editingId} style={{ border: 'none', padding: 0, margin: 0 }}>
+                            <fieldset disabled={
+                                (!isWeekEditable && !editingId) ||
+                                (isWeekLocked && !editingId) ||
+                                isDateBlocked(selectedDate).blocked // Always disable for blocked dates, even when editing
+                            } style={{ border: 'none', padding: 0, margin: 0 }}>
+                                {isWeekLocked && !editingId && !entries.some(e => e.log_status === 'rejected') && (
+                                    <div className="ts-form-locked-banner" style={{
+                                        fontSize: '12px',
+                                        color: '#b45309',
+                                        backgroundColor: '#fffbeb',
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #fde68a',
+                                        marginBottom: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <Clock size={14} />
+                                        This week's timesheet is already submitted or approved.
+                                    </div>
+                                )}
+                                {(() => {
+                                    const blockInfo = isDateBlocked(selectedDate);
+                                    return blockInfo.blocked && !editingId && (
+                                        <div className="ts-form-locked-banner" style={{
+                                            fontSize: '12px',
+                                            color: '#b91c1c',
+                                            backgroundColor: '#fee2e2',
+                                            padding: '8px 12px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #fecaca',
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            <Lock size={14} />
+                                            Cannot log time - {blockInfo.reason}
+                                        </div>
+                                    );
+                                })()}
                                 <form onSubmit={handleSubmit}>
                                     {/* Date */}
                                     <div className="ts-form-group">
@@ -388,6 +637,7 @@ export const TimesheetPage: React.FC = () => {
                                         <DatePicker
                                             value={selectedDate}
                                             onChange={setSelectedDate}
+                                            disabledDates={(date) => date.getDay() === 0}
                                             min={(() => {
                                                 // Calculate previous week Monday
                                                 const today = new Date();
@@ -454,6 +704,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {modules.find(m => String(m.id) === formData.module_id)?.name || 'Select Module'}
@@ -488,6 +751,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {tasks.find(t => String(t.id) === formData.task_id)?.name || 'Select Task'}
@@ -522,6 +798,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {activities.find(a => String(a.id) === formData.activity_id)?.name || 'Select Activity'}
@@ -554,10 +843,12 @@ export const TimesheetPage: React.FC = () => {
                                             type="number"
                                             step="0.5"
                                             min="0.5"
-                                            max="24"
+                                            max="12"
                                             className="ts-form-input"
                                             value={formData.duration}
                                             onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                                            placeholder="e.g. 8.5"
+                                            onWheel={(e) => e.currentTarget.blur()}
                                             required
                                         />
                                     </div>
@@ -570,6 +861,19 @@ export const TimesheetPage: React.FC = () => {
                                                     variant="outline"
                                                     className="ts-dropdown-trigger"
                                                     type="button"
+                                                    style={{
+                                                        width: '100%',
+                                                        justifyContent: 'space-between',
+                                                        padding: '12px 16px',
+                                                        fontSize: '15px',
+                                                        fontFamily: 'Poppins, sans-serif',
+                                                        border: '1px solid #e6e8f0',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#ffffff',
+                                                        color: '#203050',
+                                                        height: 'auto',
+                                                        fontWeight: 500
+                                                    }}
                                                 >
                                                     <span>
                                                         {formData.work_status === 'in_progress' ? 'In Progress' :
@@ -614,21 +918,22 @@ export const TimesheetPage: React.FC = () => {
                                         />
                                     </div>
 
-                                    <div className="form-actions">
+                                    <div className="form-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         {editingId && (
                                             <button
                                                 type="button"
                                                 className="ts-submit-btn"
-                                                style={{ backgroundColor: '#64748b', marginBottom: '8px' }}
+                                                style={{ backgroundColor: '#64748b', margin: 0 }}
                                                 onClick={() => {
                                                     setEditingId(null);
+                                                    setOriginalEntry(null);
                                                     setFormData(initialFormState);
                                                 }}
                                             >
                                                 Cancel Edit
                                             </button>
                                         )}
-                                        <button type="submit" className="ts-submit-btn" disabled={loading || (!isWeekEditable && !editingId)}>
+                                        <button type="submit" className="ts-submit-btn" style={{ margin: 0 }} disabled={loading || (!isWeekEditable && !editingId) || !isFormValid || (!!editingId && !isFormChanged)}>
                                             <Save size={18} />
                                             {editingId ? 'Update' : 'Log Time'}
                                         </button>
@@ -648,7 +953,7 @@ export const TimesheetPage: React.FC = () => {
                         {/* Week Days Navigation */}
                         <div className="week-days-nav" style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(7, 1fr)',
+                            gridTemplateColumns: 'repeat(6, 1fr)', // Updated to 6 columns
                             gap: '8px',
                             marginBottom: '20px',
                             padding: '10px 0'
@@ -687,12 +992,20 @@ export const TimesheetPage: React.FC = () => {
 
                                         {/* Status Dots */}
                                         <div style={{ display: 'flex', gap: '2px', marginTop: '4px' }}>
-                                            {isToday && (
-                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
-                                            )}
-                                            {dayLogCount > 0 && (
-                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
-                                            )}
+                                            {(() => {
+                                                const blockInfo = isDateBlocked(dStr);
+                                                if (blockInfo.blocked) {
+                                                    return <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#ef4444' }} title={blockInfo.reason} />;
+                                                }
+                                                return <>
+                                                    {isToday && (
+                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
+                                                    )}
+                                                    {dayLogCount > 0 && (
+                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
+                                                    )}
+                                                </>;
+                                            })()}
                                         </div>
                                     </button>
                                 );
@@ -708,13 +1021,21 @@ export const TimesheetPage: React.FC = () => {
 
                                 return (
                                     <div key={dateStr} className="day-group" style={{ opacity: 0, animation: 'fadeIn 0.5s ease-out forwards' }}>
-                                        <div className="day-header">
-                                            <div className="day-title-group">
-                                                <span className="day-title">
-                                                    {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                        <div className="day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                            <div className="day-title-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span className="day-title" style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                                                    {day.toLocaleDateString('en-GB', { weekday: 'long' })}
+                                                </span>
+                                                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>
+                                                    {(() => {
+                                                        const d = String(day.getDate()).padStart(2, '0');
+                                                        const m = String(day.getMonth() + 1).padStart(2, '0');
+                                                        const y = day.getFullYear();
+                                                        return `${d}-${m}-${y}`;
+                                                    })()}
                                                 </span>
                                             </div>
-                                            <span className="day-total">{dayTotal.toFixed(2)} Hrs</span>
+                                            <span className="day-total" style={{ fontWeight: 600, color: '#475569' }}>{dayTotal.toFixed(2)} Hrs</span>
                                         </div>
 
                                         <div className="entries-grid" style={{ marginTop: '20px' }}>
@@ -729,9 +1050,6 @@ export const TimesheetPage: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 dayEntries.map(entry => {
-                                                    const isEditable = !entry.project_name?.includes('System') && (
-                                                        entry.log_status === 'rejected' || (isWeekEditable && entry.log_status === 'draft')
-                                                    );
                                                     const formattedDesc = entry.description?.length > 100
                                                         ? entry.description.substring(0, 100) + '...'
                                                         : entry.description;
@@ -741,13 +1059,33 @@ export const TimesheetPage: React.FC = () => {
                                                             <div className="entry-inner">
                                                                 <div className="entry-header">
                                                                     <div className="entry-path">
-                                                                        <strong>{entry.project_name}</strong>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.module_name}</span>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.task_name}</span>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.activity_name}</span>
+                                                                        {entry.is_system || entry.project_name?.includes('System') ? (
+                                                                            <strong>System log</strong>
+                                                                        ) : entry.work_status === 'On Leave' || entry.project_name === 'Leave' ? (
+                                                                            <strong>On Leave</strong>
+                                                                        ) : (
+                                                                            <>
+                                                                                <strong>{entry.project_name}</strong>
+                                                                                {entry.module_name && entry.module_name !== entry.project_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.module_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {entry.task_name && entry.task_name !== entry.module_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.task_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {entry.activity_name && entry.activity_name !== entry.task_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.activity_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                     <div className="duration-label">
                                                                         {parseFloat(String(entry.duration)).toFixed(2)} hrs
@@ -758,12 +1096,14 @@ export const TimesheetPage: React.FC = () => {
                                                                     <h4 className="holiday-name" style={{ fontSize: '14px', margin: '4px 0' }}>{entry.description}</h4>
                                                                 )}
 
-                                                                <div className="description-text">
-                                                                    {formattedDesc || 'No description provided.'}
-                                                                </div>
+                                                                {!entry.project_name?.includes('System') && (
+                                                                    <div className="description-text">
+                                                                        {formattedDesc || 'No description provided.'}
+                                                                    </div>
+                                                                )}
 
                                                                 {entry.log_status === 'rejected' && entry.rejection_reason && (
-                                                                    <div style={{ marginTop: '8px', padding: '8px', background: '#fee2e2', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '13px', color: '#b91c1c' }}>
+                                                                    <div className="rejection-box">
                                                                         <strong>Rejection:</strong> {entry.rejection_reason}
                                                                     </div>
                                                                 )}
@@ -772,30 +1112,70 @@ export const TimesheetPage: React.FC = () => {
                                                                     <div className="status-pill pill-progress">
                                                                         {entry.work_status.replace('_', ' ')}
                                                                     </div>
-                                                                    <div className={`status-pill pill-status status-${entry.log_status || 'draft'}`}>
-                                                                        {entry.log_status || 'draft'}
-                                                                    </div>
+                                                                    <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
+                                                                    {/* Show Lock Icon for System Entries */}
+                                                                    {entry.project_name?.includes('System') && (
+                                                                        <span className="status-pill info" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>
+                                                                            <Lock size={12} /> System
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
-                                                            <div className="entry-actions-sidebar">
-                                                                <button
-                                                                    className="action-btn-styled edit"
-                                                                    onClick={() => handleEdit(entry)}
-                                                                    disabled={!isEditable}
-                                                                    title={isEditable ? "Edit Entry" : "Status doesn't allow editing"}
-                                                                >
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button
-                                                                    className="action-btn-styled delete"
-                                                                    onClick={() => handleDeleteClick(entry.id!)}
-                                                                    disabled={!isEditable}
-                                                                    title={isEditable ? "Delete Entry" : "Status doesn't allow deleting"}
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
+                                                            {/* Only show actions if NOT System/Holiday and not approved/submitted (unless re-opening logic exists) */}
+                                                            {((!entry.is_system && !entry.project_name?.includes('System')) || (entry.module_name === 'Leave')) &&
+                                                                entry.log_status !== 'approved' &&
+                                                                entry.log_status !== 'submitted' && (
+                                                                    <div className="entry-actions-sidebar">
+                                                                        {/* Existing actions for manual logs */}
+                                                                        {!entry.is_system && !entry.project_name?.includes('System') && (
+                                                                            <>
+                                                                                <button
+                                                                                    className="action-btn-styled edit"
+                                                                                    onClick={() => handleEdit(entry)}
+                                                                                    title="Edit"
+                                                                                    disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0}
+                                                                                >
+                                                                                    <Edit2 size={16} />
+                                                                                </button>
+                                                                                {entry.log_status !== 'rejected' && (
+                                                                                    <button
+                                                                                        className="action-btn-styled delete"
+                                                                                        onClick={() => handleDeleteClick(entry.id!)}
+                                                                                        title="Delete"
+                                                                                        disabled={!!editingId}
+                                                                                    >
+                                                                                        <Trash2 size={16} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+
+                                                                        {/* Specific actions for System Leave logs */}
+                                                                        {entry.module_name === 'Leave' && (entry.is_system || entry.project_name?.includes('System')) && (
+                                                                            <>
+                                                                                {parseFloat(String(entry.duration)) >= 8 && (
+                                                                                    <button
+                                                                                        className="action-btn-styled edit"
+                                                                                        onClick={() => handleLeaveActionClick(entry, 'half_day')}
+                                                                                        title="Change to Half Day"
+                                                                                        disabled={loading}
+                                                                                    >
+                                                                                        <Repeat size={16} />
+                                                                                    </button>
+                                                                                )}
+                                                                                <button
+                                                                                    className="action-btn-styled delete"
+                                                                                    onClick={() => handleLeaveActionClick(entry, 'delete')}
+                                                                                    title="Delete Log"
+                                                                                    disabled={loading}
+                                                                                >
+                                                                                    <Trash2 size={16} />
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                         </div>
                                                     );
                                                 })
@@ -821,7 +1201,38 @@ export const TimesheetPage: React.FC = () => {
                 >
                     <p>Are you sure you want to delete this timesheet entry? This action cannot be undone.</p>
                 </Modal>
-            </div >
-        </AppLayout >
+
+                {/* Confirm Leave Action Modal */}
+                <Modal
+                    isOpen={isLeaveActionModalOpen}
+                    onClose={() => setIsLeaveActionModalOpen(false)}
+                    title={leaveActionData?.action === 'half_day' ? "Confirm Half Day Change" : "Confirm Deletion"}
+                    footer={
+                        <>
+                            <button className="modal-btn secondary" onClick={() => setIsLeaveActionModalOpen(false)}>Cancel</button>
+                            <button
+                                className={`modal-btn ${leaveActionData?.action === 'half_day' ? 'primary' : 'danger'}`}
+                                onClick={confirmLeaveAction}
+                                disabled={loading}
+                            >
+                                {loading ? 'Processing...' : (leaveActionData?.action === 'half_day' ? 'Change to Half Day' : 'Delete Log')}
+                            </button>
+                        </>
+                    }
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <AlertCircle size={24} color={leaveActionData?.action === 'half_day' ? '#f59e0b' : '#ef4444'} />
+                        <p style={{ margin: 0, fontWeight: 500 }}>
+                            {leaveActionData?.action === 'half_day'
+                                ? "Are you sure you want to change this leave log to Half Day (4 hours)?"
+                                : "Are you sure you want to delete this leave log and reduce hours to 0?"}
+                        </p>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#64748b' }}>
+                        This will create a permanent override for this date. You can resubmit the timesheet after this change.
+                    </p>
+                </Modal>
+            </div>
+        </AppLayout>
     );
 };

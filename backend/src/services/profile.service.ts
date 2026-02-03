@@ -12,6 +12,7 @@ export const getProfile = async (userId: number) => {
 COALESCE(rm.id, sa.sa_id) as reporting_manager_id,
 COALESCE(rm.first_name || ' ' || COALESCE(rm.last_name, ''), sa.sa_full_name) as reporting_manager_full_name,
 COALESCE(rm.emp_id, sa.sa_emp_id) as reporting_manager_emp_id,
+u.personal_email,
 c.emp_id as created_by_emp_id,
 up.emp_id as updated_by_emp_id
 FROM users u
@@ -55,6 +56,7 @@ WHERE u.id = $1`,
       lastName: user.last_name,
       empId: user.emp_id,
       email: user.email,
+      personalEmail: user.personal_email,
       contactNumber: user.contact_number,
       altContact: user.alt_contact,
       dateOfBirth: formatDateLocal(user.date_of_birth),
@@ -68,7 +70,9 @@ WHERE u.id = $1`,
     employmentInfo: {
       designation: user.designation,
       department: user.department,
-      dateOfJoining: formatDateLocal(user.date_of_joining)
+      dateOfJoining: formatDateLocal(user.date_of_joining),
+      uanNumber: user.uan_number,
+      totalExperience: user.total_experience
     },
     documents: {
       aadharNumber: user.aadhar_number,
@@ -188,17 +192,21 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
     panNumber: 'pan_number',
     currentAddress: 'current_address',
     permanentAddress: 'permanent_address',
-    reportingManagerId: 'reporting_manager_id'
+    reportingManagerId: 'reporting_manager_id',
+    uanNumber: 'uan_number',
+    totalExperience: 'total_experience',
+    personalEmail: 'personal_email'
   };
 
   const allowedPersonalFields = [
     'first_name', 'middle_name', 'last_name', 'contact_number', 'alt_contact',
     'date_of_birth', 'gender', 'blood_group', 'marital_status',
-    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation'
+    'date_of_birth', 'gender', 'blood_group', 'marital_status',
+    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation', 'personal_email'
   ];
 
   const allowedEmploymentFields = [
-    'designation', 'department', 'date_of_joining'
+    'designation', 'department', 'date_of_joining', 'uan_number', 'total_experience'
   ];
 
   // Update personal info
@@ -257,10 +265,13 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
           finalValue = toTitleCase(finalValue);
         }
 
-        // Check for required fields
+        // All fields in profile are now technically non-mandatory for saving progress.
+        // We will check for completeness at the end of the function to set is_profile_updated.
+        /*
         if (requiredPersonalInfo.includes(key) && finalValue === null) {
           throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
         }
+        */
 
         updates.push(`${dbKey} = $${paramCount}`);
         values.push(finalValue);
@@ -288,31 +299,24 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
         continue;
       }
 
-      // designation and department are disabled for non-super_admin users in self-update
-      if (key === 'designation') {
-        if (userRole !== 'super_admin' && value && value !== currentValues.rows[0].designation) {
-          throw new Error('Designation cannot be updated by employee');
-        }
-        if (userRole !== 'super_admin') continue;
-      }
-      if (key === 'department') {
-        if (userRole !== 'super_admin' && value && value !== currentValues.rows[0].department) {
-          throw new Error('Department cannot be updated by employee');
-        }
-        if (userRole !== 'super_admin') continue;
-      }
+      // designation and department can now be updated by all users
+      // Role-based restrictions removed as per requirement
 
       if (value !== undefined) {
         let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
 
-        // Apply title case to text fields (designation, department)
+        // Apply title case to text fields (designation, department) - REMOVED per requirement
+        /*
         if (typeof finalValue === 'string') {
           finalValue = toTitleCase(finalValue);
         }
+        */
 
+        /*
         if (requiredEmploymentInfo.includes(key) && finalValue === null) {
           throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
         }
+        */
 
         updates.push(`${dbKey} = $${paramCount}`);
         values.push(finalValue);
@@ -329,9 +333,11 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
       if (value !== undefined) {
         let finalValue = (typeof value === 'string' && value.trim() === '') ? null : value;
 
+        /*
         if (requiredDocuments.includes(key) && finalValue === null) {
           throw new Error(`${key === 'aadharNumber' ? 'Aadhar' : 'PAN'} number is required`);
         }
+        */
 
         if (dbKey === 'pan_number' && typeof finalValue === 'string') {
           const panValue = finalValue.trim().toUpperCase();
@@ -365,9 +371,11 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
           finalValue = toTitleCase(finalValue);
         }
 
+        /*
         if (requiredAddress.includes(key) && finalValue === null) {
           throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} is required`);
         }
+        */
 
         updates.push(`${dbKey} = $${paramCount}`);
         values.push(finalValue);
@@ -410,6 +418,7 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   if (updates.length > 0) {
     logger.info(`[PROFILE] [UPDATE PROFILE] Updating ${updates.length} fields in database`);
     values.push(userId);
+    // Don't set is_profile_updated = TRUE here yet. We'll do it after completeness check.
     const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP, updated_by = $${paramCount} WHERE id = $${paramCount + 1}`;
     values.splice(values.length - 1, 0, requesterId);
     await pool.query(query, values);
@@ -510,22 +519,50 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
 
     for (const [level, prefix] of Object.entries(fields)) {
       const edu = educationMap[level];
-      eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
-      eduValues.push(edu?.groupStream || null);
-      eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
-      eduValues.push(edu?.collegeUniversity || null);
-      eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
-      eduValues.push(edu?.year || null);
-      eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);
-      eduValues.push(edu?.scorePercentage || null);
+      if (edu) {
+        eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
+        eduValues.push(edu.groupStream || null);
+        eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
+        eduValues.push(edu.collegeUniversity || null);
+        eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
+        eduValues.push(edu.year || null);
+        eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);
+        eduValues.push(edu.scorePercentage || null);
+      }
     }
 
-    eduValues.push(userId);
-    await pool.query(
-      `UPDATE users SET ${eduUpdates.join(', ')} WHERE id = $${eduParamIndex}`,
-      eduValues
-    );
+    if (eduUpdates.length > 0) {
+      eduValues.push(userId);
+      await pool.query(
+        `UPDATE users SET ${eduUpdates.join(', ')} WHERE id = $${eduParamIndex}`,
+        eduValues
+      );
+    }
   }
+
+  // --- Profile Completeness Check ---
+  // Fetch the current updated state of the user to check if all mandatory fields are filled.
+  const checkResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+  const user = checkResult.rows[0];
+
+  const mandatoryFields = [
+    'first_name', 'last_name', 'contact_number', 'date_of_birth', 'gender', 'blood_group', 'marital_status',
+    'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation', 'personal_email',
+    'designation', 'department', 'date_of_joining', 'total_experience',
+    'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
+    'twelveth_stream', 'twelveth_college', 'twelveth_year', 'twelveth_percentage',
+    'ug_stream', 'ug_college', 'ug_year', 'ug_percentage'
+  ];
+
+  const isComplete = mandatoryFields.every(field => {
+    const val = user[field];
+    return val !== null && val !== undefined && String(val).trim() !== '';
+  });
+
+  // Update is_profile_updated flag based on completeness
+  await pool.query('UPDATE users SET is_profile_updated = $1 WHERE id = $2', [isComplete, userId]);
+
+  logger.info(`[PROFILE] [UPDATE PROFILE] Profile completeness check: ${isComplete ? 'COMPLETE' : 'INCOMPLETE'}. is_profile_updated set to ${isComplete}`);
 
   logger.info(`[PROFILE] [UPDATE PROFILE] Profile update completed successfully - User ID: ${userId}`);
   return { message: 'Profile updated successfully' };

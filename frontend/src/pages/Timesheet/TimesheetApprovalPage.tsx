@@ -14,8 +14,11 @@ interface TeamMemberStatus {
     name: string;
     emp_id: string;
     designation: string;
+    reporting_manager_id: number;
     total_hours: number;
     status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'pending_submission';
+    is_late: boolean;
+    is_resubmission: boolean;
 }
 
 export const TimesheetApprovalPage: React.FC = () => {
@@ -23,12 +26,17 @@ export const TimesheetApprovalPage: React.FC = () => {
     const { showSuccess, showError } = useToast();
 
     // -- Date Logic --
-    // Default to previous week (Managers only see past/submitted weeks)
+    // Default week logic:
+    // Before Sunday 9 PM -> Default to Previous Week
+    // After Sunday 9 PM -> Default to Current Week (just submitted)
     const [currentDate, setCurrentDate] = useState(() => {
-        const d = new Date();
+        const now = new Date();
+        const d = new Date(now);
+        // Strictly show previous week for approvals
         d.setDate(d.getDate() - 7);
         return d;
     });
+
     // Initialize selectedDate to today's string format
     const [selectedDate, setSelectedDate] = useState(() => {
         const d = new Date();
@@ -48,19 +56,19 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
         const monday = new Date(date);
         monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 5); // Monday to Saturday
+        return { start: monday, end: saturday };
     };
 
     const weekRange = useMemo(() => getWeekRange(currentDate), [currentDate]);
     const weekDays = useMemo(() => {
         const days = [];
         const { start } = weekRange;
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 6; i++) { // Only 6 days: Mon - Sat
             const d = new Date(start);
             d.setDate(start.getDate() + i);
             days.push(d);
@@ -84,23 +92,18 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
     const [memberEntries, setMemberEntries] = useState<TimesheetEntry[]>([]);
-    const [loadingEntries, setLoadingEntries] = useState(false);
 
     // -- Actions State --
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [entryToReject, setEntryToReject] = useState<number | null>(null);
     const [rejectDateStr, setRejectDateStr] = useState<string | null>(null); // For day-wise rejection
     const [rejectionReason, setRejectionReason] = useState('');
+    const [processingAction, setProcessingAction] = useState(false);
 
     const [reportModalOpen, setReportModalOpen] = useState(false);
-    /*
-    const [reportFilters] = useState({
-        startDate: formatDate(weekRange.start),
-        endDate: formatDate(weekRange.end),
-        projectId: '',
-        moduleId: ''
-    });
-    */
+    // reportFilters state variable is not used for the download logic,
+    // as the TimesheetReportModal handles its own filters.
+    // The handleDownloadReport function is also removed as it's now handled by the modal.
 
     // -- Effects --
     useEffect(() => {
@@ -144,23 +147,38 @@ export const TimesheetApprovalPage: React.FC = () => {
     };
 
     const fetchMemberEntries = async (userId: number) => {
-        setLoadingEntries(true);
         try {
             const startStr = formatDate(weekRange.start);
             const endStr = formatDate(weekRange.end);
             const data = await timesheetService.getMemberEntries(userId, startStr, endStr);
             setMemberEntries(data);
         } catch (err: any) {
-            showError('Failed to load user timesheet');
-            setSelectedMemberId(null); // Reset selection on error
-        } finally {
-            setLoadingEntries(false);
+            console.error('[ApprovalPage] Fetch Member error:', err);
+            const status = err.response?.status;
+            if (status === 401) {
+                showError('Your session has expired. Please log in again.');
+            } else if (status === 403) {
+                showError('You are not authorized to view this user\'s timesheet.');
+            } else {
+                showError('Unable to load member timesheet. Please try again.');
+            }
+            // Keep the selection but clear entries to show empty/error state
+            setMemberEntries([]);
         }
     };
 
     // -- Handlers --
     const handleApproveWeek = async () => {
-        if (!selectedMemberId) return;
+        if (!selectedMemberId || processingAction) return;
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        const previousMembers = [...teamMembers];
+
+        setMemberEntries(prev => prev.map(e => ({ ...e, log_status: 'approved' })));
+        setTeamMembers(prev => prev.map(m => m.id === selectedMemberId ? { ...m, status: 'approved' } : m));
+
+        setProcessingAction(true);
         try {
             const startStr = formatDate(weekRange.start);
             const endStr = formatDate(weekRange.end);
@@ -169,19 +187,36 @@ export const TimesheetApprovalPage: React.FC = () => {
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
-            showError(err.message || 'Failed to approve');
+            // Rollback on error
+            setMemberEntries(previousEntries);
+            setTeamMembers(previousMembers);
+            showError(err.response?.data?.error || err.message || 'Failed to approve');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
     const handleApproveDay = async (dateStr: string) => {
-        if (!selectedMemberId) return;
+        if (!selectedMemberId || processingAction) return;
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        setMemberEntries(prev => prev.map(e =>
+            formatDate(new Date(e.log_date)) === dateStr ? { ...e, log_status: 'approved' } : e
+        ));
+
+        setProcessingAction(true);
         try {
             await timesheetService.approveTimesheet(selectedMemberId, dateStr, dateStr);
             showSuccess(`Timesheet for ${dateStr} approved`);
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
-            showError(err.message || 'Failed to approve day');
+            // Rollback
+            setMemberEntries(previousEntries);
+            showError(err.response?.data?.error || err.message || 'Failed to approve day');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -192,18 +227,21 @@ export const TimesheetApprovalPage: React.FC = () => {
         setRejectModalOpen(true);
     };
 
-    const handleRejectClick = (entryId: number) => {
-        setEntryToReject(entryId);
-        setRejectDateStr(null);
-        setRejectionReason('');
-        setRejectModalOpen(true);
-    };
-
     const confirmReject = async () => {
-        if ((!entryToReject && !rejectDateStr) || !rejectionReason.trim()) {
-            showError('Please provide a reason');
+        if ((!entryToReject && !rejectDateStr) || !rejectionReason.trim() || processingAction) {
+            if (!rejectionReason.trim()) showError('Please provide a reason');
             return;
         }
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        if (entryToReject) {
+            setMemberEntries(prev => prev.map(e => e.id === entryToReject ? { ...e, log_status: 'rejected', rejection_reason: rejectionReason } : e));
+        } else if (rejectDateStr) {
+            setMemberEntries(prev => prev.map(e => formatDate(new Date(e.log_date)) === rejectDateStr ? { ...e, log_status: 'rejected', rejection_reason: rejectionReason } : e));
+        }
+
+        setProcessingAction(true);
         try {
             if (entryToReject) {
                 await timesheetService.rejectEntry(entryToReject, rejectionReason);
@@ -216,7 +254,11 @@ export const TimesheetApprovalPage: React.FC = () => {
             if (selectedMemberId) fetchMemberEntries(selectedMemberId);
             fetchTeamStatus();
         } catch (err: any) {
-            showError(err.message || 'Failed to reject');
+            // Rollback
+            setMemberEntries(previousEntries);
+            showError(err.response?.data?.error || err.message || 'Failed to reject');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -226,49 +268,20 @@ export const TimesheetApprovalPage: React.FC = () => {
         setCurrentDate(newDate);
     };
 
-    /*
-    const handleDownloadReport = async () => {
-        try {
-            const data = await timesheetService.downloadReport(reportFilters);
-            // Convert JSON to CSV
-            if (!data || data.length === 0) {
-                showError('No data found for criteria');
-                return;
-            }
-
-            const headers = Object.keys(data[0]).join(',');
-            const rows = data.map((row: any) => Object.values(row).map(v => `"${v}"`).join(',')).join('\n');
-            const csvContent = `data:text/csv;charset=utf-8,${headers}\n${rows}`;
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `timesheet_report_${formatDate(new Date())}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            setReportModalOpen(false);
-            showSuccess('Report downloaded');
-        } catch (err) {
-            showError('Failed to generate report');
-        }
-    };
-    */
-
-
-
-
 
     // -- Grouping --
     const getEntriesForDay = (dateStr: string) => {
         return memberEntries.filter(e => {
             const eDate = new Date(e.log_date);
-            return formatDate(eDate) === dateStr;
+            const matchesDate = formatDate(eDate) === dateStr;
+            // Hide Draft logs from managers/approvers UNLESS it's a resubmission (fixing a rejection)
+            // We want the manager to see that a log exists there, even if it's currently being edited.
+            return matchesDate && (e.log_status !== 'draft' || e.is_resubmission);
         });
     };
 
     const selectedMember = teamMembers.find(m => m.id === selectedMemberId);
+    const isReportingManager = selectedMember && String(selectedMember.reporting_manager_id) === String(user?.id);
 
     return (
         <AppLayout>
@@ -279,33 +292,46 @@ export const TimesheetApprovalPage: React.FC = () => {
                     </div>
 
                     <div className="header-actions">
-                        <Button
-                            variant="outline"
-                            onClick={() => setReportModalOpen(true)}
-                            style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
-                        >
-                            <Download size={16} />
-                            Reports
-                        </Button>
+                        {['hr', 'super_admin'].includes(user?.role || '') && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setReportModalOpen(true)}
+                                style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                            >
+                                <Download size={16} />
+                                Reports
+                            </Button>
+                        )}
 
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
                             <span className="current-week-display">
-                                {weekRange.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - {weekRange.end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {(() => {
+                                    const d1 = String(weekRange.start.getDate()).padStart(2, '0');
+                                    const m1 = String(weekRange.start.getMonth() + 1).padStart(2, '0');
+                                    const y1 = weekRange.start.getFullYear();
+                                    const d2 = String(weekRange.end.getDate()).padStart(2, '0');
+                                    const m2 = String(weekRange.end.getMonth() + 1).padStart(2, '0');
+                                    const y2 = weekRange.end.getFullYear();
+                                    return `${d1}-${m1}-${y1} - ${d2}-${m2}-${y2}`;
+                                })()}
                             </span>
                             <button
                                 className="nav-btn"
                                 onClick={() => changeWeek(1)}
                                 disabled={(() => {
-                                    const nextWeekEnd = new Date(weekRange.end);
-                                    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-                                    return nextWeekEnd >= new Date();
+                                    const { start: todayWeekStart } = getWeekRange(new Date());
+                                    const { start: viewWeekStart } = getWeekRange(currentDate);
+
+                                    // Disable "Next" if current view is already the previous week
+                                    // (i.e., we don't want them to reach or see the current active week)
+                                    return viewWeekStart >= new Date(todayWeekStart.setDate(todayWeekStart.getDate() - 7));
                                 })()}
                                 style={{
                                     opacity: (() => {
-                                        const nextWeekEnd = new Date(weekRange.end);
-                                        nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-                                        return nextWeekEnd >= new Date();
+                                        const { start: todayWeekStart } = getWeekRange(new Date());
+                                        const { start: viewWeekStart } = getWeekRange(currentDate);
+                                        return viewWeekStart >= new Date(todayWeekStart.setDate(todayWeekStart.getDate() - 7));
                                     })() ? 0.3 : 1, cursor: 'pointer'
                                 }}
                             >
@@ -342,8 +368,14 @@ export const TimesheetApprovalPage: React.FC = () => {
                                         <span className="emp-role">{member.designation}</span>
                                     </div>
                                     <div className="emp-status">
-                                        <div className={`status-dot ${member.status}`} title={member.status} />
-                                        <span className="hours-pill">{member.total_hours.toFixed(1)}h</span>
+                                        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                                            {member.is_late && !member.is_resubmission && <span style={{ fontSize: '9px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fee2e2', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>LATE</span>}
+                                            {member.is_resubmission && <span style={{ fontSize: '9px', background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', padding: '0 4px', borderRadius: '4px', fontWeight: 800 }}>RESUB</span>}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div className={`status-dot ${member.status}`} title={member.status} />
+                                            <span className="hours-pill">{member.total_hours.toFixed(1)}h</span>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -393,103 +425,128 @@ export const TimesheetApprovalPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
-                                <div style={{ paddingBottom: '20px', borderBottom: '1px solid #f1f5f9', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
-                                            {selectedMember?.name}
-                                        </h2>
-                                        <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                            {selectedMember?.emp_id} • {selectedMember?.total_hours.toFixed(2)} Hrs Logged
-                                        </div>
-                                    </div>
-
-                                    {/* Action Bar */}
-                                    {(() => {
-                                        if (selectedMemberId === user?.id) {
-                                            return <div className="logged-hours-badge warning">Self Approval Disabled</div>;
-                                        }
-
-                                        // Criteria Check (Past Weeks Only)
-                                        const isPastWeek = weekRange.end < new Date();
-                                        const totalHours = selectedMember?.total_hours || 0;
-                                        const criteriaMet = totalHours >= 40;
-
-                                        if (isPastWeek && !criteriaMet) {
-                                            // Show nothing in action bar or show disabled state? 
-                                            // We show banner below instead.
-                                            return <div className="logged-hours-badge danger">Criteria Not Met</div>;
-                                        }
-
-                                        if (memberEntries.length === 0 && !loadingEntries) {
-                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>No Logs</div>;
-                                        }
-
-                                        const hasPending = memberEntries.some(e => e.log_status !== 'approved');
-                                        if (hasPending) {
-                                            return (
-                                                <button className="bulk-approve-btn" onClick={handleApproveWeek}>
-                                                    <CheckCircle size={16} />
-                                                    Approve Week
-                                                </button>
-                                            );
-                                        } else if (memberEntries.length > 0) {
-                                            return (
-                                                <div className="logged-hours-badge success">
-                                                    <CheckCircle size={14} style={{ marginRight: 4 }} />
-                                                    Approved
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </div>
-
-                                {/* Criteria Error Banner */}
                                 {(() => {
-                                    const isPastWeek = weekRange.end < new Date();
+                                    // Common Status Calculations
                                     const totalHours = selectedMember?.total_hours || 0;
                                     const criteriaMet = totalHours >= 40;
+                                    const hasActionable = memberEntries.some(e => e.log_status === 'submitted');
+                                    const allApproved = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'approved' || e.log_status === 'rejected');
 
-                                    // Only show if it's a past week AND criteria failed AND it's not the user themselves
-                                    if (isPastWeek && !criteriaMet && selectedMemberId !== user?.id) {
-                                        return (
-                                            <div style={{
-                                                marginBottom: '20px',
-                                                padding: '16px',
-                                                borderRadius: '12px',
-                                                background: '#fef2f2',
-                                                border: '1px solid #fee2e2',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                color: '#b91c1c',
-                                                animation: 'fadeIn 0.5s ease-out'
-                                            }}>
-                                                <style>
-                                                    {`
-                                                        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-                                                        @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-                                                    `}
-                                                </style>
-                                                <div style={{ padding: '8px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', animation: 'pulse-red 2s infinite' }}>
-                                                    <XCircle size={24} color="#ef4444" />
-                                                </div>
+                                    return (
+                                        <>
+                                            {/* Action Bar */}
+                                            <div style={{ paddingBottom: '20px', borderBottom: '1px solid #f1f5f9', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div>
-                                                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 600 }}>Submission Criteria Not Met</h3>
-                                                    <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
-                                                        This user has logged fewer than 40 hours.
-                                                    </p>
+                                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                                                        {selectedMember?.name}
+                                                    </h2>
+                                                    <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                                                        {selectedMember?.emp_id} • {selectedMember?.total_hours.toFixed(2)} Hrs Logged
+                                                    </div>
+                                                </div>
+
+                                                <div className="action-bar-badge-container">
+                                                    {(() => {
+                                                        if (selectedMemberId === user?.id) {
+                                                            return <div className="logged-hours-badge warning">Self Approval Disabled</div>;
+                                                        }
+
+                                                        // If no logs, or only drafts, or criteria not met -> Criteria Not Met
+                                                        if (memberEntries.length === 0) {
+                                                            return <div className="logged-hours-badge neutral">No Logs</div>;
+                                                        }
+
+                                                        // New Logic: If > 40 hours, but still has drafts/rejections -> Action Required (by user), not "Criteria Not Met"
+                                                        if (criteriaMet) {
+                                                            if (hasActionable) {
+                                                                return isReportingManager ? (
+                                                                    <button
+                                                                        className="bulk-approve-btn"
+                                                                        onClick={handleApproveWeek}
+                                                                        disabled={processingAction}
+                                                                    >
+                                                                        {processingAction ? (
+                                                                            <Clock size={16} className="animate-spin" />
+                                                                        ) : (
+                                                                            <CheckCircle size={16} />
+                                                                        )}
+                                                                        {processingAction ? 'Processing...' : 'Approve Week'}
+                                                                    </button>
+                                                                ) : (
+                                                                    <div className="logged-hours-badge info">
+                                                                        <Clock size={14} style={{ marginRight: 4 }} />
+                                                                        Submitted
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            if (allApproved) {
+                                                                return (
+                                                                    <div className="logged-hours-badge success">
+                                                                        <CheckCircle size={14} style={{ marginRight: 4 }} />
+                                                                        Processed
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            // If 40+ hours but has pending drafts/rejections that aren't submitted yet
+                                                            return <div className="logged-hours-badge warning">Pending Resubmission</div>;
+                                                        }
+
+                                                        // Default fallback if < 40 hours
+                                                        return <div className="logged-hours-badge danger">Criteria Not Met</div>;
+                                                    })()}
                                                 </div>
                                             </div>
-                                        )
-                                    }
-                                    return null;
+
+                                            {/* Status Banner */}
+                                            {(() => {
+                                                // Only show if it's a past week AND (criteria failed OR not submitted) AND it's not the user themselves
+                                                // AND hide it if we have actionable (submitted) logs or everything is already processed
+                                                if (weekRange.end < new Date() && !criteriaMet && selectedMemberId !== user?.id && !hasActionable && !allApproved) {
+                                                    return (
+                                                        <div style={{
+                                                            marginBottom: '20px',
+                                                            padding: '16px',
+                                                            borderRadius: '12px',
+                                                            background: '#fef2f2',
+                                                            border: '1px solid #fee2e2',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '12px',
+                                                            color: '#b91c1c',
+                                                            animation: 'fadeIn 0.5s ease-out'
+                                                        }}>
+                                                            <style>
+                                                                {`
+                                                                        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+                                                                        @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+                                                                    `}
+                                                            </style>
+                                                            <div style={{ padding: '8px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', animation: 'pulse-red 2s infinite' }}>
+                                                                <XCircle size={24} color="#ef4444" />
+                                                            </div>
+                                                            <div>
+                                                                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 600 }}>
+                                                                    Submission Criteria Not Met
+                                                                </h3>
+                                                                <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
+                                                                    This user has logged fewer than 40 hours ({totalHours.toFixed(1)}h).
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                }
+                                                return null;
+                                            })()}
+                                        </>
+                                    );
                                 })()}
 
                                 {/* Week Days Navigation */}
                                 <div className="week-days-nav" style={{
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(7, 1fr)',
+                                    gridTemplateColumns: 'repeat(6, 1fr)',
                                     gap: '8px',
                                     marginBottom: '20px',
                                     padding: '10px 0'
@@ -553,41 +610,68 @@ export const TimesheetApprovalPage: React.FC = () => {
                                             return (
                                                 <div key={dateStr} id={`day-${dateStr}`} className="day-group">
                                                     <div className="day-header">
-                                                        <div className="day-title-group">
-                                                            <span className="day-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                                        <div className="day-title-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span className="day-title" style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                                                                {day.toLocaleDateString('en-GB', { weekday: 'long' })}
+                                                            </span>
+                                                            <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                {(() => {
+                                                                    const d = String(day.getDate()).padStart(2, '0');
+                                                                    const m = String(day.getMonth() + 1).padStart(2, '0');
+                                                                    const y = day.getFullYear();
+                                                                    return `${d}-${m}-${y}`;
+                                                                })()}
 
                                                                 {/* Day Actions */}
-                                                                {selectedMemberId !== user?.id && dayEntries.length > 0 && (
-                                                                    <div className="day-actions" style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
-                                                                        {/* Only show Approve/Reject if there are pending entries and NOT only system entries */}
-                                                                        {dayEntries.some(e => e.log_status !== 'approved' && !e.project_name?.includes('System')) && (
-                                                                            <>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
-                                                                                    title="Approve Day"
-                                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#10b981', padding: '4px' }}
-                                                                                >
-                                                                                    <CheckCircle size={20} />
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
-                                                                                    title="Reject Day"
-                                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
-                                                                                >
-                                                                                    <XCircle size={20} />
-                                                                                </button>
-                                                                            </>
-                                                                        )}
+                                                                {dayEntries.length > 0 && (() => {
+                                                                    const nonSystemEntries = dayEntries.filter(e => !e.project_name?.includes('System'));
+                                                                    const hasActionable = nonSystemEntries.some(e => e.log_status === 'submitted');
+                                                                    const allApproved = nonSystemEntries.length > 0 && nonSystemEntries.every(e => e.log_status === 'approved');
+                                                                    const anyRejected = nonSystemEntries.some(e => e.log_status === 'rejected');
 
-                                                                        {/* Show Green Tick if all Approved or System */}
-                                                                        {dayEntries.every(e => e.log_status === 'approved' || e.project_name?.includes('System')) && (
-                                                                            <CheckCircle size={20} color="#10b981" fill="#ecfdf5" />
-                                                                        )}
-                                                                    </div>
-                                                                )}
+                                                                    return (
+                                                                        <div className="day-actions" style={{ display: 'flex', gap: '8px', marginLeft: '12px', alignItems: 'center' }}>
+                                                                            {hasActionable ? (
+                                                                                isReportingManager ? (
+                                                                                    <>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
+                                                                                            className="day-action-btn approve"
+                                                                                            disabled={processingAction}
+                                                                                        >
+                                                                                            {processingAction ? 'Wait...' : 'Approve Day'}
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
+                                                                                            className="day-action-btn reject"
+                                                                                            disabled={processingAction}
+                                                                                        >
+                                                                                            {processingAction ? 'Wait...' : 'Reject Day'}
+                                                                                        </button>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <div className="status-submitted-badge">
+                                                                                        <Clock size={14} /> Submitted
+                                                                                    </div>
+                                                                                )
+                                                                            ) : allApproved ? (
+                                                                                <div className="status-approved-badge">
+                                                                                    <CheckCircle size={14} /> Approved
+                                                                                </div>
+                                                                            ) : anyRejected ? (
+                                                                                <div className="status-rejected-badge">
+                                                                                    <XCircle size={14} /> Rejected
+                                                                                </div>
+                                                                            ) : (nonSystemEntries.some(e => e.log_status === 'draft')) ? (
+                                                                                <div className="status-submitted-badge" style={{ background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0' }}>
+                                                                                    <Clock size={14} /> Draft
+                                                                                </div>
+                                                                            ) : null}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </span>
                                                         </div>
                                                         <span className="day-total">{dayTotal.toFixed(2)} Hrs</span>
@@ -607,38 +691,55 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                 <div className="entry-inner">
                                                                     <div className="entry-header">
                                                                         <div className="entry-path">
-                                                                            <strong>{entry.project_name}</strong>
-                                                                            <span className="path-sep">&gt;</span>
-                                                                            <span>{entry.module_name}</span>
-                                                                            <span className="path-sep">&gt;</span>
-                                                                            <span>{entry.task_name}</span>
+                                                                            {entry.project_name?.includes('System') ? (
+                                                                                <strong>System log</strong>
+                                                                            ) : entry.work_status === 'On Leave' || entry.project_name === 'Leave' ? (
+                                                                                <strong>On Leave</strong>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <strong>{entry.project_name}</strong>
+                                                                                    {entry.module_name && entry.module_name !== entry.project_name && (
+                                                                                        <>
+                                                                                            <span className="path-sep">&gt;</span>
+                                                                                            <span>{entry.module_name}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                    {entry.task_name && entry.task_name !== entry.module_name && (
+                                                                                        <>
+                                                                                            <span className="path-sep">&gt;</span>
+                                                                                            <span>{entry.task_name}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                    {entry.activity_name && entry.activity_name !== entry.task_name && (
+                                                                                        <>
+                                                                                            <span className="path-sep">&gt;</span>
+                                                                                            <span>{entry.activity_name}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                </>
+                                                                            )}
                                                                         </div>
                                                                         <span className="duration-label">{Number(entry.duration).toFixed(2)}h</span>
                                                                     </div>
-                                                                    <div className="description-text">{entry.description}</div>
-                                                                    {entry.rejection_reason && (
+                                                                    {entry.project_name?.includes('System') && entry.description && (
+                                                                        <h4 className="holiday-name" style={{ fontSize: '14px', margin: '4px 0', color: '#ef4444' }}>{entry.description}</h4>
+                                                                    )}
+
+                                                                    {!entry.project_name?.includes('System') && (
+                                                                        <div className="description-text">{entry.description}</div>
+                                                                    )}
+                                                                    {entry.rejection_reason && entry.log_status !== 'approved' && (
                                                                         <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '4px' }}>
                                                                             <strong>Rejection Reason:</strong> {entry.rejection_reason}
                                                                         </div>
                                                                     )}
                                                                     <div className="entry-footer">
+                                                                        <span className={`status-pill pill-progress`}>{entry.work_status?.replace('_', ' ')}</span>
                                                                         <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
+                                                                        {entry.is_late && <span className="status-pill warn" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7' }}>Late</span>}
+                                                                        {entry.is_resubmission && <span className="status-pill info" style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>Resubmission</span>}
                                                                     </div>
                                                                 </div>
-
-                                                                {entry.log_status !== 'approved' && entry.log_status !== 'rejected' && !entry.project_name?.includes('System') && (
-                                                                    <div className="entry-actions-sidebar">
-                                                                        <button
-                                                                            className="action-btn-styled delete"
-                                                                            title="Reject"
-                                                                            onClick={() => {
-                                                                                if (entry.id) handleRejectClick(entry.id);
-                                                                            }}
-                                                                        >
-                                                                            <XCircle size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         ))
                                                     )}
@@ -658,8 +759,10 @@ export const TimesheetApprovalPage: React.FC = () => {
                     title="Reject Entry"
                     footer={
                         <>
-                            <button className="modal-btn secondary" onClick={() => setRejectModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn danger" onClick={confirmReject}>Reject</button>
+                            <button className="modal-btn secondary" onClick={() => setRejectModalOpen(false)} disabled={processingAction}>Cancel</button>
+                            <button className="modal-btn danger" onClick={confirmReject} disabled={processingAction}>
+                                {processingAction ? 'Rejecting...' : 'Reject'}
+                            </button>
                         </>
                     }
                 >
@@ -670,7 +773,6 @@ export const TimesheetApprovalPage: React.FC = () => {
                             style={{ minHeight: '80px' }}
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
-                            placeholder="e.g. Invalid task allocation"
                         />
                     </div>
                 </Modal>

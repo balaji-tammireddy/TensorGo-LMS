@@ -157,6 +157,8 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* Project and Timesheet Routes */}
         <Route
           path="/project-management"
           element={

@@ -1455,7 +1455,7 @@ const generateEmployeeDetailsUpdateEmailHtml = (data: EmployeeDetailsUpdateEmail
     <p>This is to inform you that your profile details have been updated in the <strong>TensorGo Intranet</strong> by <strong>${data.updatedBy}</strong>.</p>
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; margin: 30px 0; border-radius: 6px;">
       <p style="margin: 0; color: #475569; line-height: 1.6;">
-        For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
+        Please log in to the portal to review your updated profiles.
       </p>
     </div>
 
@@ -1481,7 +1481,7 @@ Dear ${data.employeeName},
 
 This is to inform you that your profile details have been updated in the TensorGo Intranet by ${data.updatedBy}.
 
-For security purposes, we do not include specific changes in this email. Please log in to the portal to review your updated profiles.
+Please log in to the portal to review your updated profiles.
 
 
 Best Regards,
@@ -1925,6 +1925,8 @@ export interface TimesheetSubmissionEmailData {
   hoursLogged: number;
   startDate: string;
   endDate: string;
+  isLate?: boolean;
+  isResubmission?: boolean;
 }
 
 /**
@@ -1947,6 +1949,8 @@ export const sendTimesheetStatusEmail = async (
   } else {
     if (data.logDate) {
       mainMessage += `Your timesheet entry for <strong>${data.logDate}</strong> has been <strong>rejected</strong>.`;
+    } else if (data.startDate === data.endDate) {
+      mainMessage += `Your timesheet entries for <strong>${data.startDate}</strong> have been <strong>rejected</strong>.`;
     } else {
       mainMessage += `Your timesheet entries for <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong> have been <strong>rejected</strong>.`;
     }
@@ -1954,7 +1958,11 @@ export const sendTimesheetStatusEmail = async (
 
   const detailsTable = generateDetailsTable([
     { label: 'Status:', value: data.status.toUpperCase(), isBold: true },
-    ...(data.startDate ? [{ label: 'Period:', value: `${data.startDate} to ${data.endDate}` }] : []),
+    ...(data.startDate ? [
+      data.startDate === data.endDate
+        ? { label: 'Date:', value: data.startDate }
+        : { label: 'Period:', value: `${data.startDate} to ${data.endDate}` }
+    ] : []),
     ...(data.logDate ? [{ label: 'Date:', value: data.logDate }] : []),
     ...(data.reason ? [{ label: 'Reason:', value: data.reason }] : []),
     ...(data.approverName ? [{ label: 'Action By:', value: data.approverName }] : []),
@@ -2008,7 +2016,7 @@ export const sendTimesheetReminderEmail = async (
     <p>Dear ${data.employeeName},</p>
     <p>${message}</p>
     <div style="margin: 30px 0; text-align: center;">
-      <a href="https://intranet.tensorgo.com/project-management" style="background-color:#1e3a8a;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:50px;text-align:center;text-decoration:none;width:200px;border-radius:6px;">Update Timesheet</a>
+      <a href="https://intra.tensorgo.com/project-management" style="background-color:#1e3a8a;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:50px;text-align:center;text-decoration:none;width:200px;border-radius:6px;">Update Timesheet</a>
     </div>
     <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
@@ -2032,15 +2040,18 @@ export const sendTimesheetSubmissionEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const title = 'Timesheet Auto-Submitted';
+  const title = data.isLate ? 'Late Timesheet Submitted' : 'Timesheet Submitted';
+
   const content = `
     <p>Dear Manager,</p>
-    <p>The timesheet for <strong>${data.employeeName}</strong> has been auto-submitted as they have met the weekly 40-hour criteria.</p>
+    <p>The timesheet for <strong>${data.employeeName}</strong> has been submitted.</p>
     ${generateDetailsTable([
     { label: 'Employee Name:', value: data.employeeName, isBold: true },
     { label: 'Weekly Hours:', value: `${data.hoursLogged} hours`, isBold: true },
     { label: 'Period:', value: `${data.startDate} to ${data.endDate}` },
-    { label: 'Status:', value: 'SUBMITTED', isBold: true }
+    { label: 'Status:', value: 'SUBMITTED', isBold: true },
+    ...(data.isLate ? [{ label: 'Submission Type:', value: '<span style="color: #dc2626; font-weight: bold;">LATE SUBMISSION</span>', isHtml: true }] : []),
+    ...(data.isResubmission ? [{ label: 'Submission Detail:', value: '<span style="color: #2563eb; font-weight: bold;">RESUBMISSION</span>', isHtml: true }] : [])
   ])}
     <p style="margin-top: 30px;">Please log in to the portal to review and approve the timesheet entries.</p>
     <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
@@ -2048,9 +2059,82 @@ export const sendTimesheetSubmissionEmail = async (
 
   return await sendEmail({
     to: managerEmail,
-    subject: `Timesheet Submitted: ${data.employeeName} [Ref: ${uniqueId}]`,
-    html: generateEmailWrapper(title, content, uniqueId, `${data.employeeName} submitted their timesheet`),
-    text: `${title}\n\nThe timesheet for ${data.employeeName} has been auto-submitted with ${data.hoursLogged} hours.`
+    subject: `Timesheet Submitted: ${data.employeeName} ${data.isLate ? '(LATE)' : ''} [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, `${data.employeeName} submitted their timesheet ${data.isLate ? '(LATE)' : ''}`),
+    text: `${title}\n\nThe timesheet for ${data.employeeName} has been submitted with ${data.hoursLogged} hours. ${data.isLate ? 'This is a LATE submission.' : ''} ${data.isResubmission ? 'This is a RESUBMISSION.' : ''}`
+  });
+};
+
+export interface TimesheetSummaryEmailData {
+  managerName: string;
+  startDate: string;
+  endDate: string;
+  submissions: Array<{ name: string; hours: number }>;
+  failures: Array<{ name: string; hours: number }>;
+}
+
+/**
+ * Send Timesheet Summary Email (to Manager)
+ */
+export const sendTimesheetSummaryEmail = async (
+  managerEmail: string,
+  data: TimesheetSummaryEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const title = 'Weekly Timesheet Summary';
+
+  const submissionRows = data.submissions.length > 0
+    ? data.submissions.map(s => `<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${s.name}</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${s.hours}h</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #166534; font-weight: bold; text-align: right;">SUBMITTED</td></tr>`).join('')
+    : '<tr><td colspan="3" style="padding: 12px; color: #64748b; text-align: center;">No auto-submissions</td></tr>';
+
+  const failureRows = data.failures.length > 0
+    ? data.failures.map(f => `<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${f.name}</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.hours}h</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #991b1b; font-weight: bold; text-align: right;">FAILED</td></tr>`).join('')
+    : '<tr><td colspan="3" style="padding: 12px; color: #64748b; text-align: center;">None</td></tr>';
+
+  const content = `
+    <p>Dear ${data.managerName || 'Manager'},</p>
+    <p>Here is the weekly timesheet status summary for your team for the period <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong>.</p>
+    
+    <h3 style="margin: 30px 0 10px 0; font-size: 16px; color: #1e3a8a;">Auto-Submissions (Confirmed)</h3>
+    <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #f8fafc;">
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: left;">Employee</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Hours</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${submissionRows}
+      </tbody>
+    </table>
+
+    <h3 style="margin: 30px 0 10px 0; font-size: 16px; color: #991b1b;">Missed Submissions (Action Required)</h3>
+    <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #f8fafc;">
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: left;">Employee</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Hours</th>
+          <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: right;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${failureRows}
+      </tbody>
+    </table>
+
+    <p style="margin-top: 30px;">Please log in to the portal to review the submitted timesheets or follow up with employees who missed the deadline.</p>
+    <p>Best Regards,<br/><strong>TensorGo Intranet</strong></p>
+  `;
+
+  return await sendEmail({
+    to: managerEmail,
+    subject: `Weekly Timesheet Summary [Ref: ${uniqueId}]`,
+    html: generateEmailWrapper(title, content, uniqueId, 'Weekly timesheet submission summary for your team'),
+    text: `Weekly Timesheet Summary\n\nPeriod: ${data.startDate} to ${data.endDate}\n\nSubmissions:\n${data.submissions.map(s => `${s.name}: ${s.hours}h (SUBMITTED)`).join('\n')}\n\nFailures:\n${data.failures.map(f => `${f.name}: ${f.hours}h (FAILED)`).join('\n')}`
   });
 };
 

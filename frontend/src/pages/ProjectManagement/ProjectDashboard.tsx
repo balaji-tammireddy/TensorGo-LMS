@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
@@ -12,9 +12,115 @@ import EmptyState from '../../components/common/EmptyState';
 import { ProjectCard } from './components/ProjectCard';
 import './ProjectDashboard.css';
 
+
+const ProjectListSection = ({
+    title,
+    projects,
+    emptyMsg,
+    isOpen,
+    onToggle,
+    navigate,
+    user,
+    getStatusClass,
+    setDeleteConfirm
+}: {
+    title: string,
+    projects: Project[],
+    emptyMsg: string,
+    isOpen: boolean,
+    onToggle?: () => void,
+    navigate: (path: string) => void,
+    user: any,
+    getStatusClass: (status: string) => string,
+    setDeleteConfirm: (val: { id: number, name: string } | null) => void
+}) => {
+    const scrollRef = React.useRef<HTMLDivElement>(null);
+    const displayProjects = projects;
+
+    const handleScroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const scrollAmount = 364; // card width (340) + gap (24)
+            scrollRef.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+
+    return (
+        <div className={`section-container ${isOpen ? 'open' : ''}`}>
+            <div
+                className={`section-header-row ${onToggle ? 'clickable' : ''}`}
+                onClick={onToggle}
+                style={{ cursor: onToggle ? 'pointer' : 'default', userSelect: 'none' }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {onToggle && (isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />)}
+                    <h2 className="section-title" style={{ margin: 0 }}>{title}</h2>
+                </div>
+                {isOpen && projects.length > 0 && (
+                    <div className="header-scroll-actions" onClick={e => e.stopPropagation()}>
+                        <button
+                            className="header-scroll-btn"
+                            onClick={() => handleScroll('left')}
+                            title="Scroll Left"
+                        >
+                            <ChevronDown size={18} style={{ transform: 'rotate(90deg)' }} />
+                        </button>
+                        <button
+                            className="header-scroll-btn"
+                            onClick={() => handleScroll('right')}
+                            title="Scroll Right"
+                        >
+                            <ChevronDown size={18} style={{ transform: 'rotate(-90deg)' }} />
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {isOpen && (
+                <div className="section-content">
+                    {projects.length === 0 ? (
+                        <EmptyState
+                            title="No Projects"
+                            description={emptyMsg}
+                            icon={AlertCircle}
+                            size="small"
+                            className="dashboard-empty-state"
+                        />
+                    ) : (
+                        <div className="projects-grid-preview" ref={scrollRef}>
+                            {displayProjects.map((project: Project) => (
+                                <ProjectCard
+                                    key={project.id}
+                                    project={project}
+                                    navigate={navigate}
+                                    getStatusClass={getStatusClass}
+                                    onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
+                                    canDelete={user?.role === 'super_admin'}
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {projects.length > 0 && (
+                        <div className="section-footer-row">
+                            <span className="project-count-badge">
+                                {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+
 export const ProjectDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const queryClient = useQueryClient();
     const { showSuccess, showError } = useToast();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number, name: string } | null>(null);
@@ -24,27 +130,32 @@ export const ProjectDashboard: React.FC = () => {
     const [openSection, setOpenSection] = useState<string | null>('my-projects');
 
     const handleToggleSection = (section: string) => {
-        // Enforce one section always open (optimal space usage)
-        if (openSection !== section) {
+        if (openSection === section) {
+            // If clicking the already open section, open the other one
+            setOpenSection(section === 'my-projects' ? 'all-projects' : 'my-projects');
+        } else {
             setOpenSection(section);
         }
     };
 
     // Fetch projects
-    const { data: projects, isLoading, refetch } = useQuery(
+    const { data: projects, isLoading } = useQuery(
         'projects',
-        projectService.getProjects
+        projectService.getProjects,
+        {
+            refetchOnWindowFocus: false,
+            staleTime: 60000, // 1 minute
+        }
     );
-
     // Helper to check if user can create (Admin/HR/Manager)
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
-    const isGlobalAdmin = ['super_admin', 'hr'].includes(user?.role || '');
+    const isGlobalAdmin = user?.role === 'super_admin';
 
     const getStatusClass = (status: string) => {
         if (status === 'active') return 'status-active';
-        if (status === 'on_hold') return 'status-on-hold';
         if (status === 'completed') return 'status-completed';
         if (status === 'archived') return 'status-archived';
+        if (status === 'on_hold') return 'status-on-hold';
         return 'status-other';
     };
 
@@ -52,12 +163,18 @@ export const ProjectDashboard: React.FC = () => {
         if (!deleteConfirm) return;
 
         setIsDeleting(true);
-        setDeleteConfirm(null); // Close modal immediately
         try {
             await projectService.deleteProject(deleteConfirm.id);
             showSuccess(`Project "${deleteConfirm.name}" deleted successfully`);
+
+            // Optimistic Update: Remove from list immediately
+            queryClient.setQueryData<Project[]>('projects', (old) => {
+                return (old || []).filter(p => p.id !== deleteConfirm.id);
+            });
+
             setDeleteConfirm(null);
-            refetch();
+            // Optionally invalidate to ensure sync, but local update is enough for "no reload" feel
+            // queryClient.invalidateQueries('projects');
         } catch (error: any) {
             console.error('[PROJECT] Delete Error:', error);
             showError(error.response?.data?.error || 'Failed to delete project');
@@ -66,79 +183,6 @@ export const ProjectDashboard: React.FC = () => {
         }
     };
 
-    const ProjectListSection = ({
-        title,
-        projects,
-        filterType,
-        emptyMsg,
-        // sectionId,
-        isOpen,
-        onToggle
-    }: {
-        title: string,
-        projects: Project[],
-        filterType: string,
-        emptyMsg: string,
-        sectionId: string,
-        isOpen: boolean,
-        onToggle: () => void
-    }) => {
-        const displayProjects = projects.slice(0, 4); // Show only top 4
-        const hasMore = projects.length > 4;
-
-        return (
-            <div className={`section-container ${isOpen ? 'open' : ''}`}>
-                <div
-                    className="section-header-row clickable"
-                    onClick={onToggle}
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                        <h2 className="section-title" style={{ margin: 0 }}>{title}</h2>
-                    </div>
-                    {hasMore && isOpen && (
-                        <button
-                            className="btn-view-all"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/project-management/list?filter=${filterType}`);
-                            }}
-                        >
-                            View All &gt;
-                        </button>
-                    )}
-                </div>
-
-                {isOpen && (
-                    <div className="section-content">
-                        {projects.length === 0 ? (
-                            <EmptyState
-                                title="No Projects"
-                                description={emptyMsg}
-                                icon={AlertCircle}
-                                size="small"
-                                className="dashboard-empty-state"
-                            />
-                        ) : (
-                            <div className="projects-grid-preview">
-                                {displayProjects.map((project: Project) => (
-                                    <ProjectCard
-                                        key={project.id}
-                                        project={project}
-                                        navigate={navigate}
-                                        getStatusClass={getStatusClass}
-                                        onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                        canDelete={user?.role === 'super_admin'}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     return (
         <AppLayout>
@@ -157,78 +201,55 @@ export const ProjectDashboard: React.FC = () => {
                     )}
                 </div>
 
-                {/* Loading State */}
-                {isLoading && (
-                    <div className="project-loading">Loading projects...</div>
-                )}
-
                 {/* Projects Content Split */}
                 {!isLoading && (
                     <div className="dashboard-content">
                         {/* 1. SECTION: My Projects */}
-                        <div className={`dashboard-section ${openSection !== 'my-projects' ? 'collapsed' : ''}`}>
+                        <div className={`dashboard-section ${(!isGlobalAdmin || openSection === 'my-projects') ? 'open' : 'collapsed'}`}>
                             {(() => {
-                                const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
-                                const myProjectsList = (projects || []).filter((p: Project) =>
-                                    isPMView ? (p.is_pm || p.is_member) : p.is_member
-                                );
+                                const myProjectsList = isGlobalAdmin
+                                    ? (projects || []).filter(p => p.is_pm || p.is_member)
+                                    : (projects || []);
 
                                 return (
                                     <ProjectListSection
                                         title="My Projects"
                                         projects={myProjectsList}
-                                        filterType="my-projects"
                                         emptyMsg="No projects found in this section."
-                                        sectionId="my-projects"
-                                        isOpen={openSection === 'my-projects'}
-                                        onToggle={() => handleToggleSection('my-projects')}
+                                        isOpen={!isGlobalAdmin || openSection === 'my-projects'}
+                                        onToggle={isGlobalAdmin ? () => handleToggleSection('my-projects') : undefined}
+                                        navigate={navigate}
+                                        user={user}
+                                        getStatusClass={getStatusClass}
+                                        setDeleteConfirm={setDeleteConfirm}
                                     />
                                 );
                             })()}
                         </div>
 
                         {/* 2. SECTION: All Projects */}
-                        <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
-                            {isGlobalAdmin ? (
-                                (() => {
-                                    const allOtherProjects = projects || [];
+                        {isGlobalAdmin && (
+                            <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
+                                {(() => {
+                                    // Show ALL projects (user request: "all project should show all of them")
+                                    const allProjects = projects || [];
                                     return (
                                         <ProjectListSection
                                             title="All Projects"
-                                            projects={allOtherProjects}
-                                            filterType="all"
+                                            projects={allProjects}
                                             emptyMsg="No global projects to display."
                                             sectionId="all-projects"
                                             isOpen={openSection === 'all-projects'}
                                             onToggle={() => handleToggleSection('all-projects')}
+                                            navigate={navigate}
+                                            user={user}
+                                            getStatusClass={getStatusClass}
+                                            setDeleteConfirm={setDeleteConfirm}
                                         />
                                     );
-                                })()
-                            ) : (
-                                <div className="section-container">
-                                    <div
-                                        className="section-header-row clickable"
-                                        onClick={() => handleToggleSection('all-projects')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            {openSection === 'all-projects' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                                            <h2 className="section-title" style={{ margin: 0 }}>All Projects</h2>
-                                        </div>
-                                    </div>
-
-                                    {openSection === 'all-projects' && (
-                                        <EmptyState
-                                            title="Access Restricted"
-                                            description="You are not authorized to view all projects."
-                                            icon={AlertCircle}
-                                            size="small"
-                                            className="dashboard-empty-state"
-                                        />
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                })()}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -236,9 +257,27 @@ export const ProjectDashboard: React.FC = () => {
                     isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
                     type="project"
-                    onSuccess={refetch}
-                />
+                    onSuccess={(newProject?: any) => {
+                        if (newProject && newProject.id) {
+                            // Enrich newProject with manager name if missing (CreateModal returns raw API response usually)
+                            // Since we don't know the manager name easily here without searching, 
+                            // we can fallback to user's name if they created it for themselves, or leave it blank/loading.
+                            // Ideally CreateModal sends back enriched data or we rely on the list to fetch it eventually.
+                            // But since we removed invalidateQueries, we need it NOW.
+                            // Let's rely on the fact that for "My Projects", if I created it, I am likely the PM or member.
 
+                            // Better approach: In CreateModal, assume result has manager_name or we might miss it.
+                            // If missing, UI might show blank.
+                            // Let's invalidQueries in the background (silent refetch) to fix data eventually,
+                            // but setQueryData immediately for responsiveness.
+
+                            queryClient.setQueryData<Project[]>('projects', (old) => {
+                                if (!old) return [newProject];
+                                return [newProject, ...old];
+                            });
+                        }
+                    }}
+                />
 
                 <ConfirmationDialog
                     isOpen={!!deleteConfirm}

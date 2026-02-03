@@ -17,17 +17,31 @@ export interface TimesheetEntry {
     log_status?: string;
     rejection_reason?: string;
     manager_comment?: string;
+    is_late?: boolean;
+    is_resubmission?: boolean;
 }
 
 export class TimesheetService {
 
     // Helper to format date safely without timezone shift
-    private static formatDate(date: Date | string): string {
+    // Helper to format date safely without timezone shift
+    // Updated to be more robust: handles Date objects, strings, and nulls
+    public static formatDate(date: Date | string | null | undefined): string {
         if (!date) return '';
-        const d = new Date(date);
-        if (isNaN(d.getTime())) {
-            return typeof date === 'string' ? date : '';
+
+        let d: Date;
+        if (typeof date === 'string') {
+            // Try parsing
+            d = new Date(date);
+        } else {
+            d = date;
         }
+
+        if (isNaN(d.getTime())) {
+            // Return raw string if valid, else empty
+            return typeof date === 'string' ? date.split('T')[0] : '';
+        }
+
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -50,9 +64,11 @@ export class TimesheetService {
     }
 
     static async getEntriesForWeek(userId: number, startDateStr: string, endDateStr: string) {
-        console.log(`[Timesheet] Fetching entries for user ${userId} from ${startDateStr} to ${endDateStr}`);
+
+        const client = await pool.connect();
         try {
-            const res = await pool.query(`
+            // 1. Fetch Real Logs
+            const res = await client.query(`
                 SELECT t.id, t.user_id, t.project_id, t.module_id, t.task_id, t.activity_id, 
                        t.log_date, t.duration::float, t.description, t.work_status, t.log_status, 
                        t.rejection_reason, t.manager_comment, t.created_at, t.updated_at,
@@ -70,10 +86,127 @@ export class TimesheetService {
                   AND t.log_date <= $3
                 ORDER BY t.log_date ASC, t.created_at ASC
             `, [userId, startDateStr, endDateStr]);
-            return res.rows;
+
+            let entries = res.rows.map(e => {
+                // Formatting date strictly
+                e.log_date = TimesheetService.formatDate(e.log_date);
+
+                // Identify System DB Entries (inserted by Auto-Fill)
+                // Criteria: work_status is 'not_applicable' (as set in processDailyAutoFill)
+                // We mark them as is_system to lock them on Frontend
+                // Also, if the week is submitted, these should behave as 'approved' visually
+                if (e.work_status === 'not_applicable') {
+                    (e as any).is_system = true;
+                    // Auto-approve visual logic: If it's submitted, show as approved (System Luck)
+                    if (e.log_status === 'submitted') {
+                        e.log_status = 'approved';
+                    }
+                }
+                return e;
+            });
+
+            // POST-FETCH CLEANUP: Remove "Leave" DB entries if "Holiday" DB entry exists on the same day.
+            const holidaysMap = new Set<string>();
+            entries.forEach(e => {
+                if (e.module_name === 'Holiday') holidaysMap.add(e.log_date);
+            });
+
+            // Filter out leaves that overlap with holidays
+            entries = entries.filter(e => {
+                if (e.module_name === 'Leave' && holidaysMap.has(e.log_date)) {
+                    return false; // Skip this leave entry
+                }
+                return true;
+            });
+
+            // Determine Overall Week Status based on Real Entries
+            // Hierarchy: Approved > Submitted > Draft
+            let weekStatus = 'draft';
+            const hasSubmitted = entries.some(e => e.log_status === 'submitted');
+            const hasApproved = entries.some(e => e.log_status === 'approved');
+
+            if (hasApproved) weekStatus = 'approved';
+            else if (hasSubmitted) weekStatus = 'submitted';
+
+
+            // 2. Holidays are now ALWAYS logged to DB via logHolidayForEveryone
+            // No need to inject virtual holiday entries - DB entries will be fetched in step 1
+            // This prevents timing issues where virtual entries showed before DB entries were created
+
+
+            // 3. Fetch Approved Leaves in Range
+            const leaveRes = await client.query(`
+                SELECT id, leave_type, start_date, end_date, no_of_days, reason, start_type, end_type
+                FROM leave_requests
+                WHERE employee_id = $1
+                  AND current_status = 'approved'
+                  AND (start_date <= $2 AND end_date >= $3)
+            `, [userId, endDateStr, startDateStr]);
+
+            for (const leave of leaveRes.rows) {
+                let d = new Date(leave.start_date);
+                const end = new Date(leave.end_date);
+                const rangeStart = new Date(startDateStr);
+                const rangeEnd = new Date(endDateStr);
+
+                while (d <= end) {
+                    if (d >= rangeStart && d <= rangeEnd) {
+                        const dateStr = TimesheetService.formatDate(d);
+
+                        let isHalfDay = false;
+                        if (dateStr === TimesheetService.formatDate(leave.start_date) && leave.start_type === 'half') isHalfDay = true;
+                        if (dateStr === TimesheetService.formatDate(leave.end_date) && leave.end_type === 'half') isHalfDay = true;
+
+                        const durationType = isHalfDay ? 'Half Day' : 'Full Day';
+                        let duration = isHalfDay ? 4 : 8;
+
+                        // CHECK DUPLICATE for Leaves
+                        // Robust check: Look for existing Holiday or Leave entries by Module Name
+                        const existingHoliday = entries.find(e => e.log_date === dateStr && e.module_name === 'Holiday');
+                        const existingLeave = entries.find(e => e.log_date === dateStr && e.module_name === 'Leave');
+
+                        if (existingHoliday) {
+                            // If Holiday exists: SKIP adding the Leave entry entirely (User request: "remove this card")
+                            d.setDate(d.getDate() + 1);
+                            continue;
+                        } else if (existingLeave) {
+                            // If Leave exists (DB entry): Skip virtual injection to avoid duplicate
+                            d.setDate(d.getDate() + 1);
+                            continue;
+                        }
+
+                        entries.push({
+                            id: -1000 - leave.id, // Mock unique ID 
+                            user_id: userId,
+                            project_id: 0,
+                            project_name: 'System',
+                            module_name: 'Leave',
+                            task_name: `${leave.leave_type} (${durationType})`,
+                            activity_name: 'N/A',
+                            log_date: dateStr,
+                            duration: duration,
+                            description: leave.reason || 'Approved Leave',
+                            work_status: 'completed',
+                            log_status: (weekStatus === 'draft') ? 'draft' : 'approved',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                            is_system: true // Lock UI
+                        });
+                    }
+                    d.setDate(d.getDate() + 1);
+                }
+            }
+
+            // Sort mixed entries by date
+            entries.sort((a: any, b: any) => new Date(a.log_date).getTime() - new Date(b.log_date).getTime());
+
+            // FINAL FILTER: Remove entries with 0 duration (deleted leaves)
+            return entries.filter((e: any) => e.duration > 0);
         } catch (error) {
             console.error('[TimesheetService] Query Error:', error);
             throw error;
+        } finally {
+            client.release();
         }
     }
 
@@ -93,15 +226,109 @@ export class TimesheetService {
                 throw new Error("Cannot log time for future dates");
             }
 
-            // Validation 2: Current Week and One Previous Week Only
-            const { start, end } = this.getCurrentWeekRange();
+            // Validation 2: Current Week and One Previous
+            // Validation 2: Current Week and One Previous
+            const { start, end } = TimesheetService.getCurrentWeekRange();
             const previousWeekStart = new Date(start);
-            previousWeekStart.setDate(previousWeekStart.getDate() - 7); // One week before current week Monday
+            previousWeekStart.setDate(previousWeekStart.getDate() - 7);
 
             // Relax validation for Updates (to allow fixing rejected logs from older weeks)
             // Allow logging from previous week Monday to today
             if (!entry.id && (logDateOnly < previousWeekStart || logDateOnly > today)) {
                 throw new Error("Can only log time for the current week or previous week");
+            }
+
+            // Validation 3: Past Week Submission Restriction
+            // If the date being logged is before the current week, check if that week is already submitted or approved
+            if (logDateOnly < start) {
+                const logDay = logDateOnly.getDay();
+                const logDiff = logDateOnly.getDate() - logDay + (logDay === 0 ? -6 : 1);
+                const logMonday = new Date(logDateOnly);
+                logMonday.setDate(logDiff);
+                logMonday.setHours(0, 0, 0, 0);
+                const logSunday = new Date(logMonday);
+                logSunday.setDate(logMonday.getDate() + 6);
+                logSunday.setHours(23, 59, 59, 999);
+
+                // Check if we are updating a rejected entry - if so, allow it even if the week is locked
+                let isFixingRejected = false;
+                if (entry.id) {
+                    const currentEntry = await client.query('SELECT log_status FROM project_entries WHERE id = $1', [entry.id]);
+                    if (currentEntry.rows.length > 0 && currentEntry.rows[0].log_status === 'rejected') {
+                        isFixingRejected = true;
+                    }
+                }
+
+                if (!isFixingRejected) {
+                    const lockCheck = await client.query(`
+                        SELECT 1 FROM project_entries 
+                        WHERE user_id = $1 
+                          AND log_date >= $2 AND log_date <= $3
+                          AND log_status IN ('submitted', 'approved')
+                        LIMIT 1
+                    `, [userId, logMonday.toISOString().split('T')[0], logSunday.toISOString().split('T')[0]]);
+
+                    if (lockCheck.rows.length > 0) {
+                        throw new Error("Cannot add or modify logs for a week that is already submitted or approved.");
+                    }
+                }
+            }
+
+            // Validation 4: Max 12 Hours Per Day (Updated from 24)
+            const dailyTotalRes = await client.query(`
+                SELECT COALESCE(SUM(duration), 0)::float as total
+                FROM project_entries
+                WHERE user_id = $1 AND log_date = $2 AND id != $3
+            `, [userId, entry.log_date, entry.id || -1]);
+
+            const existingDailyTotal = parseFloat(dailyTotalRes.rows[0].total);
+            if (existingDailyTotal + entry.duration > 12) {
+                throw new Error("You cannot log for more than 12 hours in a day");
+            }
+
+            // Validation 5: Check for Holidays
+            const holidayRes = await client.query('SELECT holiday_name FROM holidays WHERE holiday_date = $1', [entry.log_date]);
+            if (holidayRes.rows.length > 0) {
+                throw new Error(`Cannot log time on a holiday: ${holidayRes.rows[0].holiday_name}`);
+            }
+
+            // Validation 6: Check for Full Day Leaves (Approved)
+            const leaveRes = await client.query(`
+                SELECT start_date, end_date, start_type, end_type 
+                FROM leave_requests 
+                WHERE employee_id = $1 
+                  AND current_status = 'approved'
+                  AND $2 BETWEEN start_date AND end_date
+            `, [userId, entry.log_date]);
+
+            for (const leave of leaveRes.rows) {
+                const logDateStr = TimesheetService.formatDate(entry.log_date); // e.g. YYYY-MM-DD
+                const startStr = TimesheetService.formatDate(leave.start_date);
+                const endStr = TimesheetService.formatDate(leave.end_date);
+
+                let isFullDay = true;
+
+                // Debug: Log the leave data
+                logger.info(`[Timesheet] Checking leave for ${logDateStr}: start=${startStr}, end=${endStr}, start_type=${leave.start_type}, end_type=${leave.end_type}`);
+
+                // For single-day leaves: check if either start or end is half
+                if (logDateStr === startStr && logDateStr === endStr) {
+                    // Same day leave - check for first_half or second_half
+                    if (leave.start_type === 'first_half' || leave.start_type === 'second_half' ||
+                        leave.end_type === 'first_half' || leave.end_type === 'second_half') {
+                        isFullDay = false;
+                        logger.info(`[Timesheet] Single-day half leave detected - allowing timesheet entry`);
+                    }
+                } else {
+                    // Multi-day leave: check start/end days separately
+                    if (logDateStr === startStr && (leave.start_type === 'first_half' || leave.start_type === 'second_half')) isFullDay = false;
+                    if (logDateStr === endStr && (leave.end_type === 'first_half' || leave.end_type === 'second_half')) isFullDay = false;
+                }
+
+                logger.info(`[Timesheet] isFullDay=${isFullDay} for ${logDateStr}`);
+                if (isFullDay) {
+                    throw new Error("Cannot log time on a full-day approved leave.");
+                }
             }
 
             if (entry.id) {
@@ -118,7 +345,10 @@ export class TimesheetService {
                     UPDATE project_entries 
                     SET project_id=$1, module_id=$2, task_id=$3, activity_id=$4, 
                         log_date=$5, duration=$6, description=$7, work_status=$8,
-                        log_status = 'draft',
+                        log_status = CASE 
+                            WHEN log_status = 'rejected' THEN 'rejected' 
+                            ELSE 'draft' 
+                        END,
                         updated_by = $9, updated_at = CURRENT_TIMESTAMP
                     WHERE id=$10
                     RETURNING *
@@ -203,19 +433,22 @@ export class TimesheetService {
                 u.first_name || ' ' || COALESCE(u.last_name, '') as name,
                 u.emp_id,
                 u.designation,
+                u.reporting_manager_id,
                 COALESCE(SUM(pe.duration), 0)::float as total_hours,
                 COUNT(pe.id) as log_count,
                 COUNT(CASE WHEN pe.log_status = 'approved' THEN 1 END) as approved_count,
                 COUNT(CASE WHEN pe.log_status = 'rejected' THEN 1 END) as rejected_count,
                 COUNT(CASE WHEN pe.log_status = 'submitted' THEN 1 END) as submitted_count,
-                COUNT(CASE WHEN pe.log_status = 'draft' THEN 1 END) as draft_count
+                COUNT(CASE WHEN pe.log_status = 'draft' THEN 1 END) as draft_count,
+                BOOL_OR(pe.is_late) as is_late,
+                BOOL_OR(pe.is_resubmission) as is_resubmission
             FROM users u
             LEFT JOIN project_entries pe ON u.id = pe.user_id 
                 AND pe.log_date >= $1 AND pe.log_date <= $2
             WHERE u.status = 'active' 
               AND u.user_role != 'super_admin'
               ${userFilter}
-            GROUP BY u.id
+            GROUP BY u.id, u.reporting_manager_id
             ORDER BY u.first_name ASC
         `;
 
@@ -233,26 +466,30 @@ export class TimesheetService {
                 name: row.name,
                 emp_id: row.emp_id,
                 designation: row.designation,
+                reporting_manager_id: row.reporting_manager_id,
                 total_hours: row.total_hours,
-                status // 'draft', 'submitted', 'approved', 'rejected', 'pending_submission'
+                status, // 'draft', 'submitted', 'approved', 'rejected', 'pending_submission'
+                is_late: row.is_late || false,
+                is_resubmission: row.is_resubmission || false
             };
         });
     }
 
     static async approveTimesheet(approverId: number, targetUserId: number, startDateStr: string, endDateStr: string) {
-        // Validate Access: In a real controller we check if approver manages targetUser.
-        // For Service, we simply execute. Controller checks permissions.
-
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            // Approve all entries in range that are 'submitted' (or 'draft' if we allow direct approval)
-            // Ideally only 'submitted' should be approvable? 
-            // The requirement says automatic submission happens on Sunday. 
-            // But managers can approve "weeks timesheet".
-            // Let's allow approving any non-approved entry to be safe.
+            // STRICT: Verify Approver is the Reporting Manager
+            const managerCheck = await client.query('SELECT reporting_manager_id FROM users WHERE id = $1', [targetUserId]);
+            if (managerCheck.rows.length === 0) throw new Error("User not found");
 
+            // Note: We cast to String to ensure safe comparison
+            if (String(managerCheck.rows[0].reporting_manager_id) !== String(approverId)) {
+                throw new Error("Unauthorized: Only the reporting manager can approve timesheets.");
+            }
+
+            // Approve all entries in range that are 'submitted' (or 'draft' if we allow direct approval)
             await client.query(`
                 UPDATE project_entries 
                 SET log_status = 'approved', 
@@ -264,16 +501,52 @@ export class TimesheetService {
                   AND log_status != 'approved'
             `, [approverId, targetUserId, startDateStr, endDateStr]);
 
-            // Notify User
+            // Notify User (Non-blocking)
             const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [targetUserId]);
             if (userRes.rows.length > 0) {
-                await sendTimesheetStatusEmail(userRes.rows[0].email, {
+                sendTimesheetStatusEmail(userRes.rows[0].email, {
                     employeeName: userRes.rows[0].first_name,
                     status: 'approved',
                     startDate: startDateStr,
                     endDate: endDateStr
-                });
+                }).catch(err => logger.error('[TimesheetEmail] Error sending approval email:', err));
             }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
+
+    static async approveTimesheetEntry(approverId: number, entryId: number) {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Fetch the entry to get the user_id
+            const entryRes = await client.query('SELECT user_id FROM project_entries WHERE id = $1', [entryId]);
+            if (entryRes.rows.length === 0) throw new Error("Entry not found");
+            const targetUserId = entryRes.rows[0].user_id;
+
+            // STRICT: Verify Approver is the Reporting Manager
+            const managerCheck = await client.query('SELECT reporting_manager_id FROM users WHERE id = $1', [targetUserId]);
+            if (String(managerCheck.rows[0].reporting_manager_id) !== String(approverId)) {
+                throw new Error("Unauthorized: Only the reporting manager can approve timesheets.");
+            }
+
+            await client.query(`
+                UPDATE project_entries 
+                SET log_status = 'approved', 
+                    manager_comment = 'Approved by Manager',
+                    updated_by = $1, 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2
+                  AND log_status != 'approved'
+            `, [approverId, entryId]);
 
             await client.query('COMMIT');
             return { success: true };
@@ -290,6 +563,17 @@ export class TimesheetService {
         try {
             await client.query('BEGIN');
 
+            // Fetch the entry to get the user_id
+            const entryRes = await client.query('SELECT user_id FROM project_entries WHERE id = $1', [entryId]);
+            if (entryRes.rows.length === 0) throw new Error("Entry not found");
+            const targetUserId = entryRes.rows[0].user_id;
+
+            // STRICT: Verify Approver is the Reporting Manager
+            const managerCheck = await client.query('SELECT reporting_manager_id FROM users WHERE id = $1', [targetUserId]);
+            if (String(managerCheck.rows[0].reporting_manager_id) !== String(approverId)) {
+                throw new Error("Unauthorized: Only the reporting manager can reject timesheets.");
+            }
+
             const res = await client.query(`
                 UPDATE project_entries 
                 SET log_status = 'rejected', 
@@ -305,12 +589,12 @@ export class TimesheetService {
                 // Notify User
                 const userRes = await client.query('SELECT email, first_name FROM users WHERE id = $1', [user_id]);
                 if (userRes.rows.length > 0) {
-                    await sendTimesheetStatusEmail(userRes.rows[0].email, {
+                    sendTimesheetStatusEmail(userRes.rows[0].email, {
                         employeeName: userRes.rows[0].first_name,
                         status: 'rejected',
                         logDate: this.formatDate(log_date),
                         reason: reason
-                    });
+                    }).catch(err => logger.error('[TimesheetEmail] Error sending rejection email:', err));
                 }
             }
 
@@ -325,14 +609,16 @@ export class TimesheetService {
     }
 
     static async rejectTimesheet(approverId: number, targetUserId: number, startDate: string, endDate: string, reason: string) {
-        // Validate Access
-        if (!(await this.isManagerOrAdmin(approverId, targetUserId))) {
-            throw new Error('Unauthorized');
-        }
-
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
+
+            const managerCheck = await client.query('SELECT reporting_manager_id FROM users WHERE id = $1', [targetUserId]);
+            if (managerCheck.rows.length === 0) throw new Error("User not found");
+
+            if (String(managerCheck.rows[0].reporting_manager_id) !== String(approverId)) {
+                throw new Error('Unauthorized: Only the reporting manager can reject timesheets.');
+            }
 
             const res = await client.query(`
                 UPDATE project_entries
@@ -366,6 +652,105 @@ export class TimesheetService {
         }
     }
 
+    static async manualSubmitTimesheet(userId: number, startStr: string, endStr: string) {
+        const client = await pool.connect();
+        try {
+            // 1. Validate Week (Must be Past Week)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const weekEnd = new Date(endStr);
+            if (weekEnd >= today) {
+                // If it's a current week, we generally block, unless today is Monday and week ended yesterday.
+                // The requirement is "Past 1 week".
+            }
+
+            // 2. Calculate Total Hours
+            const res = await client.query(`
+                SELECT COALESCE(SUM(duration), 0)::float as total
+                FROM project_entries
+                WHERE user_id = $1 AND log_date >= $2 AND log_date <= $3
+            `, [userId, startStr, endStr]);
+
+            const total = parseFloat(res.rows[0].total);
+            if (total < 40) {
+                throw new Error(`Cannot submit timesheet: Total hours (${total}) is less than 40.`);
+            }
+
+            // 3. Update Status
+            await client.query('BEGIN');
+
+            // Check if this is a resubmission (were there rejected entries?)
+            const rejectCheck = await client.query(`
+                SELECT 1 FROM project_entries 
+                WHERE user_id = $1 AND log_date >= $2 AND log_date <= $3 
+                AND log_status = 'rejected'
+                LIMIT 1
+            `, [userId, startStr, endStr]);
+
+            const isResubmission = rejectCheck.rows.length > 0;
+
+            // Late Check: If submitting after Monday 00:00 AM of the week following the timesheet week
+            const nextMonday = new Date(endStr);
+            nextMonday.setDate(nextMonday.getDate() + 1);
+            nextMonday.setHours(0, 0, 0, 0);
+            const isLate = today > nextMonday;
+
+            // UPDATE 1: Auto-Approve System Entries (Leaves/Holidays)
+            await client.query(`
+                UPDATE project_entries pe
+                SET log_status = 'approved', 
+                    updated_at = CURRENT_TIMESTAMP,
+                    is_late = $4,
+                    is_resubmission = $5
+                FROM project_activities pa
+                WHERE pe.activity_id = pa.id
+                  AND pe.user_id = $1 
+                  AND pe.log_date >= $2 AND pe.log_date <= $3
+                  AND pa.custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+            `, [userId, startStr, endStr, isLate, isResubmission]);
+
+            // UPDATE 2: Submit Manual Entries (Waiting for Manager)
+            await client.query(`
+                UPDATE project_entries pe
+                SET log_status = 'submitted', 
+                    updated_at = CURRENT_TIMESTAMP,
+                    is_late = $4,
+                    is_resubmission = $5
+                FROM project_activities pa
+                WHERE pe.activity_id = pa.id
+                  AND pe.user_id = $1 
+                  AND pe.log_date >= $2 AND pe.log_date <= $3
+                  AND pa.custom_id NOT IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                  AND pe.log_status IN ('draft', 'rejected')
+            `, [userId, startStr, endStr, isLate, isResubmission]);
+
+            await client.query('COMMIT');
+
+            // Notify Manager
+            const uRes = await pool.query('SELECT first_name, reporting_manager_id FROM users WHERE id = $1', [userId]);
+            const user = uRes.rows[0];
+            if (user && user.reporting_manager_id) {
+                const mgrRes = await pool.query('SELECT email FROM users WHERE id = $1', [user.reporting_manager_id]);
+                if (mgrRes.rows.length > 0) {
+                    sendTimesheetSubmissionEmail(mgrRes.rows[0].email, {
+                        employeeName: user.first_name,
+                        hoursLogged: total,
+                        startDate: startStr,
+                        endDate: endStr,
+                        isLate,
+                        isResubmission
+                    }).catch(console.error);
+                }
+            }
+
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
+
 
     // 1. Daily Auto-Fill (8 AM)
     static async processDailyAutoFill() {
@@ -390,35 +775,47 @@ export class TimesheetService {
                     await this.insertSystemEntry(client, u.id, todayStr, ids, 8, h.holiday_name);
                 }
                 logger.info(`[Timesheet] Logged holiday '${h.holiday_name}' for ${usersRes.rows.length} users.`);
-            }
+            } else {
+                // Only process leaves if it's NOT a holiday (Priority: Holiday > Leave)
+                // If it IS a holiday, the holiday entry covers the day (8 hours).
+                // We do not want to double-book 8 hours of holiday + 8 hours of leave in the DB.
+                // The frontend virtual injection will still show the leave (as 0 hours) if needed,
+                // but for DB auto-fill, we skip to avoid creating duplicate system entries.
 
-            // C. Check for Approved Leaves TODAY
-            const leavesRes = await client.query(`
-                SELECT lr.employee_id, lr.leave_type, ld.day_type, lr.time_for_permission_start, lr.time_for_permission_end
-                FROM leave_days ld
-                JOIN leave_requests lr ON ld.leave_request_id = lr.id
-                WHERE ld.leave_date = $1 AND ld.day_status = 'approved'
-            `, [todayStr]);
+                // C. Check for Approved Leaves TODAY
+                const leavesRes = await client.query(`
+                    SELECT lr.employee_id, lr.leave_type, ld.day_type, lr.time_for_permission_start, lr.time_for_permission_end
+                    FROM leave_days ld
+                    JOIN leave_requests lr ON ld.leave_request_id = lr.id
+                    WHERE ld.leave_date = $1 AND ld.day_status = 'approved'
+                `, [todayStr]);
 
-            if (leavesRes.rows.length > 0) {
-                const ids = await this.ensureSystemProjectStructure(client, 'Leave');
-                for (const l of leavesRes.rows) {
-                    let duration = l.day_type === 'half' ? 4 : 8;
-                    let desc = 'On Leave';
-                    if (l.leave_type === 'permission') {
-                        desc = 'Permission';
-                        if (l.time_for_permission_start && l.time_for_permission_end) {
-                            const [h1, m1] = l.time_for_permission_start.split(':').map(Number);
-                            const [h2, m2] = l.time_for_permission_end.split(':').map(Number);
-                            duration = (h2 + m2 / 60) - (h1 + m1 / 60);
-                            duration = duration > 0 ? parseFloat(duration.toFixed(1)) : 2;
-                        } else {
-                            duration = 2;
+                if (leavesRes.rows.length > 0) {
+                    const ids = await this.ensureSystemProjectStructure(client, 'Leave');
+                    for (const l of leavesRes.rows) {
+                        let duration = l.day_type === 'half' ? 4 : 8;
+                        let desc = 'On Leave';
+                        if (l.leave_type === 'permission') {
+                            desc = 'Permission';
+                            if (l.time_for_permission_start && l.time_for_permission_end) {
+                                const [h1, m1] = l.time_for_permission_start.split(':').map(Number);
+                                const [h2, m2] = l.time_for_permission_end.split(':').map(Number);
+                                let hoursDiff = h2 - h1;
+                                let minsDiff = m2 - m1;
+                                duration = hoursDiff + (minsDiff / 60);
+
+                                // Round to nearest 0.5
+                                duration = Math.round(duration * 2) / 2;
+                                // Ensure at least 0.5 if valid time exists
+                                if (duration < 0.5) duration = 0.5;
+                            } else {
+                                duration = 2; // Default fallback
+                            }
                         }
+                        await this.insertSystemEntry(client, l.employee_id, todayStr, ids, duration, desc);
                     }
-                    await this.insertSystemEntry(client, l.employee_id, todayStr, ids, duration, desc);
+                    logger.info(`[Timesheet] Logged leaves for ${leavesRes.rows.length} users.`);
                 }
-                logger.info(`[Timesheet] Logged leaves for ${leavesRes.rows.length} users.`);
             }
 
             logger.info('[Timesheet] Daily Auto-Fill Completed');
@@ -456,9 +853,9 @@ export class TimesheetService {
     // 3. Friday Validation (4 PM)
     static async processFridayValidation() {
         logger.info('[Timesheet] Processing Friday Validation...');
-        const { start, end } = this.getCurrentWeekRange();
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
+        const { start, end } = TimesheetService.getCurrentWeekRange();
+        const startStr = TimesheetService.formatDate(start);
+        const endStr = TimesheetService.formatDate(end);
 
         // Find users with < 32 hours logged
         const res = await pool.query(`
@@ -480,71 +877,108 @@ export class TimesheetService {
         }
     }
 
-    // 4. Saturday Submission (9 PM)
+    // 4. Sunday Submission (9 PM)
     static async processWeeklySubmission() {
         logger.info('[Timesheet] Processing Weekly Submission...');
-        const client = await pool.connect();
-        const { start, end } = this.getCurrentWeekRange();
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
-
+        let client;
         try {
+            client = await pool.connect();
+            const { start, end } = TimesheetService.getCurrentWeekRange();
+
+            const startStr = TimesheetService.formatDate(start);
+            const endStr = TimesheetService.formatDate(end);
+
             await client.query('BEGIN');
 
-            // Get hours per user
             const res = await client.query(`
                 SELECT u.id, u.email, u.first_name, u.reporting_manager_id, 
+                       mgr.email as manager_email, mgr.first_name as manager_name,
                        COALESCE(SUM(pe.duration), 0) as total_hours
                 FROM users u
+                LEFT JOIN users mgr ON u.reporting_manager_id = mgr.id
                 LEFT JOIN project_entries pe ON u.id = pe.user_id 
                     AND pe.log_date >= $1 AND pe.log_date <= $2
                 WHERE u.status = 'active' AND u.user_role != 'super_admin'
-                GROUP BY u.id
+                GROUP BY u.id, mgr.email, mgr.first_name
             `, [startStr, endStr]);
+
+            // Map to store summary data per manager: managerEmail -> { name, submissions: [], failures: [] }
+            const managerSummaries = new Map<string, any>();
 
             for (const u of res.rows) {
                 const hours = parseFloat(u.total_hours);
+                const employeeInfo = { name: u.first_name, hours };
 
                 if (hours >= 40) {
-                    // Criteria Met: Submit
+                    // UPDATE 1: Auto-Approve System Entries (Holidays/Leaves)
                     await client.query(`
-                        UPDATE project_entries 
+                        UPDATE project_entries pe
+                        SET log_status = 'approved', updated_at = CURRENT_TIMESTAMP
+                        FROM project_activities pa
+                        WHERE pe.activity_id = pa.id
+                          AND pe.user_id = $1 
+                          AND pe.log_date >= $2 AND pe.log_date <= $3 
+                          AND pa.custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                          AND pe.log_status = 'draft'
+                    `, [u.id, startStr, endStr]);
+
+                    // UPDATE 2: Submit Manual Entries (Waiting for Manager)
+                    await client.query(`
+                        UPDATE project_entries pe
                         SET log_status = 'submitted', updated_at = CURRENT_TIMESTAMP
-                        WHERE user_id = $1 AND log_date >= $2 AND log_date <= $3 AND log_status = 'draft'
+                        FROM project_activities pa
+                        WHERE pe.activity_id = pa.id
+                          AND pe.user_id = $1 
+                          AND pe.log_date >= $2 AND pe.log_date <= $3 
+                          AND pa.custom_id NOT IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                          AND pe.log_status = 'draft'
                     `, [u.id, startStr, endStr]);
 
                     logger.info(`[Timesheet] User ${u.id} Auto-Submitted (${hours} hrs)`);
 
-                    // Notify Manager
-                    if (u.reporting_manager_id) {
-                        const mgrRes = await client.query('SELECT email FROM users WHERE id = $1', [u.reporting_manager_id]);
-                        if (mgrRes.rows.length > 0) {
-                            await sendTimesheetSubmissionEmail(mgrRes.rows[0].email, {
-                                employeeName: u.first_name,
-                                hoursLogged: hours,
-                                startDate: startStr,
-                                endDate: endStr
-                            });
+                    if (u.manager_email) {
+                        if (!managerSummaries.has(u.manager_email)) {
+                            managerSummaries.set(u.manager_email, { name: u.manager_name, submissions: [], failures: [] });
                         }
+                        managerSummaries.get(u.manager_email).submissions.push(employeeInfo);
                     }
-
                 } else {
-                    // Criteria Not Met: Warn User
                     await sendTimesheetReminderEmail(u.email, {
                         employeeName: u.first_name,
                         reminderType: 'criteria_not_met',
                         hoursLogged: hours
                     });
                     logger.info(`[Timesheet] User ${u.id} Not Submitted (<40h). Warning sent.`);
+
+                    if (u.manager_email) {
+                        if (!managerSummaries.has(u.manager_email)) {
+                            managerSummaries.set(u.manager_email, { name: u.manager_name, submissions: [], failures: [] });
+                        }
+                        managerSummaries.get(u.manager_email).failures.push(employeeInfo);
+                    }
                 }
             }
 
-            await client.query('COMMIT');
+            // Send consolidated emails to managers
+            for (const [email, data] of managerSummaries.entries()) {
+                await import('../utils/emailTemplates').then(m =>
+                    m.sendTimesheetSummaryEmail(email, {
+                        managerName: data.name,
+                        startDate: startStr,
+                        endDate: endStr,
+                        submissions: data.submissions,
+                        failures: data.failures
+                    })
+                );
+                logger.info(`[Timesheet] Summary email sent to manager: ${email}`);
+            }
+
+            if (client) await client.query('COMMIT');
         } catch (e) {
-            await client.query('ROLLBACK');
+            if (client) await client.query('ROLLBACK');
             logger.error('[Timesheet] Submission Error', e);
         } finally {
-            client.release();
+            if (client) client.release();
         }
     }
 
@@ -726,7 +1160,56 @@ export class TimesheetService {
         }
     }
 
-    // 4. Remove Holiday Logs
+    // 4. Update Leave Log (Switch to Half Day or Delete)
+    // For virtual entries (id < 0), we insert a real entry in project_entries as an override.
+    // For real entries (id > 0), we just update the duration.
+    static async updateLeaveLog(userId: number, entryId: number, logDate: string, action: 'half_day' | 'delete') {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const duration = action === 'half_day' ? 4 : 0;
+
+            if (entryId < 0) {
+                // Virtual Entry -> Real Entry Override
+                const ids = await this.ensureSystemProjectStructure(client, 'Leave');
+
+                // Check if an override already exists for this date (just in case)
+                const existing = await client.query(`
+                    SELECT id FROM project_entries 
+                    WHERE user_id = $1 AND log_date = $2 AND activity_id = $3
+                `, [userId, logDate, ids.activityId]);
+
+                if (existing.rows.length > 0) {
+                    await client.query(`
+                        UPDATE project_entries SET duration = $1, log_status = 'draft', updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $2
+                    `, [duration, existing.rows[0].id]);
+                } else {
+                    await client.query(`
+                        INSERT INTO project_entries (
+                            user_id, project_id, module_id, task_id, activity_id,
+                            log_date, duration, description, work_status, log_status, created_by, updated_by
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'not_applicable', 'draft', $1, $1)
+                    `, [userId, ids.projectId, ids.moduleId, ids.taskId, ids.activityId, logDate, duration, action === 'half_day' ? 'Half Day Leave (Override)' : 'Full Day Leave (Deleted)']);
+                }
+            } else {
+                // Real Entry -> Just Update
+                await client.query(`
+                    UPDATE project_entries SET duration = $1, log_status = 'draft', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $2 AND user_id = $3
+                `, [duration, entryId, userId]);
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
     static async removeHolidayLog(dateStr: string) {
         logger.info(`[Timesheet] Removing Holiday Logs for date: ${dateStr}`);
         const client = await pool.connect();
@@ -754,11 +1237,6 @@ export class TimesheetService {
 
         const client = await pool.connect();
         try {
-            // Check Role
-            const roleRes = await client.query('SELECT user_role FROM users WHERE id = $1', [approverId]);
-            const role = roleRes.rows[0]?.user_role;
-            if (role === 'super_admin' || role === 'hr') return true;
-
             // Check Manager Link
             const linkRes = await client.query('SELECT 1 FROM users WHERE id = $1 AND reporting_manager_id = $2', [targetUserId, approverId]);
             return linkRes.rows.length > 0;
@@ -789,7 +1267,7 @@ export class TimesheetService {
             LEFT JOIN project_modules m ON pe.module_id = m.id
             LEFT JOIN project_tasks t ON pe.task_id = t.id
             LEFT JOIN project_activities a ON pe.activity_id = a.id
-            WHERE 1=1
+            WHERE pe.log_status IN ('approved', 'submitted')
         `;
         const params: any[] = [];
         let pIdx = 1;
@@ -803,9 +1281,12 @@ export class TimesheetService {
         if (filters.taskId) { query += ` AND pe.task_id = $${pIdx++}`; params.push(filters.taskId); }
         if (filters.activityId) { query += ` AND pe.activity_id = $${pIdx++}`; params.push(filters.activityId); }
 
-        // Scope Filter (Manager sees only reportees)
+        // Scope Filter
         if (filters.managerScopeId) {
-            query += ` AND (u.reporting_manager_id = $${pIdx++})`; params.push(filters.managerScopeId);
+            // Manager sees their reportees OR themselves (for self-reports)
+            query += ` AND (u.reporting_manager_id = $${pIdx} OR pe.user_id = $${pIdx})`;
+            params.push(filters.managerScopeId);
+            pIdx++;
         }
 
         query += ` ORDER BY pe.log_date DESC, u.first_name ASC`;

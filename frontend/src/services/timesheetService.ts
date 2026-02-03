@@ -17,6 +17,9 @@ export interface TimesheetEntry {
     activity_name?: string;
     rejection_reason?: string;
     manager_comment?: string;
+    is_late?: boolean;
+    is_resubmission?: boolean;
+    is_system?: boolean;
 }
 
 export const timesheetService = {
@@ -52,12 +55,12 @@ export const timesheetService = {
     },
 
     rejectEntry: async (entryId: number, reason: string) => {
-        const response = await api.post('/timesheets/reject', { entryId, reason });
+        const response = await api.post('/timesheets/reject-entry', { entryId, reason });
         return response.data;
     },
 
     rejectTimesheet: async (targetUserId: number, startDate: string, endDate: string, reason: string) => {
-        const response = await api.post('/timesheets/reject-bulk', { targetUserId, start_date: startDate, end_date: endDate, reason });
+        const response = await api.post('/timesheets/reject', { targetUserId, start_date: startDate, end_date: endDate, reason });
         return response.data;
     },
 
@@ -97,6 +100,18 @@ export const timesheetService = {
             responseType: 'blob'
         });
 
+        return response.data;
+    },
+    approveEntry: async (entryId: number) => {
+        const response = await api.post('/timesheets/approve-entry', { entryId });
+        return response.data;
+    },
+    submitTimesheet: async (startDate: string, endDate: string) => {
+        const response = await api.post('/timesheets/submit-manual', { start_date: startDate, end_date: endDate });
+        return response.data;
+    },
+    updateLeaveLog: async (entryId: number, logDate: string, action: 'half_day' | 'delete') => {
+        const response = await api.post('/timesheets/leave-log/action', { entryId, logDate, action });
         return response.data;
     }
 };
