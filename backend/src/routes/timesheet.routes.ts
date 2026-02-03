@@ -15,6 +15,7 @@ router.post('/approve', authenticateToken, timesheetController.approveTimesheet)
 router.post('/approve-entry', authenticateToken, timesheetController.approveEntry);
 router.post('/submit-manual', authenticateToken, timesheetController.manualSubmit);
 router.post('/reject-entry', authenticateToken, timesheetController.rejectEntry);
+router.post('/leave-log/action', authenticateToken, timesheetController.updateLeaveLogAction);
 router.post('/reject', authenticateToken, timesheetController.rejectTimesheet);
 router.get('/report', authenticateToken, timesheetController.generateReport);
 router.get('/report/pdf', authenticateToken, timesheetController.generatePDFReport);

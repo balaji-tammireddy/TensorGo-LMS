@@ -200,7 +200,8 @@ export class TimesheetService {
             // Sort mixed entries by date
             entries.sort((a: any, b: any) => new Date(a.log_date).getTime() - new Date(b.log_date).getTime());
 
-            return entries;
+            // FINAL FILTER: Remove entries with 0 duration (deleted leaves)
+            return entries.filter((e: any) => e.duration > 0);
         } catch (error) {
             console.error('[TimesheetService] Query Error:', error);
             throw error;
@@ -1159,7 +1160,56 @@ export class TimesheetService {
         }
     }
 
-    // 4. Remove Holiday Logs
+    // 4. Update Leave Log (Switch to Half Day or Delete)
+    // For virtual entries (id < 0), we insert a real entry in project_entries as an override.
+    // For real entries (id > 0), we just update the duration.
+    static async updateLeaveLog(userId: number, entryId: number, logDate: string, action: 'half_day' | 'delete') {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const duration = action === 'half_day' ? 4 : 0;
+
+            if (entryId < 0) {
+                // Virtual Entry -> Real Entry Override
+                const ids = await this.ensureSystemProjectStructure(client, 'Leave');
+
+                // Check if an override already exists for this date (just in case)
+                const existing = await client.query(`
+                    SELECT id FROM project_entries 
+                    WHERE user_id = $1 AND log_date = $2 AND activity_id = $3
+                `, [userId, logDate, ids.activityId]);
+
+                if (existing.rows.length > 0) {
+                    await client.query(`
+                        UPDATE project_entries SET duration = $1, log_status = 'draft', updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $2
+                    `, [duration, existing.rows[0].id]);
+                } else {
+                    await client.query(`
+                        INSERT INTO project_entries (
+                            user_id, project_id, module_id, task_id, activity_id,
+                            log_date, duration, description, work_status, log_status, created_by, updated_by
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'not_applicable', 'draft', $1, $1)
+                    `, [userId, ids.projectId, ids.moduleId, ids.taskId, ids.activityId, logDate, duration, action === 'half_day' ? 'Half Day Leave (Override)' : 'Full Day Leave (Deleted)']);
+                }
+            } else {
+                // Real Entry -> Just Update
+                await client.query(`
+                    UPDATE project_entries SET duration = $1, log_status = 'draft', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $2 AND user_id = $3
+                `, [duration, entryId, userId]);
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
     static async removeHolidayLog(dateStr: string) {
         logger.info(`[Timesheet] Removing Holiday Logs for date: ${dateStr}`);
         const client = await pool.connect();

@@ -9,7 +9,9 @@ import {
     Edit2,
     Trash2,
     ChevronDown,
-    Lock // Added Lock
+    Lock,
+    Repeat,
+    AlertCircle
 } from 'lucide-react';
 
 import { useToast } from '../../contexts/ToastContext';
@@ -242,6 +244,8 @@ export const TimesheetPage: React.FC = () => {
     // Modal State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+    const [isLeaveActionModalOpen, setIsLeaveActionModalOpen] = useState(false);
+    const [leaveActionData, setLeaveActionData] = useState<{ entry: TimesheetEntry, action: 'half_day' | 'delete' } | null>(null);
 
     // Form Submission
     const handleSubmit = async (e: React.FormEvent) => {
@@ -363,6 +367,28 @@ export const TimesheetPage: React.FC = () => {
     const handleDeleteClick = (id: number) => {
         setEntryToDelete(id);
         setIsDeleteModalOpen(true);
+    };
+
+    const handleLeaveActionClick = (entry: TimesheetEntry, action: 'half_day' | 'delete') => {
+        setLeaveActionData({ entry, action });
+        setIsLeaveActionModalOpen(true);
+    };
+
+    const confirmLeaveAction = async () => {
+        if (!leaveActionData) return;
+        const { entry, action } = leaveActionData;
+        setLoading(true);
+        try {
+            await timesheetService.updateLeaveLog(entry.id!, entry.log_date, action);
+            showSuccess(action === 'half_day' ? "Leave updated to half day" : "Leave log removed");
+            fetchEntries();
+        } catch (err: any) {
+            showError(err.response?.data?.error || err.message || "Action failed");
+        } finally {
+            setLoading(false);
+            setIsLeaveActionModalOpen(false);
+            setLeaveActionData(null);
+        }
     };
 
     const changeWeek = (offset: number) => {
@@ -1097,27 +1123,56 @@ export const TimesheetPage: React.FC = () => {
                                                             </div>
 
                                                             {/* Only show actions if NOT System/Holiday and not approved/submitted (unless re-opening logic exists) */}
-                                                            {!entry.is_system && !entry.project_name?.includes('System') &&
+                                                            {((!entry.is_system && !entry.project_name?.includes('System')) || (entry.module_name === 'Leave')) &&
                                                                 entry.log_status !== 'approved' &&
                                                                 entry.log_status !== 'submitted' && (
                                                                     <div className="entry-actions-sidebar">
-                                                                        <button
-                                                                            className="action-btn-styled edit"
-                                                                            onClick={() => handleEdit(entry)}
-                                                                            title="Edit"
-                                                                            disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0} // 0 is system, but we hide it anyway
-                                                                        >
-                                                                            <Edit2 size={16} />
-                                                                        </button>
-                                                                        {entry.log_status !== 'rejected' && (
-                                                                            <button
-                                                                                className="action-btn-styled delete"
-                                                                                onClick={() => handleDeleteClick(entry.id!)}
-                                                                                title="Delete"
-                                                                                disabled={!!editingId}
-                                                                            >
-                                                                                <Trash2 size={16} />
-                                                                            </button>
+                                                                        {/* Existing actions for manual logs */}
+                                                                        {!entry.is_system && !entry.project_name?.includes('System') && (
+                                                                            <>
+                                                                                <button
+                                                                                    className="action-btn-styled edit"
+                                                                                    onClick={() => handleEdit(entry)}
+                                                                                    title="Edit"
+                                                                                    disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0}
+                                                                                >
+                                                                                    <Edit2 size={16} />
+                                                                                </button>
+                                                                                {entry.log_status !== 'rejected' && (
+                                                                                    <button
+                                                                                        className="action-btn-styled delete"
+                                                                                        onClick={() => handleDeleteClick(entry.id!)}
+                                                                                        title="Delete"
+                                                                                        disabled={!!editingId}
+                                                                                    >
+                                                                                        <Trash2 size={16} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+
+                                                                        {/* Specific actions for System Leave logs */}
+                                                                        {entry.module_name === 'Leave' && (entry.is_system || entry.project_name?.includes('System')) && (
+                                                                            <>
+                                                                                {parseFloat(String(entry.duration)) >= 8 && (
+                                                                                    <button
+                                                                                        className="action-btn-styled edit"
+                                                                                        onClick={() => handleLeaveActionClick(entry, 'half_day')}
+                                                                                        title="Change to Half Day"
+                                                                                        disabled={loading}
+                                                                                    >
+                                                                                        <Repeat size={16} />
+                                                                                    </button>
+                                                                                )}
+                                                                                <button
+                                                                                    className="action-btn-styled delete"
+                                                                                    onClick={() => handleLeaveActionClick(entry, 'delete')}
+                                                                                    title="Delete Log"
+                                                                                    disabled={loading}
+                                                                                >
+                                                                                    <Trash2 size={16} />
+                                                                                </button>
+                                                                            </>
                                                                         )}
                                                                     </div>
                                                                 )}
@@ -1146,7 +1201,38 @@ export const TimesheetPage: React.FC = () => {
                 >
                     <p>Are you sure you want to delete this timesheet entry? This action cannot be undone.</p>
                 </Modal>
-            </div >
-        </AppLayout >
+
+                {/* Confirm Leave Action Modal */}
+                <Modal
+                    isOpen={isLeaveActionModalOpen}
+                    onClose={() => setIsLeaveActionModalOpen(false)}
+                    title={leaveActionData?.action === 'half_day' ? "Confirm Half Day Change" : "Confirm Deletion"}
+                    footer={
+                        <>
+                            <button className="modal-btn secondary" onClick={() => setIsLeaveActionModalOpen(false)}>Cancel</button>
+                            <button
+                                className={`modal-btn ${leaveActionData?.action === 'half_day' ? 'primary' : 'danger'}`}
+                                onClick={confirmLeaveAction}
+                                disabled={loading}
+                            >
+                                {loading ? 'Processing...' : (leaveActionData?.action === 'half_day' ? 'Change to Half Day' : 'Delete Log')}
+                            </button>
+                        </>
+                    }
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <AlertCircle size={24} color={leaveActionData?.action === 'half_day' ? '#f59e0b' : '#ef4444'} />
+                        <p style={{ margin: 0, fontWeight: 500 }}>
+                            {leaveActionData?.action === 'half_day'
+                                ? "Are you sure you want to change this leave log to Half Day (4 hours)?"
+                                : "Are you sure you want to delete this leave log and reduce hours to 0?"}
+                        </p>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#64748b' }}>
+                        This will create a permanent override for this date. You can resubmit the timesheet after this change.
+                    </p>
+                </Modal>
+            </div>
+        </AppLayout>
     );
 };

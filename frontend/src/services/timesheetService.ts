@@ -109,5 +109,9 @@ export const timesheetService = {
     submitTimesheet: async (startDate: string, endDate: string) => {
         const response = await api.post('/timesheets/submit-manual', { start_date: startDate, end_date: endDate });
         return response.data;
+    },
+    updateLeaveLog: async (entryId: number, logDate: string, action: 'half_day' | 'delete') => {
+        const response = await api.post('/timesheets/leave-log/action', { entryId, logDate, action });
+        return response.data;
     }
 };

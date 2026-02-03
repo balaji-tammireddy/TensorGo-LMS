@@ -189,6 +189,28 @@ export const rejectEntry = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const updateLeaveLogAction = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { entryId, logDate, action } = req.body;
+        if (entryId === undefined || !logDate || !action) {
+            return res.status(400).json({ error: 'entryId, logDate, and action are required' });
+        }
+
+        if (action !== 'half_day' && action !== 'delete') {
+            return res.status(400).json({ error: 'Invalid action' });
+        }
+
+        const result = await TimesheetService.updateLeaveLog(userId, entryId, logDate, action);
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[TimeSheet] Update Leave Log Action Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const manualSubmit = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
