@@ -291,7 +291,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                     </div>
 
                     <div className="header-actions">
-                        {['manager', 'hr', 'super_admin'].includes(user?.role || '') && (
+                        {['hr', 'super_admin'].includes(user?.role || '') && (
                             <Button
                                 variant="outline"
                                 onClick={() => setReportModalOpen(true)}

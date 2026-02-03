@@ -290,9 +290,9 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
         const { id: userId, role, name: userName } = req.user!;
 
         // Security: Block employees and interns from accessing reports
-        if (role === 'employee' || role === 'intern') {
+        if (role === 'employee' || role === 'intern' || role === 'manager') {
             logger.warn(`[Timesheet PDF Report] Unauthorized access attempt by user ${userId} (${role})`);
-            return res.status(403).json({ error: 'Access denied. Only Managers and HR/Admins can generate reports.' });
+            return res.status(403).json({ error: 'Access denied. Only HR/Admins can generate reports.' });
         }
 
         const queryParams = { ...req.query } as any;
