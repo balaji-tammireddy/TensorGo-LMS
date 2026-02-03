@@ -48,7 +48,7 @@ export const createEmployeeSchema = z.object({
     body: z.object({
         empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format'),
         role: z.enum(['super_admin', 'hr', 'manager', 'employee', 'intern']),
-        email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
+        email: z.string().email('Invalid email address').max(100, 'Email cannot exceed 100 characters').refine(
             (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
             { message: 'Only organization mail should be used' }
         ),
@@ -116,7 +116,7 @@ export const updateEmployeeSchema = z.object({
         reportingManagerName: z.string().max(100).nullable().optional(),
         education: z.array(educationSchema).optional(),
         empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format').optional(),
-        email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
+        email: z.string().email('Invalid email address').max(100, 'Email cannot exceed 100 characters').refine(
             (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
             { message: 'Only organization mail should be used' }
         ).optional(),
@@ -176,11 +176,11 @@ export const updateProfileSchema = z.object({
             emergencyContactNo: phoneSchema.optional().nullable(),
             emergencyContactRelation: nameSchema.optional().nullable(),
             empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format').optional().nullable(),
-            email: z.string().email().max(100, 'Email cannot exceed 100 characters').refine(
+            email: z.string().email('Invalid email address').max(100, 'Email cannot exceed 100 characters').refine(
                 (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
                 { message: 'Only organization mail should be used' }
             ).optional().nullable(),
-            personalEmail: z.string().email().nullable().optional().or(z.literal(''))
+            personalEmail: z.string().email('Invalid email address').nullable().optional().or(z.literal(''))
         }).optional().nullable(),
         employmentInfo: z.object({
             designation: nameSchema.optional().nullable().or(z.literal('')),
