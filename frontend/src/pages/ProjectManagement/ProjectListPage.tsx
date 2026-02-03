@@ -21,7 +21,7 @@ export const ProjectListPage: React.FC = () => {
     const filterType = searchParams.get('filter') || 'all';
 
     // Fetch projects
-    const { data: projects, isLoading, refetch } = useQuery(
+    const { data: projects, refetch } = useQuery(
         'projects',
         projectService.getProjects
     );
@@ -35,8 +35,8 @@ export const ProjectListPage: React.FC = () => {
     const confirmDelete = async () => {
         if (!deleteConfirm) return;
         setIsDeleting(true);
-        const projectId = deleteConfirm.id;
-        const projectName = deleteConfirm.name;
+        // const projectId = deleteConfirm.id;
+        // const projectName = deleteConfirm.name;
         setDeleteConfirm(null);
         try {
             await projectService.deleteProject(deleteConfirm.id);

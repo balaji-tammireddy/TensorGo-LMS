@@ -33,7 +33,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     onSuccess,
     initialData,
     isEdit = false,
-    projectManagerId
+    // projectManagerId
 }) => {
     const { showSuccess, showError } = useToast();
     const { user } = useAuth();
@@ -50,8 +50,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     const [managerSearch, setManagerSearch] = useState('');
 
     // Multi-select state
-    const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
-    const [loadingCandidates, setLoadingCandidates] = useState(false);
+    // const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
+    // const [loadingCandidates, setLoadingCandidates] = useState(false);
 
 
     useEffect(() => {
@@ -97,7 +97,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
         // Fetch Assignee Candidates for Module/Task/Activity
         if (['module', 'task', 'activity'].includes(type) && parentId) {
-            setLoadingCandidates(true);
+            // setLoadingCandidates(true);
             let fetchLevel = '';
             // For Module creation, we need Project Members -> fetchLevel = 'project'
             if (type === 'module') fetchLevel = 'project';
@@ -107,12 +107,14 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             if (type === 'activity') fetchLevel = 'task';
 
             projectService.getAccessList(fetchLevel, parentId)
-                .then(data => {
+                .then(_data => {
                     // Filter out Project Manager from candidates
+                    /*
                     const filteredData = projectManagerId
                         ? data.filter((u: any) => u.id !== projectManagerId)
                         : data;
-                    setAssigneeCandidates(filteredData);
+                    */
+                    // setAssigneeCandidates(filteredData);
 
                     // If editing a module, also fetch WHO CURRENTLY HAS ACCESS to pre-fill checkboxes
                     if (isEdit && type === 'module' && initialData?.id) {
@@ -127,7 +129,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 .catch(err => {
                     console.error(`[CreateModal] Error fetching ${fetchLevel} access list:`, err);
                 })
-                .finally(() => setLoadingCandidates(false));
+            // .finally(() => setLoadingCandidates(false));
         }
     }, [isOpen, type, user, isEdit, initialData, parentId]);
 

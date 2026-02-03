@@ -4,15 +4,15 @@ import { useQuery } from 'react-query';
 import AppLayout from '../components/layout/AppLayout';
 import * as dashboardService from '../services/dashboardService';
 import { useAuth } from '../contexts/AuthContext';
-import {
-    FaLaptop,
-    FaComments,
-    FaUserTie,
-    FaCalendarAlt,
-    FaCheckCircle,
-    FaBuilding,
-    FaFileAlt
-} from 'react-icons/fa';
+// import {
+//     FaLaptop,
+//     FaComments,
+//     FaUserTie,
+//     FaCalendarAlt,
+//     FaCheckCircle,
+//     FaBuilding,
+//     FaFileAlt
+// } from 'react-icons/fa';
 import './DashboardPage.css';
 
 const formatStat = (num: number) => {

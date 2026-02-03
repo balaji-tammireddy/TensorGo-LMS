@@ -71,7 +71,7 @@ export const ProjectDashboard: React.FC = () => {
         projects,
         filterType,
         emptyMsg,
-        sectionId,
+        // sectionId,
         isOpen,
         onToggle
     }: {
@@ -179,6 +179,7 @@ export const ProjectDashboard: React.FC = () => {
                                         projects={myProjectsList}
                                         filterType="my-projects"
                                         emptyMsg="No projects found in this section."
+                                        sectionId="my-projects"
                                         isOpen={openSection === 'my-projects'}
                                         onToggle={() => handleToggleSection('my-projects')}
                                     />
@@ -197,6 +198,7 @@ export const ProjectDashboard: React.FC = () => {
                                             projects={allOtherProjects}
                                             filterType="all"
                                             emptyMsg="No global projects to display."
+                                            sectionId="all-projects"
                                             isOpen={openSection === 'all-projects'}
                                             onToggle={() => handleToggleSection('all-projects')}
                                         />

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
-// import * as employeeService from '../../services/employeeService'; // Unused after refactor
+// import * as employeeService from '../../services/employeeService';
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -24,7 +24,7 @@ export const ProjectWorkspace: React.FC = () => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
-    const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then(res => res.employees));
+    // const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then((res: any) => res.employees));
 
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -176,7 +176,7 @@ export const ProjectWorkspace: React.FC = () => {
     };
 
     const assignModuleUserMutation = useMutation(
-        ({ moduleId, userId, action, userObj }: { moduleId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
+        ({ moduleId, userId, action, userObj: _userObj }: { moduleId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('module', moduleId, userId, action);
         },
         {
@@ -262,7 +262,7 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     const assignTaskUserMutation = useMutation(
-        ({ taskId, userId, action, userObj }: { taskId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
+        ({ taskId, userId, action, userObj: _userObj }: { taskId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('task', taskId, userId, action);
         },
         {
@@ -333,7 +333,7 @@ export const ProjectWorkspace: React.FC = () => {
     );
 
     const assignActivityUserMutation = useMutation(
-        ({ activityId, userId, action, userObj }: { activityId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
+        ({ activityId, userId, action, userObj: _userObj }: { activityId: number, userId: number, action: 'add' | 'remove', userObj?: any }) => {
             return projectService.toggleAccess('activity', activityId, userId, action);
         },
         {

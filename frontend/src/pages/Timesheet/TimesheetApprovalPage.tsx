@@ -93,12 +93,14 @@ export const TimesheetApprovalPage: React.FC = () => {
     const [rejectionReason, setRejectionReason] = useState('');
 
     const [reportModalOpen, setReportModalOpen] = useState(false);
-    const [reportFilters, setReportFilters] = useState({
+    /*
+    const [reportFilters] = useState({
         startDate: formatDate(weekRange.start),
         endDate: formatDate(weekRange.end),
         projectId: '',
         moduleId: ''
     });
+    */
 
     // -- Effects --
     useEffect(() => {
@@ -224,6 +226,7 @@ export const TimesheetApprovalPage: React.FC = () => {
         setCurrentDate(newDate);
     };
 
+    /*
     const handleDownloadReport = async () => {
         try {
             const data = await timesheetService.downloadReport(reportFilters);
@@ -251,6 +254,7 @@ export const TimesheetApprovalPage: React.FC = () => {
             showError('Failed to generate report');
         }
     };
+    */
 
 
 

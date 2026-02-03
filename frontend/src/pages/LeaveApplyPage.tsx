@@ -2560,7 +2560,7 @@ const LeaveApplyPage: React.FC = () => {
                         return valB - valA;
                       }
                     })
-                    .map((request: any, idx: number) => {
+                    .map((request: any) => {
                       const isUpdating = (applyMutation.isLoading && editingId === request.id) ||
                         (deleteMutation.isLoading && deleteRequestId === request.id) ||
                         editingRequestId === request.id;
