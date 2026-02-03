@@ -94,8 +94,8 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/leave-rules', leaveRuleRoutes);
-// app.use('/api/projects', projectRoutes);
-// app.use('/api/timesheets', timesheetRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/timesheets', timesheetRoutes);
 
 // Error handling
 app.use(errorHandler);

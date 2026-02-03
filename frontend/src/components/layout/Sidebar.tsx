@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog } from 'react-icons/fa';
+import { FaFileAlt, FaCheckCircle, FaUsers, FaUser, FaSignOutAlt, FaCalendarAlt, FaBook, FaChartPie, FaCog, FaBriefcase, FaClock, FaClipboardCheck } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar: React.FC = memo(() => {
@@ -76,26 +76,20 @@ const Sidebar: React.FC = memo(() => {
     // View Policies - Available to all
     routes.push({ path: '/view-policies', icon: <FaBook />, label: 'View Policies' });
 
-    // Project Management - Hidden in Leave-Only branch
-    /*
+    // Project Management
     if (['manager', 'hr', 'super_admin', 'employee', 'intern'].includes(user.role)) {
       routes.push({ path: '/project-management', icon: <FaBriefcase />, label: 'Projects' });
     }
-    */
 
-    // Timesheet - Hidden in Leave-Only branch
-    /*
+    // Timesheet
     if (['manager', 'hr', 'employee', 'intern'].includes(user.role)) {
       routes.push({ path: '/timesheets', icon: <FaClock />, label: 'Timesheets' });
     }
-    */
 
-    // Timesheet Approval - Hidden in Leave-Only branch
-    /*
+    // Timesheet Approval
     if (['manager', 'hr', 'super_admin'].includes(user.role)) {
       routes.push({ path: '/timesheet/approvals', icon: <FaClipboardCheck />, label: 'Timesheet Approvals' });
     }
-    */
 
     // Profile is always available
     routes.push({ path: '/profile', icon: <FaUser />, label: 'Profile' });
