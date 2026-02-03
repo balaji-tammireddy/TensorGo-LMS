@@ -450,7 +450,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                         // New Logic: If > 40 hours, but still has drafts/rejections -> Action Required (by user), not "Criteria Not Met"
                                                         if (criteriaMet) {
                                                             if (hasActionable) {
-                                                                return (
+                                                                return isReportingManager ? (
                                                                     <button
                                                                         className="bulk-approve-btn"
                                                                         onClick={handleApproveWeek}
@@ -463,6 +463,11 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                         )}
                                                                         {processingAction ? 'Processing...' : 'Approve Week'}
                                                                     </button>
+                                                                ) : (
+                                                                    <div className="logged-hours-badge info">
+                                                                        <Clock size={14} style={{ marginRight: 4 }} />
+                                                                        Submitted
+                                                                    </div>
                                                                 );
                                                             }
 
@@ -601,7 +606,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                 {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
 
                                                                 {/* Day Actions */}
-                                                                {isReportingManager && dayEntries.length > 0 && (() => {
+                                                                {dayEntries.length > 0 && (() => {
                                                                     const nonSystemEntries = dayEntries.filter(e => !e.project_name?.includes('System'));
                                                                     const hasActionable = nonSystemEntries.some(e => e.log_status === 'submitted');
                                                                     const allApproved = nonSystemEntries.length > 0 && nonSystemEntries.every(e => e.log_status === 'approved');
@@ -610,24 +615,30 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                     return (
                                                                         <div className="day-actions" style={{ display: 'flex', gap: '8px', marginLeft: '12px', alignItems: 'center' }}>
                                                                             {hasActionable ? (
-                                                                                <>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
-                                                                                        className="day-action-btn approve"
-                                                                                        disabled={processingAction}
-                                                                                    >
-                                                                                        {processingAction ? 'Wait...' : 'Approve Day'}
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
-                                                                                        className="day-action-btn reject"
-                                                                                        disabled={processingAction}
-                                                                                    >
-                                                                                        {processingAction ? 'Wait...' : 'Reject Day'}
-                                                                                    </button>
-                                                                                </>
+                                                                                isReportingManager ? (
+                                                                                    <>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
+                                                                                            className="day-action-btn approve"
+                                                                                            disabled={processingAction}
+                                                                                        >
+                                                                                            {processingAction ? 'Wait...' : 'Approve Day'}
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
+                                                                                            className="day-action-btn reject"
+                                                                                            disabled={processingAction}
+                                                                                        >
+                                                                                            {processingAction ? 'Wait...' : 'Reject Day'}
+                                                                                        </button>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <div className="status-submitted-badge">
+                                                                                        <Clock size={14} /> Submitted
+                                                                                    </div>
+                                                                                )
                                                                             ) : allApproved ? (
                                                                                 <div className="status-approved-badge">
                                                                                     <CheckCircle size={14} /> Approved

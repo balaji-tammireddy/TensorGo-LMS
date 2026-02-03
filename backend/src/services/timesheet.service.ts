@@ -1187,11 +1187,6 @@ export class TimesheetService {
 
         const client = await pool.connect();
         try {
-            // Check Role
-            const roleRes = await client.query('SELECT user_role FROM users WHERE id = $1', [approverId]);
-            const role = roleRes.rows[0]?.user_role;
-            if (role === 'super_admin' || role === 'hr') return true;
-
             // Check Manager Link
             const linkRes = await client.query('SELECT 1 FROM users WHERE id = $1 AND reporting_manager_id = $2', [targetUserId, approverId]);
             return linkRes.rows.length > 0;
