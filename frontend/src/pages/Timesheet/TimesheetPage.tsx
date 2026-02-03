@@ -473,17 +473,18 @@ export const TimesheetPage: React.FC = () => {
                             const today = new Date();
                             today.setHours(0, 0, 0, 0);
 
-                            // Calculate Sunday 12 AM of the following week (Start of submission window)
+                            // Calculate Monday 12 AM of the following week (Start of manual submission window)
+                            // This opens after the Sunday 11:59 PM auto-submission has run.
                             const submissionStart = new Date(weekRange.end);
-                            submissionStart.setDate(submissionStart.getDate() + 1);
+                            submissionStart.setDate(submissionStart.getDate() + 2); // Sat + 2 = Monday
                             submissionStart.setHours(0, 0, 0, 0);
 
                             // Calculate Sunday 12 AM of the week after (End of submission window)
                             const submissionEnd = new Date(submissionStart);
-                            submissionEnd.setDate(submissionStart.getDate() + 7);
+                            submissionEnd.setDate(submissionStart.getDate() + 7); // Next Sunday
                             submissionEnd.setHours(0, 0, 0, 0);
 
-                            // Only show if today is within the 1-week window (Sunday to Sunday)
+                            // Only show if today is within the 1-week window (Monday to Sunday)
                             if (today >= submissionStart && today < submissionEnd) {
                                 const th = parseFloat(String(totalHours));
                                 // Check if already submitted/approved
