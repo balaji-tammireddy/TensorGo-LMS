@@ -579,7 +579,7 @@ const EmployeeDetailsPage: React.FC = () => {
                     const value = e.target.value.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 20).toUpperCase();
                     setEmployeeData({ ...employeeData, empId: value });
                   }}
-                  disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')}
+                  disabled={!isEditMode || (isEditMode && !['super_admin', 'hr'].includes(user?.role || ''))}
                 />
               </div>
               <div className={`employee-modal-field employee-role-field ${formErrors.role ? 'has-error' : ''}`}>
@@ -853,7 +853,7 @@ const EmployeeDetailsPage: React.FC = () => {
                   type="email"
                   value={employeeData.email}
                   onChange={(e) => setEmployeeData({ ...employeeData, email: e.target.value })}
-                  disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')}
+                  disabled={!isEditMode || (isEditMode && !['super_admin', 'hr'].includes(user?.role || ''))}
                 />
               </div>
               <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
@@ -901,7 +901,7 @@ const EmployeeDetailsPage: React.FC = () => {
                 <DatePicker
                   value={employeeData.dateOfJoining}
                   onChange={(date) => setEmployeeData({ ...employeeData, dateOfJoining: date })}
-                  disabled={!isEditMode || (isEditMode && user?.role !== 'super_admin')}
+                  disabled={!isEditMode || (isEditMode && !['super_admin', 'hr'].includes(user?.role || ''))}
                   placeholder="DD-MM-YYYY"
                   allowManualEntry={true}
                   isEmployeeVariant={true}

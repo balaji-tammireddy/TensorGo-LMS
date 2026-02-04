@@ -1365,7 +1365,7 @@ const EmployeeManagementPage: React.FC = () => {
                               });
                             }}
                             maxLength={20}
-                            disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
+                            disabled={isViewMode || (isEditMode && !['super_admin', 'hr'].includes(user?.role || ''))}
                           />
                         </div>
                         <div className={`employee-modal-field employee-role-field ${formErrors.role ? 'has-error' : ''}`}>
@@ -1887,7 +1887,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 });
                               }
                             }}
-                            disabled={(isEditMode && user?.role !== 'super_admin') || isViewMode}
+                            disabled={(isEditMode && !['super_admin', 'hr'].includes(user?.role || '')) || isViewMode}
                           />
                         </div>
                         <div className={`employee-modal-field ${formErrors.designation ? 'has-error' : ''}`}>
@@ -1958,7 +1958,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 dateOfJoining: date
                               })
                             }
-                            disabled={isViewMode || (isEditMode && user?.role !== 'super_admin')}
+                            disabled={isViewMode || (isEditMode && !['super_admin', 'hr'].includes(user?.role || ''))}
                             placeholder="DD-MM-YYYY"
                             allowManualEntry={true}
                             isEmployeeVariant={true}
