@@ -255,7 +255,7 @@ const EmployeeManagementPage: React.FC = () => {
     () =>
       employeeService.getEmployees(
         1,
-        20,
+        1000,
         appliedSearch,
         undefined,
         statusFilter || undefined,
@@ -998,7 +998,7 @@ const EmployeeManagementPage: React.FC = () => {
           </Button>
         </div>
 
-        <div className={`employees-section employees-table-wrapper ${employeesLoading && sortedEmployees.length > 0 ? 'fetching' : ''}`}>
+        <div className={`employees-section employee-table-container ${employeesLoading && sortedEmployees.length > 0 ? 'fetching' : ''}`}>
           {employeesLoading && sortedEmployees.length === 0 ? (
             <div className="skeleton-table">
               {Array.from({ length: 5 }).map((_, idx) => (

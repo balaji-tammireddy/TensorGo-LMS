@@ -100,13 +100,33 @@
   box-shadow: 0 10px 22px rgba(60, 111, 242, 0.35);
 }
 
-.employees-section {
+.employee-table-container {
   margin-top: 8px;
-  /* Take remaining space and scroll only when content exceeds page height */
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+}
+
+/* Scrollbar styling */
+.employee-table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.employee-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.employee-table-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.employee-table-container::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
 }
 
 .employees-table {
@@ -166,15 +186,16 @@
 
 .employees-table thead th {
   background-color: #f8f9fa;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 2px solid #e5e7eb;
   padding: 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: #374151;
   text-align: left;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.05);
 }
 
 .employees-table thead th:last-child,
@@ -647,12 +668,12 @@
 }
 
 /* Local loading styles for employee management */
-.employees-table-wrapper {
+.employee-table-container {
   position: relative;
   width: 100%;
 }
 
-.employees-table-wrapper.fetching {
+.employee-table-container.fetching {
   opacity: 0.7;
   pointer-events: none;
 }
