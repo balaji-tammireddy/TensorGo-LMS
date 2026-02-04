@@ -79,9 +79,9 @@ export class ProjectService {
       // REMOVED: Restriction that forced Manager role to self-assign
       // if (creatorRole === 'manager') { managerId = data.created_by; }
 
-      // 2. Validate Manager Status
+      // 2. Validate Manager Status & Role
       const managerRes = await client.query(
-        `SELECT status FROM users WHERE id = $1`,
+        `SELECT status, user_role as role FROM users WHERE id = $1`,
         [managerId]
       );
 
@@ -89,7 +89,13 @@ export class ProjectService {
         throw new Error('Project Manager not found');
       }
 
-      const managerStatus = managerRes.rows[0].status;
+      const { status: managerStatus, role: managerRole } = managerRes.rows[0];
+
+      const allowedPMRoles = ['super_admin', 'hr', 'manager'];
+      if (!allowedPMRoles.includes(managerRole)) {
+        throw new Error('Assigned Project Manager must be a Super Admin, HR, or Manager');
+      }
+
       const forbiddenStatuses = ['on_notice', 'resigned', 'terminated', 'inactive'];
       if (forbiddenStatuses.includes(managerStatus)) {
         throw new Error('Cannot assign a user on notice/inactive as Project Manager');
@@ -133,7 +139,7 @@ export class ProjectService {
     }
   }
 
-  static async updateProject(id: number, data: Partial<ProjectData> & { status?: string }, requesterId?: number) {
+  static async updateProject(id: number, data: Partial<ProjectData> & { status?: string }, requesterId: number, requesterRole: string) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -143,10 +149,34 @@ export class ProjectService {
       if (currentRes.rows.length === 0) throw new Error('Project not found');
       const currentProject = currentRes.rows[0];
 
-      // 1. Check for PM Change
+      // 1. ROLE-BASED RESTRICTIONS
+      // If requester is a Manager (PM), they can only edit Name, Description, and Status.
+      if (requesterRole !== 'super_admin' && requesterRole !== 'hr') {
+        // Manager role (PM) can ONLY edit name, description, and status
+        delete data.project_manager_id;
+        delete data.start_date;
+        delete data.end_date;
+
+        // Log restriction attempt if they tried to change other fields (optional but good for debugging)
+        console.log(`[ProjectService] Restricting update for Manager ${requesterId} on Project ${id}`);
+      }
+
+      // 2. Check for PM Change (Only for SA/HR)
       const isManagerChanging = data.project_manager_id && data.project_manager_id !== currentProject.project_manager_id;
 
-      // 2. AUTOMATION: Check for status change to set end_date
+      if (isManagerChanging) {
+        // Validate NEW Manager status and role
+        const managerRes = await client.query('SELECT status, user_role as role FROM users WHERE id = $1', [data.project_manager_id]);
+        if (managerRes.rows.length === 0) throw new Error('Project Manager not found');
+        if (!['super_admin', 'hr', 'manager'].includes(managerRes.rows[0].role)) {
+          throw new Error('New Project Manager must be a Super Admin, HR, or Manager');
+        }
+        if (['on_notice', 'resigned', 'terminated', 'inactive'].includes(managerRes.rows[0].status)) {
+          throw new Error('Cannot assign a user on notice/inactive as Project Manager');
+        }
+      }
+
+      // 3. AUTOMATION: Check for status change to set end_date
       if (data.status && currentProject.status === 'active' && data.status !== 'active' && !data.end_date) {
         data.end_date = new Date().toISOString();
       }
@@ -198,11 +228,11 @@ export class ProjectService {
 
         await client.query('COMMIT');
         // Return full joined data including manager_name and is_pm
-        return this.getProject(id, requesterId!, 'super_admin'); // We use super_admin here to bypass visibility checks for the return value
+        return this.getProject(id, requesterId, requesterRole); // Use bypass logic inside getProject or pass role
       }
 
       await client.query('COMMIT');
-      return this.getProject(id, requesterId!, 'super_admin');
+      return this.getProject(id, requesterId, requesterRole);
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
@@ -866,7 +896,7 @@ export class ProjectService {
   // --- 4. Getters with Access Control ---
 
   static async getProject(projectId: number, userId: number, role: string) {
-    const isGlobalViewer = role === 'super_admin';
+    const isGlobalViewer = role === 'super_admin' || role === 'hr';
 
     let queryStr = `
       SELECT p.*, 
@@ -902,7 +932,7 @@ export class ProjectService {
 
   static async getProjectsForUser(userId: number, role: string) {
     // Global Viewers
-    if (role === 'super_admin') {
+    if (role === 'super_admin' || role === 'hr') {
       return query(
         `SELECT p.*, 
                 COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
@@ -937,7 +967,7 @@ export class ProjectService {
   }
 
   static async getModulesForProject(projectId: number, userId: number, role: string) {
-    const isGlobal = role === 'super_admin';
+    const isGlobal = role === 'super_admin' || role === 'hr';
 
     // 1. Check basic access (PM, Member, or logged time)
     const projectCheck = await query(`
@@ -1007,7 +1037,7 @@ export class ProjectService {
 
 
   static async getTasksForModule(moduleId: number, userId: number, role: string) {
-    const isGlobal = role === 'super_admin';
+    const isGlobal = role === 'super_admin' || role === 'hr';
 
     // 1. Get the parent project ID and PM ID
     const projectInfo = await query(`
@@ -1089,7 +1119,7 @@ export class ProjectService {
   }
 
   static async getActivitiesForTask(taskId: number, userId: number, role: string) {
-    const isGlobal = role === 'super_admin';
+    const isGlobal = role === 'super_admin' || role === 'hr';
 
     // 1. Get parent info
     const projectInfo = await query(`
@@ -1475,21 +1505,20 @@ export class ProjectService {
 
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
-    if (role === 'super_admin') return true;
-    const res = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
-      SELECT 1 FROM projects WHERE id = $2 AND project_manager_id IN (SELECT id FROM hierarchy)
-    `, [userId, projectId]);
+    if (role === 'super_admin' || role === 'hr') return true;
+
+    // Only the assigned Project Manager can manage project metadata
+    const res = await query(
+      `SELECT 1 FROM projects WHERE id = $1 AND project_manager_id = $2`,
+      [projectId, userId]
+    );
     return res.rows.length > 0;
   }
 
   static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
-    // STRICT: Only the Project Manager assigned to THIS project can manage modules/tasks
-    // removed super_admin bypass
+    // STRICT: Project Manager assigned to THIS project, OR Super Admin / HR
+    if (role === 'super_admin' || role === 'hr') return true;
+
     const res = await query(`
       SELECT 1 FROM projects 
       WHERE id = $2 AND project_manager_id = $1 
@@ -1500,7 +1529,8 @@ export class ProjectService {
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
-    // removed super_admin bypass
+    if (role === 'super_admin' || role === 'hr') return true;
+
     const res = await query(`
       WITH RECURSIVE hierarchy AS (
         SELECT id FROM users WHERE id = $1
@@ -1514,7 +1544,8 @@ export class ProjectService {
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
-    // removed super_admin bypass
+    if (role === 'super_admin' || role === 'hr') return true;
+
     const res = await query(`
       WITH RECURSIVE hierarchy AS (
         SELECT id FROM users WHERE id = $1
@@ -1528,7 +1559,8 @@ export class ProjectService {
   }
 
   static async canUserManageActivity(userId: number, role: string, activityId: number): Promise<boolean> {
-    // removed super_admin bypass
+    if (role === 'super_admin' || role === 'hr') return true;
+
     const res = await query(`
       WITH RECURSIVE hierarchy AS (
         SELECT id FROM users WHERE id = $1

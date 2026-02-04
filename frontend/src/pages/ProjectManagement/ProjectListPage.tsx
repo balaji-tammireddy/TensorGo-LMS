@@ -56,8 +56,8 @@ export const ProjectListPage: React.FC = () => {
         if (filterType === 'my-projects') {
             return projects;
         } else {
-            const isGlobalAdmin = user?.role === 'super_admin';
-            if (isGlobalAdmin) return projects;
+            const isGlobalViewer = ['super_admin', 'hr'].includes(user?.role || '');
+            if (isGlobalViewer) return projects;
             return [];
         }
     };

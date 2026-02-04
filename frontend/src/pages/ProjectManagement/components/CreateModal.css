@@ -23,7 +23,6 @@
   animation: slideIn 0.2s ease-out;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Ensure header/footer stay within rounded corners */
 }
 
 @keyframes slideIn {
@@ -231,7 +230,7 @@
   width: var(--radix-dropdown-menu-trigger-width);
   /* Full width matching trigger */
   padding: 0;
-  z-index: 1001;
+  z-index: 9999;
 }
 
 .dropdown-search-wrapper {

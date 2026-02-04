@@ -149,7 +149,7 @@ export const ProjectDashboard: React.FC = () => {
     );
     // Helper to check if user can create (Admin/HR/Manager)
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
-    const isGlobalAdmin = user?.role === 'super_admin';
+    const isGlobalViewer = ['super_admin', 'hr'].includes(user?.role || '');
 
     const getStatusClass = (status: string) => {
         if (status === 'active') return 'status-active';
@@ -205,9 +205,9 @@ export const ProjectDashboard: React.FC = () => {
                 {!isLoading && (
                     <div className="dashboard-content">
                         {/* 1. SECTION: My Projects */}
-                        <div className={`dashboard-section ${(!isGlobalAdmin || openSection === 'my-projects') ? 'open' : 'collapsed'}`}>
+                        <div className={`dashboard-section ${(!isGlobalViewer || openSection === 'my-projects') ? 'open' : 'collapsed'}`}>
                             {(() => {
-                                const myProjectsList = isGlobalAdmin
+                                const myProjectsList = isGlobalViewer
                                     ? (projects || []).filter(p => p.is_pm || p.is_member)
                                     : (projects || []);
 
@@ -216,8 +216,8 @@ export const ProjectDashboard: React.FC = () => {
                                         title="My Projects"
                                         projects={myProjectsList}
                                         emptyMsg="No projects found in this section."
-                                        isOpen={!isGlobalAdmin || openSection === 'my-projects'}
-                                        onToggle={isGlobalAdmin ? () => handleToggleSection('my-projects') : undefined}
+                                        isOpen={!isGlobalViewer || openSection === 'my-projects'}
+                                        onToggle={isGlobalViewer ? () => handleToggleSection('my-projects') : undefined}
                                         navigate={navigate}
                                         user={user}
                                         getStatusClass={getStatusClass}
@@ -228,7 +228,7 @@ export const ProjectDashboard: React.FC = () => {
                         </div>
 
                         {/* 2. SECTION: All Projects */}
-                        {isGlobalAdmin && (
+                        {isGlobalViewer && (
                             <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
                                 {(() => {
                                     // Show ALL projects (user request: "all project should show all of them")

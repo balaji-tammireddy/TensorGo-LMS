@@ -195,26 +195,28 @@ export const ProjectWorkspace: React.FC = () => {
     // Permissions Logic
     const isPM = !!project?.is_pm;
     const isSuperAdmin = user?.role === 'super_admin';
+    const isHR = user?.role === 'hr';
 
     // Check if project is in a read-only state
     // Details can be edited ONLY in active state
     const isProjectReadOnly = project?.status !== 'active';
 
-    //    - STRICT: Super Admin can edit project metadata
-    //    - STRICT: Project Manager can also edit project metadata (Name/Description)
-    const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
+    // 1. Project Metadata Control:
+    //    - STRICT: Super Admin and HR can edit EVERYTHING (including PM and Dates)
+    //    - STRICT: Project Manager can ONLY edit Name and Description
+    const canManageProject = (isSuperAdmin || isHR || isPM) && !isProjectReadOnly;
 
     // 2. Module/Task/Activity Operational Control:
-    //    - STRICT: Only the Project Manager can create/edit/delete/assign (User Request)
+    //    - STRICT: Super Admin, HR, and the Project Manager can manage resources
     //    - AND ONLY if project is Active
-    const canManageResources = isPM && !isProjectReadOnly;
+    const canManageResources = (isSuperAdmin || isHR || isPM) && !isProjectReadOnly;
     const canCreateModule = canManageResources;
     const canAddTask = canManageResources;
     const canAddActivity = canManageResources;
 
     // 3. Status Management:
-    //    - STRICT: Super Admin can change status
-    const canManageStatus = isSuperAdmin;
+    //    - STRICT: Super Admin, HR, and the specific Project Manager can change status
+    const canManageStatus = (isSuperAdmin || isHR || isPM);
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type

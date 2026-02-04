@@ -141,12 +141,12 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
                 if (isEdit && initialData?.id) {
                     const isGlobalAdmin = user?.role === 'super_admin';
+                    const isHR = user?.role === 'hr';
                     const isPM = String(initialData.project_manager_id) === String(user?.id);
 
-                    // Can edit details (Name/Desc): SA OR Current PM
-                    // Can change PM: ONLY SA
-                    const canEditDetails = isGlobalAdmin || isPM;
-                    const canChangePM = isGlobalAdmin;
+                    // Requirement: SA and HR can edit EVERYTHING. PM can only edit Name/Description.
+                    const canEditMetadata = isGlobalAdmin || isHR;
+                    const canEditDetails = canEditMetadata || isPM;
 
                     if (!canEditDetails) {
                         throw new Error('You do not have permission to edit this project');
@@ -157,12 +157,10 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         description: payload.description,
                     };
 
-                    // Only Super Admin can change the Project Manager
-                    if (canChangePM) {
+                    // Only Super Admin and HR can change Project Manager and Dates
+                    if (canEditMetadata) {
                         updateData.project_manager_id = parseInt(payload.project_manager_id);
-                    } else {
-                        // For others, strictly ignore the selected ID to prevent override
-                        // (Though UI is disabled, this is backend safety)
+                        if (payload.due_date) updateData.end_date = payload.due_date;
                     }
 
                     result = await projectService.updateProject(initialData.id, updateData);
@@ -177,8 +175,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             } else if (type === 'module' && parentId) {
                 const payload = { ...basePayload };
                 // STRICT: Only Project Manager can add/edit modules
-                const isPM = projectManagerId === user?.id;
-                if (!isPM) throw new Error('Only the Project Manager can manage modules');
+                const isAuthorized = ['super_admin', 'hr'].includes(user?.role || '') || projectManagerId === user?.id;
+                if (!isAuthorized) throw new Error('Only the Project Manager, HR, or Super Admin can manage modules');
 
                 if (isEdit && initialData?.id) {
                     // Omit assigneeIds to prevent updating access
@@ -195,8 +193,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             } else if (type === 'task' && parentId) {
                 const payload = { ...basePayload };
                 // STRICT: Only Project Manager can add/edit tasks
-                const isPM = projectManagerId === user?.id;
-                if (!isPM) throw new Error('Only the Project Manager can manage tasks');
+                const isAuthorized = ['super_admin', 'hr'].includes(user?.role || '') || projectManagerId === user?.id;
+                if (!isAuthorized) throw new Error('Only the Project Manager, HR, or Super Admin can manage tasks');
 
                 if (isEdit && initialData?.id) {
                     // Payload sanitization ensures due_date is undefined if empty, preventing 500 error
@@ -213,8 +211,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             } else if (type === 'activity' && (parentId || initialData?.id)) {
                 const payload = { ...basePayload };
                 // STRICT: Only Project Manager can add/edit activities
-                const isPM = projectManagerId === user?.id;
-                if (!isPM) throw new Error('Only the Project Manager can manage activities');
+                const isAuthorized = ['super_admin', 'hr'].includes(user?.role || '') || projectManagerId === user?.id;
+                if (!isAuthorized) throw new Error('Only the Project Manager, HR, or Super Admin can manage activities');
 
                 if (isEdit && initialData?.id) {
                     result = await projectService.updateActivity(initialData.id, {
@@ -258,13 +256,13 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
     };
 
-    const canEditDetails = type === 'project' && isEdit && (user?.role === 'super_admin' || String(initialData?.project_manager_id) === String(user?.id));
+    const canEditDetails = type === 'project' && isEdit && (user?.role === 'super_admin' || user?.role === 'hr' || String(initialData?.project_manager_id) === String(user?.id));
 
     // PM Selection:
     // - Create: Enabled for Super Admin, HR, Manager
-    // - Edit: Enabled ONLY for Super Admin
+    // - Edit: Enabled ONLY for Super Admin and HR
     const isManagerSelectDisabled = isEdit
-        ? user?.role !== 'super_admin'
+        ? !['super_admin', 'hr'].includes(user?.role || '')
         : !['super_admin', 'hr', 'manager'].includes(user?.role || '');
 
     // Character limits
@@ -402,6 +400,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                             side="top"
                                             align="start"
                                             sideOffset={5}
+                                            style={{ minWidth: (formData.name && type === 'project') ? '350px' : '300px' }} // Dynamic or stable width
                                         >
                                             <div className="dropdown-search-wrapper">
                                                 <Search size={14} className="search-icon" />
