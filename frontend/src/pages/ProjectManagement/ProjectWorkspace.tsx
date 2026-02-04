@@ -200,8 +200,8 @@ export const ProjectWorkspace: React.FC = () => {
     // Details can be edited ONLY in active state
     const isProjectReadOnly = project?.status !== 'active';
 
-    //    - STRICT: Super Admin or the assigned PM can edit project metadata
-    const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
+    //    - STRICT: Super Admin can edit project metadata
+    const canManageProject = isSuperAdmin && !isProjectReadOnly;
 
     // 2. Module/Task/Activity Operational Control:
     //    - STRICT: Only the Project Manager can create/edit/delete/assign (User Request)
@@ -212,8 +212,8 @@ export const ProjectWorkspace: React.FC = () => {
     const canAddActivity = canManageResources;
 
     // 3. Status Management:
-    //    - STRICT: Super Admin or the assigned PM can change status
-    const canManageStatus = isSuperAdmin || isPM;
+    //    - STRICT: Super Admin can change status
+    const canManageStatus = isSuperAdmin;
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type

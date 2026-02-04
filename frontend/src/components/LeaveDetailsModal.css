@@ -694,21 +694,21 @@
 }
 
 .breakdown-stat.approved {
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-  color: #2e7d32;
-  border: 1px solid #a5d6a7;
+  background: linear-gradient(135deg, #00c853 0%, #00e676 100%);
+  color: #fff;
+  border: none;
 }
 
 .breakdown-stat.rejected {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-  color: #c62828;
-  border: 1px solid #ef9a9a;
+  background: linear-gradient(135deg, #ff5252 0%, #ff8080 100%);
+  color: #fff;
+  border: none;
 }
 
 .breakdown-stat.pending {
-  background: linear-gradient(135deg, #fffbf0 0%, #ffe0b2 100%);
-  color: #f57c00;
-  border: 1px solid #ffcc80;
+  background: linear-gradient(135deg, #ffab00 0%, #ffc400 100%);
+  color: #fff;
+  border: none;
 }
 
 .stat-label {
@@ -809,19 +809,22 @@
 }
 
 .day-status.status-approved {
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-  color: #2e7d32;
-  border: 1px solid #a5d6a7;
+  background: linear-gradient(135deg, #00c853 0%, #00e676 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
 }
 
 .day-status.status-rejected {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-  color: #c62828;
-  border: 1px solid #ef9a9a;
+  background: linear-gradient(135deg, #ff5252 0%, #ff8080 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
 }
 
 .day-status.status-pending {
-  background: linear-gradient(135deg, #fffbf0 0%, #ffe0b2 100%);
-  color: #f57c00;
-  border: 1px solid #ffcc80;
+  background: linear-gradient(135deg, #ffab00 0%, #ffc400 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
 }
