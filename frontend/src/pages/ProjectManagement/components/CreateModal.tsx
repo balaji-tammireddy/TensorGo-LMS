@@ -89,7 +89,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }]);
             }
 
-            if (user.role === 'super_admin') {
+            // Fetch managers if user has permission to assign (Super Admin, HR, Manager)
+            if (['super_admin', 'hr', 'manager'].includes(user.role)) {
                 employeeService.getEmployees(1, 1000).then(res => {
                     const eligibleManagers = res.employees.filter((emp: any) =>
                         ['super_admin', 'hr', 'manager'].includes(emp.role) &&
@@ -139,27 +140,29 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 // The previous check `if (!payload.project_manager_id)` is now handled by the strict validation above.
 
                 if (isEdit && initialData?.id) {
-                    // STRICT: Super Admin OR Project Manager can edit details
-                    // But PM cannot change the manager
                     const isGlobalAdmin = user?.role === 'super_admin';
                     const isPM = String(initialData.project_manager_id) === String(user?.id);
 
-                    if (!isGlobalAdmin && !isPM) {
+                    // Can edit details (Name/Desc): SA OR Current PM
+                    // Can change PM: ONLY SA
+                    const canEditDetails = isGlobalAdmin || isPM;
+                    const canChangePM = isGlobalAdmin;
+
+                    if (!canEditDetails) {
                         throw new Error('You do not have permission to edit this project');
                     }
 
                     const updateData: any = {
                         name: payload.name,
                         description: payload.description,
-                        // project_manager_id: ... // Conditional below
                     };
 
-                    // Only Admin can change the Project Manager
-                    if (isGlobalAdmin) {
+                    // Only Super Admin can change the Project Manager
+                    if (canChangePM) {
                         updateData.project_manager_id = parseInt(payload.project_manager_id);
                     } else {
-                        // For PM, ensure we don't accidentally send a changed ID (UI should block it, but backend safety)
-                        // We do NOT send project_manager_id so backend keeps existing
+                        // For others, strictly ignore the selected ID to prevent override
+                        // (Though UI is disabled, this is backend safety)
                     }
 
                     result = await projectService.updateProject(initialData.id, updateData);
@@ -255,8 +258,14 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
     };
 
-    const canEditMetadata = type === 'project' && isEdit && user?.role === 'super_admin';
-    const isManagerSelectDisabled = user?.role !== 'super_admin';
+    const canEditDetails = type === 'project' && isEdit && (user?.role === 'super_admin' || String(initialData?.project_manager_id) === String(user?.id));
+
+    // PM Selection:
+    // - Create: Enabled for Super Admin, HR, Manager
+    // - Edit: Enabled ONLY for Super Admin
+    const isManagerSelectDisabled = isEdit
+        ? user?.role !== 'super_admin'
+        : !['super_admin', 'hr', 'manager'].includes(user?.role || '');
 
     // Character limits
     const NAME_LIMIT = 20;
@@ -326,7 +335,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                             </label>
                             <input
                                 type="text"
-                                className={`form-input ${isEdit && type === 'project' && !canEditMetadata ? 'disabled' : ''}`}
+                                className={`form-input ${isEdit && type === 'project' && !canEditDetails ? 'disabled' : ''}`}
                                 value={formData.name}
                                 onChange={e => {
                                     const val = e.target.value;
@@ -338,7 +347,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                     }
                                 }}
                                 required
-                                disabled={isEdit && type === 'project' && !canEditMetadata}
+                                disabled={isEdit && type === 'project' && !canEditDetails}
                             />
                             <div className="char-counter">
                                 {formData.name.length}/{NAME_LIMIT}
@@ -349,7 +358,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         <div className="form-group">
                             <label className="form-label">Description</label>
                             <textarea
-                                className={`form-textarea ${isEdit && type === 'project' && !canEditMetadata ? 'disabled' : ''}`}
+                                className={`form-textarea ${isEdit && type === 'project' && !canEditDetails ? 'disabled' : ''}`}
                                 rows={5}
                                 value={formData.description}
                                 onChange={e => {
@@ -359,7 +368,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                         setFormData({ ...formData, description: toSentenceCase(val) });
                                     }
                                 }}
-                                disabled={isEdit && type === 'project' && !canEditMetadata}
+                                disabled={isEdit && type === 'project' && !canEditDetails}
                             />
                             <div className="char-counter">
                                 {formData.description.length}/{DESC_LIMIT}

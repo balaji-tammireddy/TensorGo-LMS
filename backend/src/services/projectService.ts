@@ -76,10 +76,8 @@ export class ProjectService {
 
       // 1. Manager Assignment Logic
       let managerId = data.project_manager_id;
-      if (creatorRole === 'manager') {
-        // Enforce: Manager creating project MUST be the PM
-        managerId = data.created_by;
-      }
+      // REMOVED: Restriction that forced Manager role to self-assign
+      // if (creatorRole === 'manager') { managerId = data.created_by; }
 
       // 2. Validate Manager Status
       const managerRes = await client.query(

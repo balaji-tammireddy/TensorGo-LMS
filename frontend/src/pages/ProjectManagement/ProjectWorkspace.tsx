@@ -201,7 +201,8 @@ export const ProjectWorkspace: React.FC = () => {
     const isProjectReadOnly = project?.status !== 'active';
 
     //    - STRICT: Super Admin can edit project metadata
-    const canManageProject = isSuperAdmin && !isProjectReadOnly;
+    //    - STRICT: Project Manager can also edit project metadata (Name/Description)
+    const canManageProject = (isSuperAdmin || isPM) && !isProjectReadOnly;
 
     // 2. Module/Task/Activity Operational Control:
     //    - STRICT: Only the Project Manager can create/edit/delete/assign (User Request)
