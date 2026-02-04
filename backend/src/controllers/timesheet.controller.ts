@@ -336,7 +336,7 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
 
         if (reportData.length === 0) {
             logger.warn('[Timesheet Report] No entries found for selected filters');
-            return res.status(404).json({ error: 'No timesheet entries found for the selected criteria' });
+            return res.status(400).json({ error: 'No entries found' });
         }
 
         if (filters.projectId) {

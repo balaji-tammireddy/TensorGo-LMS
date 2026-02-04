@@ -184,9 +184,8 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
         } catch (error: any) {
             console.error('Failed to generate PDF:', error);
             let errorMessage = 'Failed to generate PDF report';
-            if (error.message) {
-                errorMessage = error.message;
-            } else if (error.response?.data instanceof Blob) {
+
+            if (error.response?.data instanceof Blob) {
                 try {
                     const text = await error.response.data.text();
                     const errorData = JSON.parse(text);
@@ -196,7 +195,10 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
                 }
             } else if (error.response?.data?.error) {
                 errorMessage = error.response.data.error;
+            } else if (error.message) {
+                errorMessage = error.message;
             }
+
             showError(errorMessage);
         } finally {
             setLoading(false);
