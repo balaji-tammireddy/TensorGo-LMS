@@ -148,7 +148,7 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const result = await employeeService.deleteEmployee(employeeId, req.user!.id);
+    const result = await employeeService.deleteEmployee(employeeId);
     logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee deleted successfully - Employee ID: ${employeeId}`);
     res.json(result);
   } catch (error: any) {

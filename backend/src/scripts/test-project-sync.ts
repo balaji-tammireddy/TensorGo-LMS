@@ -107,7 +107,7 @@ async function testSync() {
 
         // 7. Clean up
         console.log("\n[CLEANUP] Deleting test employee...");
-        await deleteEmployee(newEmpId, saId);
+        await deleteEmployee(newEmpId);
         console.log("Cleanup complete.");
 
     } catch (err) {

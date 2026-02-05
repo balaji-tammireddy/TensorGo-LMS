@@ -975,7 +975,7 @@ export class ProjectService {
       WHERE p.id = $1::integer AND (
         p.project_manager_id = $2::integer
         OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id::integer AND pm.user_id = $2::integer)
-        OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.project_id = p.id::integer AND te.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM project_entries te WHERE te.project_id = p.id::integer AND te.user_id = $2::integer)
         OR $3::boolean = true
       )
     `, [projectId, userId, isGlobal]);
@@ -1028,7 +1028,7 @@ export class ProjectService {
        WHERE m.project_id = $1::integer 
        AND (
          EXISTS (SELECT 1 FROM module_access ma WHERE ma.module_id = m.id AND ma.user_id = $2::integer)
-         OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.module_id = m.id AND te.user_id = $2::integer)
+         OR EXISTS (SELECT 1 FROM project_entries te WHERE te.module_id = m.id AND te.user_id = $2::integer)
        )
        ORDER BY m.custom_id`,
       [projectId, userId]
@@ -1059,7 +1059,7 @@ export class ProjectService {
       WHERE p.id = $1::integer AND (
         p.project_manager_id = $2::integer
         OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2::integer)
-        OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.module_id = $3::integer AND te.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM project_entries te WHERE te.module_id = $3::integer AND te.user_id = $2::integer)
         OR $4::boolean = true
       )
     `, [project_id, userId, moduleId, isGlobal]);
@@ -1111,7 +1111,7 @@ export class ProjectService {
        WHERE t.module_id = $1::integer
        AND (
          EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2::integer)
-         OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.task_id = t.id AND te.user_id = $2::integer)
+         OR EXISTS (SELECT 1 FROM project_entries te WHERE te.task_id = t.id AND te.user_id = $2::integer)
        )
        ORDER BY t.custom_id`,
       [moduleId, userId, project_manager_id]
@@ -1141,7 +1141,7 @@ export class ProjectService {
       WHERE p.id = $1::integer AND (
         p.project_manager_id = $2::integer
         OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2::integer)
-        OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.task_id = $3::integer AND te.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM project_entries te WHERE te.task_id = $3::integer AND te.user_id = $2::integer)
         OR $4::boolean = true
       )
     `, [project_id, userId, taskId, isGlobal]);
@@ -1193,7 +1193,7 @@ export class ProjectService {
        WHERE a.task_id = $1::integer
        AND (
          EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = a.id AND aa.user_id = $2::integer)
-         OR EXISTS (SELECT 1 FROM timesheet_entries te WHERE te.activity_id = a.id AND te.user_id = $2::integer)
+         OR EXISTS (SELECT 1 FROM project_entries te WHERE te.activity_id = a.id AND te.user_id = $2::integer)
        )
        ORDER BY a.custom_id`,
       [taskId, userId, project_manager_id]

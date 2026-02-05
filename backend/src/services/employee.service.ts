@@ -5,7 +5,6 @@ import { formatDateLocal } from '../utils/dateCalculator';
 import * as emailTemplates from '../utils/emailTemplates';
 import { calculateAllLeaveCredits } from '../utils/leaveCredit';
 import { toTitleCase } from '../utils/stringUtils';
-import { ProjectService } from './projectService';
 
 
 export const getEmployees = async (
@@ -26,7 +25,6 @@ export const getEmployees = async (
     SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
            u.designation as position, u.date_of_joining as joining_date, u.status as status, u.user_role as role,
            u.profile_photo_url as profile_photo_key,
-           u.personal_email,
            c.emp_id as created_by_emp_id,
            up.emp_id as updated_by_emp_id
     FROM users u
@@ -158,8 +156,6 @@ export const getEmployees = async (
       profilePhotoKey: row.profile_photo_key && row.profile_photo_key.startsWith('profile-photos/')
         ? row.profile_photo_key
         : null,
-      personalEmail: row.personal_email || null,
-      isProfileUpdated: row.is_profile_updated || false,
       createdBy: row.created_by_emp_id || 'System',
       updatedBy: row.updated_by_emp_id || row.created_by_emp_id || 'System'
     })),
@@ -266,9 +262,6 @@ export const getEmployeeById = async (employeeId: number) => {
     date_of_birth: formatDateLocal(user.date_of_birth),
     date_of_joining: formatDateLocal(user.date_of_joining),
     education: education,
-    isProfileUpdated: user.is_profile_updated || false,
-    uanNumber: user.uan_number || '',
-    totalExperience: user.total_experience || 0,
     createdBy: user.created_by_emp_id || 'System',
     updatedBy: user.updated_by_emp_id || user.created_by_emp_id || 'System'
   };
@@ -277,10 +270,14 @@ export const getEmployeeById = async (employeeId: number) => {
 export const createEmployee = async (employeeData: any, requesterRole?: string, requesterId?: number) => {
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
 
-  // Normalize employee ID (trim and uppercase, preserve leading zeros)
-  // Keep employee ID as entered (preserve leading zeros)
+  // Remove leading zeros from empId if it's a numeric ID
   if (employeeData.empId) {
-    employeeData.empId = employeeData.empId.toString().trim().toUpperCase();
+    const empIdStr = employeeData.empId.toString().trim();
+    // If it's purely numeric, convert to integer and back to remove leading zeros
+    if (/^\d+$/.test(empIdStr)) {
+      employeeData.empId = parseInt(empIdStr, 10).toString();
+    }
+    // Otherwise keep the original value (for alphanumeric IDs like "SA 0001")
   }
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}, Requester: ${requesterRole || 'none'}`);
@@ -291,14 +288,28 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     throw new Error('Only Super Admin can create Super Admin users');
   }
 
-  // Mandatory fields check - RELAXED for Add Employee
+  // Mandatory fields check
   const mandatoryFields = [
-    { key: 'empId', label: 'Employee ID' },
+    { key: 'role', label: 'Role' },
     { key: 'firstName', label: 'First Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'email', label: 'Official Email' },
+    { key: 'contactNumber', label: 'Contact Number' },
+    { key: 'altContact', label: 'Alternate Contact Number' },
     { key: 'dateOfBirth', label: 'Date of Birth' },
-    { key: 'role', label: 'Role' }
+    { key: 'gender', label: 'Gender' },
+    { key: 'bloodGroup', label: 'Blood Group' },
+    { key: 'maritalStatus', label: 'Marital Status' },
+    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
+    { key: 'emergencyContactNo', label: 'Emergency Contact Number' },
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department' },
+    { key: 'dateOfJoining', label: 'Date of Joining' },
+    { key: 'aadharNumber', label: 'Aadhar Number' },
+    { key: 'panNumber', label: 'PAN Number' },
+    { key: 'currentAddress', label: 'Current Address' },
+    { key: 'permanentAddress', label: 'Permanent Address' }
   ];
 
   for (const field of mandatoryFields) {
@@ -336,7 +347,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     throw new Error('Reporting Manager is required');
   }
 
-  // Validate phone numbers length and format (ONLY IF PROVIDED)
+  // Validate phone numbers length and format
   const phoneFields = [
     { key: 'contactNumber', label: 'Contact Number' },
     { key: 'altContact', label: 'Alternate Contact Number' },
@@ -345,7 +356,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   for (const field of phoneFields) {
     const val = String(employeeData[field.key] || '').trim();
-    if (val && (val.length !== 10 || !/^\d+$/.test(val))) {
+    if (val.length !== 10 || !/^\d+$/.test(val)) {
       throw new Error(`${field.label} must be exactly 10 digits`);
     }
   }
@@ -356,7 +367,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     { key: 'middleName', label: 'Middle Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' }
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department' }
   ];
 
   for (const field of textFields) {
@@ -376,17 +389,15 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     }
   }
 
-  // Education validation - RELAXED (Optional during creation)
-  /*
+  // Education validation
   if (!employeeData.education || !Array.isArray(employeeData.education)) {
     throw new Error('Education details are required');
   }
 
   const eduLevels = employeeData.education.map((e: any) => e.level);
   if (!eduLevels.includes('UG') || !eduLevels.includes('12th')) {
-     // throw new Error('UG and 12th education details are mandatory');
+    throw new Error('UG and 12th education details are mandatory');
   }
-  */
 
   const birthDate = new Date(employeeData.dateOfBirth);
   const birthYear = birthDate.getFullYear();
@@ -397,19 +408,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
 
     if (isMandatory || hasAnyField) {
-      // If none of the fields are filled, skip validation (making it optional)
-      if (!edu.groupStream && !edu.collegeUniversity && !edu.year && !edu.scorePercentage) {
-        continue;
-      }
-
-      const missingFields = [];
-      if (!edu.groupStream) missingFields.push('Group/Stream');
-      if (!edu.collegeUniversity) missingFields.push('College/University');
-      if (!edu.year) missingFields.push('Graduation Year');
-      if (!edu.scorePercentage) missingFields.push('Score %');
-
-      if (missingFields.length > 0) {
-        throw new Error(`Please fill complete details for ${edu.level} education (missing: ${missingFields.join(', ')})`);
+      if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+        throw new Error(`Please fill complete details for ${edu.level} education`);
       }
 
       // Validate for special characters and emojis
@@ -615,12 +615,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       contact_number, alt_contact, date_of_birth, gender, blood_group,
       marital_status, emergency_contact_name, emergency_contact_no, emergency_contact_relation,
       designation, department, date_of_joining, aadhar_number, pan_number,
-      current_address, permanent_address, reporting_manager_id, status, 
-      is_profile_updated, must_change_password, total_experience, uan_number, personal_email,
-      created_by, updated_by
+      current_address, permanent_address, reporting_manager_id, status, created_by, updated_by
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, 
-      FALSE, TRUE, $26, $27, $30, $28, $29
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
     ) RETURNING id`,
     [
       empId,
@@ -639,17 +636,20 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.emergencyContactName),
       employeeData.emergencyContactNo || null,
       toTitleCase(employeeData.emergencyContactRelation),
-      employeeData.designation,
-      employeeData.department,
+      toTitleCase(employeeData.designation),
+      toTitleCase(employeeData.department),
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
       (() => {
         if (!employeeData.panNumber) return null;
         const pan = String(employeeData.panNumber).trim().toUpperCase();
+        // Validate PAN format: 5 letters, 4 digits, 1 letter
         if (pan.length !== 10) {
-          // Relaxed check if empty? No, checking length if present
-          // For now, allow null if not provided in relaxed mode
-          return pan;
+          throw new Error('PAN number must be exactly 10 characters long');
+        }
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!panRegex.test(pan)) {
+          throw new Error('Invalid PAN format. Format: ABCDE1234F (5 letters, 4 digits, 1 letter)');
         }
         return pan;
       })(),
@@ -657,11 +657,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       toTitleCase(employeeData.permanentAddress),
       reportingManagerId,
       employeeData.status || 'active',
-      employeeData.totalExperience || 0,
-      employeeData.uanNumber || null,
       requesterId || null,
-      requesterId || null,
-      employeeData.personalEmail || null
+      requesterId || null
     ]
   );
 
@@ -710,9 +707,9 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       const prefix = fields[edu.level];
       if (prefix) {
         setClauses.push(`${prefix}_stream = $${eduParamIndex++}`);
-        eduValues.push(edu.groupStream || null);
+        eduValues.push(toTitleCase(edu.groupStream));
         setClauses.push(`${prefix}_college = $${eduParamIndex++}`);
-        eduValues.push(edu.collegeUniversity || null);
+        eduValues.push(toTitleCase(edu.collegeUniversity));
         setClauses.push(`${prefix}_year = $${eduParamIndex++}`);
         eduValues.push(edu.year || null);
         setClauses.push(`${prefix}_percentage = $${eduParamIndex++}`);
@@ -733,7 +730,6 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   // Send welcome email with credentials
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
-    // const loginUrl = 'http://51.15.227.10:3000/login';
     const loginUrl = 'https://intra.tensorgo.com/login';
     const temporaryPassword = finalPassword;
 
@@ -751,14 +747,6 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Error sending new employee credentials email:`, emailError);
   }
 
-
-  // Trigger global project sync to inherit projects from manager
-  try {
-    await ProjectService.syncAllProjectTeams();
-  } catch (syncError) {
-    logger.error(`[EMPLOYEE] [CREATE EMPLOYEE] Global project sync failed:`, syncError);
-  }
-
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee creation completed successfully - User ID: ${userId}, Emp ID: ${empId}`);
   return { employeeId: userId, message: 'Employee created successfully' };
 };
@@ -767,9 +755,13 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] ========== FUNCTION CALLED ==========`);
 
   // Remove leading zeros from empId if it's a numeric ID
-  // Keep employee ID as entered (preserve leading zeros)
   if (employeeData.empId) {
-    employeeData.empId = employeeData.empId.toString().trim().toUpperCase();
+    const empIdStr = employeeData.empId.toString().trim();
+    // If it's purely numeric, convert to integer and back to remove leading zeros
+    if (/^\d+$/.test(empIdStr)) {
+      employeeData.empId = parseInt(empIdStr, 10).toString();
+    }
+    // Otherwise keep the original value (for alphanumeric IDs like "SA 0001")
   }
 
   logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee ID: ${employeeId}, Requester Role: ${requesterRole || 'none'}, Requester ID: ${requesterId || 'none'}`);
@@ -798,7 +790,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     { key: 'middleName', label: 'Middle Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' }
+    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department' }
   ];
 
   for (const field of textFields) {
@@ -815,26 +809,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     const aadhar = String(employeeData.aadharNumber).trim();
     if (aadhar.length !== 12 || !/^\d+$/.test(aadhar)) {
       throw new Error('Aadhar must be exactly 12 digits');
-    }
-  }
-
-  // Validate UAN if updated
-  if (employeeData.uanNumber) {
-    const uan = String(employeeData.uanNumber).trim();
-    if (uan.length !== 12 || !/^\d+$/.test(uan)) {
-      throw new Error('UAN must be exactly 12 digits');
-    }
-  }
-
-  // Validate Total Experience (0.5 increments)
-  if (employeeData.totalExperience !== undefined && employeeData.totalExperience !== null) {
-    const exp = Number(employeeData.totalExperience);
-    if (isNaN(exp) || exp < 0) {
-      throw new Error('Total Experience must be a valid non-negative number');
-    }
-    // Check for 0.5 increments: (exp * 2) should be integer
-    if (!Number.isInteger(exp * 2)) {
-      throw new Error('Total Experience must be in 0.5 increments (e.g., 2.5, 3.0)');
     }
   }
 
@@ -952,13 +926,22 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     if (employeeCheck.rows[0].twelveth_year) educationYears['12th'] = parseInt(employeeCheck.rows[0].twelveth_year, 10);
 
     for (const edu of employeeData.education) {
+      const isMandatory = ['UG', '12th'].includes(edu.level);
       const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
 
-      if (hasAnyField) {
+      if (isMandatory || hasAnyField) {
         if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
           throw new Error(`Please fill complete details for ${edu.level} education`);
         }
 
+        // Validate for special characters and emojis
+        const nameRegex = /^[a-zA-Z0-9\s.,&()-]+$/;
+        if (!nameRegex.test(edu.groupStream)) {
+          throw new Error(`Group/Stream for ${edu.level} contains invalid characters or emojis`);
+        }
+        if (!nameRegex.test(edu.collegeUniversity)) {
+          throw new Error(`College/University for ${edu.level} contains invalid characters or emojis`);
+        }
         if (!/^[0-9]{4}$/.test(edu.year)) {
           throw new Error(`Graduation Year for ${edu.level} must be a valid 4-digit year`);
         }
@@ -980,9 +963,6 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
 
         educationYears[edu.level] = gradYear;
-      } else {
-        // If a level is completely cleared, remove it from year map for gap validations
-        delete educationYears[edu.level];
       }
     }
 
@@ -1127,8 +1107,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation',
     'designation', 'department',
     'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
-    'reporting_manager_id', 'status',
-    'is_profile_updated', 'uan_number', 'total_experience', 'personal_email'
+    'reporting_manager_id', 'status'
   ];
 
   // HR and Super Admin can update role
@@ -1265,11 +1244,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     status: 'status',
     reportingManagerId: 'reporting_manager_id',
     empId: 'emp_id',
-    role: 'user_role',
-    isProfileUpdated: 'is_profile_updated',
-    uanNumber: 'uan_number',
-    totalExperience: 'total_experience',
-    personalEmail: 'personal_email'
+    role: 'user_role'
   };
 
   const processedKeys = new Set();
@@ -1301,7 +1276,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     updates.push(`${dbKey} = $${paramCount}`);
     processedKeys.add(dbKey);
 
-    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'current_address', 'permanent_address'];
+    const textFields = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'emergency_contact_relation', 'designation', 'department', 'current_address', 'permanent_address'];
 
     if (dbKey === 'pan_number' && typeof value === 'string') {
       const pan = value.trim().toUpperCase();
@@ -1377,18 +1352,18 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
           const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
           const previousManagerName = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
 
-          // Send emails in background (non-blocking)
           for (const sub of subordinatesResult.rows) {
-            sendReportingManagerChangeEmail(sub.email, {
-              employeeName: sub.name,
-              previousManagerName,
-              newManagerName: managerName,
-              newManagerEmpId: managerEmpId
-            }).then(() => {
+            try {
+              await sendReportingManagerChangeEmail(sub.email, {
+                employeeName: sub.name,
+                previousManagerName,
+                newManagerName: managerName,
+                newManagerEmpId: managerEmpId
+              });
               logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassignment email sent to subordinate: ${sub.email}`);
-            }).catch(emailError => {
+            } catch (emailError) {
               logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending reassignment email to ${sub.email}:`, emailError);
-            });
+            }
           }
         } catch (importError) {
           logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error importing email templates for reassignment:`, importError);
@@ -1415,73 +1390,57 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       );
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
         const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
-        // Send email in background (non-blocking)
-        sendReportingManagerChangeEmail(empResult.rows[0].email, {
+        await sendReportingManagerChangeEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           previousManagerName: employeeCheck.rows[0].reporting_manager_name || 'N/A',
           newManagerName: empResult.rows[0].reporting_manager_name || 'New Manager',
           newManagerEmpId: empResult.rows[0].manager_emp_id || ''
-        }).then(() => {
-          logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
-        }).catch(e => {
-          logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending manual manager change notification:`, e);
         });
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
-
     } catch (e) {
-      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error fetching employee data for manager change notification:`, e);
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending manual manager change notification:`, e);
     }
   }
 
   // Item 15: Role changed notification
   if (isRoleChanged) {
     try {
-      const [empResult, requesterResult] = await Promise.all([
-        pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]),
-        pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId])
-      ]);
+      const empResult = await pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]);
+      const requesterResult = await pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId]);
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
         const { sendRoleChangeEmail } = await import('../utils/emailTemplates');
-        // Send email in background (non-blocking)
-        sendRoleChangeEmail(empResult.rows[0].email, {
+        await sendRoleChangeEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newRole,
           updatedBy: requesterName
-        }).catch(e => {
-          logger.error('Error sending role change notification:', e);
         });
       }
     } catch (e) {
-      logger.error('Error fetching employee data for role change notification:', e);
+      logger.error('Error sending role change notification:', e);
     }
   }
 
   // Item 16: Status changed notification
   if (isStatusChanged) {
     try {
-      const [empResult, requesterResult] = await Promise.all([
-        pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]),
-        pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId])
-      ]);
+      const empResult = await pool.query('SELECT email, first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [employeeId]);
+      const requesterResult = await pool.query('SELECT first_name || \' \' || COALESCE(last_name, \'\') as name FROM users WHERE id = $1', [requesterId]);
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
         const { sendStatusChangeEmail } = await import('../utils/emailTemplates');
-        // Send email in background (non-blocking)
-        sendStatusChangeEmail(empResult.rows[0].email, {
+        await sendStatusChangeEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newStatus,
           updatedBy: requesterName
-        }).catch(e => {
-          logger.error('Error sending status change notification:', e);
         });
       }
     } catch (e) {
-      logger.error('Error fetching employee data for status change notification:', e);
+      logger.error('Error sending status change notification:', e);
     }
-
   }
 
   // If joining date was updated, recalculate leave balances (skip for super_admin)
@@ -1554,9 +1513,9 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     for (const [level, prefix] of Object.entries(fields)) {
       const edu = educationMap[level];
       eduUpdates.push(`${prefix}_stream = $${eduParamIndex++}`);
-      eduValues.push(edu?.groupStream || null);
+      eduValues.push(toTitleCase(edu?.groupStream));
       eduUpdates.push(`${prefix}_college = $${eduParamIndex++}`);
-      eduValues.push(edu?.collegeUniversity || null);
+      eduValues.push(toTitleCase(edu?.collegeUniversity));
       eduUpdates.push(`${prefix}_year = $${eduParamIndex++}`);
       eduValues.push(edu?.year || null);
       eduUpdates.push(`${prefix}_percentage = $${eduParamIndex++}`);
@@ -1590,29 +1549,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       if (employeeResult.rows.length > 0 && employeeResult.rows[0].email) {
         const requesterName = requesterResult.rows.length > 0 ? requesterResult.rows[0].name : (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
-        // Send email in background (non-blocking)
-        emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
+        await emailTemplates.sendEmployeeDetailsUpdateEmail(employeeResult.rows[0].email, {
           employeeName: employeeResult.rows[0].employee_name || 'Employee',
           employeeEmpId: employeeResult.rows[0].emp_id || '',
           updatedBy: requesterName
-        }).then(() => {
-          logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
-        }).catch((emailError: any) => {
-          // Log error but don't fail employee update
-          logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending employee details update email:`, emailError);
         });
+        logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Employee details update email sent successfully to: ${employeeResult.rows[0].email}`);
       }
-    } catch (e: any) {
-      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error fetching employee data for email notification:`, e);
-    }
-  }
-
-  // Trigger global project sync for hierarchy changes
-  if (isManagerChanged || isStatusChanged || isRoleChanged) {
-    try {
-      await ProjectService.syncAllProjectTeams();
-    } catch (syncError) {
-      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Global project sync failed:`, syncError);
+    } catch (emailError: any) {
+      // Log error but don't fail employee update
+      logger.error(`[EMPLOYEE] [UPDATE EMPLOYEE] Error sending employee details update email:`, emailError);
     }
   }
 
@@ -1620,7 +1566,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   return { message: 'Employee updated successfully' };
 };
 
-export const deleteEmployee = async (employeeId: number, requesterId: number) => {
+export const deleteEmployee = async (employeeId: number) => {
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] ========== FUNCTION CALLED ==========`);
   logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${employeeId}`);
 
@@ -1670,48 +1616,14 @@ export const deleteEmployee = async (employeeId: number, requesterId: number) =>
     // 3. Delete leave balances
     await client.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
 
-    // 4. Delete project entries (Timesheet)
-    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting project entries`);
-    await client.query('DELETE FROM project_entries WHERE user_id = $1', [employeeId]);
-
-    // 5. Update reporting_manager_id in users table to NULL for employees reporting to this user
+    // 4. Update reporting_manager_id in users table to NULL for employees reporting to this user
     await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
 
-    // 6. Reassign projects where this user was the manager
-    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Reassigning project manager roles`);
-    await client.query('UPDATE projects SET project_manager_id = NULL WHERE project_manager_id = $1', [employeeId]);
+    // 6. Update created_by and updated_by references to NULL
+    await client.query('UPDATE users SET created_by = NULL WHERE created_by = $1', [employeeId]);
+    await client.query('UPDATE users SET updated_by = NULL WHERE updated_by = $1', [employeeId]);
 
-    // 7. Reassign audit references to a system user (first super admin) instead of NULL
-    // This is required because of the NOT NULL constraints added to audit columns in migration 024
-    const saResult = await client.query('SELECT id FROM users WHERE user_role = \'super_admin\' ORDER BY id ASC LIMIT 1');
-    const saId = saResult.rows[0]?.id || 1;
-
-    const auditTables = [
-      'activity_access', 'module_access', 'project_members', 'task_access', 'project_activities',
-      'project_modules', 'project_tasks', 'projects', 'holidays', 'leave_balances',
-      'leave_days', 'leave_policy_configurations', 'leave_requests', 'leave_rules',
-      'leave_types', 'password_reset_otps', 'policies', 'project_entries', 'users'
-    ];
-
-    for (const table of auditTables) {
-      await client.query(`UPDATE ${table} SET created_by = $1 WHERE created_by = $2`, [saId, employeeId]);
-      await client.query(`UPDATE ${table} SET updated_by = $1 WHERE updated_by = $2`, [saId, employeeId]);
-    }
-
-    // 8. Reassign specific business logic references
-    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Reassigning approval and grant references`);
-
-    // Reassign leave request approvals
-    await client.query('UPDATE leave_requests SET manager_approved_by = $1 WHERE manager_approved_by = $2', [saId, employeeId]);
-    await client.query('UPDATE leave_requests SET hr_approved_by = $1 WHERE hr_approved_by = $2', [saId, employeeId]);
-    await client.query('UPDATE leave_requests SET super_admin_approved_by = $1 WHERE super_admin_approved_by = $2', [saId, employeeId]);
-
-    // Reassign project-related grants
-    await client.query('UPDATE activity_access SET granted_by = $1 WHERE granted_by = $2', [saId, employeeId]);
-    await client.query('UPDATE module_access SET granted_by = $1 WHERE granted_by = $2', [saId, employeeId]);
-    await client.query('UPDATE task_access SET granted_by = $1 WHERE granted_by = $2', [saId, employeeId]);
-
-    // 9. Finally, delete the user
+    // 7. Finally, delete the user
     logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting user record`);
     await client.query('DELETE FROM users WHERE id = $1', [employeeId]);
 
