@@ -294,22 +294,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     { key: 'firstName', label: 'First Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'email', label: 'Official Email' },
-    { key: 'contactNumber', label: 'Contact Number' },
-    { key: 'altContact', label: 'Alternate Contact Number' },
     { key: 'dateOfBirth', label: 'Date of Birth' },
-    { key: 'gender', label: 'Gender' },
-    { key: 'bloodGroup', label: 'Blood Group' },
-    { key: 'maritalStatus', label: 'Marital Status' },
-    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactNo', label: 'Emergency Contact Number' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
-    { key: 'designation', label: 'Designation' },
-    { key: 'department', label: 'Department' },
-    { key: 'dateOfJoining', label: 'Date of Joining' },
-    { key: 'aadharNumber', label: 'Aadhar Number' },
-    { key: 'panNumber', label: 'PAN Number' },
-    { key: 'currentAddress', label: 'Current Address' },
-    { key: 'permanentAddress', label: 'Permanent Address' }
+    { key: 'dateOfJoining', label: 'Date of Joining' }
   ];
 
   for (const field of mandatoryFields) {
@@ -355,9 +341,12 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   ];
 
   for (const field of phoneFields) {
-    const val = String(employeeData[field.key] || '').trim();
-    if (val.length !== 10 || !/^\d+$/.test(val)) {
-      throw new Error(`${field.label} must be exactly 10 digits`);
+    const rawVal = employeeData[field.key];
+    if (rawVal !== undefined && rawVal !== null && (typeof rawVal !== 'string' || rawVal.trim() !== '')) {
+      const val = String(rawVal).trim();
+      if (val.length !== 10 || !/^\d+$/.test(val)) {
+        throw new Error(`${field.label} must be exactly 10 digits`);
+      }
     }
   }
 
@@ -389,7 +378,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     }
   }
 
-  // Education validation
+  // Education validation - making mandatory check optional based on user feedback
+  /*
   if (!employeeData.education || !Array.isArray(employeeData.education)) {
     throw new Error('Education details are required');
   }
@@ -398,17 +388,24 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   if (!eduLevels.includes('UG') || !eduLevels.includes('12th')) {
     throw new Error('UG and 12th education details are mandatory');
   }
+  */
 
-  const birthDate = new Date(employeeData.dateOfBirth);
-  const birthYear = birthDate.getFullYear();
+  const education = employeeData.education || [];
+  const birthDate = employeeData.dateOfBirth ? new Date(employeeData.dateOfBirth) : null;
+  const birthYear = birthDate ? birthDate.getFullYear() : null;
 
   const educationYears: Record<string, number> = {};
-  for (const edu of employeeData.education) {
-    const isMandatory = ['UG', '12th'].includes(edu.level);
-    const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
+  for (const edu of education) {
+    const hasAnyField = (edu.groupStream && edu.groupStream.trim() !== '') ||
+      (edu.collegeUniversity && edu.collegeUniversity.trim() !== '') ||
+      (edu.year && edu.year.toString().trim() !== '') ||
+      (edu.scorePercentage && edu.scorePercentage.toString().trim() !== '');
 
-    if (isMandatory || hasAnyField) {
-      if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+    if (hasAnyField) {
+      if (!edu.groupStream || !edu.groupStream.trim() ||
+        !edu.collegeUniversity || !edu.collegeUniversity.trim() ||
+        !edu.year || !edu.year.toString().trim() ||
+        !edu.scorePercentage || !edu.scorePercentage.toString().trim()) {
         throw new Error(`Please fill complete details for ${edu.level} education`);
       }
 
@@ -633,11 +630,11 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       employeeData.gender || null,
       employeeData.bloodGroup || null,
       employeeData.maritalStatus || null,
-      toTitleCase(employeeData.emergencyContactName),
+      toTitleCase(employeeData.emergencyContactName) || null,
       employeeData.emergencyContactNo || null,
-      toTitleCase(employeeData.emergencyContactRelation),
-      toTitleCase(employeeData.designation),
-      toTitleCase(employeeData.department),
+      toTitleCase(employeeData.emergencyContactRelation) || null,
+      toTitleCase(employeeData.designation) || null,
+      toTitleCase(employeeData.department) || null,
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
       (() => {
@@ -653,8 +650,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
         }
         return pan;
       })(),
-      toTitleCase(employeeData.currentAddress),
-      toTitleCase(employeeData.permanentAddress),
+      toTitleCase(employeeData.currentAddress) || null,
+      toTitleCase(employeeData.permanentAddress) || null,
       reportingManagerId,
       employeeData.status || 'active',
       requesterId || null,
