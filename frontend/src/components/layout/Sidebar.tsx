@@ -112,13 +112,13 @@ const Sidebar: React.FC = memo(() => {
     <div className="sidebar">
       <div className="sidebar-nav">
         {availableRoutes.map((route) => (
-          <div
-            key={route.path}
-            className={`nav-item ${location.pathname === route.path || (route.path === '/project-management' && location.pathname.startsWith('/project-management/')) ? 'active' : ''}`}
-            onClick={() => navigate(route.path)}
-            title={route.label}
-          >
-            <span className="nav-icon">{route.icon}</span>
+          <div className="nav-item-wrapper" key={route.path} data-tooltip={route.label}>
+            <div
+              className={`nav-item ${location.pathname === route.path || (route.path === '/project-management' && location.pathname.startsWith('/project-management/')) ? 'active' : ''}`}
+              onClick={() => navigate(route.path)}
+            >
+              <span className="nav-icon">{route.icon}</span>
+            </div>
           </div>
         ))}
       </div>
