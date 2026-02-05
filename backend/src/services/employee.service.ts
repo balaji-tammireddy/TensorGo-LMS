@@ -1670,10 +1670,18 @@ export const deleteEmployee = async (employeeId: number, requesterId: number) =>
     // 3. Delete leave balances
     await client.query('DELETE FROM leave_balances WHERE employee_id = $1', [employeeId]);
 
-    // 4. Update reporting_manager_id in users table to NULL for employees reporting to this user
+    // 4. Delete project entries (Timesheet)
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting project entries`);
+    await client.query('DELETE FROM project_entries WHERE user_id = $1', [employeeId]);
+
+    // 5. Update reporting_manager_id in users table to NULL for employees reporting to this user
     await client.query('UPDATE users SET reporting_manager_id = NULL WHERE reporting_manager_id = $1', [employeeId]);
 
-    // 5. Reassign audit references to a system user (first super admin) instead of NULL
+    // 6. Reassign projects where this user was the manager
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Reassigning project manager roles`);
+    await client.query('UPDATE projects SET project_manager_id = NULL WHERE project_manager_id = $1', [employeeId]);
+
+    // 7. Reassign audit references to a system user (first super admin) instead of NULL
     // This is required because of the NOT NULL constraints added to audit columns in migration 024
     const saResult = await client.query('SELECT id FROM users WHERE user_role = \'super_admin\' ORDER BY id ASC LIMIT 1');
     const saId = saResult.rows[0]?.id || 1;
@@ -1690,7 +1698,20 @@ export const deleteEmployee = async (employeeId: number, requesterId: number) =>
       await client.query(`UPDATE ${table} SET updated_by = $1 WHERE updated_by = $2`, [saId, employeeId]);
     }
 
-    // 7. Finally, delete the user
+    // 8. Reassign specific business logic references
+    logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Reassigning approval and grant references`);
+
+    // Reassign leave request approvals
+    await client.query('UPDATE leave_requests SET manager_approved_by = $1 WHERE manager_approved_by = $2', [saId, employeeId]);
+    await client.query('UPDATE leave_requests SET hr_approved_by = $1 WHERE hr_approved_by = $2', [saId, employeeId]);
+    await client.query('UPDATE leave_requests SET super_admin_approved_by = $1 WHERE super_admin_approved_by = $2', [saId, employeeId]);
+
+    // Reassign project-related grants
+    await client.query('UPDATE activity_access SET granted_by = $1 WHERE granted_by = $2', [saId, employeeId]);
+    await client.query('UPDATE module_access SET granted_by = $1 WHERE granted_by = $2', [saId, employeeId]);
+    await client.query('UPDATE task_access SET granted_by = $1 WHERE granted_by = $2', [saId, employeeId]);
+
+    // 9. Finally, delete the user
     logger.info(`[EMPLOYEE] [DELETE EMPLOYEE] Deleting user record`);
     await client.query('DELETE FROM users WHERE id = $1', [employeeId]);
 
