@@ -28,7 +28,7 @@ const ProjectListSection = ({
     projects: Project[],
     emptyMsg: string,
     isOpen: boolean,
-    onToggle: () => void,
+    onToggle?: () => void,
     navigate: (path: string) => void,
     user: any,
     getStatusClass: (status: string) => string,
@@ -50,12 +50,12 @@ const ProjectListSection = ({
     return (
         <div className={`section-container ${isOpen ? 'open' : ''}`}>
             <div
-                className="section-header-row clickable"
+                className={`section-header-row ${onToggle ? 'clickable' : ''}`}
                 onClick={onToggle}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
+                style={{ cursor: onToggle ? 'pointer' : 'default', userSelect: 'none' }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    {onToggle && (isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />)}
                     <h2 className="section-title" style={{ margin: 0 }}>{title}</h2>
                 </div>
                 {isOpen && projects.length > 0 && (
@@ -142,7 +142,7 @@ export const ProjectDashboard: React.FC = () => {
     );
     // Helper to check if user can create (Admin/HR/Manager)
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
-    const isGlobalAdmin = ['super_admin', 'hr'].includes(user?.role || '');
+    const isGlobalAdmin = user?.role === 'super_admin';
 
     const getStatusClass = (status: string) => {
         if (status === 'active') return 'status-active';
@@ -197,7 +197,7 @@ export const ProjectDashboard: React.FC = () => {
                 {!isLoading && (
                     <div className="dashboard-content">
                         {/* 1. SECTION: My Projects */}
-                        <div className={`dashboard-section ${openSection !== 'my-projects' ? 'collapsed' : ''}`}>
+                        <div className={`dashboard-section ${(!isGlobalAdmin || openSection === 'my-projects') ? 'open' : 'collapsed'}`}>
                             {(() => {
                                 const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
                                 const myProjectsList = (projects || []).filter((p: Project) =>
@@ -209,8 +209,8 @@ export const ProjectDashboard: React.FC = () => {
                                         title="My Projects"
                                         projects={myProjectsList}
                                         emptyMsg="No projects found in this section."
-                                        isOpen={openSection === 'my-projects'}
-                                        onToggle={() => handleToggleSection('my-projects')}
+                                        isOpen={!isGlobalAdmin || openSection === 'my-projects'}
+                                        onToggle={isGlobalAdmin ? () => handleToggleSection('my-projects') : undefined}
                                         navigate={navigate}
                                         user={user}
                                         getStatusClass={getStatusClass}
@@ -221,9 +221,9 @@ export const ProjectDashboard: React.FC = () => {
                         </div>
 
                         {/* 2. SECTION: All Projects */}
-                        <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
-                            {isGlobalAdmin ? (
-                                (() => {
+                        {isGlobalAdmin && (
+                            <div className={`dashboard-section ${openSection !== 'all-projects' ? 'collapsed' : ''}`}>
+                                {(() => {
                                     const allOtherProjects = projects || [];
                                     return (
                                         <ProjectListSection
@@ -238,32 +238,9 @@ export const ProjectDashboard: React.FC = () => {
                                             setDeleteConfirm={setDeleteConfirm}
                                         />
                                     );
-                                })()
-                            ) : (
-                                <div className="section-container">
-                                    <div
-                                        className="section-header-row clickable"
-                                        onClick={() => handleToggleSection('all-projects')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            {openSection === 'all-projects' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                                            <h2 className="section-title" style={{ margin: 0 }}>All Projects</h2>
-                                        </div>
-                                    </div>
-
-                                    {openSection === 'all-projects' && (
-                                        <EmptyState
-                                            title="Access Restricted"
-                                            description="You are not authorized to view all projects."
-                                            icon={AlertCircle}
-                                            size="small"
-                                            className="dashboard-empty-state"
-                                        />
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                })()}
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -43,12 +43,12 @@ export const TimesheetPage: React.FC = () => {
 
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
         const monday = new Date(date);
         monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 5); // Monday to Saturday
+        return { start: monday, end: saturday };
     };
 
     // Date State
@@ -169,7 +169,7 @@ export const TimesheetPage: React.FC = () => {
     const weekDays = useMemo(() => {
         const days = [];
         const { start } = weekRange;
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 6; i++) { // Only 6 days: Mon - Sat
             const d = new Date(start);
             d.setDate(start.getDate() + i);
             days.push(d);
@@ -250,6 +250,13 @@ export const TimesheetPage: React.FC = () => {
         const today = formatDate(new Date());
         if (selectedDate > today) {
             showError("Cannot log time for future dates");
+            return;
+        }
+
+        // Block Sunday entries
+        const dateObj = new Date(selectedDate);
+        if (dateObj.getDay() === 0) {
+            showError("Sunday is a non-working day. Entries cannot be logged.");
             return;
         }
 
@@ -369,10 +376,39 @@ export const TimesheetPage: React.FC = () => {
         return entries.filter(e => {
             // Normalize log_date (which might be ISO string) to local YYYY-MM-DD
             const eDate = new Date(e.log_date);
-            return formatDate(eDate) === dateStr;
+            const local = new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate());
+            const compare = formatDate(local);
+            return compare === dateStr;
         });
     };
 
+    // Check if date is blocked for logging (holidays or approved full-day leaves)
+    const isDateBlocked = (dateStr: string): { blocked: boolean; reason: string } => {
+        const dayEntries = getEntriesForDay(dateStr);
+
+        // Check for holidays (System + Holiday module)
+        const holiday = dayEntries.find(e =>
+            e.project_name?.includes('System') &&
+            e.module_name === 'Holiday'
+        );
+
+        if (holiday) {
+            return { blocked: true, reason: `Holiday - ${holiday.description || 'Day Off'}` };
+        }
+
+        // Check for approved full-day leaves (System + Leave module with 8+ hours)
+        const fullDayLeave = dayEntries.find(e =>
+            e.project_name?.includes('System') &&
+            e.module_name === 'Leave' &&
+            e.duration >= 8 // Full day = 8 hours
+        );
+
+        if (fullDayLeave) {
+            return { blocked: true, reason: `Full-Day Leave` };
+        }
+
+        return { blocked: false, reason: '' };
+    };
 
 
     // Validation for Form Completion
@@ -505,7 +541,11 @@ export const TimesheetPage: React.FC = () => {
                                 </div>
                                 {!isWeekEditable && !editingId && <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Locked</span>}
                             </div>
-                            <fieldset disabled={(!isWeekEditable && !editingId) || (isWeekLocked && !editingId)} style={{ border: 'none', padding: 0, margin: 0 }}>
+                            <fieldset disabled={
+                                (!isWeekEditable && !editingId) ||
+                                (isWeekLocked && !editingId) ||
+                                isDateBlocked(selectedDate).blocked // Always disable for blocked dates, even when editing
+                            } style={{ border: 'none', padding: 0, margin: 0 }}>
                                 {isWeekLocked && !editingId && (
                                     <div className="ts-form-locked-banner" style={{
                                         fontSize: '12px',
@@ -523,6 +563,26 @@ export const TimesheetPage: React.FC = () => {
                                         This week's timesheet is already submitted or approved.
                                     </div>
                                 )}
+                                {(() => {
+                                    const blockInfo = isDateBlocked(selectedDate);
+                                    return blockInfo.blocked && !editingId && (
+                                        <div className="ts-form-locked-banner" style={{
+                                            fontSize: '12px',
+                                            color: '#b91c1c',
+                                            backgroundColor: '#fee2e2',
+                                            padding: '8px 12px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #fecaca',
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            <Lock size={14} />
+                                            Cannot log time - {blockInfo.reason}
+                                        </div>
+                                    );
+                                })()}
                                 <form onSubmit={handleSubmit}>
                                     {/* Date */}
                                     <div className="ts-form-group">
@@ -530,6 +590,7 @@ export const TimesheetPage: React.FC = () => {
                                         <DatePicker
                                             value={selectedDate}
                                             onChange={setSelectedDate}
+                                            disabledDates={(date) => date.getDay() === 0}
                                             min={(() => {
                                                 // Calculate previous week Monday
                                                 const today = new Date();
@@ -844,7 +905,7 @@ export const TimesheetPage: React.FC = () => {
                         {/* Week Days Navigation */}
                         <div className="week-days-nav" style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(7, 1fr)',
+                            gridTemplateColumns: 'repeat(6, 1fr)', // Updated to 6 columns
                             gap: '8px',
                             marginBottom: '20px',
                             padding: '10px 0'
@@ -883,12 +944,20 @@ export const TimesheetPage: React.FC = () => {
 
                                         {/* Status Dots */}
                                         <div style={{ display: 'flex', gap: '2px', marginTop: '4px' }}>
-                                            {isToday && (
-                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
-                                            )}
-                                            {dayLogCount > 0 && (
-                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
-                                            )}
+                                            {(() => {
+                                                const blockInfo = isDateBlocked(dStr);
+                                                if (blockInfo.blocked) {
+                                                    return <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#ef4444' }} title={blockInfo.reason} />;
+                                                }
+                                                return <>
+                                                    {isToday && (
+                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
+                                                    )}
+                                                    {dayLogCount > 0 && (
+                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
+                                                    )}
+                                                </>;
+                                            })()}
                                         </div>
                                     </button>
                                 );
@@ -951,9 +1020,11 @@ export const TimesheetPage: React.FC = () => {
                                                                     <h4 className="holiday-name" style={{ fontSize: '14px', margin: '4px 0' }}>{entry.description}</h4>
                                                                 )}
 
-                                                                <div className="description-text">
-                                                                    {formattedDesc || 'No description provided.'}
-                                                                </div>
+                                                                {!entry.project_name?.includes('System') && (
+                                                                    <div className="description-text">
+                                                                        {formattedDesc || 'No description provided.'}
+                                                                    </div>
+                                                                )}
 
                                                                 {entry.log_status === 'rejected' && entry.rejection_reason && (
                                                                     <div style={{ marginTop: '8px', padding: '8px', background: '#fee2e2', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '13px', color: '#b91c1c' }}>

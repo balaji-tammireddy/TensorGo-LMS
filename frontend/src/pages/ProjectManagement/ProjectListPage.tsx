@@ -53,19 +53,17 @@ export const ProjectListPage: React.FC = () => {
     const getFilteredProjects = () => {
         if (!projects) return [];
         const isPMView = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
-        const isGlobalAdmin = ['super_admin', 'hr'].includes(user?.role || '');
+        const isGlobalAdmin = user?.role === 'super_admin';
 
         if (filterType === 'my-projects') {
             return projects.filter((p: Project) => isPMView ? (p.is_pm || p.is_member) : p.is_member);
         } else {
             // "All Projects" logic
-            // For Global Admin (Super Admin/HR), show everything
+            // ONLY Super Admin can see "All Projects"
             if (isGlobalAdmin) return projects;
-            // For others, show projects they are member of but NOT the PM (matching "All Projects" intent)
-            // Actually, for regular users, "All Projects" usually means "Projects in organization" 
-            // but they can only see what they are assigned to.
-            // Let's stick to the definition: Organization-wide for admins, member-but-not-pm for others.
-            return projects.filter((p: Project) => p.is_member && !p.is_pm);
+
+            // For all other roles, "All Projects" filter returns nothing as it's restricted
+            return [];
         }
     };
 

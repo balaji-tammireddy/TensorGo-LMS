@@ -810,7 +810,7 @@ export class ProjectService {
   // --- 4. Getters with Access Control ---
 
   static async getProject(projectId: number, userId: number, role: string) {
-    const isGlobalViewer = role === 'super_admin' || role === 'hr';
+    const isGlobalViewer = role === 'super_admin';
 
     let queryStr = `
       SELECT p.*, 
@@ -844,7 +844,7 @@ export class ProjectService {
 
   static async getProjectsForUser(userId: number, role: string) {
     // Global Viewers
-    if (role === 'super_admin' || role === 'hr') {
+    if (role === 'super_admin') {
       return query(
         `SELECT p.*, 
                 COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
@@ -899,7 +899,7 @@ export class ProjectService {
     // 1. Check if user is PM of this specific project
     const projectCheck = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);
     const isPM = projectCheck.rows[0]?.project_manager_id === userId;
-    const isGlobal = role === 'super_admin' || role === 'hr';
+    const isGlobal = role === 'super_admin';
 
     if (isPM || isGlobal) {
       return query(`
@@ -969,7 +969,7 @@ export class ProjectService {
       WHERE m.id = $1`, [moduleId]);
     if (moduleRes.rows.length === 0) return { rows: [] };
     const isPM = moduleRes.rows[0].project_manager_id === userId;
-    const isGlobal = role === 'super_admin' || role === 'hr';
+    const isGlobal = role === 'super_admin';
 
     if (isPM || isGlobal) {
       return query(
@@ -1047,7 +1047,7 @@ export class ProjectService {
       WHERE t.id = $1`, [taskId]);
     if (taskRes.rows.length === 0) return { rows: [] };
     const isPM = taskRes.rows[0].project_manager_id === userId;
-    const isGlobal = role === 'super_admin' || role === 'hr';
+    const isGlobal = role === 'super_admin';
 
     if (isPM || isGlobal) {
       return query(`
@@ -1422,7 +1422,7 @@ export class ProjectService {
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
     // Super Admin and HR can manage any project
-    if (role === 'super_admin' || role === 'hr') return true;
+    if (role === 'super_admin') return true;
 
     // Project Manager can manage their own project
     const res = await query(`SELECT project_manager_id FROM projects WHERE id = $1`, [projectId]);

@@ -170,10 +170,16 @@ export const createHoliday = async (holidayDate: string, holidayName: string, re
 
     logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${result.rows[0].id}`);
 
-    // Hook: Log Holiday Immediately
-    TimesheetService.logHolidayForEveryone(holidayDate, trimmedName).catch(e => {
+    // Hook: Log Holiday Immediately - WAIT for completion
+    // This ensures DB entries are created BEFORE responding to client
+    // so the frontend sees holiday logs immediately without needing to reload
+    try {
+      await TimesheetService.logHolidayForEveryone(holidayDate, trimmedName);
+      logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday logs created successfully for all users`);
+    } catch (e) {
       logger.error(`[LEAVE] Failed to log holiday to timesheets`, e);
-    });
+      // Don't fail the holiday creation if timesheet logging fails
+    }
 
     return {
       id: result.rows[0].id,

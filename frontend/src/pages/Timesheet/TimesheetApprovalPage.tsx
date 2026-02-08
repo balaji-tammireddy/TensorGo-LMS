@@ -61,19 +61,19 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
         const monday = new Date(date);
         monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 5); // Monday to Saturday
+        return { start: monday, end: saturday };
     };
 
     const weekRange = useMemo(() => getWeekRange(currentDate), [currentDate]);
     const weekDays = useMemo(() => {
         const days = [];
         const { start } = weekRange;
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 6; i++) { // Only 6 days: Mon - Sat
             const d = new Date(start);
             d.setDate(start.getDate() + i);
             days.push(d);
@@ -523,7 +523,7 @@ export const TimesheetApprovalPage: React.FC = () => {
                                 {/* Week Days Navigation */}
                                 <div className="week-days-nav" style={{
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(7, 1fr)',
+                                    gridTemplateColumns: 'repeat(6, 1fr)',
                                     gap: '8px',
                                     marginBottom: '20px',
                                     padding: '10px 0'
@@ -592,36 +592,43 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                 {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
 
                                                                 {/* Day Actions */}
-                                                                {isReportingManager && dayEntries.length > 0 && (
-                                                                    <div className="day-actions" style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
-                                                                        {/* Only show Approve/Reject if there are pending entries and NOT only system entries */}
-                                                                        {dayEntries.some(e => e.log_status !== 'approved' && !e.project_name?.includes('System')) && (
-                                                                            <>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
-                                                                                    title="Approve Day"
-                                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#10b981', padding: '4px' }}
-                                                                                >
-                                                                                    <CheckCircle size={20} />
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
-                                                                                    title="Reject Day"
-                                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
-                                                                                >
-                                                                                    <XCircle size={20} />
-                                                                                </button>
-                                                                            </>
-                                                                        )}
+                                                                {isReportingManager && dayEntries.length > 0 && (() => {
+                                                                    // Check if there are any non-system entries that need approval
+                                                                    const nonSystemEntries = dayEntries.filter(e => !e.project_name?.includes('System'));
+                                                                    const hasPendingNonSystem = nonSystemEntries.some(e => e.log_status !== 'approved');
+                                                                    const allApproved = dayEntries.every(e => e.log_status === 'approved');
 
-                                                                        {/* Show Green Tick if all Approved or System */}
-                                                                        {dayEntries.every(e => e.log_status === 'approved' || e.project_name?.includes('System')) && (
-                                                                            <CheckCircle size={20} color="#10b981" fill="#ecfdf5" />
-                                                                        )}
-                                                                    </div>
-                                                                )}
+                                                                    return (
+                                                                        <div className="day-actions" style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
+                                                                            {/* Only show Approve/Reject if there are pending non-system entries */}
+                                                                            {hasPendingNonSystem && (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
+                                                                                        title="Approve Day"
+                                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#10b981', padding: '4px' }}
+                                                                                    >
+                                                                                        <CheckCircle size={20} />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
+                                                                                        title="Reject Day"
+                                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                                                                                    >
+                                                                                        <XCircle size={20} />
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+
+                                                                            {/* Show Green Tick if all entries approved */}
+                                                                            {allApproved && (
+                                                                                <CheckCircle size={20} color="#10b981" fill="#ecfdf5" />
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </span>
                                                         </div>
                                                         <span className="day-total">{dayTotal.toFixed(2)} Hrs</span>
@@ -649,13 +656,20 @@ export const TimesheetApprovalPage: React.FC = () => {
                                                                         </div>
                                                                         <span className="duration-label">{Number(entry.duration).toFixed(2)}h</span>
                                                                     </div>
-                                                                    <div className="description-text">{entry.description}</div>
+                                                                    {entry.project_name?.includes('System') && entry.description && (
+                                                                        <h4 className="holiday-name" style={{ fontSize: '14px', margin: '4px 0', color: '#ef4444' }}>{entry.description}</h4>
+                                                                    )}
+
+                                                                    {!entry.project_name?.includes('System') && (
+                                                                        <div className="description-text">{entry.description}</div>
+                                                                    )}
                                                                     {entry.rejection_reason && (
                                                                         <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '4px' }}>
                                                                             <strong>Rejection Reason:</strong> {entry.rejection_reason}
                                                                         </div>
                                                                     )}
                                                                     <div className="entry-footer">
+                                                                        <span className={`status-pill pill-progress`}>{entry.work_status?.replace('_', ' ')}</span>
                                                                         <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
                                                                         {entry.is_late && <span className="status-pill warn" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7' }}>Late</span>}
                                                                         {entry.is_resubmission && <span className="status-pill info" style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>Resubmission</span>}

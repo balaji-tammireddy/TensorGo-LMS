@@ -128,39 +128,11 @@ export class TimesheetService {
             if (hasApproved) weekStatus = 'approved';
             else if (hasSubmitted) weekStatus = 'submitted';
 
-            // 2. Fetch Holidays in Range
-            const holidayRes = await client.query(`
-                SELECT id, holiday_name, holiday_date 
-                FROM holidays 
-                WHERE holiday_date BETWEEN $1 AND $2
-            `, [startDateStr, endDateStr]);
 
-            for (const holiday of holidayRes.rows) {
-                const hDate = TimesheetService.formatDate(holiday.holiday_date);
+            // 2. Holidays are now ALWAYS logged to DB via logHolidayForEveryone
+            // No need to inject virtual holiday entries - DB entries will be fetched in step 1
+            // This prevents timing issues where virtual entries showed before DB entries were created
 
-                // CHECK DUPLICATE: If we already have a 'Holiday' entry (DB) or 'System' entry for this date, SKIP Virtual
-                const exists = entries.some(e => e.log_date === hDate && (e.module_name === 'Holiday' || e.is_system));
-                if (exists) continue;
-
-                // Add System Entry for Holiday using negative ID to avoid collision
-                entries.push({
-                    id: -1 * holiday.id, // Mock ID
-                    user_id: userId,
-                    project_id: 0,
-                    project_name: 'System',
-                    module_name: 'Holiday',
-                    task_name: holiday.holiday_name,
-                    activity_name: 'N/A',
-                    log_date: hDate,
-                    duration: 8, // 8 hours for holiday
-                    description: `Holiday: ${holiday.holiday_name}`,
-                    work_status: 'completed',
-                    log_status: (weekStatus === 'draft') ? 'draft' : 'approved', // Auto-approve if week submitted
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    is_system: true // Lock UI
-                });
-            }
 
             // 3. Fetch Approved Leaves in Range
             const leaveRes = await client.query(`
@@ -213,7 +185,7 @@ export class TimesheetService {
                             activity_name: 'N/A',
                             log_date: dateStr,
                             duration: duration,
-                            description: `Leave: ${leave.reason || 'Approved Leave'}`,
+                            description: leave.reason || 'Approved Leave',
                             work_status: 'completed',
                             log_status: (weekStatus === 'draft') ? 'draft' : 'approved',
                             created_at: new Date().toISOString(),
@@ -323,9 +295,25 @@ export class TimesheetService {
                 const endStr = TimesheetService.formatDate(leave.end_date);
 
                 let isFullDay = true;
-                if (logDateStr === startStr && leave.start_type === 'half') isFullDay = false;
-                if (logDateStr === endStr && leave.end_type === 'half') isFullDay = false;
 
+                // Debug: Log the leave data
+                logger.info(`[Timesheet] Checking leave for ${logDateStr}: start=${startStr}, end=${endStr}, start_type=${leave.start_type}, end_type=${leave.end_type}`);
+
+                // For single-day leaves: check if either start or end is half
+                if (logDateStr === startStr && logDateStr === endStr) {
+                    // Same day leave - check for first_half or second_half
+                    if (leave.start_type === 'first_half' || leave.start_type === 'second_half' ||
+                        leave.end_type === 'first_half' || leave.end_type === 'second_half') {
+                        isFullDay = false;
+                        logger.info(`[Timesheet] Single-day half leave detected - allowing timesheet entry`);
+                    }
+                } else {
+                    // Multi-day leave: check start/end days separately
+                    if (logDateStr === startStr && (leave.start_type === 'first_half' || leave.start_type === 'second_half')) isFullDay = false;
+                    if (logDateStr === endStr && (leave.end_type === 'first_half' || leave.end_type === 'second_half')) isFullDay = false;
+                }
+
+                logger.info(`[Timesheet] isFullDay=${isFullDay} for ${logDateStr}`);
                 if (isFullDay) {
                     throw new Error("Cannot log time on a full-day approved leave.");
                 }
@@ -694,27 +682,31 @@ export class TimesheetService {
 
             // UPDATE 1: Auto-Approve System Entries (Leaves/Holidays)
             await client.query(`
-                UPDATE project_entries
+                UPDATE project_entries pe
                 SET log_status = 'approved', 
                     updated_at = CURRENT_TIMESTAMP,
                     is_late = $4,
                     is_resubmission = $5
-                WHERE user_id = $1 
-                  AND log_date >= $2 AND log_date <= $3
-                  AND work_status = 'not_applicable' -- Identifies System Entries
+                FROM project_activities pa
+                WHERE pe.activity_id = pa.id
+                  AND pe.user_id = $1 
+                  AND pe.log_date >= $2 AND pe.log_date <= $3
+                  AND pa.custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
             `, [userId, startStr, endStr, isLate, isResubmission]);
 
             // UPDATE 2: Submit Manual Entries (Waiting for Manager)
             await client.query(`
-                UPDATE project_entries
+                UPDATE project_entries pe
                 SET log_status = 'submitted', 
                     updated_at = CURRENT_TIMESTAMP,
                     is_late = $4,
                     is_resubmission = $5
-                WHERE user_id = $1 
-                  AND log_date >= $2 AND log_date <= $3
-                  AND work_status != 'not_applicable' -- Identifies Manual Entries
-                  AND log_status IN ('draft', 'rejected')
+                FROM project_activities pa
+                WHERE pe.activity_id = pa.id
+                  AND pe.user_id = $1 
+                  AND pe.log_date >= $2 AND pe.log_date <= $3
+                  AND pa.custom_id NOT IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                  AND pe.log_status IN ('draft', 'rejected')
             `, [userId, startStr, endStr, isLate, isResubmission]);
 
             await client.query('COMMIT');
@@ -903,10 +895,28 @@ export class TimesheetService {
                 const employeeInfo = { name: u.first_name, hours };
 
                 if (hours >= 40) {
+                    // UPDATE 1: Auto-Approve System Entries (Holidays/Leaves)
                     await client.query(`
-                        UPDATE project_entries 
+                        UPDATE project_entries pe
+                        SET log_status = 'approved', updated_at = CURRENT_TIMESTAMP
+                        FROM project_activities pa
+                        WHERE pe.activity_id = pa.id
+                          AND pe.user_id = $1 
+                          AND pe.log_date >= $2 AND pe.log_date <= $3 
+                          AND pa.custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                          AND pe.log_status = 'draft'
+                    `, [u.id, startStr, endStr]);
+
+                    // UPDATE 2: Submit Manual Entries (Waiting for Manager)
+                    await client.query(`
+                        UPDATE project_entries pe
                         SET log_status = 'submitted', updated_at = CURRENT_TIMESTAMP
-                        WHERE user_id = $1 AND log_date >= $2 AND log_date <= $3 AND log_status = 'draft'
+                        FROM project_activities pa
+                        WHERE pe.activity_id = pa.id
+                          AND pe.user_id = $1 
+                          AND pe.log_date >= $2 AND pe.log_date <= $3 
+                          AND pa.custom_id NOT IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                          AND pe.log_status = 'draft'
                     `, [u.id, startStr, endStr]);
 
                     logger.info(`[Timesheet] User ${u.id} Auto-Submitted (${hours} hrs)`);
