@@ -1,11 +1,11 @@
 import { pool } from './db';
-import { creditAnniversaryLeaves } from '../services/leaveCredit.service';
+import { creditMonthlyLeaves } from '../services/leaveCredit.service';
 
 async function creditAnniversaryLeavesNow() {
   try {
-    console.log('Starting anniversary leave credit for employees who completed 3 years...');
+    console.log('Starting monthly and anniversary leave credit check...');
 
-    const result = await creditAnniversaryLeaves();
+    const result = await creditMonthlyLeaves();
 
     console.log(`\nAnniversary leave credit completed:`);
     console.log(`  - Employees credited: ${result.credited}`);
