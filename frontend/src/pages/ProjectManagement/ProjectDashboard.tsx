@@ -227,7 +227,7 @@ export const ProjectDashboard: React.FC = () => {
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </th>
-                                <th style={{ width: '100px' }}>Actions</th>
+                                {user?.role === 'super_admin' && <th style={{ width: '100px' }}>Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -281,9 +281,9 @@ export const ProjectDashboard: React.FC = () => {
                                                 {(project.status || 'active').replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td onClick={e => e.stopPropagation()}>
-                                            <div className="action-btns">
-                                                {user?.role === 'super_admin' && (
+                                        {user?.role === 'super_admin' && (
+                                            <td onClick={e => e.stopPropagation()}>
+                                                <div className="action-btns">
                                                     <button
                                                         className="btn-icon-action delete"
                                                         onClick={() => setDeleteConfirm({ id: project.id, name: project.name })}
@@ -291,9 +291,9 @@ export const ProjectDashboard: React.FC = () => {
                                                     >
                                                         <FaTrash size={12} />
                                                     </button>
-                                                )}
-                                            </div>
-                                        </td>
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))
                             )}
