@@ -292,7 +292,47 @@ export class TimesheetService {
                 throw new Error(`Cannot log time on a holiday: ${holidayRes.rows[0].holiday_name}`);
             }
 
-            // Validation 6: Check for Full Day Leaves (Approved)
+            // Validation 7: STRICT Activity Access Check + PM Grace Period
+            const accessCheckRes = await client.query(`
+                SELECT p.project_manager_id, 
+                       EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = $1 AND aa.user_id = $2) as is_assigned
+                FROM project_activities a
+                JOIN project_tasks t ON a.task_id = t.id
+                JOIN project_modules m ON t.module_id = m.id
+                JOIN projects p ON m.project_id = p.id
+                WHERE a.id = $1
+            `, [entry.activity_id, userId]);
+
+            if (accessCheckRes.rows.length === 0) {
+                throw new Error("Activity not found.");
+            }
+
+            const { project_manager_id, is_assigned } = accessCheckRes.rows[0];
+            const isCurrentPM = project_manager_id === userId;
+
+            if (!isCurrentPM && !is_assigned) {
+                // Grace Period Heuristic: If the user had ANY logs in this project for the current week, 
+                // OR if they logged anything in the last 7 days, they are allowed to finish the current week.
+                const { start } = TimesheetService.getCurrentWeekRange();
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                const graceCheckRes = await client.query(`
+                    SELECT 1 FROM project_entries 
+                    WHERE user_id = $1 AND project_id = $2
+                      AND (log_date >= $3 OR created_at >= $4)
+                    LIMIT 1
+                `, [userId, entry.project_id, start.toISOString().split('T')[0], sevenDaysAgo.toISOString()]);
+
+                const isWithinCurrentWeek = logDateOnly >= start;
+
+                if (!(graceCheckRes.rows.length > 0 && isWithinCurrentWeek)) {
+                    throw new Error("Access denied: You are not assigned to this activity and your grace period has expired.");
+                }
+                logger.info(`[Timesheet] Grace period access granted to user ${userId} for Project ${entry.project_id}`);
+            }
+
+            // Validation 8: Check for Full Day Leaves (Approved)
             const leaveRes = await client.query(`
                 SELECT start_date, end_date, start_type, end_type 
                 FROM leave_requests 
@@ -307,25 +347,16 @@ export class TimesheetService {
                 const endStr = TimesheetService.formatDate(leave.end_date);
 
                 let isFullDay = true;
-
-                // Debug: Log the leave data
-                logger.info(`[Timesheet] Checking leave for ${logDateStr}: start=${startStr}, end=${endStr}, start_type=${leave.start_type}, end_type=${leave.end_type}`);
-
-                // For single-day leaves: check if either start or end is half
                 if (logDateStr === startStr && logDateStr === endStr) {
-                    // Same day leave - check for first_half or second_half
                     if (leave.start_type === 'first_half' || leave.start_type === 'second_half' ||
                         leave.end_type === 'first_half' || leave.end_type === 'second_half') {
                         isFullDay = false;
-                        logger.info(`[Timesheet] Single-day half leave detected - allowing timesheet entry`);
                     }
                 } else {
-                    // Multi-day leave: check start/end days separately
                     if (logDateStr === startStr && (leave.start_type === 'first_half' || leave.start_type === 'second_half')) isFullDay = false;
                     if (logDateStr === endStr && (leave.end_type === 'first_half' || leave.end_type === 'second_half')) isFullDay = false;
                 }
 
-                logger.info(`[Timesheet] isFullDay=${isFullDay} for ${logDateStr}`);
                 if (isFullDay) {
                     throw new Error("Cannot log time on a full-day approved leave.");
                 }

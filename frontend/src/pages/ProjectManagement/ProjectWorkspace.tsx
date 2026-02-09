@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
-// import * as employeeService from '../../services/employeeService';
+import * as employeeService from '../../services/employeeService';
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -125,9 +125,7 @@ export const ProjectWorkspace: React.FC = () => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
-    /* 
-    const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then(res => res.employees));
-    */
+    const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then((res: any) => res.employees));
 
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -698,13 +696,20 @@ export const ProjectWorkspace: React.FC = () => {
                                         isPM={canManageResources}
                                         isCompact={true}
                                         availableUsers={(() => {
-                                            const candidates = projectMembers || [];
-                                            const current = module.assigned_users || [];
-                                            const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
+                                            // Requirement: ANY employee in the organization can be assigned to a module
+                                            const candidates = allEmployees || projectMembers || [];
+                                            const pmId = String(project?.project_manager_id);
+
+                                            // Filter out the Project Manager from individual module assignments (implicitly has access)
+                                            // And ensure unique list
                                             const uniqueMap = new Map();
-                                            [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+                                            candidates.forEach((u: any) => {
+                                                if (String(u.id) !== pmId) {
+                                                    uniqueMap.set(String(u.id), u);
+                                                }
+                                            });
+
                                             return Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== pmId)
                                                 .map((u: any) => ({
                                                     ...u,
                                                     initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
@@ -712,13 +717,15 @@ export const ProjectWorkspace: React.FC = () => {
                                         })()}
                                         onAssignUser={(userId) => {
                                             const availableUsers = (() => {
-                                                const candidates = projectMembers || [];
-                                                const current = module.assigned_users || [];
-                                                const pmId = String(project?.project_manager_id || candidates.find((m: any) => m.is_pm)?.id);
+                                                const candidates = allEmployees || projectMembers || [];
+                                                const pmId = String(project?.project_manager_id);
                                                 const uniqueMap = new Map();
-                                                [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
+                                                candidates.forEach((u: any) => {
+                                                    if (String(u.id) !== pmId) {
+                                                        uniqueMap.set(String(u.id), u);
+                                                    }
+                                                });
                                                 return Array.from(uniqueMap.values())
-                                                    .filter((u: any) => String(u.id) !== pmId)
                                                     .map((u: any) => ({
                                                         ...u,
                                                         initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')

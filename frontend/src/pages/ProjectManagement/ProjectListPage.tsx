@@ -1,145 +1,209 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { useQuery, useQueryClient } from 'react-query';
+import { FaArrowLeft, FaSearch, FaTrash, FaChevronDown } from 'react-icons/fa';
+import { ChevronDown } from 'lucide-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService, Project } from '../../services/projectService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { ProjectCard } from './components/ProjectCard';
-import './ProjectDashboard.css'; // Reuse dashboard styles including card styles
+import EmptyState from '../../components/common/EmptyState';
+import {
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+} from '../../components/ui/dropdown-menu';
+import './ProjectDashboard.css';
 
 export const ProjectListPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { user } = useAuth();
     const { showSuccess, showError } = useToast();
+    const queryClient = useQueryClient();
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number, name: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
 
     const filterType = searchParams.get('filter') || 'all';
 
-    // Fetch projects
-    const { data: projects, refetch } = useQuery(
-        'projects',
-        projectService.getProjects
+    // Fetch projects - fetch all if SA/HR, or just involvement
+    const { data: projects, isLoading } = useQuery(
+        ['projects', filterType],
+        () => projectService.getProjects(['super_admin', 'hr'].includes(user?.role || '') && filterType === 'all'),
+        {
+            refetchOnWindowFocus: false,
+        }
     );
 
     const getStatusClass = (status: string) => {
-        if (status === 'active') return 'status-active';
-        if (status === 'completed') return 'status-completed';
-        return 'status-other';
+        switch (status) {
+            case 'active': return 'status-badge-active';
+            case 'completed': return 'status-badge-completed';
+            case 'archived': return 'status-badge-archived';
+            case 'on_hold': return 'status-badge-hold';
+            default: return 'status-badge-other';
+        }
     };
-
 
     const confirmDelete = async () => {
         if (!deleteConfirm) return;
         setIsDeleting(true);
-
-        setDeleteConfirm(null);
         try {
             await projectService.deleteProject(deleteConfirm.id);
             showSuccess(`Project "${deleteConfirm.name}" deleted successfully`);
+            queryClient.invalidateQueries('projects');
             setDeleteConfirm(null);
-            refetch();
         } catch (error: any) {
-            console.error('[PROJECT] Delete Error:', error);
             showError(error.response?.data?.error || 'Failed to delete project');
         } finally {
             setIsDeleting(false);
         }
     };
 
-    const getFilteredProjects = () => {
-        if (!projects) return [];
-        if (filterType === 'my-projects') {
-            return projects;
-        } else {
-            const isGlobalViewer = ['super_admin', 'hr'].includes(user?.role || '');
-            if (isGlobalViewer) return projects;
-            return [];
+    const filteredProjects = (projects || []).filter(p => {
+        if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            return p.name.toLowerCase().includes(term);
         }
-    };
+        return true;
+    });
 
-    const filteredProjects = getFilteredProjects();
-    const pageTitle = filterType === 'my-projects' ? 'My Projects' : 'All Projects';
+    const pageTitle = filterType === 'my-projects' ? 'My Projects' : 'Organization Projects';
 
     return (
         <AppLayout>
-            <div className="project-dashboard" style={{ overflow: 'hidden' }}>
-                <div className="dashboard-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button
-                            onClick={() => navigate('/project-management')}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}
-                        >
-                            <ArrowLeft size={20} color="#64748b" />
+            <div className="project-dashboard-v2">
+                <div className="dashboard-header-modern">
+                    <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <button onClick={() => navigate('/project-management')} className="btn-icon-action view">
+                            <FaArrowLeft size={14} />
                         </button>
-                        <h1>{pageTitle}</h1>
-                    </div>
-                </div>
-
-                <div className="dashboard-content">
-                    <div className="dashboard-section" style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minHeight: 0,
-                        overflow: 'hidden' /* Ensure container clips content */
-                    }}>
-                        <div
-                            className="custom-vertical-scroll"
-                            style={{
-                                flex: 1, /* Use flex to fill available space reliably */
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, 340px)',
-                                justifyContent: 'center',
-                                gap: '20px',
-                                padding: '10px 10px 20px 10px',
-                                height: '100%',
-                                overflowY: 'scroll' /* Ensure this is set via style or class preference */
-                            }}>
-                            {filteredProjects.map((project: Project) => (
-                                <ProjectCard
-                                    key={project.id}
-                                    project={project}
-                                    navigate={navigate}
-                                    getStatusClass={getStatusClass}
-                                    onDelete={(id: number, name: string) => setDeleteConfirm({ id, name })}
-                                    canDelete={user?.role === 'super_admin'}
-                                />
-                            ))}
-
-                            {filteredProjects.length === 0 && (
-                                <div style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gridColumn: '1 / -1',
-                                    height: '100%',
-                                    color: '#94a3b8'
-                                }}>
-                                    <AlertCircle size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-                                    <p>No projects found in this list.</p>
-                                </div>
-                            )}
+                        <div>
+                            <h1>{pageTitle}</h1>
+                            <p className="subtitle">Detailed overview of projects</p>
                         </div>
                     </div>
                 </div>
 
+                <div className="controls-bar">
+                    <div className="search-group">
+                        <FaSearch className="search-icon" size={14} />
+                        <input
+                            type="text"
+                            placeholder="Search projects..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="table-container-modern">
+                    <table className="modern-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '120px' }}>Project ID</th>
+                                <th style={{ width: '250px' }}>Project Name</th>
+                                <th className="hide-mobile" style={{ width: '200px' }}>Project Manager</th>
+                                <th style={{ width: '150px' }}>
+                                    Status
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className={`header-filter-btn ${statusFilter !== 'all' ? 'active' : ''}`}>
+                                                <FaChevronDown size={10} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            <DropdownMenuItem
+                                                onSelect={() => setStatusFilter('all')}
+                                                className={statusFilter === 'all' ? 'active-filter-item' : ''}
+                                            >
+                                                All Statuses
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onSelect={() => setStatusFilter('active')} className={statusFilter === 'active' ? 'active-filter-item' : ''}>Active</DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => setStatusFilter('completed')} className={statusFilter === 'completed' ? 'active-filter-item' : ''}>Completed</DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => setStatusFilter('on_hold')} className={statusFilter === 'on_hold' ? 'active-filter-item' : ''}>On Hold</DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => setStatusFilter('archived')} className={statusFilter === 'archived' ? 'active-filter-item' : ''}>Archived</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </th>
+                                <th style={{ width: '100px' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan={5} style={{ padding: '0' }}>
+                                        <div style={{ padding: '20px' }}>
+                                            {Array.from({ length: 5 }).map((_, idx) => (
+                                                <div key={idx} className="shimmer-table"></div>
+                                            ))}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredProjects.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5}>
+                                        <div className="empty-state-container">
+                                            <EmptyState
+                                                title="No Projects Found"
+                                                description={searchTerm ? "Try adjusting your search or filters." : "No projects in this category."}
+                                                icon={FaSearch as any}
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredProjects.map(project => (
+                                    <tr
+                                        key={project.id}
+                                        className="clickable-row"
+                                        onClick={() => navigate(`/project-management/${project.id}`)}
+                                    >
+                                        <td style={{ fontWeight: '700', color: '#64748B' }}>{project.custom_id}</td>
+                                        <td className="project-name-cell">
+                                            <div className="name">{project.name}</div>
+                                        </td>
+                                        <td className="hide-mobile">
+                                            <div className="pm-cell">
+                                                {project.manager_name}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className={`status-badge ${getStatusClass(project.status)}`}>
+                                                {project.status.replace('_', ' ')}
+                                            </span>
+                                        </td>
+                                        <td onClick={(e) => e.stopPropagation()}>
+                                            <div className="action-btns">
+                                                {user?.role === 'super_admin' && (
+                                                    <button
+                                                        className="btn-icon-action delete"
+                                                        onClick={() => setDeleteConfirm({ id: project.id, name: project.name })}
+                                                        title="Delete Project"
+                                                    >
+                                                        <FaTrash size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
                 <ConfirmationDialog
                     isOpen={!!deleteConfirm}
                     title="Delete Project?"
-                    message={`Are you sure you want to delete ${deleteConfirm?.name}?\nThis will permanently remove all associated modules, tasks, and activities. This action cannot be undone.`}
+                    message={`Are you sure you want to delete "${deleteConfirm?.name}"? All associated data will be lost.`}
                     confirmText="Delete"
                     cancelText="Cancel"
                     type="danger"

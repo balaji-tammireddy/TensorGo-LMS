@@ -125,8 +125,9 @@ export class ProjectService {
       );
       const project = insertRes.rows[0];
 
-      // 4. Recursive Team Generation
-      await this.syncProjectTeam(project.id, managerId, client, data.created_by);
+      // REMOVED: Automatic team sync based on reporting hierarchy
+      // The "team" is now implicitly defined by resource assignment.
+      // await this.syncProjectTeam(project.id, managerId, client, data.created_by);
 
       await client.query('COMMIT');
       return project;
@@ -216,11 +217,11 @@ export class ProjectService {
         // 4. IF PM Changed: Trigger Reset Logic
         if (isManagerChanging) {
           console.log(`[ProjectService] Triggering metadata-driven PM swap logic for project ${id}`);
-          // A. Wipe all Module/Task/Activity access
+          // A. Wipe all Module/Task/Activity access (Cascades)
           await this.wipeProjectResourceAccess(id, client);
 
-          // B. Re-sync Project Team (Subtree)
-          await this.syncProjectTeam(id, data.project_manager_id!, client, requesterId);
+          // B. Removed hierarchy sync
+          // await this.syncProjectTeam(id, data.project_manager_id!, client, requesterId);
 
           // C. Re-assign NEW PM to everything
           await this.assignIrrevocableAccess(id, data.project_manager_id!, client);
@@ -902,25 +903,24 @@ export class ProjectService {
       SELECT p.*, 
              COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
              (p.project_manager_id = $1) as is_pm,
-             EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+             (
+               EXISTS (SELECT 1 FROM module_access ma JOIN project_modules m ON ma.module_id = m.id WHERE m.project_id = p.id AND ma.user_id = $1)
+               OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks t ON ta.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND ta.user_id = $1)
+               OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities a ON aa.activity_id = a.id JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND aa.user_id = $1)
+             ) as is_member
       FROM projects p 
       LEFT JOIN users u ON p.project_manager_id = u.id
       WHERE p.id = $2
     `;
 
     if (!isGlobalViewer) {
-      // STRICT: Only the Project Manager or a direct Team Member can access
-      queryStr = `
-        SELECT p.*, 
-               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
-               (p.project_manager_id = $1) as is_pm,
-               EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
-        FROM projects p 
-        LEFT JOIN users u ON p.project_manager_id = u.id
-        WHERE p.id = $2
+      // Involvement-based visibility
+      queryStr += `
         AND (
           p.project_manager_id = $1
-          OR EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1)
+          OR EXISTS (SELECT 1 FROM module_access ma JOIN project_modules m ON ma.module_id = m.id WHERE m.project_id = p.id AND ma.user_id = $1)
+          OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks t ON ta.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND ta.user_id = $1)
+          OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities a ON aa.activity_id = a.id JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND aa.user_id = $1)
         )
       `;
     }
@@ -930,14 +930,22 @@ export class ProjectService {
     return res.rows[0];
   }
 
-  static async getProjectsForUser(userId: number, role: string) {
-    // Global Viewers
-    if (role === 'super_admin' || role === 'hr') {
+  static async getProjectsForUser(userId: number, role: string, orgWide: boolean = false) {
+    const involvementSubquery = `
+      (
+        EXISTS (SELECT 1 FROM module_access ma JOIN project_modules m ON ma.module_id = m.id WHERE m.project_id = p.id AND ma.user_id = $1)
+        OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks t ON ta.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND ta.user_id = $1)
+        OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities a ON aa.activity_id = a.id JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND aa.user_id = $1)
+      ) as is_member
+    `;
+
+    // Global Viewers - Only return all if orgWide is true
+    if ((role === 'super_admin' || role === 'hr') && orgWide) {
       return query(
         `SELECT p.*, 
                 COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
                 (p.project_manager_id = $1) as is_pm,
-                EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+                ${involvementSubquery}
          FROM projects p 
          LEFT JOIN users u ON p.project_manager_id = u.id
          ORDER BY p.created_at DESC`,
@@ -945,20 +953,20 @@ export class ProjectService {
       );
     }
 
-    // PM and Members: Show ONLY projects where they are the PM or are added as a member
-    // Note: Subordinates are automatically added as members via syncAllProjectTeams, 
-    // but higher authorities are not, correctly excluding them from the "My Projects" list.
-    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing strict PM/Member visibility query`);
+    // Involvement-based visibility for other roles
+    console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Executing involvement-based visibility query`);
     const res = await query(
       `SELECT p.*, 
               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
               (p.project_manager_id = $1) as is_pm,
-              EXISTS (SELECT 1 FROM project_members WHERE project_id = p.id AND user_id = $1) as is_member
+              ${involvementSubquery}
        FROM projects p
        LEFT JOIN users u ON p.project_manager_id = u.id
        WHERE 
           p.project_manager_id = $1
-          OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $1)
+          OR EXISTS (SELECT 1 FROM module_access ma JOIN project_modules m ON ma.module_id = m.id WHERE m.project_id = p.id AND ma.user_id = $1)
+          OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks t ON ta.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND ta.user_id = $1)
+          OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities a ON aa.activity_id = a.id JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND aa.user_id = $1)
        ORDER BY p.created_at DESC`,
       [userId]
     );
@@ -974,7 +982,9 @@ export class ProjectService {
       SELECT 1 FROM projects p
       WHERE p.id = $1::integer AND (
         p.project_manager_id = $2::integer
-        OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id::integer AND pm.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM module_access ma JOIN project_modules pm ON ma.module_id = pm.id WHERE pm.project_id = p.id AND ma.user_id = $2)
+        OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks pt ON ta.task_id = pt.id JOIN project_modules pm ON pt.module_id = pm.id WHERE pm.project_id = p.id AND ta.user_id = $2)
+        OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities pa ON aa.activity_id = pa.id JOIN project_tasks pt ON pa.task_id = pt.id JOIN project_modules pm ON pt.module_id = pm.id WHERE pm.project_id = p.id AND aa.user_id = $2)
         OR EXISTS (SELECT 1 FROM project_entries te WHERE te.project_id = p.id::integer AND te.user_id = $2::integer)
         OR $3::boolean = true
       )
@@ -1058,7 +1068,9 @@ export class ProjectService {
       SELECT 1 FROM projects p
       WHERE p.id = $1::integer AND (
         p.project_manager_id = $2::integer
-        OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM module_access ma JOIN project_modules pm ON ma.module_id = pm.id WHERE pm.project_id = p.id AND ma.user_id = $2)
+        OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks pt ON ta.task_id = pt.id JOIN project_modules pm ON pt.module_id = pm.id WHERE pm.project_id = p.id AND ta.user_id = $2)
+        OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities pa ON aa.activity_id = pa.id JOIN project_tasks pt ON pa.task_id = pt.id JOIN project_modules pm ON pt.module_id = pm.id WHERE pm.project_id = p.id AND aa.user_id = $2)
         OR EXISTS (SELECT 1 FROM project_entries te WHERE te.module_id = $3::integer AND te.user_id = $2::integer)
         OR $4::boolean = true
       )
@@ -1140,7 +1152,9 @@ export class ProjectService {
       SELECT 1 FROM projects p
       WHERE p.id = $1::integer AND (
         p.project_manager_id = $2::integer
-        OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2::integer)
+        OR EXISTS (SELECT 1 FROM module_access ma JOIN project_modules pm ON ma.module_id = pm.id WHERE pm.project_id = p.id AND ma.user_id = $2)
+        OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks pt ON ta.task_id = pt.id JOIN project_modules pm ON pt.module_id = pm.id WHERE pm.project_id = p.id AND ta.user_id = $2)
+        OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities pa ON aa.activity_id = pa.id JOIN project_tasks pt ON pa.task_id = pt.id JOIN project_modules pm ON pt.module_id = pm.id WHERE pm.project_id = p.id AND aa.user_id = $2)
         OR EXISTS (SELECT 1 FROM project_entries te WHERE te.task_id = $3::integer AND te.user_id = $2::integer)
         OR $4::boolean = true
       )
@@ -1228,7 +1242,11 @@ export class ProjectService {
       console.log(`[ProjectService] View Team: Returning ${res.rows.length} members for Project ${id}`);
       return res.rows;
     } else if (level === 'module') {
-      // 1. Get Module Access + Project Manager
+      // 1. Requirement: Return ALL active employees in the organization for module assignment.
+      // Exception: Exclude the Project Manager from the list.
+      const pmRes = await query(`SELECT project_manager_id FROM projects WHERE id = (SELECT project_id FROM project_modules WHERE id = $1)`, [id]);
+      const pmId = pmRes.rows[0]?.project_manager_id;
+
       const res = await query(`
         SELECT u.id, u.emp_id as "empId", 
                COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, 
@@ -1236,28 +1254,24 @@ export class ProjectService {
                COALESCE(u.email, '') as email,
                COALESCE(u.designation, 'N/A') as designation,
                COALESCE(u.department, 'N/A') as department,
-               CASE WHEN u.id = p.project_manager_id THEN true ELSE false END as is_pm
-        FROM project_modules m
-        JOIN projects p ON m.project_id = p.id
-        JOIN users u ON u.id = p.project_manager_id
-        WHERE m.id = $1
-        
-        UNION
-        
-        SELECT u.id, u.emp_id as "empId", 
-               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as name, 
-               u.user_role as role,
-               COALESCE(u.email, '') as email,
-               COALESCE(u.designation, 'N/A') as designation,
-               COALESCE(u.department, 'N/A') as department,
                false as is_pm
-        FROM module_access ma
-        JOIN users u ON ma.user_id = u.id
-        WHERE ma.module_id = $1
-        ORDER BY name`, [id]);
+        FROM users u
+        WHERE u.id != $1
+        AND NOT (u.status IN ('on_notice', 'resigned', 'terminated', 'inactive'))
+        ORDER BY name
+      `, [pmId]);
       return res.rows;
     } else if (level === 'task') {
       // Cascade Rule: For a TASK, show only users who have access to the parent MODULE
+      // AND Exclude PM
+      const pmRes = await query(`
+        SELECT p.project_manager_id 
+        FROM projects p
+        JOIN project_modules m ON p.id = m.project_id
+        JOIN project_tasks t ON m.id = t.module_id
+        WHERE t.id = $1
+      `, [id]);
+      const pmId = pmRes.rows[0]?.project_manager_id;
 
       // 1. Get Parent Module ID
       const tRes = await query(`SELECT module_id FROM project_tasks WHERE id = $1`, [id]);
@@ -1274,14 +1288,24 @@ export class ProjectService {
                 COALESCE(u.department, 'N/A') as department
          FROM module_access ma
          JOIN users u ON ma.user_id = u.id
-         WHERE ma.module_id = $1
+         WHERE ma.module_id = $1 AND u.id != $2
          ORDER BY name`,
-        [moduleId]
+        [moduleId, pmId]
       );
       return res.rows;
 
     } else if (level === 'activity') {
       // Cascade Rule: For an ACTIVITY, show only users who have access to the parent TASK
+      // AND Exclude PM
+      const pmRes = await query(`
+        SELECT p.project_manager_id 
+        FROM projects p
+        JOIN project_modules m ON p.id = m.project_id
+        JOIN project_tasks t ON m.id = t.module_id
+        JOIN project_activities a ON t.id = a.task_id
+        WHERE a.id = $1
+      `, [id]);
+      const pmId = pmRes.rows[0]?.project_manager_id;
 
       // 1. Get Parent Task ID
       const aRes = await query(`SELECT task_id FROM project_activities WHERE id = $1`, [id]);
@@ -1298,9 +1322,9 @@ export class ProjectService {
                 COALESCE(u.department, 'N/A') as department
          FROM task_access ta
          JOIN users u ON ta.user_id = u.id
-         WHERE ta.task_id = $1
+         WHERE ta.task_id = $1 AND u.id != $2
          ORDER BY name`,
-        [taskId]
+        [taskId, pmId]
       );
       return res.rows;
     }
@@ -1532,13 +1556,8 @@ export class ProjectService {
     if (role === 'super_admin' || role === 'hr') return true;
 
     const res = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
       SELECT 1 FROM project_modules m JOIN projects p ON m.project_id = p.id
-      WHERE m.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy) AND p.status = 'active'
+      WHERE m.id = $2 AND p.project_manager_id = $1 AND p.status = 'active'
     `, [userId, moduleId]);
     return res.rows.length > 0;
   }
@@ -1547,13 +1566,8 @@ export class ProjectService {
     if (role === 'super_admin' || role === 'hr') return true;
 
     const res = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
       SELECT 1 FROM project_tasks t JOIN project_modules m ON t.module_id = m.id JOIN projects p ON m.project_id = p.id
-      WHERE t.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy) AND p.status = 'active'
+      WHERE t.id = $2 AND p.project_manager_id = $1 AND p.status = 'active'
     `, [userId, taskId]);
     return res.rows.length > 0;
   }
@@ -1562,14 +1576,9 @@ export class ProjectService {
     if (role === 'super_admin' || role === 'hr') return true;
 
     const res = await query(`
-      WITH RECURSIVE hierarchy AS (
-        SELECT id FROM users WHERE id = $1
-        UNION ALL
-        SELECT u.id FROM users u JOIN hierarchy h ON u.reporting_manager_id = h.id
-      )
       SELECT 1 FROM project_activities a JOIN project_tasks t ON a.task_id = t.id
       JOIN project_modules m ON t.module_id = m.id JOIN projects p ON m.project_id = p.id
-      WHERE a.id = $2 AND p.project_manager_id IN (SELECT id FROM hierarchy) AND p.status = 'active'
+      WHERE a.id = $2 AND p.project_manager_id = $1 AND p.status = 'active'
     `, [userId, activityId]);
     return res.rows.length > 0;
   }

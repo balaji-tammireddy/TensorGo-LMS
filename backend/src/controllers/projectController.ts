@@ -77,9 +77,11 @@ export const getProjects = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
         const role = req.user?.role;
+        const orgWide = req.query.orgWide === 'true';
+
         if (!userId || !role) return res.status(401).json({ error: 'Unauthorized' });
 
-        const result = await ProjectService.getProjectsForUser(userId, role);
+        const result = await ProjectService.getProjectsForUser(userId, role, orgWide);
         res.json(result.rows);
     } catch (error: any) {
         logger.error('[PROJECT] Get Error:', error);

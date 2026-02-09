@@ -54,8 +54,8 @@ export const projectService = {
         return response.data;
     },
 
-    getProjects: async () => {
-        const response = await api.get<Project[]>('/projects');
+    getProjects: async (orgWide?: boolean) => {
+        const response = await api.get<Project[]>('/projects', { params: { orgWide } });
         return response.data;
     },
 
@@ -144,7 +144,7 @@ export const projectService = {
         api.delete('/projects/access', { data: { level, id, userId } }),
 
     getAccessList: (level: string, id: number) =>
-        api.get<any[]>(`/projects/access/${level}/${id}`).then(res => res.data),
+        api.get<any[]>(`/projects/${id}/access-list?level=${level}`).then(res => res.data),
 
     toggleAccess: async (level: 'module' | 'task' | 'activity', targetId: number, userId: number, action: 'add' | 'remove') => {
         const response = await api.post('/projects/access/toggle', { level, targetId, userId, action });
