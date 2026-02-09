@@ -1174,16 +1174,16 @@ const EmployeeManagementPage: React.FC = () => {
                               title={
                                 !(employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
                                   ? "Cannot add leaves for inactive/resigned employees"
-                                  : ((user?.role === 'hr' && employee.id !== user.id) ||
-                                    (user?.role === 'super_admin' && employee.role !== 'super_admin'))
+                                  : (user?.role === 'hr' || (user?.role === 'super_admin' && employee.role !== 'super_admin'))
                                     ? "Add Leaves"
                                     : "You do not have permission to add leaves for this employee"
                               }
                               onClick={() => handleAddLeaves(employee.id, employee.name, employee.status)}
                               disabled={
-                                !(((user?.role === 'hr' && employee.id !== user.id) ||
-                                  (user?.role === 'super_admin' && employee.role !== 'super_admin')) &&
-                                  (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned'))
+                                !(
+                                  (user?.role === 'hr' || (user?.role === 'super_admin' && employee.role !== 'super_admin')) &&
+                                  (employee.status !== 'inactive' && employee.status !== 'terminated' && employee.status !== 'resigned')
+                                )
                               }
                             >
                               <FaCalendarPlus />

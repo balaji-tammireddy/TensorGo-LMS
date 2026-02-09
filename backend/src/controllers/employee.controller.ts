@@ -236,17 +236,7 @@ export const addLeavesToEmployee = [
         });
       }
 
-      // HR specific restrictions
-      if (req.user?.role === 'hr') {
-        if (employeeId === req.user.id) {
-          return res.status(403).json({
-            error: {
-              code: 'FORBIDDEN',
-              message: 'HR cannot add leaves to themselves'
-            }
-          });
-        }
-      }
+
 
       if (!leaveType || !count) {
         return res.status(400).json({

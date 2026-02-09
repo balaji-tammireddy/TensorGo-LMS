@@ -1675,9 +1675,9 @@ export const addLeavesToEmployee = async (
   const requesterRole = requesterResult.rows[0].role;
   const targetRole = targetResult.rows[0].role;
 
-  // HR cannot add leaves for themselves, other HRs, or Super Admins
-  if (requesterRole === 'hr' && (targetRole === 'hr' || targetRole === 'super_admin')) {
-    throw new Error('HR cannot add leaves for themselves, other HR users, or Super Admins');
+  // HR cannot add leaves for Super Admins
+  if (requesterRole === 'hr' && targetRole === 'super_admin') {
+    throw new Error('HR cannot add leaves for Super Admins');
   }
 
   // Check if employee exists
