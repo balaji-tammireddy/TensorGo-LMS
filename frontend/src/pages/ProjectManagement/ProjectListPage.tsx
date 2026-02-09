@@ -98,7 +98,10 @@ export const ProjectListPage: React.FC = () => {
                             type="text"
                             placeholder="Search projects..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+                                setSearchTerm(val);
+                            }}
                         />
                     </div>
                 </div>
@@ -164,7 +167,7 @@ export const ProjectListPage: React.FC = () => {
                                     <tr
                                         key={project.id}
                                         className="clickable-row"
-                                        onClick={() => navigate(`/project-management/${project.id}`)}
+                                        onClick={() => navigate(`/project-management/${project.id}`, { state: { from: 'all' } })}
                                     >
                                         <td style={{ fontWeight: '700', color: '#64748B' }}>{project.custom_id}</td>
                                         <td className="project-name-cell">

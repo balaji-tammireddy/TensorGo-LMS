@@ -265,6 +265,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         ? !['super_admin', 'hr'].includes(user?.role || '')
         : !['super_admin', 'hr', 'manager'].includes(user?.role || '');
 
+    // Other project metadata (Dates etc) should also be restricted in Edit mode
+    const isMetadataDisabled = isEdit && !['super_admin', 'hr'].includes(user?.role || '');
+
     // Character limits
     const NAME_LIMIT = 20;
     const DESC_LIMIT = 200;
@@ -410,8 +413,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                                     value={managerSearch}
                                                     onChange={(e) => {
                                                         const val = e.target.value;
-                                                        // Validation: Allow only letters and spaces
-                                                        if (/^[a-zA-Z ]*$/.test(val)) {
+                                                        // Validation: Allow letters, numbers and spaces
+                                                        if (/^[a-zA-Z0-9 ]*$/.test(val)) {
                                                             setManagerSearch(val);
                                                         }
                                                     }}

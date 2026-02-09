@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
@@ -7,6 +7,7 @@ import { projectService } from '../../services/projectService';
 import * as employeeService from '../../services/employeeService';
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -124,6 +125,8 @@ export const ProjectWorkspace: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const queryClient = useQueryClient();
+    const { showSuccess, showError } = useToast();
+    const location = useLocation();
 
     const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then((res: any) => res.employees));
 
@@ -272,6 +275,7 @@ export const ProjectWorkspace: React.FC = () => {
                 }
 
                 await projectService.deleteModule(id);
+                showSuccess("Module deleted successfully");
                 refetchModules();
             } else if (type === 'task') {
                 // Optimistic Update
@@ -283,6 +287,7 @@ export const ProjectWorkspace: React.FC = () => {
                 }
 
                 await projectService.deleteTask(id);
+                showSuccess("Task deleted successfully");
                 refetchTasks();
             } else if (type === 'activity') {
                 // Optimistic Update
@@ -291,6 +296,7 @@ export const ProjectWorkspace: React.FC = () => {
                 );
 
                 await projectService.deleteActivity(id);
+                showSuccess("Activity deleted successfully");
                 refetchActivities();
             }
         } catch (error) {
@@ -613,7 +619,17 @@ export const ProjectWorkspace: React.FC = () => {
                 {/* Header */}
                 <div className="ws-header">
                     <div className="ws-header-left">
-                        <button onClick={() => navigate(-1)} className="btn-back">
+                        <button
+                            onClick={() => {
+                                const from = (location.state as any)?.from;
+                                if (from === 'all') {
+                                    navigate('/project-management?view=all');
+                                } else {
+                                    navigate('/project-management');
+                                }
+                            }}
+                            className="btn-back"
+                        >
                             <ChevronLeft size={16} /> Back
                         </button>
                         <div className="ws-project-info">

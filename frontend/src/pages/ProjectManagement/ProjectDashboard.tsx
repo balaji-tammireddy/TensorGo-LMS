@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FaPlus, FaSearch, FaTrash, FaTimes, FaChevronDown } from 'react-icons/fa';
 import { ChevronDown } from 'lucide-react';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
@@ -27,12 +27,23 @@ export const ProjectDashboard: React.FC = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number, name: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [searchParams] = useSearchParams();
+    const queryView = searchParams.get('view');
 
     // Filters and Search
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [pmFilter, setPmFilter] = useState('all');
-    const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
+    const [viewMode, setViewMode] = useState<'my' | 'all'>((queryView === 'all') ? 'all' : 'my');
+
+    useEffect(() => {
+        if (queryView === 'all') {
+            setViewMode('all');
+        } else if (!queryView && ['super_admin', 'hr'].includes(user?.role || '')) {
+            // Default to 'my' only if no explicit view is provided
+            setViewMode('my');
+        }
+    }, [queryView, user?.role]);
 
     // Fetch projects
     const { data: projects, isLoading } = useQuery(
@@ -47,11 +58,7 @@ export const ProjectDashboard: React.FC = () => {
     const isGlobalViewer = ['super_admin', 'hr'].includes(user?.role || '');
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
 
-    useEffect(() => {
-        if (isGlobalViewer) {
-            setViewMode('my');
-        }
-    }, [isGlobalViewer]);
+    // Cleaned up redundant effect that was resetting viewMode
 
     // Unique PMs for header filter
     const uniquePMs = useMemo(() => {
@@ -99,7 +106,7 @@ export const ProjectDashboard: React.FC = () => {
     });
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+        const val = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
         setSearchTerm(val);
     };
 
@@ -250,7 +257,7 @@ export const ProjectDashboard: React.FC = () => {
                                 filteredProjects.map((project) => (
                                     <tr
                                         key={project.id}
-                                        onClick={() => navigate(`/project-management/${project.id}`)}
+                                        onClick={() => navigate(`/project-management/${project.id}`, { state: { from: viewMode } })}
                                         className="clickable-row"
                                     >
                                         <td style={{ fontWeight: '700', color: '#64748B' }}>{project.custom_id}</td>
