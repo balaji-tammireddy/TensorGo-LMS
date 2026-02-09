@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { pool } from '../database/db';
 import { logger } from './logger';
 import { sendPendingLeaveReminderEmail, sendBirthdayWishEmail, sendHolidayListReminderEmail, sendLeaveAllocationEmail } from './emailTemplates';
-import { isLastWorkingDayOfMonth, hasCompleted3Years, hasCompleted5Years } from './leaveCredit';
+import { isLastWorkingDayOfMonth } from './leaveCredit';
 import { TimesheetService } from '../services/timesheet.service';
 
 /**
@@ -351,107 +351,7 @@ const autoApprovePastPendingLeaves = async () => {
   }
 };
 
-/**
- * Process daily leave credits (Anniversaries)
- * Runs every day at 00:01 AM
- */
-export const processDailyLeaveCredits = async () => {
-  try {
-    logger.info('🔄 Starting daily leave credit processing job...');
-    const today = new Date(); // Local server time
 
-    // Get all active employees
-    const result = await pool.query(
-      `SELECT id, emp_id, date_of_joining, email, first_name || ' ' || COALESCE(last_name, '') as name 
-       FROM users 
-       WHERE status NOT IN ('inactive', 'resigned') 
-         AND date_of_joining IS NOT NULL
-         AND user_role != 'super_admin'`
-    );
-
-    const employees = result.rows;
-    logger.info(`Checking leave credits for ${employees.length} employees...`);
-
-    for (const emp of employees) {
-      if (!emp.date_of_joining) continue;
-
-      const doj = new Date(emp.date_of_joining);
-      let addedCredits = 0;
-      let reason = '';
-
-      if (hasCompleted3Years(doj, today)) {
-        addedCredits = 3;
-        reason = '3-Year Service Anniversary Bonus';
-      } else if (hasCompleted5Years(doj, today)) {
-        addedCredits = 5;
-        reason = '5-Year Service Anniversary Bonus';
-      }
-
-      if (addedCredits > 0) {
-        logger.info(`🎉 Awarding ${addedCredits} leaves to ${emp.name} (${emp.emp_id}) for ${reason}`);
-
-        const client = await pool.connect();
-        try {
-          await client.query('BEGIN');
-
-          // Check/Create balance
-          const balanceCheck = await client.query(
-            'SELECT casual_balance FROM leave_balances WHERE employee_id = $1',
-            [emp.id]
-          );
-
-          let previousBalance = 0;
-
-          if (balanceCheck.rows.length === 0) {
-            await client.query(
-              `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
-               VALUES ($1, $2, 0, 0, NULL)`,
-              [emp.id, addedCredits]
-            );
-          } else {
-            previousBalance = parseFloat(balanceCheck.rows[0].casual_balance || '0');
-            await client.query(
-              `UPDATE leave_balances 
-               SET casual_balance = casual_balance + $1,
-                   last_updated = CURRENT_TIMESTAMP
-               WHERE employee_id = $2`,
-              [addedCredits, emp.id]
-            );
-          }
-
-          await client.query('COMMIT');
-
-          // Send Email
-          try {
-            await sendLeaveAllocationEmail(emp.email, {
-              employeeName: emp.name,
-              employeeEmpId: emp.emp_id,
-              leaveType: 'casual',
-              allocatedDays: addedCredits,
-              previousBalance: previousBalance,
-              newBalance: previousBalance + addedCredits,
-              allocatedBy: 'Super Admin',
-              allocatedByEmpId: undefined,
-              allocationDate: today.toISOString().split('T')[0],
-              comment: reason
-            });
-          } catch (emailErr) {
-            logger.error(`❌ Failed to send credit email to ${emp.email}`, emailErr);
-          }
-
-        } catch (err) {
-          await client.query('ROLLBACK');
-          logger.error(`❌ Failed to credit leaves for ${emp.emp_id}`, err);
-        } finally {
-          client.release();
-        }
-      }
-    }
-    logger.info('✅ Daily leave credit processing job completed');
-  } catch (error) {
-    logger.error('❌ Error in daily leave credit job:', error);
-  }
-};
 
 /**
  * Initialize and start all cron jobs
@@ -483,11 +383,7 @@ export const initializeCronJobs = () => {
   });
   logger.info('✅ Cron job scheduled: Holiday cleanup (Annually Dec 31st 00:00)');
 
-  // Daily leave credits (Anniversary) at 00:01 AM
-  cron.schedule('1 0 * * *', processDailyLeaveCredits, {
-    timezone: 'Asia/Kolkata'
-  });
-  logger.info('✅ Cron job scheduled: Daily Leave Credits (Anniversary) (00:01 AM)');
+
 
   // Auto-approve past pending leaves at 00:01 AM
   cron.schedule('1 0 * * *', autoApprovePastPendingLeaves, {

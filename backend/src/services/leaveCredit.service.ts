@@ -139,119 +139,7 @@ export const creditMonthlyLeaves = async (): Promise<{ credited: number; errors:
 /**
  * Credit anniversary leaves to employees based on policy
  */
-export const creditAnniversaryLeaves = async (): Promise<{ credited: number; errors: number }> => {
-  logger.info(`[LEAVE_CREDIT] [CREDIT ANNIVERSARY LEAVES] ========== FUNCTION CALLED ==========`);
 
-  const client = await pool.connect();
-  let credited = 0;
-  let errors = 0;
-  const today = new Date();
-
-  try {
-    const allPolicies = await getAllPolicies();
-    const policyMap: Record<string, Record<string, any>> = {};
-    allPolicies.forEach(p => {
-      if (!policyMap[p.role]) policyMap[p.role] = {};
-      if (p.leave_type_code) policyMap[p.role][p.leave_type_code] = p;
-    });
-
-    await client.query('BEGIN');
-
-    // Get all active employees (excluding super_admin)
-    const employeesResult = await client.query(`
-      SELECT u.id, u.emp_id, u.first_name || ' ' || COALESCE(u.last_name, '') as name,
-             u.date_of_joining, u.user_role as role,
-             COALESCE(lb.casual_balance, 0) as current_casual,
-             lb.id as balance_id
-      FROM users u
-      LEFT JOIN leave_balances lb ON u.id = lb.employee_id
-      WHERE u.status IN ('active', 'on_notice')
-        AND u.user_role IN ('employee', 'manager', 'hr', 'intern')
-    `);
-
-    for (const employee of employeesResult.rows) {
-      try {
-        const joinDate = new Date(employee.date_of_joining);
-        let years = today.getFullYear() - joinDate.getFullYear();
-        const monthDiff = today.getMonth() - joinDate.getMonth();
-        const dayDiff = today.getDate() - joinDate.getDate();
-
-        if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-          years--;
-        }
-
-        const rolePolicies = policyMap[employee.role] || {};
-        const casualPolicy = rolePolicies['casual'];
-        const bonus3 = casualPolicy ? parseFloat(casualPolicy.anniversary_3_year_bonus) : 3;
-        const bonus5 = casualPolicy ? parseFloat(casualPolicy.anniversary_5_year_bonus) : 5;
-
-        let anniversaryCredit = 0;
-        let anniversaryType = '';
-        let anniversaryDate: Date | null = null;
-
-        if (years === 3) {
-          const threeYearAnniversary = new Date(joinDate.getFullYear() + 3, joinDate.getMonth(), joinDate.getDate());
-          if (today.toISOString().split('T')[0] === threeYearAnniversary.toISOString().split('T')[0]) {
-            anniversaryCredit = bonus3;
-            anniversaryType = '3-year';
-            anniversaryDate = threeYearAnniversary;
-          }
-        }
-
-        if (years === 5) {
-          const fiveYearAnniversary = new Date(joinDate.getFullYear() + 5, joinDate.getMonth(), joinDate.getDate());
-          if (today.toISOString().split('T')[0] === fiveYearAnniversary.toISOString().split('T')[0]) {
-            anniversaryCredit = bonus5;
-            anniversaryType = '5-year';
-            anniversaryDate = fiveYearAnniversary;
-          }
-        }
-
-        if (anniversaryCredit === 0) continue;
-
-        // Check if already credited today
-        if (employee.balance_id && anniversaryDate) {
-          const balanceCheck = await client.query(
-            `SELECT last_updated FROM leave_balances WHERE employee_id = $1`,
-            [employee.id]
-          );
-          if (balanceCheck.rows.length > 0) {
-            const lastUpdated = new Date(balanceCheck.rows[0].last_updated);
-            if (lastUpdated.toISOString().split('T')[0] === anniversaryDate.toISOString().split('T')[0]) {
-              continue;
-            }
-          }
-        }
-
-        if (employee.balance_id) {
-          await client.query(
-            `UPDATE leave_balances SET casual_balance = casual_balance + $1, last_updated = CURRENT_TIMESTAMP WHERE employee_id = $2`,
-            [anniversaryCredit, employee.id]
-          );
-        } else {
-          await client.query(
-            `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, 0, 0)`,
-            [employee.id, anniversaryCredit]
-          );
-        }
-
-        credited++;
-        logger.info(`[LEAVE_CREDIT] Credited ${anniversaryType} anniversary to ${employee.emp_id}: +${anniversaryCredit} casual`);
-      } catch (error: any) {
-        errors++;
-        logger.error(`[LEAVE_CREDIT] Anniversary failed for ${employee.emp_id}:`, error);
-      }
-    }
-
-    await client.query('COMMIT');
-    return { credited, errors };
-  } catch (error: any) {
-    if (client) await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-};
 
 /**
  * Process year-end leave balance adjustments
@@ -513,8 +401,7 @@ export const checkAndCreditMonthlyLeaves = async (): Promise<void> => {
       // However, the caller (server.ts) already does the hour check.
     }
 
-    // OLD: await creditAnniversaryLeaves(); 
-    // Anniversary bonuses are now handled within creditMonthlyLeaves
+
 
     if (isYearEnd()) {
       const today = new Date().toISOString().split('T')[0];
