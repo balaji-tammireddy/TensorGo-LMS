@@ -545,14 +545,21 @@ export const updateProfile = async (userId: number, profileData: any, requesterR
   const checkResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
   const user = checkResult.rows[0];
 
-  const mandatoryFields = [
+  let mandatoryFields = [
     'first_name', 'last_name', 'contact_number', 'date_of_birth', 'gender', 'blood_group', 'marital_status',
     'emergency_contact_name', 'emergency_contact_no', 'emergency_contact_relation', 'personal_email',
     'designation', 'department', 'date_of_joining', 'total_experience',
-    'aadhar_number', 'pan_number', 'current_address', 'permanent_address',
-    'twelveth_stream', 'twelveth_college', 'twelveth_year', 'twelveth_percentage',
-    'ug_stream', 'ug_college', 'ug_year', 'ug_percentage'
+    'aadhar_number', 'pan_number', 'current_address', 'permanent_address'
   ];
+
+  // Only require education for non-HR/non-SA roles
+  if (user.user_role !== 'hr' && user.user_role !== 'super_admin') {
+    mandatoryFields = [
+      ...mandatoryFields,
+      'twelveth_stream', 'twelveth_college', 'twelveth_year', 'twelveth_percentage',
+      'ug_stream', 'ug_college', 'ug_year', 'ug_percentage'
+    ];
+  }
 
   const isComplete = mandatoryFields.every(field => {
     const val = user[field];
