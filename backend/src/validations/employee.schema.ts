@@ -169,12 +169,12 @@ export const updateProfileSchema = z.object({
             contactNumber: phoneSchema.optional().nullable(),
             altContact: phoneSchema.optional().nullable(),
             dateOfBirth: z.string().optional().nullable(),
-            gender: z.enum(['Male', 'Female', 'Other']).optional().nullable(),
-            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']).optional().nullable(),
-            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional().nullable(),
-            emergencyContactName: nameSchema.optional().nullable(),
-            emergencyContactNo: phoneSchema.optional().nullable(),
-            emergencyContactRelation: nameSchema.optional().nullable(),
+            gender: z.enum(['Male', 'Female', 'Other', '']).optional().nullable().or(z.literal('')),
+            bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', '']).optional().nullable().or(z.literal('')),
+            maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed', '']).optional().nullable().or(z.literal('')),
+            emergencyContactName: nameSchema.optional().nullable().or(z.literal('')),
+            emergencyContactNo: phoneSchema.optional().nullable().or(z.literal('')),
+            emergencyContactRelation: nameSchema.optional().nullable().or(z.literal('')),
             empId: z.string().max(20).regex(/^[A-Z0-9-]+$/, 'Invalid Employee ID format').optional().nullable(),
             email: z.string().email('Invalid email address').max(100, 'Email cannot exceed 100 characters').refine(
                 (email) => email.endsWith('@tensorgo.com') || email.endsWith('@tensorgo.co.in'),
@@ -185,12 +185,12 @@ export const updateProfileSchema = z.object({
         employmentInfo: z.object({
             designation: nameSchema.optional().nullable().or(z.literal('')),
             department: nameSchema.optional().nullable().or(z.literal('')),
-            dateOfJoining: z.string().optional().nullable(),
+            dateOfJoining: z.string().optional().nullable().or(z.literal('')),
             uanNumber: z.string().max(14).nullable().optional().or(z.literal('')),
             totalExperience: z.union([z.string(), z.number()]).nullable().optional().or(z.literal(''))
         }).optional().nullable(),
         documents: z.object({
-            aadharNumber: aadharSchema.optional().nullable(),
+            aadharNumber: aadharSchema.optional().nullable().or(z.literal('')),
             panNumber: z.union([
                 z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
                 z.string().length(0),
@@ -199,8 +199,8 @@ export const updateProfileSchema = z.object({
             ]).optional().nullable()
         }).optional().nullable(),
         address: z.object({
-            currentAddress: z.string().optional().nullable(),
-            permanentAddress: z.string().optional().nullable()
+            currentAddress: z.string().optional().nullable().or(z.literal('')),
+            permanentAddress: z.string().optional().nullable().or(z.literal(''))
         }).optional().nullable(),
         education: z.array(educationSchema).optional().nullable(),
         reportingManagerId: z.number().nullable().optional()

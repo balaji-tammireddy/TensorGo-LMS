@@ -604,21 +604,10 @@
 }
 
 /* Validation Highlights */
-.form-group.has-error label {
-  color: #e53935;
-}
 
-.form-group.has-error input,
-.form-group.has-error select,
-.form-group.has-error textarea,
-.form-group.has-error .date-picker-input-field,
-.form-group.has-error .profile-field-trigger {
-  border-color: #e53935 !important;
-  background-color: #fff8f8 !important;
-}
 
 .education-table tr.has-error {
-  background-color: #fff8f8;
+  background-color: transparent;
 }
 
 .education-table tr.has-error td {
@@ -627,5 +616,4 @@
 
 .education-table td.has-error input {
   border-color: #e53935 !important;
-  background-color: #fff !important;
 }

@@ -1459,17 +1459,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 firstName: sanitizeName(e.target.value)
                               })
                             }
-                            onBlur={() => {
-                              if (!newEmployee.firstName || newEmployee.firstName.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, firstName: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.firstName;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1500,17 +1489,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 lastName: sanitizeName(e.target.value)
                               })
                             }
-                            onBlur={() => {
-                              if (!newEmployee.lastName || newEmployee.lastName.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, lastName: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.lastName;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1569,20 +1547,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 }
                               }, 0);
                             }}
-                            onBlur={() => {
-                              const val = newEmployee.contactNumber;
-                              if (!val || val.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, contactNumber: true }));
-                              } else if (val.length < 10) {
-                                setFormErrors((prev) => ({ ...prev, contactNumber: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.contactNumber;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1613,28 +1577,6 @@ const EmployeeManagementPage: React.FC = () => {
                                   inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
                                 }
                               }, 0);
-                            }}
-                            onBlur={() => {
-                              const val = newEmployee.altContact;
-                              // Only validate if value is provided
-                              if (val && val.trim() !== '') {
-                                if (val.length < 10) {
-                                  setFormErrors((prev) => ({ ...prev, altContact: true }));
-                                } else {
-                                  setFormErrors((prev) => {
-                                    const next = { ...prev };
-                                    delete next.altContact;
-                                    return next;
-                                  });
-                                }
-                              } else {
-                                // Clear error if field is empty (it's optional)
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.altContact;
-                                  return next;
-                                });
-                              }
                             }}
                             disabled={isViewMode}
                           />
@@ -1760,17 +1702,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 emergencyContactName: sanitizeName(e.target.value)
                               })
                             }
-                            onBlur={() => {
-                              if (!newEmployee.emergencyContactName || newEmployee.emergencyContactName.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, emergencyContactName: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.emergencyContactName;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1813,20 +1744,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 }
                               }, 0);
                             }}
-                            onBlur={() => {
-                              const val = newEmployee.emergencyContactNo;
-                              if (!val || val.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
-                              } else if (val.length < 10) {
-                                setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.emergencyContactNo;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1843,17 +1760,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 emergencyContactRelation: sanitizeLettersOnly(e.target.value)
                               })
                             }
-                            onBlur={() => {
-                              if (!newEmployee.emergencyContactRelation || newEmployee.emergencyContactRelation.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, emergencyContactRelation: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.emergencyContactRelation;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -1876,17 +1782,6 @@ const EmployeeManagementPage: React.FC = () => {
                             onChange={(e) =>
                               setNewEmployee({ ...newEmployee, email: e.target.value })
                             }
-                            onBlur={() => {
-                              if (!newEmployee.email || newEmployee.email.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, email: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.email;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={(isEditMode && !['super_admin', 'hr'].includes(user?.role || '')) || isViewMode}
                           />
                         </div>
@@ -1904,17 +1799,6 @@ const EmployeeManagementPage: React.FC = () => {
                                   designation: e.target.value
                                 })
                               }
-                              onBlur={() => {
-                                if (!newEmployee.designation || newEmployee.designation.trim() === '') {
-                                  setFormErrors((prev) => ({ ...prev, designation: true }));
-                                } else {
-                                  setFormErrors((prev) => {
-                                    const next = { ...prev };
-                                    delete next.designation;
-                                    return next;
-                                  });
-                                }
-                              }}
                               disabled={isViewMode}
                             />
                           </div>
@@ -1932,17 +1816,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 department: e.target.value
                               })
                             }
-                            onBlur={() => {
-                              if (!newEmployee.department || newEmployee.department.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, department: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.department;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -2027,21 +1900,6 @@ const EmployeeManagementPage: React.FC = () => {
                             onChange={(e) => {
                               setNewEmployee({ ...newEmployee, totalExperience: e.target.value });
                             }}
-                            onBlur={() => {
-                              if (
-                                newEmployee.totalExperience === undefined ||
-                                newEmployee.totalExperience === null ||
-                                (typeof newEmployee.totalExperience === 'string' && newEmployee.totalExperience.trim() === '')
-                              ) {
-                                setFormErrors((prev) => ({ ...prev, totalExperience: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.totalExperience;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                           {newEmployee.totalExperience && (parseFloat(newEmployee.totalExperience) * 10) % 5 !== 0 && (
@@ -2070,17 +1928,6 @@ const EmployeeManagementPage: React.FC = () => {
                               })
                             }
                             placeholder="XXXX XXXX XXXX"
-                            onBlur={() => {
-                              if (!newEmployee.aadharNumber || newEmployee.aadharNumber.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, aadharNumber: true }));
-                              } else {
-                                setFormErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next.aadharNumber;
-                                  return next;
-                                });
-                              }
-                            }}
                             disabled={isViewMode}
                           />
                         </div>
@@ -2098,23 +1945,7 @@ const EmployeeManagementPage: React.FC = () => {
                                 panNumber: sanitized
                               });
                             }}
-                            onBlur={() => {
-                              const panVal = newEmployee.panNumber || '';
-                              if (!panVal || panVal.trim() === '') {
-                                setFormErrors((prev) => ({ ...prev, panNumber: true }));
-                              } else {
-                                const panError = validatePan(panVal);
-                                if (panError) {
-                                  setFormErrors((prev) => ({ ...prev, panNumber: true }));
-                                } else {
-                                  setFormErrors((prev) => {
-                                    const next = { ...prev };
-                                    delete next.panNumber;
-                                    return next;
-                                  });
-                                }
-                              }
-                            }}
+                            disabled={isViewMode}
                             placeholder="ABCDE1234F"
                             maxLength={10}
                             disabled={isViewMode}
@@ -2177,17 +2008,6 @@ const EmployeeManagementPage: React.FC = () => {
                               }
                             }, 0);
                           }}
-                          onBlur={() => {
-                            if (!newEmployee.permanentAddress || newEmployee.permanentAddress.trim() === '') {
-                              setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
-                            } else {
-                              setFormErrors((prev) => {
-                                const next = { ...prev };
-                                delete next.permanentAddress;
-                                return next;
-                              });
-                            }
-                          }}
                           disabled={isViewMode}
                         />
                       </div>
@@ -2214,17 +2034,7 @@ const EmployeeManagementPage: React.FC = () => {
                               }
                             }, 0);
                           }}
-                          onBlur={() => {
-                            if (!newEmployee.currentAddress || newEmployee.currentAddress.trim() === '') {
-                              setFormErrors((prev) => ({ ...prev, currentAddress: true }));
-                            } else {
-                              setFormErrors((prev) => {
-                                const next = { ...prev };
-                                delete next.currentAddress;
-                                return next;
-                              });
-                            }
-                          }}
+                          disabled={(isSameAddress && !isEditMode) || isViewMode}
                           disabled={(isSameAddress && !isEditMode) || isViewMode}
                         />
                         {!isEditMode && !isViewMode && (

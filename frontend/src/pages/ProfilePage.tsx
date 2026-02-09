@@ -405,15 +405,7 @@ const ProfilePage: React.FC = () => {
 
         const filledFields = eduFields.filter(f => !isEmpty(f.value));
 
-        // All-or-nothing logic for education levels (including PG if provided)
-        if (filledFields.length > 0 && filledFields.length < eduFields.length) {
-          showWarning(`Please fill complete details for ${levelLabel} education`);
-          eduFields.forEach(f => {
-            if (isEmpty(f.value)) fieldErrors[`edu_${index}_${f.key}`] = true;
-          });
-          setFormErrors(fieldErrors);
-          isEducationValid = false;
-        }
+        // All-or-nothing logic removed to allow partial saves
 
         if (!isEmpty(edu.year)) {
           const year = parseInt(edu.year, 10);
@@ -823,17 +815,6 @@ const ProfilePage: React.FC = () => {
                       personalInfo: { ...formData.personalInfo, firstName: value }
                     });
                   }}
-                  onBlur={() => {
-                    if (!formData.personalInfo?.firstName || formData.personalInfo.firstName.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, firstName: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.firstName;
-                        return next;
-                      });
-                    }
-                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -868,17 +849,6 @@ const ProfilePage: React.FC = () => {
                       ...formData,
                       personalInfo: { ...formData.personalInfo, lastName: value }
                     });
-                  }}
-                  onBlur={() => {
-                    if (!formData.personalInfo?.lastName || formData.personalInfo.lastName.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, lastName: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.lastName;
-                        return next;
-                      });
-                    }
                   }}
                   disabled={!isEditMode}
                 />
@@ -947,20 +917,6 @@ const ProfilePage: React.FC = () => {
                       }
                     }, 0);
                   }}
-                  onBlur={() => {
-                    const val = formData.personalInfo?.contactNumber;
-                    if (!val || val.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, contactNumber: true }));
-                    } else if (val.length < 10) {
-                      setFormErrors((prev) => ({ ...prev, contactNumber: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.contactNumber;
-                        return next;
-                      });
-                    }
-                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1003,28 +959,6 @@ const ProfilePage: React.FC = () => {
                       }
                     }, 0);
                   }}
-                  onBlur={() => {
-                    const val = formData.personalInfo?.altContact;
-                    // Only validate if value is provided
-                    if (val && val.trim() !== '') {
-                      if (val.length < 10) {
-                        setFormErrors((prev) => ({ ...prev, altContact: true }));
-                      } else {
-                        setFormErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.altContact;
-                          return next;
-                        });
-                      }
-                    } else {
-                      // Clear error if field is empty (it's optional)
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.altContact;
-                        return next;
-                      });
-                    }
-                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1042,51 +976,6 @@ const ProfilePage: React.FC = () => {
                       personalInfo: { ...formData.personalInfo, dateOfBirth: date }
                     });
                     // Clear error on valid change
-                    setFormErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.dateOfBirth;
-                      return next;
-                    });
-                  }}
-                  onBlur={(e) => {
-                    const val = e.target.value;
-                    // If empty, let the required check handle it (or if it was previously filled, clear error)
-                    if (!val) {
-                      if (!formData.personalInfo?.dateOfBirth) {
-                        setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
-                      }
-                      return;
-                    }
-
-                    // Regex for dd-mm-yyyy
-                    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
-                    if (!datePattern.test(val)) {
-                      setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
-                      return;
-                    }
-
-                    // Logical validation for parts
-                    const [, dayStr, monthStr, yearStr] = val.match(datePattern) || [];
-                    const day = parseInt(dayStr, 10);
-                    const month = parseInt(monthStr, 10);
-                    const year = parseInt(yearStr, 10);
-
-                    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > new Date().getFullYear()) {
-                      setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
-                      return;
-                    }
-
-                    // Check valid day for month
-                    const testDate = new Date(year, month - 1, day);
-                    if (testDate.getDate() !== day || testDate.getMonth() !== month - 1 || testDate.getFullYear() !== year) {
-                      setFormErrors((prev) => ({ ...prev, dateOfBirth: true }));
-                      return;
-                    }
-
-                    // If we reach here, date string is valid format.
-                    // But we should also check if onChange fired (formData updated).
-                    // If formData is empty but this looks valid, it might be that DatePicker failed to parse?
-                    // Usually if valid here, DatePicker would have parsed it.
                     setFormErrors((prev) => {
                       const next = { ...prev };
                       delete next.dateOfBirth;
@@ -1246,17 +1135,6 @@ const ProfilePage: React.FC = () => {
                       personalInfo: { ...formData.personalInfo, emergencyContactName: value }
                     });
                   }}
-                  onBlur={() => {
-                    if (!formData.personalInfo?.emergencyContactName || formData.personalInfo.emergencyContactName.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, emergencyContactName: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.emergencyContactName;
-                        return next;
-                      });
-                    }
-                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1300,20 +1178,6 @@ const ProfilePage: React.FC = () => {
                       }
                     }, 0);
                   }}
-                  onBlur={() => {
-                    const val = formData.personalInfo?.emergencyContactNo;
-                    if (!val || val.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
-                    } else if (val.length < 10) {
-                      setFormErrors((prev) => ({ ...prev, emergencyContactNo: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.emergencyContactNo;
-                        return next;
-                      });
-                    }
-                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1332,17 +1196,6 @@ const ProfilePage: React.FC = () => {
                       ...formData,
                       personalInfo: { ...formData.personalInfo, emergencyContactRelation: value }
                     });
-                  }}
-                  onBlur={() => {
-                    if (!formData.personalInfo?.emergencyContactRelation || formData.personalInfo.emergencyContactRelation.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, emergencyContactRelation: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.emergencyContactRelation;
-                        return next;
-                      });
-                    }
                   }}
                   disabled={!isEditMode}
                 />
@@ -1381,17 +1234,6 @@ const ProfilePage: React.FC = () => {
                       employmentInfo: { ...formData.employmentInfo, designation: value }
                     });
                   }}
-                  onBlur={() => {
-                    if (!formData.employmentInfo?.designation || formData.employmentInfo.designation.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, designation: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.designation;
-                        return next;
-                      });
-                    }
-                  }}
                   disabled={!isEditMode}
                 />
               </div>
@@ -1409,17 +1251,6 @@ const ProfilePage: React.FC = () => {
                       ...formData,
                       employmentInfo: { ...formData.employmentInfo, department: value }
                     });
-                  }}
-                  onBlur={() => {
-                    if (!formData.employmentInfo?.department || formData.employmentInfo.department.trim() === '') {
-                      setFormErrors((prev) => ({ ...prev, department: true }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.department;
-                        return next;
-                      });
-                    }
                   }}
                   disabled={!isEditMode}
                 />
@@ -1614,17 +1445,6 @@ const ProfilePage: React.FC = () => {
                     }
                   }, 0);
                 }}
-                onBlur={() => {
-                  if (!formData.address?.permanentAddress || formData.address.permanentAddress.trim() === '') {
-                    setFormErrors((prev) => ({ ...prev, permanentAddress: true }));
-                  } else {
-                    setFormErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.permanentAddress;
-                      return next;
-                    });
-                  }
-                }}
                 disabled={!isEditMode}
                 rows={4}
               />
@@ -1648,17 +1468,6 @@ const ProfilePage: React.FC = () => {
                       input.setSelectionRange(cursorPosition, cursorPosition);
                     }
                   }, 0);
-                }}
-                onBlur={() => {
-                  if (!formData.address?.currentAddress || formData.address.currentAddress.trim() === '') {
-                    setFormErrors((prev) => ({ ...prev, currentAddress: true }));
-                  } else {
-                    setFormErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.currentAddress;
-                      return next;
-                    });
-                  }
                 }}
                 disabled={!isEditMode}
                 rows={4}
@@ -1695,17 +1504,6 @@ const ProfilePage: React.FC = () => {
                             newEducation[idx] = { ...edu, groupStream: value };
                             setFormData({ ...formData, education: newEducation });
                           }}
-                          onBlur={() => {
-                            if ((edu.level === 'UG' || edu.level === '12th') && (!edu.groupStream || edu.groupStream.trim() === '')) {
-                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_groupStream`]: true }));
-                            } else {
-                              setFormErrors((prev) => {
-                                const next = { ...prev };
-                                delete next[`edu_${idx}_groupStream`];
-                                return next;
-                              });
-                            }
-                          }}
                           disabled={!isEditMode}
                         />
                       </td>
@@ -1718,17 +1516,6 @@ const ProfilePage: React.FC = () => {
                             const newEducation = [...formData.education];
                             newEducation[idx] = { ...edu, collegeUniversity: value };
                             setFormData({ ...formData, education: newEducation });
-                          }}
-                          onBlur={() => {
-                            if ((edu.level === 'UG' || edu.level === '12th') && (!edu.collegeUniversity || edu.collegeUniversity.trim() === '')) {
-                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_collegeUniversity`]: true }));
-                            } else {
-                              setFormErrors((prev) => {
-                                const next = { ...prev };
-                                delete next[`edu_${idx}_collegeUniversity`];
-                                return next;
-                              });
-                            }
                           }}
                           disabled={!isEditMode}
                         />
@@ -1744,24 +1531,6 @@ const ProfilePage: React.FC = () => {
                             const newEducation = [...formData.education];
                             newEducation[idx] = { ...edu, year: value };
                             setFormData({ ...formData, education: newEducation });
-                          }}
-                          onBlur={(e) => {
-                            const yearStr = e.target.value;
-                            const year = parseInt(yearStr, 10);
-                            const currentYear = new Date().getFullYear();
-                            const maxYear = currentYear + 5;
-
-                            if ((edu.level === 'UG' || edu.level === '12th') && (!yearStr || yearStr.trim() === '')) {
-                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
-                            } else if (yearStr && (isNaN(year) || year < 1950 || year > maxYear)) {
-                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_year`]: true }));
-                            } else {
-                              setFormErrors((prev) => {
-                                const next = { ...prev };
-                                delete next[`edu_${idx}_year`];
-                                return next;
-                              });
-                            }
                           }}
                           disabled={!isEditMode}
                         />
@@ -1802,17 +1571,6 @@ const ProfilePage: React.FC = () => {
                               scorePercentage: sanitized
                             };
                             setFormData({ ...formData, education: newEducation });
-                          }}
-                          onBlur={() => {
-                            if ((edu.level === 'UG' || edu.level === '12th') && (edu.scorePercentage === null || edu.scorePercentage === undefined || String(edu.scorePercentage).trim() === '')) {
-                              setFormErrors((prev) => ({ ...prev, [`edu_${idx}_scorePercentage`]: true }));
-                            } else {
-                              setFormErrors((prev) => {
-                                const next = { ...prev };
-                                delete next[`edu_${idx}_scorePercentage`];
-                                return next;
-                              });
-                            }
                           }}
                           disabled={!isEditMode}
                         />
