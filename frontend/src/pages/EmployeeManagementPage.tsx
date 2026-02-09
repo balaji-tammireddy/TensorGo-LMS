@@ -1945,7 +1945,6 @@ const EmployeeManagementPage: React.FC = () => {
                                 panNumber: sanitized
                               });
                             }}
-                            disabled={isViewMode}
                             placeholder="ABCDE1234F"
                             maxLength={10}
                             disabled={isViewMode}
@@ -2034,7 +2033,6 @@ const EmployeeManagementPage: React.FC = () => {
                               }
                             }, 0);
                           }}
-                          disabled={(isSameAddress && !isEditMode) || isViewMode}
                           disabled={(isSameAddress && !isEditMode) || isViewMode}
                         />
                         {!isEditMode && !isViewMode && (
