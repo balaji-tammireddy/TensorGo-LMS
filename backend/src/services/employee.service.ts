@@ -1765,8 +1765,7 @@ export const addLeavesToEmployee = async (
           ? parseFloat(balanceCheck.rows[0][balanceColumn] || '0')
           : 0;
         const newBalance = previousBalance + count;
-
-        await emailTemplates.sendLeaveAllocationEmail(employee.email, {
+        const emailData = {
           employeeName: employee.employee_name || 'Employee',
           employeeEmpId: employee.emp_id || '',
           leaveType: leaveType,
@@ -1778,12 +1777,30 @@ export const addLeavesToEmployee = async (
           allocationDate: formatDateLocal(new Date()) || '',
           comment: comment,
           documentUrl: documentUrl
-        });
+        };
+
+        // 1. Send notification to employee (the function now handles removing the documentUrl)
+        await emailTemplates.sendLeaveAllocationEmail(employee.email, emailData);
         logger.info(`✅ Leave allocation email sent to employee: ${employee.email}`);
+
+        // 2. Fetch all active Super Admins
+        const superAdminsResult = await pool.query(
+          "SELECT email FROM users WHERE user_role = 'super_admin' AND status = 'active'"
+        );
+
+        // 3. Send notification to all Super Admins (with documentUrl)
+        for (const admin of superAdminsResult.rows) {
+          try {
+            await emailTemplates.sendSuperAdminLeaveAllocationEmail(admin.email, emailData);
+            logger.info(`✅ Leave allocation alert sent to Super Admin: ${admin.email}`);
+          } catch (adminEmailError) {
+            logger.error(`❌ Error sending leave allocation email to Super Admin ${admin.email}:`, adminEmailError);
+          }
+        }
       }
     } catch (emailError: any) {
       // Log error but don't fail leave allocation
-      logger.error(`❌ Error sending leave allocation email:`, emailError);
+      logger.error(`❌ Error sending leave allocation emails:`, emailError);
     }
 
     return { message: `${count} ${leaveType} leave(s) added successfully` };

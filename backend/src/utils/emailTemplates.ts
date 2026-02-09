@@ -778,7 +778,7 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
       isHtml: true,
       isBold: true
     },
-    { label: 'Allocated By:', value: data.allocatedByEmpId ? `${data.allocatedBy} (${data.allocatedByEmpId})` : data.allocatedBy },
+    { label: 'Allocated By:', value: data.allocatedBy },
     { label: 'Allocation Date:', value: allocationDateDisplay },
     ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : []),
     ...(data.documentUrl ? [{
@@ -790,19 +790,14 @@ const generateLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): strin
 
   const content = `
     <p>Dear ${data.employeeName},</p>
-    <p>Additional leaves have been allocated to your account. Please find the allocation details below.</p>
+    <p>This is to notify you that your leave balance has been updated. Please find the allocation details below.</p>
     <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Allocation Details</h3>
     ${detailsTable}
-    ${data.conversionNote ? `
-      <div style="margin-top: 30px; padding: 15px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
-        <p style="margin: 0; color: #166534; font-size: 14px;"><strong>Conversion Note:</strong> ${data.conversionNote}</p>
-      </div>
-    ` : ''}
     <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
   `;
 
   return generateEmailWrapper(
-    'Leave Allocation Notification',
+    'Leave Balance Updated',
     content,
     uniqueId,
     `${data.allocatedDays} days of ${leaveTypeDisplay} allocated`
@@ -814,27 +809,92 @@ const generateLeaveAllocationEmailText = (data: LeaveAllocationEmailData): strin
   const allocationDateDisplay = formatDateForDisplay(data.allocationDate);
 
   return `
-Leave Allocation Notification
+Leave Balance Updated
 
 Dear ${data.employeeName},
 
-Additional leaves have been allocated to your account.
+This is to notify you that your leave balance has been updated.
 
 Allocation Details:
 - Leave Type: ${leaveTypeDisplay}
-- Days Allocated: ${data.allocatedDays} ${data.allocatedDays === 1 ? 'day' : 'days'}
-- Previous Balance: ${data.previousBalance} ${data.previousBalance === 1 ? 'day' : 'days'}
-- New Balance: ${data.newBalance} ${data.newBalance === 1 ? 'day' : 'days'}
+- Days Allocated: ${data.allocatedDays}
+- Previous Balance: ${data.previousBalance}
+- New Balance: ${data.newBalance}
 - Allocated By: ${data.allocatedBy}
 - Allocation Date: ${allocationDateDisplay}
-${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.conversionNote ? `\nConversion Note: ${data.conversionNote}` : ''}${data.documentUrl ? `\n- Document: ${data.documentUrl}` : ''}
+${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.documentUrl ? `- Document: ${data.documentUrl}\n` : ''}
 
 Best Regards,
 TensorGo Intranet
+  `;
+};
 
----
-This is an automated email from TensorGo Intranet.
-Please do not reply to this email.
+/**
+ * Generate super admin leave allocation notification email HTML
+ */
+const generateSuperAdminLeaveAllocationEmailHtml = (data: LeaveAllocationEmailData): string => {
+  const leaveTypeDisplay = formatLeaveType(data.leaveType);
+  const allocationDateDisplay = formatDateForDisplay(data.allocationDate);
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const detailsTable = generateDetailsTable([
+    { label: 'Employee Name:', value: data.employeeName, isBold: true },
+    { label: 'Employee ID:', value: data.employeeEmpId },
+    { label: 'Leave Type:', value: leaveTypeDisplay, isBold: true },
+    { label: 'Days Allocated:', value: `${data.allocatedDays} ${data.allocatedDays === 1 ? 'day' : 'days'}`, isBold: true },
+    { label: 'Allocated By:', value: data.allocatedBy },
+    { label: 'Allocation Date:', value: allocationDateDisplay },
+    ...(data.comment ? [{ label: 'Comment:', value: data.comment }] : []),
+    ...(data.documentUrl ? [{
+      label: 'Document:',
+      value: `<a href="${data.documentUrl}" target="_blank" style="color: #2563eb; text-decoration: underline;">View Attachment</a>`,
+      isHtml: true
+    }] : [])
+  ]);
+
+  const content = `
+    <p>Dear Super Admin,</p>
+    <p>This is to notify you that <strong>${data.allocatedBy}</strong> has added <strong>${data.allocatedDays} ${data.allocatedDays === 1 ? 'day' : 'days'}</strong> of <strong>${leaveTypeDisplay}</strong> to <strong>${data.employeeName}'s</strong> leave balance.</p>
+    <h3 style="margin: 30px 0 10px 0; font-size: 18px;">Allocation Details</h3>
+    ${detailsTable}
+    <p style="margin-top: 30px;">Best Regards,<br/><strong>TensorGo Intranet</strong></p>
+  `;
+
+  return generateEmailWrapper(
+    'Leave Allocation Alert - Super Admin',
+    content,
+    uniqueId,
+    `${data.allocatedBy} added leaves to ${data.employeeName}`
+  );
+};
+
+/**
+ * Generate super admin leave allocation notification email text
+ */
+const generateSuperAdminLeaveAllocationEmailText = (data: LeaveAllocationEmailData): string => {
+  const leaveTypeDisplay = formatLeaveType(data.leaveType);
+  const allocationDateDisplay = formatDateForDisplay(data.allocationDate);
+
+  return `
+Leave Allocation Alert - Super Admin
+
+Dear Super Admin,
+
+This is to notify you that ${data.allocatedBy} has added ${data.allocatedDays} ${data.allocatedDays === 1 ? 'day' : 'days'} of ${leaveTypeDisplay} to ${data.employeeName}'s leave balance.
+
+Allocation Details:
+- Employee Name: ${data.employeeName}
+- Employee ID: ${data.employeeEmpId}
+- Leave Type: ${leaveTypeDisplay}
+- Days Allocated: ${data.allocatedDays}
+- Allocated By: ${data.allocatedBy}
+- Allocation Date: ${allocationDateDisplay}
+${data.comment ? `- Comment: ${data.comment}\n` : ''}${data.documentUrl ? `- Document: ${data.documentUrl}\n` : ''}
+
+Best Regards,
+TensorGo Intranet
   `;
 };
 
@@ -846,12 +906,39 @@ export const sendLeaveAllocationEmail = async (
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
   const uniqueId = `${timestamp}${randomStr}`;
 
-  const emailSubject = `Leave Allocation - ${data.leaveType} Leave Added [Ref: ${uniqueId}]`;
-  const emailHtml = generateLeaveAllocationEmailHtml(data);
-  const emailText = generateLeaveAllocationEmailText(data);
+  const emailSubject = `Leave Balance Updated [Ref: ${uniqueId}]`;
+  // Create a copy of data without documentUrl for employee
+  const employeeData = { ...data };
+  delete employeeData.documentUrl;
+
+  const emailHtml = generateLeaveAllocationEmailHtml(employeeData);
+  const emailText = generateLeaveAllocationEmailText(employeeData);
 
   return await sendEmail({
     to: employeeEmail,
+    subject: emailSubject,
+    html: emailHtml,
+    text: emailText,
+  });
+};
+
+/**
+ * Send leave allocation notification to Super Admins
+ */
+export const sendSuperAdminLeaveAllocationEmail = async (
+  adminEmail: string,
+  data: LeaveAllocationEmailData
+): Promise<boolean> => {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const uniqueId = `${timestamp}${randomStr}`;
+
+  const emailSubject = `Leave Allocation Alert: ${data.allocatedBy} ➜ ${data.employeeName} [Ref: ${uniqueId}]`;
+  const emailHtml = generateSuperAdminLeaveAllocationEmailHtml(data);
+  const emailText = generateSuperAdminLeaveAllocationEmailText(data);
+
+  return await sendEmail({
+    to: adminEmail,
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
