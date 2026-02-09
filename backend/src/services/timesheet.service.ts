@@ -829,17 +829,45 @@ export class TimesheetService {
     // 2. Daily Reminder (8 PM)
     static async processDailyReminders() {
         logger.info('[Timesheet] Processing Daily Check...');
+
+        // 1. Get Today's date in IST
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const dayOfWeek = nowIST.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+        const todayStr = nowIST.toISOString().split('T')[0];
+
+        // 2. Skip on Sundays
+        if (dayOfWeek === 0) {
+            logger.info('[Timesheet] Skipping daily reminder: Today is Sunday.');
+            return;
+        }
+
+        // 3. Skip if Today is a Public Holiday
+        const holidayCheck = await pool.query('SELECT holiday_name FROM holidays WHERE holiday_date = $1 AND is_active = true', [todayStr]);
+        if (holidayCheck.rows.length > 0) {
+            logger.info(`[Timesheet] Skipping daily reminder: Today is a public holiday (${holidayCheck.rows[0].holiday_name}).`);
+            return;
+        }
+
+        // 4. Role Filter based on working days
+        // Mon-Fri (1-5): employee, manager, hr, intern
+        // Sat (6): only intern
+        let roleFilter: string[] = ['intern'];
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+            roleFilter = ['employee', 'manager', 'hr', 'intern'];
+        }
+
+        logger.info(`[Timesheet] Today is ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]}. Reminder scope: ${roleFilter.join(', ')}`);
+
         // Users who haven't logged for Today
-        const todayStr = new Date().toISOString().split('T')[0];
         const res = await pool.query(`
             SELECT u.id, u.email, u.first_name 
             FROM users u
-            WHERE u.status = 'active' AND u.user_role != 'super_admin'
+            WHERE u.status = 'active' AND u.user_role = ANY($2)
             AND NOT EXISTS (
                 SELECT 1 FROM project_entries pe 
                 WHERE pe.user_id = u.id AND pe.log_date = $1
             )
-        `, [todayStr]);
+        `, [todayStr, roleFilter]);
 
         for (const u of res.rows) {
             await sendTimesheetReminderEmail(u.email, {
@@ -848,6 +876,7 @@ export class TimesheetService {
                 date: todayStr
             });
         }
+        logger.info(`[Timesheet] Sent ${res.rows.length} daily reminders.`);
     }
 
     // 3. Friday Validation (4 PM)
