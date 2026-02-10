@@ -75,7 +75,13 @@ export class ProjectService {
       await client.query('BEGIN');
 
       // 1. Manager Assignment Logic
-      let managerId = data.project_manager_id;
+      const managerId = parseInt(data.project_manager_id as any); // Cast to any for parseInt, as ProjectData expects number
+      if (isNaN(managerId)) throw new Error('Invalid project manager ID');
+
+      if (!data.description || !data.description.trim()) {
+        throw new Error('Description is mandatory');
+      }
+
       // REMOVED: Restriction that forced Manager role to self-assign
       // if (creatorRole === 'manager') { managerId = data.created_by; }
 
@@ -210,7 +216,13 @@ export class ProjectService {
       let idx = 1;
 
       if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
-      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.description !== undefined) {
+        if (!data.description || !data.description.trim()) {
+          throw new Error('Description cannot be empty');
+        }
+        updates.push(`description = $${idx++}`);
+        values.push(data.description.trim());
+      }
       if (data.start_date !== undefined) { updates.push(`start_date = $${idx++}`); values.push(data.start_date); }
       if (data.end_date !== undefined) { updates.push(`end_date = $${idx++}`); values.push(data.end_date); }
 
@@ -477,6 +489,11 @@ export class ProjectService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      if (!data.description || !data.description.trim()) {
+        throw new Error('Description is mandatory');
+      }
+
       // Generate Custom ID automatically
       const customId = await this.generateNextCustomId('project_modules', 'MOD', 'project_id', data.project_id, client);
 
@@ -523,7 +540,13 @@ export class ProjectService {
       let idx = 1;
 
       if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
-      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.description !== undefined) {
+        if (!data.description || !data.description.trim()) {
+          throw new Error('Description cannot be empty');
+        }
+        updates.push(`description = $${idx++}`);
+        values.push(data.description.trim());
+      }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
 
       // Check for duplicate name within project
@@ -642,6 +665,11 @@ export class ProjectService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      if (!data.description || !data.description.trim()) {
+        throw new Error('Description is mandatory');
+      }
+
       // Generate Custom ID automatically
       const customId = await this.generateNextCustomId('project_tasks', 'TSK', 'module_id', data.module_id, client);
 
@@ -686,6 +714,10 @@ export class ProjectService {
       const taskRes = await client.query('SELECT custom_id FROM project_tasks WHERE id = $1', [data.task_id]);
       if (taskRes.rows.length === 0) throw new Error('Parent task not found');
       const taskCustomId = taskRes.rows[0].custom_id;
+
+      if (!data.description || !data.description.trim()) {
+        throw new Error('Description is mandatory');
+      }
 
       // 2. Generate Custom ID (e.g. TSK-001-01)
       const customId = data.custom_id || await this.generateNextCustomId('project_activities', taskCustomId, 'task_id', data.task_id, client);
@@ -757,7 +789,13 @@ export class ProjectService {
       let idx = 1;
 
       if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
-      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.description !== undefined) {
+        if (!data.description || !data.description.trim()) {
+          throw new Error('Description cannot be empty');
+        }
+        updates.push(`description = $${idx++}`);
+        values.push(data.description.trim());
+      }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
       if (data.due_date !== undefined) { updates.push(`due_date = $${idx++}`); values.push(data.due_date); }
 
@@ -839,7 +877,13 @@ export class ProjectService {
       let idx = 1;
 
       if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
-      if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
+      if (data.description !== undefined) {
+        if (!data.description || !data.description.trim()) {
+          throw new Error('Description cannot be empty');
+        }
+        updates.push(`description = $${idx++}`);
+        values.push(data.description.trim());
+      }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
 
       // Check for duplicate name within task

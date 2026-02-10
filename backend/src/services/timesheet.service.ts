@@ -857,7 +857,7 @@ export class TimesheetService {
         }
     }
 
-    // 2. Daily Reminder (8 PM)
+    // 2. Daily Reminder (5 PM)
     static async processDailyReminders() {
         logger.info('[Timesheet] Processing Daily Check...');
 

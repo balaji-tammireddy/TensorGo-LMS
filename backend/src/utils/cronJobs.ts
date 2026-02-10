@@ -407,11 +407,11 @@ export const initializeCronJobs = () => {
   });
   logger.info('✅ Cron job scheduled: Timesheet Daily Auto-Fill (08:00 AM)');
 
-  // 2. Daily Reminders: 6 PM Daily
-  cron.schedule('0 18 * * *', TimesheetService.processDailyReminders, {
+  // 2. Daily Reminders: 5 PM Daily
+  cron.schedule('0 17 * * *', TimesheetService.processDailyReminders, {
     timezone: 'Asia/Kolkata'
   });
-  logger.info('✅ Cron job scheduled: Timesheet Daily Reminder (6 PM)');
+  logger.info('✅ Cron job scheduled: Timesheet Daily Reminder (5 PM)');
 
   // 3. Friday Validation: 4 PM (Fri only)
   cron.schedule('0 16 * * 5', TimesheetService.processFridayValidation, {

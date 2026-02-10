@@ -127,6 +127,11 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             return;
         }
 
+        if (!formData.description || !formData.description.trim()) {
+            showError('Description is mandatory');
+            return;
+        }
+
         try {
             setLoading(true);
             let result: any;
@@ -347,7 +352,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
                         {/* Description */}
                         <div className="form-group">
-                            <label className="form-label">Description</label>
+                            <label className="form-label">
+                                Description <span className="text-danger">*</span>
+                            </label>
                             <textarea
                                 className={`form-textarea ${isEdit && type === 'project' && !canEditDetails ? 'disabled' : ''}`}
                                 rows={5}
@@ -360,6 +367,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                     }
                                 }}
                                 disabled={isEdit && type === 'project' && !canEditDetails}
+                                required
                             />
                             <div className="char-counter">
                                 {formData.description.length}/{DESC_LIMIT}
