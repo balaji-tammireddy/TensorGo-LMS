@@ -377,3 +377,87 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+export const generateExcelReport = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id: userId, role, name: userName } = req.user!;
+
+        // Security: Block employees and interns from accessing reports
+        if (role === 'employee' || role === 'intern' || role === 'manager') {
+            logger.warn(`[Timesheet Excel Report] Unauthorized access attempt by user ${userId} (${role})`);
+            return res.status(403).json({ error: 'Access denied. Only HR/Admins can generate reports.' });
+        }
+
+        const queryParams = { ...req.query } as any;
+        logger.info(`[Timesheet Report] Generating Excel report. User: ${userId}, Role: ${role}, Filters: ${JSON.stringify(queryParams)}`);
+
+        const filters: any = {
+            startDate: queryParams.startDate ? String(queryParams.startDate) : undefined,
+            endDate: queryParams.endDate ? String(queryParams.endDate) : undefined,
+            projectId: queryParams.projectId ? parseInt(String(queryParams.projectId)) : undefined,
+            moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
+            taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
+            activityId: queryParams.activityId ? parseInt(String(queryParams.activityId)) : undefined,
+            userId: queryParams.targetUserId ? parseInt(String(queryParams.targetUserId)) : undefined
+        };
+
+        // Scope enforcement
+        if (role !== 'super_admin' && role !== 'hr') {
+            filters.managerScopeId = userId;
+        }
+
+        const filterNames: any = {
+            startDate: filters.startDate,
+            endDate: filters.endDate
+        };
+
+        if (filters.userId) {
+            const userRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [filters.userId]);
+            if (userRes.rows.length > 0) {
+                filterNames.employeeName = `${userRes.rows[0].first_name} ${userRes.rows[0].last_name}`;
+            }
+        }
+
+        const reportData = await TimesheetService.getReportData(filters);
+
+        if (reportData.length === 0) {
+            return res.status(400).json({ error: 'No entries found' });
+        }
+
+        if (filters.projectId) {
+            const projRes = await pool.query('SELECT name FROM projects WHERE id = $1', [filters.projectId]);
+            if (projRes.rows.length > 0) filterNames.projectName = projRes.rows[0].name;
+        }
+        if (filters.moduleId) {
+            const modRes = await pool.query('SELECT name FROM project_modules WHERE id = $1', [filters.moduleId]);
+            if (modRes.rows.length > 0) filterNames.moduleName = modRes.rows[0].name;
+        }
+        if (filters.taskId) {
+            const taskRes = await pool.query('SELECT name FROM project_tasks WHERE id = $1', [filters.taskId]);
+            if (taskRes.rows.length > 0) filterNames.taskName = taskRes.rows[0].name;
+        }
+        if (filters.activityId) {
+            const actRes = await pool.query('SELECT name FROM project_activities WHERE id = $1', [filters.activityId]);
+            if (actRes.rows.length > 0) filterNames.activityName = actRes.rows[0].name;
+        }
+
+        const { generateTimesheetExcel } = await import('../utils/excelGenerator');
+
+        const excelBuffer = await generateTimesheetExcel({
+            entries: reportData,
+            filters: filterNames,
+            generatedBy: userName || 'Manager',
+            generatedAt: new Date().toISOString()
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=timesheet-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+        res.setHeader('Content-Length', excelBuffer.length);
+
+        res.send(excelBuffer);
+        logger.info('[Timesheet Report] Excel report sent to client');
+
+    } catch (error: any) {
+        logger.error('[Timesheet Report] Excel Controller Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};

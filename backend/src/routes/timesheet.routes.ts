@@ -19,5 +19,6 @@ router.post('/leave-log/action', authenticateToken, timesheetController.updateLe
 router.post('/reject', authenticateToken, timesheetController.rejectTimesheet);
 router.get('/report', authenticateToken, timesheetController.generateReport);
 router.get('/report/pdf', authenticateToken, timesheetController.generatePDFReport);
+router.get('/report/excel', authenticateToken, timesheetController.generateExcelReport);
 
 export default router;
