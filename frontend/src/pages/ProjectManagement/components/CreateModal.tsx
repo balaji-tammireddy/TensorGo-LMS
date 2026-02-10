@@ -233,7 +233,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             onSuccess(result);
             onClose();
         } catch (err: any) {
-            showError(err.message || 'Failed to save item');
+            const errorMessage = err.response?.data?.error || err.message || 'Failed to save item';
+            showError(errorMessage);
         } finally {
             setLoading(false);
         }

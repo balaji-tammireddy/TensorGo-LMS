@@ -101,6 +101,12 @@ export class ProjectService {
         throw new Error('Cannot assign a user on notice/inactive as Project Manager');
       }
 
+      // Check for duplicate name
+      const nameCheck = await client.query('SELECT 1 FROM projects WHERE name = $1', [data.name]);
+      if (nameCheck.rows.length > 0) {
+        throw new Error('Name already exists');
+      }
+
       // Generate Custom ID
       const customId = await this.generateNextCustomId('projects', 'PRO', undefined, undefined, client);
 
@@ -188,6 +194,14 @@ export class ProjectService {
       // 3. AUTOMATION: Check for status change to set end_date
       if (data.status && currentProject.status === 'active' && data.status !== 'active' && !data.end_date) {
         data.end_date = new Date().toISOString();
+      }
+
+      // Check for duplicate name
+      if (data.name) {
+        const nameCheck = await client.query('SELECT 1 FROM projects WHERE name = $1 AND id != $2', [data.name, id]);
+        if (nameCheck.rows.length > 0) {
+          throw new Error('Name already exists');
+        }
       }
 
       // 3. Build dynamic update query
@@ -466,6 +480,12 @@ export class ProjectService {
       // Generate Custom ID automatically
       const customId = await this.generateNextCustomId('project_modules', 'MOD', 'project_id', data.project_id, client);
 
+      // Check for duplicate name within project
+      const nameCheck = await client.query('SELECT 1 FROM project_modules WHERE name = $1 AND project_id = $2', [data.name, data.project_id]);
+      if (nameCheck.rows.length > 0) {
+        throw new Error('Name already exists');
+      }
+
       const res = await client.query(
         `INSERT INTO project_modules (project_id, custom_id, name, description, created_by, updated_by)
              VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
@@ -505,6 +525,18 @@ export class ProjectService {
       if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
       if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
+
+      // Check for duplicate name within project
+      if (data.name) {
+        const moduleRes = await client.query('SELECT project_id FROM project_modules WHERE id = $1', [id]);
+        if (moduleRes.rows.length > 0) {
+          const projectId = moduleRes.rows[0].project_id;
+          const nameCheck = await client.query('SELECT 1 FROM project_modules WHERE name = $1 AND project_id = $2 AND id != $3', [data.name, projectId, id]);
+          if (nameCheck.rows.length > 0) {
+            throw new Error('Name already exists');
+          }
+        }
+      }
 
       if (updates.length > 0 || userId) {
         updates.push(`updated_at = CURRENT_TIMESTAMP`);
@@ -613,6 +645,12 @@ export class ProjectService {
       // Generate Custom ID automatically
       const customId = await this.generateNextCustomId('project_tasks', 'TSK', 'module_id', data.module_id, client);
 
+      // Check for duplicate name within module
+      const nameCheck = await client.query('SELECT 1 FROM project_tasks WHERE name = $1 AND module_id = $2', [data.name, data.module_id]);
+      if (nameCheck.rows.length > 0) {
+        throw new Error('Name already exists');
+      }
+
       const res = await client.query(
         `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date, created_by, updated_by)
              VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
@@ -651,6 +689,12 @@ export class ProjectService {
 
       // 2. Generate Custom ID (e.g. TSK-001-01)
       const customId = data.custom_id || await this.generateNextCustomId('project_activities', taskCustomId, 'task_id', data.task_id, client);
+
+      // Check for duplicate name within task
+      const nameCheck = await client.query('SELECT 1 FROM project_activities WHERE name = $1 AND task_id = $2', [data.name, data.task_id]);
+      if (nameCheck.rows.length > 0) {
+        throw new Error('Name already exists');
+      }
 
       const res = await client.query(
         `INSERT INTO project_activities (task_id, custom_id, name, description, created_by, updated_by)
@@ -716,6 +760,18 @@ export class ProjectService {
       if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
       if (data.due_date !== undefined) { updates.push(`due_date = $${idx++}`); values.push(data.due_date); }
+
+      // Check for duplicate name within module
+      if (data.name) {
+        const taskRes = await client.query('SELECT module_id FROM project_tasks WHERE id = $1', [id]);
+        if (taskRes.rows.length > 0) {
+          const moduleId = taskRes.rows[0].module_id;
+          const nameCheck = await client.query('SELECT 1 FROM project_tasks WHERE name = $1 AND module_id = $2 AND id != $3', [data.name, moduleId, id]);
+          if (nameCheck.rows.length > 0) {
+            throw new Error('Name already exists');
+          }
+        }
+      }
 
 
       if (updates.length > 0 || userId) {
@@ -785,6 +841,18 @@ export class ProjectService {
       if (data.name) { updates.push(`name = $${idx++}`); values.push(data.name); }
       if (data.description !== undefined) { updates.push(`description = $${idx++}`); values.push(data.description); }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
+
+      // Check for duplicate name within task
+      if (data.name) {
+        const activityRes = await client.query('SELECT task_id FROM project_activities WHERE id = $1', [id]);
+        if (activityRes.rows.length > 0) {
+          const taskId = activityRes.rows[0].task_id;
+          const nameCheck = await client.query('SELECT 1 FROM project_activities WHERE name = $1 AND task_id = $2 AND id != $3', [data.name, taskId, id]);
+          if (nameCheck.rows.length > 0) {
+            throw new Error('Name already exists');
+          }
+        }
+      }
 
       if (updates.length > 0 || userId) {
         updates.push(`updated_at = CURRENT_TIMESTAMP`);

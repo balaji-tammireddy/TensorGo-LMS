@@ -30,7 +30,7 @@ export const createProject = async (req: AuthRequest, res: Response) => {
         console.error('[PROJECT] Create Error:', error);
         logger.error('[PROJECT] Create Error:', error);
         if (error.message.includes('already exists')) {
-            return res.status(409).json({ error: 'Project ID already exists' });
+            return res.status(409).json({ error: error.message });
         }
         res.status(500).json({ error: error.message });
     }
@@ -69,6 +69,9 @@ export const updateProject = async (req: AuthRequest, res: Response) => {
         res.json(project);
     } catch (error: any) {
         console.error('[PROJECT] Update Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -115,6 +118,9 @@ export const createModule = async (req: AuthRequest, res: Response) => {
         res.status(201).json(result);
     } catch (error: any) {
         logger.error('[MODULE] Create Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -147,6 +153,9 @@ export const updateModule = async (req: AuthRequest, res: Response) => {
         res.json(result);
     } catch (error: any) {
         logger.error('[MODULE] Update Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -196,6 +205,9 @@ export const createTask = async (req: AuthRequest, res: Response) => {
         res.status(201).json(result);
     } catch (error: any) {
         logger.error('[TASK] Create Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -226,6 +238,9 @@ export const createActivity = async (req: AuthRequest, res: Response) => {
         res.status(201).json(result);
     } catch (error: any) {
         logger.error('[ACTIVITY] Create Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -243,6 +258,9 @@ export const updateActivity = async (req: AuthRequest, res: Response) => {
         res.json(result);
     } catch (error: any) {
         logger.error('[ACTIVITY] Update Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -260,6 +278,9 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
         res.json(result);
     } catch (error: any) {
         logger.error('[TASK] Update Error:', error);
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
