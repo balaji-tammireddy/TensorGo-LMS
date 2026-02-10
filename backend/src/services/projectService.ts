@@ -1008,16 +1008,8 @@ export class ProjectService {
       WHERE p.id = $2
     `;
 
-    if (!isGlobalViewer) {
-      // Involvement-based visibility
-      queryStr += `
-        AND (
-          p.project_manager_id = $1
-          OR EXISTS (SELECT 1 FROM module_access ma JOIN project_modules m ON ma.module_id = m.id WHERE m.project_id = p.id AND ma.user_id = $1)
-          OR EXISTS (SELECT 1 FROM task_access ta JOIN project_tasks t ON ta.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND ta.user_id = $1)
-          OR EXISTS (SELECT 1 FROM activity_access aa JOIN project_activities a ON aa.activity_id = a.id JOIN project_tasks t ON a.task_id = t.id JOIN project_modules m ON t.module_id = m.id WHERE m.project_id = p.id AND aa.user_id = $1)
-        )
-      `;
+    if (role !== 'super_admin') {
+      queryStr += ` AND p.custom_id != 'SYS-TG'`;
     }
 
     const res = await query(queryStr, [userId, projectId]);
