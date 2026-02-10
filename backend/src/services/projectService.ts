@@ -240,10 +240,10 @@ export class ProjectService {
 
           // Add old PM to project_members table so they remain available for re-assignment
           await client.query(`
-            INSERT INTO project_members (project_id, user_id, joined_at)
-            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            INSERT INTO project_members (project_id, user_id, joined_at, created_by, updated_by)
+            VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $3)
             ON CONFLICT (project_id, user_id) DO NOTHING
-          `, [id, oldPmId]);
+          `, [id, oldPmId, requesterId]);
 
           // C. Re-assign NEW PM to everything as "Default Access"
           await this.assignIrrevocableAccess(id, data.project_manager_id!, client);
@@ -729,9 +729,9 @@ export class ProjectService {
     for (const userId of userIds) {
       await clientOrPool.query(
         `INSERT INTO module_access (module_id, user_id, granted_by, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5)
+         VALUES ($1, $2, $3, $3, $3)
          ON CONFLICT (module_id, user_id) DO NOTHING`,
-        [moduleId, userId, grantedBy, grantedBy, grantedBy]
+        [moduleId, userId, grantedBy]
       );
     }
   }
@@ -740,9 +740,9 @@ export class ProjectService {
     for (const userId of userIds) {
       await clientOrPool.query(
         `INSERT INTO task_access (task_id, user_id, granted_by, created_by, updated_by)
-               VALUES ($1, $2, $3, $4, $5)
+               VALUES ($1, $2, $3, $3, $3)
                ON CONFLICT (task_id, user_id) DO NOTHING`,
-        [taskId, userId, grantedBy, grantedBy, grantedBy]
+        [taskId, userId, grantedBy]
       );
     }
   }
@@ -890,9 +890,9 @@ export class ProjectService {
     for (const userId of userIds) {
       await clientOrPool.query(
         `INSERT INTO activity_access (activity_id, user_id, granted_by, created_by, updated_by)
-               VALUES ($1, $2, $3, $4, $5)
+               VALUES ($1, $2, $3, $3, $3)
                ON CONFLICT (activity_id, user_id) DO NOTHING`,
-        [activityId, userId, grantedBy, grantedBy, grantedBy]
+        [activityId, userId, grantedBy]
       );
     }
   }
@@ -1341,9 +1341,9 @@ export class ProjectService {
         console.log(`[ACCESS_TRACE] Adding ${uId} to ${table} for ${idColumn}=${tId}`);
         const result = await client.query(
           `INSERT INTO ${table} (${idColumn}, user_id, granted_by, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5)
+             VALUES ($1, $2, $3, $3, $3)
              ON CONFLICT (${idColumn}, user_id) DO NOTHING`,
-          [tId, uId, requestedBy, requestedBy, requestedBy]
+          [tId, uId, requestedBy]
         );
         console.log(`[ACCESS_TRACE] Add result:`, result.rowCount);
       } else {
