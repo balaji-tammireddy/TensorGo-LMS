@@ -969,8 +969,13 @@ export class ProjectService {
 
     console.log(`[ProjectService] getProjectsForUser: userId=${userId}, role=${role} - Returning all projects for organization-wide visibility`);
 
-    // Requirement 4 & 5: All users can see all projects.
-    // We return projects without filtering by involvement, but we keep is_member for logging permission checks in the UI.
+    // Visibility Filter: Hide system projects (SYS-TG) from non-super admins
+    let filterClause = '';
+    const params: any[] = [userId];
+    if (role !== 'super_admin') {
+      filterClause = `WHERE p.custom_id != 'SYS-TG'`;
+    }
+
     const res = await query(
       `SELECT p.*, 
               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
@@ -978,8 +983,9 @@ export class ProjectService {
               ${involvementSubquery}
        FROM projects p
        LEFT JOIN users u ON p.project_manager_id = u.id
+       ${filterClause}
        ORDER BY p.created_at DESC`,
-      [userId]
+      params
     );
 
     console.log(`[ProjectService] getProjectsForUser: Found ${res.rows.length} projects`);
