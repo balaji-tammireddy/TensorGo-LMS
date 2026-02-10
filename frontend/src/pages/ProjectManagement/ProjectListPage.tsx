@@ -142,7 +142,7 @@ export const ProjectListPage: React.FC = () => {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={5} style={{ padding: '0' }}>
+                                    <td colSpan={user?.role === 'super_admin' ? 5 : 4} style={{ padding: '0' }}>
                                         <div style={{ padding: '20px' }}>
                                             {Array.from({ length: 5 }).map((_, idx) => (
                                                 <div key={idx} className="shimmer-table"></div>
@@ -152,7 +152,7 @@ export const ProjectListPage: React.FC = () => {
                                 </tr>
                             ) : filteredProjects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5}>
+                                    <td colSpan={user?.role === 'super_admin' ? 5 : 4}>
                                         <div className="empty-state-container">
                                             <EmptyState
                                                 title="No Projects Found"
