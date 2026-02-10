@@ -271,6 +271,8 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
         a.name.toLowerCase().includes(activitySearch.toLowerCase())
     );
 
+    if (!isOpen) return null;
+
     return (
         <div className="modal-overlay">
             <div className="modal-container report-modal-container">
