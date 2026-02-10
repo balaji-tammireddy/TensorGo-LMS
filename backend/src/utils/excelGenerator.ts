@@ -1,4 +1,4 @@
-import ExcelJS, { Cell } from 'exceljs';
+import * as ExcelJS from 'exceljs';
 import { logger } from './logger';
 
 interface TimesheetReportData {
@@ -83,7 +83,7 @@ export const generateTimesheetExcel = async (data: TimesheetReportData): Promise
 
         const headerRow = worksheet.getRow(currentRow);
         headerRow.values = headers;
-        headerRow.eachCell((cell: Cell) => {
+        headerRow.eachCell((cell: ExcelJS.Cell) => {
             cell.style = headerStyle;
             cell.border = {
                 top: { style: 'thin' },
@@ -107,7 +107,7 @@ export const generateTimesheetExcel = async (data: TimesheetReportData): Promise
                 entry.description || ''
             ]);
 
-            row.eachCell((cell: Cell) => {
+            row.eachCell((cell: ExcelJS.Cell) => {
                 cell.border = {
                     top: { style: 'thin' },
                     left: { style: 'thin' },

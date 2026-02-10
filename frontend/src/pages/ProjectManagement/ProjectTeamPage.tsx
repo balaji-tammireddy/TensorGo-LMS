@@ -12,7 +12,7 @@ export const ProjectTeamPage: React.FC = () => {
     const projectId = parseInt(id || '0');
 
     // Fetch Project Details (for header)
-    const { data: projects } = useQuery('projects', projectService.getProjects);
+    const { data: projects } = useQuery('projects', () => projectService.getProjects());
     const project = projects?.find(p => p.id === projectId);
 
     // Fetch Team Members
