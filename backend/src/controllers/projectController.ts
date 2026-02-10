@@ -62,7 +62,7 @@ export const updateProject = async (req: AuthRequest, res: Response) => {
 
         const canManage = await ProjectService.canUserManageProject(userId, role, parseInt(id));
         if (!canManage) {
-            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Project Manager can update the project metadata.' });
+            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Manager can update the project metadata.' });
         }
 
         const project = await ProjectService.updateProject(parseInt(id), updates, userId, role);
@@ -102,7 +102,7 @@ export const createModule = async (req: AuthRequest, res: Response) => {
 
         const canManage = await ProjectService.canUserManageResources(userId, req.user?.role || '', parseInt(projectId));
         if (!canManage) {
-            return res.status(403).json({ error: 'Access denied: Only the Project Manager can add modules' });
+            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Manager can add modules.' });
         }
 
         const result = await ProjectService.createModule({
@@ -141,7 +141,7 @@ export const updateModule = async (req: AuthRequest, res: Response) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
         const canManage = await ProjectService.canUserManageModule(userId, req.user?.role || '', parseInt(moduleId));
-        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can update modules' });
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Manager can update modules.' });
 
         const result = await ProjectService.updateModule(parseInt(moduleId), req.body, userId);
         res.json(result);
@@ -159,7 +159,7 @@ export const deleteModule = async (req: AuthRequest, res: Response) => {
 
         const { moduleId } = req.params;
         const canManage = await ProjectService.canUserManageModule(userId, role, parseInt(moduleId));
-        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can delete modules' });
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, or Manager can delete modules.' });
 
         const result = await ProjectService.deleteModule(parseInt(moduleId));
         res.json(result);
@@ -182,7 +182,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
 
         const canManage = await ProjectService.canUserManageModule(userId, req.user?.role || '', parseInt(moduleId));
         if (!canManage) {
-            return res.status(403).json({ error: 'Access denied: Only the Project Manager can add tasks' });
+            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, Manager, or users with access to the parent module can add tasks.' });
         }
 
         const result = await ProjectService.createTask({
@@ -213,7 +213,7 @@ export const createActivity = async (req: AuthRequest, res: Response) => {
 
         const canManage = await ProjectService.canUserManageTask(userId, req.user?.role || '', parseInt(taskId));
         if (!canManage) {
-            return res.status(403).json({ error: 'Access denied: Only the Project Manager can add activities' });
+            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, Manager, or users with access to the parent task can add activities.' });
         }
 
         const result = await ProjectService.createActivity({
@@ -237,7 +237,7 @@ export const updateActivity = async (req: AuthRequest, res: Response) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
         const canManage = await ProjectService.canUserManageActivity(userId, req.user?.role || '', parseInt(activityId));
-        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can update activities' });
+        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, Manager, or users with access to the parent task can update activities.' });
 
         const result = await ProjectService.updateActivity(parseInt(activityId), req.body, userId);
         res.json(result);
@@ -360,6 +360,21 @@ export const toggleAccess = async (req: AuthRequest, res: Response) => {
 
         if (!['add', 'remove'].includes(action)) {
             return res.status(400).json({ error: 'Invalid action' });
+        }
+
+        // Permission Check
+        let canManage = false;
+        const role = req.user?.role || '';
+        if (level === 'module') {
+            canManage = await ProjectService.canUserManageModule(requestedBy, role, parseInt(targetId));
+        } else if (level === 'task') {
+            canManage = await ProjectService.canUserManageTask(requestedBy, role, parseInt(targetId));
+        } else if (level === 'activity') {
+            canManage = await ProjectService.canUserManageActivity(requestedBy, role, parseInt(targetId));
+        }
+
+        if (!canManage) {
+            return res.status(403).json({ error: 'Access denied: You do not have permission to manage access for this resource.' });
         }
 
         const result = await ProjectService.toggleAccess(level, targetId, userId, action, requestedBy);

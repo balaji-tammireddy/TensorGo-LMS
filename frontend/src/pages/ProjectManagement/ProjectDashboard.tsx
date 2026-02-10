@@ -31,36 +31,25 @@ export const ProjectDashboard: React.FC = () => {
     const queryView = searchParams.get('view');
 
     // Filters and Search
+    // Filters and Search
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [pmFilter, setPmFilter] = useState('all');
-    const [viewMode, setViewMode] = useState<'my' | 'all'>((queryView === 'all') ? 'all' : 'my');
 
-    useEffect(() => {
-        if (queryView === 'all') {
-            setViewMode('all');
-        } else if (!queryView && ['super_admin', 'hr'].includes(user?.role || '')) {
-            // Default to 'my' only if no explicit view is provided
-            setViewMode('my');
-        }
-    }, [queryView, user?.role]);
-
-    // Fetch projects
+    // Fetch projects - Requirement 4: Always fetch organization-wide for all users
     const { data: projects, isLoading } = useQuery(
-        ['projects', viewMode],
-        () => projectService.getProjects(viewMode === 'all'),
+        ['projects', 'all'],
+        () => projectService.getProjects(true),
         {
             refetchOnWindowFocus: false,
             staleTime: 60000,
         }
     );
 
-    const isGlobalViewer = ['super_admin', 'hr'].includes(user?.role || '');
+    const isGlobalViewer = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
     const canCreate = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
 
-    // Cleaned up redundant effect that was resetting viewMode
-
-    // Unique PMs for header filter
+    // ... uniquePMs logic ...
     const uniquePMs = useMemo(() => {
         if (!projects) return [];
         const pms = projects
@@ -95,7 +84,6 @@ export const ProjectDashboard: React.FC = () => {
     };
 
     const filteredProjects = (projects || []).filter(p => {
-        if (isGlobalViewer && viewMode === 'my' && !p.is_pm && !p.is_member) return false;
         if (statusFilter !== 'all' && p.status !== statusFilter) return false;
         if (pmFilter !== 'all' && p.manager_name !== pmFilter) return false;
         if (searchTerm) {
@@ -148,26 +136,10 @@ export const ProjectDashboard: React.FC = () => {
                     </div>
 
                     <div className="filter-group">
-                        <div className="toggle-group">
-                            {isGlobalViewer && (
-                                <>
-                                    <button
-                                        className={viewMode === 'my' ? 'active' : ''}
-                                        onClick={() => setViewMode('my')}
-                                    >
-                                        My Projects
-                                    </button>
-                                    <button
-                                        className={viewMode === 'all' ? 'active' : ''}
-                                        onClick={() => setViewMode('all')}
-                                    >
-                                        All Projects
-                                    </button>
-                                </>
-                            )}
-                        </div>
+                        {/* View toggles removed - unified display */}
                     </div>
                 </div>
+
 
                 <div className="table-container-modern">
                     <table className="modern-table">
@@ -257,7 +229,7 @@ export const ProjectDashboard: React.FC = () => {
                                 filteredProjects.map((project) => (
                                     <tr
                                         key={project.id}
-                                        onClick={() => navigate(`/project-management/${project.id}`, { state: { from: viewMode } })}
+                                        onClick={() => navigate(`/project-management/${project.id}`)}
                                         className="clickable-row"
                                     >
                                         <td style={{ fontWeight: '700', color: '#64748B' }}>{project.custom_id}</td>

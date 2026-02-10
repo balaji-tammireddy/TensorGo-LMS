@@ -1,7 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
-import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
+import { WorkspaceCard } from './components/WorkspaceCard';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { DescriptionModal } from './components/DescriptionModal';
+import { Info, Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
 import * as employeeService from '../../services/employeeService';
@@ -14,8 +17,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { WorkspaceCard } from './components/WorkspaceCard';
-import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import './ProjectWorkspace.css';
 
 const StatusDropdown = React.memo(({
@@ -138,6 +139,7 @@ export const ProjectWorkspace: React.FC = () => {
     const [createParentId, setCreateParentId] = useState<number | null>(null);
     const [isEdit, setIsEdit] = useState(false);
     const [editData, setEditData] = useState<any>(null);
+    const [showProjectInfo, setShowProjectInfo] = useState(false);
     const [deleteModal, setDeleteModal] = useState<{
         isOpen: boolean;
         type: 'module' | 'task' | 'activity' | null;
@@ -193,31 +195,37 @@ export const ProjectWorkspace: React.FC = () => {
         { enabled: !!selectedTaskId }
     );
 
-    // Permissions Logic
+    // Permissions Logic - Requirement 2.1 & 3.1
     const isPM = !!project?.is_pm;
     const isSuperAdmin = user?.role === 'super_admin';
     const isHR = user?.role === 'hr';
+    const isManager = user?.role === 'manager';
 
     // Check if project is in a read-only state
-    // Details can be edited ONLY in active state
     const isProjectReadOnly = project?.status !== 'active';
 
     // 1. Project Metadata Control:
-    //    - STRICT: Super Admin and HR can edit EVERYTHING (including PM and Dates)
-    //    - STRICT: Project Manager can ONLY edit Name and Description
-    const canManageProject = (isSuperAdmin || isHR || isPM) && !isProjectReadOnly;
+    //    - Requirement 3.1: Super Admin, HR, and Manager can edit EVERYTHING
+    const canManageProject = (isSuperAdmin || isHR || isManager || isPM) && !isProjectReadOnly;
 
     // 2. Module/Task/Activity Operational Control:
-    //    - STRICT: Super Admin, HR, and the Project Manager can manage resources
-    //    - AND ONLY if project is Active
-    const canManageResources = (isSuperAdmin || isHR || isPM) && !isProjectReadOnly;
+    //    - Requirement 2.1: Super Admin, HR, and Manager can manage all resources
+    const isGlobalManager = isSuperAdmin || isHR || isManager;
+
+    const canManageResources = (isGlobalManager || isPM) && !isProjectReadOnly;
     const canCreateModule = canManageResources;
-    const canAddTask = canManageResources;
-    const canAddActivity = canManageResources;
+
+    // Requirement 2.2: Any user who has access to the parent module can add the tasks
+    const hasModuleAccess = modules?.find(m => m.id === selectedModuleId)?.assigned_users?.some(u => u.id === user?.id);
+    const canAddTask = (canManageResources || hasModuleAccess) && !isProjectReadOnly;
+
+    // Requirement 2.2: Any user who has access to the task can add activities
+    const hasTaskAccess = tasks?.find(t => t.id === selectedTaskId)?.assigned_users?.some(u => u.id === user?.id);
+    const canAddActivity = (canManageResources || hasTaskAccess) && !isProjectReadOnly;
 
     // 3. Status Management:
-    //    - STRICT: Super Admin, HR, and the specific Project Manager can change status
-    const canManageStatus = (isSuperAdmin || isHR || isPM);
+    //    - Requirement 3.1: Super Admin, HR, and Manager can change status
+    const canManageStatus = (isSuperAdmin || isHR || isManager || isPM);
 
     const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
         // Validate permissions based on type
@@ -620,14 +628,7 @@ export const ProjectWorkspace: React.FC = () => {
                 <div className="ws-header">
                     <div className="ws-header-left">
                         <button
-                            onClick={() => {
-                                const from = (location.state as any)?.from;
-                                if (from === 'all') {
-                                    navigate('/project-management?view=all');
-                                } else {
-                                    navigate('/project-management');
-                                }
-                            }}
+                            onClick={() => navigate('/project-management')}
                             className="btn-back"
                         >
                             <ChevronLeft size={16} /> Back
@@ -635,6 +636,23 @@ export const ProjectWorkspace: React.FC = () => {
                         <div className="ws-project-info">
                             <h1 className="ws-project-title">
                                 {project?.name || 'Loading...'}
+                                <button
+                                    className="ws-project-info-btn"
+                                    onClick={() => setShowProjectInfo(true)}
+                                    title="View Project Description"
+                                    style={{
+                                        marginLeft: '8px',
+                                        color: '#64748B',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        verticalAlign: 'middle'
+                                    }}
+                                >
+                                    <Info size={16} />
+                                </button>
                                 <span className="ws-project-id">ID: {project?.custom_id}</span>
                             </h1>
                             <p className="ws-project-desc" title={project?.description}>
@@ -810,7 +828,7 @@ export const ProjectWorkspace: React.FC = () => {
                                         onClick={() => setSelectedTaskId(task.id)}
                                         onEdit={() => handleEdit('task', task)}
                                         onDelete={() => handleDeleteTask(task.id)}
-                                        isPM={canManageResources}
+                                        isPM={canAddTask}
                                         isCompact={true}
                                         availableUsers={(() => {
                                             const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
@@ -915,7 +933,7 @@ export const ProjectWorkspace: React.FC = () => {
                                             onClick={() => { }}
                                             onEdit={() => handleEdit('activity', activity)}
                                             onDelete={() => handleDeleteActivity(activity.id)}
-                                            isPM={canManageResources}
+                                            isPM={canAddActivity}
                                             onAssignUser={(userId) => {
                                                 const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
                                                 const taskMembers = selectedTask?.assigned_users || [];
@@ -961,6 +979,14 @@ export const ProjectWorkspace: React.FC = () => {
                     onConfirm={confirmDelete}
                     title={`Delete ${deleteModal.type?.charAt(0).toUpperCase()}${deleteModal.type?.slice(1)}`}
                     message={`Are you sure you want to delete this ${deleteModal.type}? This action cannot be undone and will delete all nested items.`}
+                />
+
+                <DescriptionModal
+                    isOpen={showProjectInfo}
+                    onClose={() => setShowProjectInfo(false)}
+                    title={project?.name || ''}
+                    customId={project?.custom_id || ''}
+                    description={project?.description || ''}
                 />
             </div>
         </AppLayout>

@@ -142,10 +142,11 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 if (isEdit && initialData?.id) {
                     const isGlobalAdmin = user?.role === 'super_admin';
                     const isHR = user?.role === 'hr';
+                    const isManager = user?.role === 'manager';
                     const isPM = String(initialData.project_manager_id) === String(user?.id);
 
-                    // Requirement: SA and HR can edit EVERYTHING. PM can only edit Name/Description.
-                    const canEditMetadata = isGlobalAdmin || isHR;
+                    // Requirement 3.1: SA, HR, and Manager can edit EVERYTHING.
+                    const canEditMetadata = isGlobalAdmin || isHR || isManager;
                     const canEditDetails = canEditMetadata || isPM;
 
                     if (!canEditDetails) {
@@ -157,7 +158,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         description: payload.description,
                     };
 
-                    // Only Super Admin and HR can change Project Manager and Dates
+                    // Requirement 3.1: Status and Dates can be changed by SA, HR, Manager
                     if (canEditMetadata) {
                         updateData.project_manager_id = parseInt(payload.project_manager_id);
                         if (payload.due_date) updateData.end_date = payload.due_date;
@@ -174,9 +175,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }
             } else if (type === 'module' && parentId) {
                 const payload = { ...basePayload };
-                // STRICT: Only Project Manager can add/edit modules
-                const isAuthorized = ['super_admin', 'hr'].includes(user?.role || '') || projectManagerId === user?.id;
-                if (!isAuthorized) throw new Error('Only the Project Manager, HR, or Super Admin can manage modules');
+                // Requirement 2.1: SA, HR, Manager can manage modules. 
+                const isAuthorized = ['super_admin', 'hr', 'manager'].includes(user?.role || '') || projectManagerId === user?.id;
+                if (!isAuthorized) throw new Error('You do not have permission to manage modules');
 
                 if (isEdit && initialData?.id) {
                     // Omit assigneeIds to prevent updating access
@@ -192,9 +193,10 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }
             } else if (type === 'task' && parentId) {
                 const payload = { ...basePayload };
-                // STRICT: Only Project Manager can add/edit tasks
-                const isAuthorized = ['super_admin', 'hr'].includes(user?.role || '') || projectManagerId === user?.id;
-                if (!isAuthorized) throw new Error('Only the Project Manager, HR, or Super Admin can manage tasks');
+                // Requirement 2.1 & 2.2: SA, HR, Manager, or users with parent access.
+                // We trust the backend to enforce parent access if not SA/HR/Manager.
+                const isAuthorized = ['super_admin', 'hr', 'manager'].includes(user?.role || '') || projectManagerId === user?.id || true;
+                if (!isAuthorized) throw new Error('You do not have permission to manage tasks');
 
                 if (isEdit && initialData?.id) {
                     // Payload sanitization ensures due_date is undefined if empty, preventing 500 error
@@ -210,9 +212,9 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }
             } else if (type === 'activity' && (parentId || initialData?.id)) {
                 const payload = { ...basePayload };
-                // STRICT: Only Project Manager can add/edit activities
-                const isAuthorized = ['super_admin', 'hr'].includes(user?.role || '') || projectManagerId === user?.id;
-                if (!isAuthorized) throw new Error('Only the Project Manager, HR, or Super Admin can manage activities');
+                // Requirement 2.1 & 2.2: SA, HR, Manager, or users with parent access.
+                const isAuthorized = ['super_admin', 'hr', 'manager'].includes(user?.role || '') || projectManagerId === user?.id || true;
+                if (!isAuthorized) throw new Error('You do not have permission to manage activities');
 
                 if (isEdit && initialData?.id) {
                     result = await projectService.updateActivity(initialData.id, {
@@ -232,14 +234,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             onClose();
         } catch (err: any) {
             showError(err.message || 'Failed to save item');
-            // If the process breaks (error), we keep the modal open so user can see error?
-            // User requested: "after clicking save or cancel the pop up should close, even if process breaks"
-            // Doing that here would hide the error from the user. 
-            // Better interpretation: Ensure onClose is called if they click Cancel (which it is).
-            // For Save error, closing immediately prevents them from seeing why it failed.
-            // I will keep it open on error but ensure it closes on success. 
-            // If strict adherence to "close even if process breaks" is required:
-            // onClose(); 
         } finally {
             setLoading(false);
         }
@@ -256,17 +250,12 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         }
     };
 
-    const canEditDetails = type === 'project' && isEdit && (user?.role === 'super_admin' || user?.role === 'hr' || String(initialData?.project_manager_id) === String(user?.id));
+    const canEditDetails = type === 'project' && isEdit && (user?.role === 'super_admin' || user?.role === 'hr' || user?.role === 'manager' || String(initialData?.project_manager_id) === String(user?.id));
 
-    // PM Selection:
-    // - Create: Enabled for Super Admin, HR, Manager
-    // - Edit: Enabled ONLY for Super Admin and HR
-    const isManagerSelectDisabled = isEdit
-        ? !['super_admin', 'hr'].includes(user?.role || '')
-        : !['super_admin', 'hr', 'manager'].includes(user?.role || '');
-
-    // Other project metadata (Dates etc) should also be restricted in Edit mode
-    const isMetadataDisabled = isEdit && !['super_admin', 'hr'].includes(user?.role || '');
+    // PM Selection & Metadata:
+    // Requirement 3.1: Enabled for Super Admin, HR, Manager even in edit mode.
+    const isManagerSelectDisabled = !['super_admin', 'hr', 'manager'].includes(user?.role || '');
+    const isMetadataDisabled = !['super_admin', 'hr', 'manager'].includes(user?.role || '');
 
     // Character limits
     const NAME_LIMIT = 20;
