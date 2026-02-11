@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronDown, Search, UserX } from 'lucide-react';
 import EmptyState from '../../../components/common/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
@@ -48,6 +48,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     const [loading, setLoading] = useState(false);
     const [managers, setManagers] = useState<any[]>([]);
     const [managerSearch, setManagerSearch] = useState('');
+    const nameInputRef = useRef<HTMLInputElement>(null);
 
     // Multi-select state removal
     // const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
@@ -55,6 +56,18 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     useEffect(() => {
         if (!isOpen) return;
+
+        // Auto-focus name field on open
+        // Small delay to ensure the modal animation/mounting is settled
+        const focusTimeout = setTimeout(() => {
+            if (nameInputRef.current && !nameInputRef.current.disabled) {
+                nameInputRef.current.focus();
+                // If there's already text (Edit mode), select it for faster replacement
+                if (isEdit) {
+                    nameInputRef.current.select();
+                }
+            }
+        }, 150);
 
         if (isEdit && initialData) {
             setFormData({
@@ -101,6 +114,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             }
         }
         // Removed Access List Fetching
+        return () => clearTimeout(focusTimeout);
     }, [isOpen, type, user, isEdit, initialData, parentId]);
 
     if (!isOpen) return null;
@@ -330,6 +344,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                 {type === 'project' ? 'Project Name' : 'Name'} <span className="text-danger">*</span>
                             </label>
                             <input
+                                ref={nameInputRef}
                                 type="text"
                                 className={`form-input ${isEdit && type === 'project' && !canEditDetails ? 'disabled' : ''}`}
                                 value={formData.name}
