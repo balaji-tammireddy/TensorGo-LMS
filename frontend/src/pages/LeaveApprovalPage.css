@@ -309,7 +309,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 90px !important;
+  min-width: 80px !important;
   text-transform: capitalize;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }

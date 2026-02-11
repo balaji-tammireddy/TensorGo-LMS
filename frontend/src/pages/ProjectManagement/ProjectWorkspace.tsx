@@ -52,11 +52,12 @@ const StatusDropdown = React.memo(({
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     fontSize: '12px',
-                    padding: '6px 16px',
+                    padding: '4px 12px',
                     borderRadius: '20px',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    minWidth: '85px'
                 }}
             >
                 {current.label}
@@ -80,10 +81,12 @@ const StatusDropdown = React.memo(({
                         fontWeight: '700',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
-                        fontSize: '12px',
-                        padding: '6px 16px',
+                        fontSize: '11px',
+                        padding: '4px 12px',
                         borderRadius: '20px',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        minWidth: '85px',
+                        justifyContent: 'center'
                     }}
                 >
                     {current.label}
