@@ -167,115 +167,103 @@
   /* Allow content to wrap if needed */
 }
 
-/* --- Pending Requests (9 Columns) --- */
+/* --- Pending Requests (8 Columns) --- */
 /* Total = 100% */
-/* 1. ID */
+/* 1. Name */
 .pending-requests-section .requests-table th:nth-child(1),
 .pending-requests-section .requests-table td:nth-child(1) {
-  width: 5%;
-}
-
-/* 2. Name */
-.pending-requests-section .requests-table th:nth-child(2),
-.pending-requests-section .requests-table td:nth-child(2) {
   width: 14%;
 }
 
-/* 3. Applied Date */
-.pending-requests-section .requests-table th:nth-child(3),
-.pending-requests-section .requests-table td:nth-child(3) {
+/* 2. Applied Date */
+.pending-requests-section .requests-table th:nth-child(2),
+.pending-requests-section .requests-table td:nth-child(2) {
   width: 10%;
 }
 
-/* 4. Leave Date */
-.pending-requests-section .requests-table th:nth-child(4),
-.pending-requests-section .requests-table td:nth-child(4) {
+/* 3. Leave Date */
+.pending-requests-section .requests-table th:nth-child(3),
+.pending-requests-section .requests-table td:nth-child(3) {
   width: 16%;
 }
 
-/* 5. Leave Type */
-.pending-requests-section .requests-table th:nth-child(5),
-.pending-requests-section .requests-table td:nth-child(5) {
+/* 4. Leave Type */
+.pending-requests-section .requests-table th:nth-child(4),
+.pending-requests-section .requests-table td:nth-child(4) {
   width: 10%;
 }
 
-/* 6. Days */
-.pending-requests-section .requests-table th:nth-child(6),
-.pending-requests-section .requests-table td:nth-child(6) {
-  width: 5%;
+/* 5. Days */
+.pending-requests-section .requests-table th:nth-child(5),
+.pending-requests-section .requests-table td:nth-child(5) {
+  width: 10%;
   text-align: left;
 }
 
-/* 7. Reason */
-.pending-requests-section .requests-table th:nth-child(7),
-.pending-requests-section .requests-table td:nth-child(7) {
+/* 6. Reason */
+.pending-requests-section .requests-table th:nth-child(6),
+.pending-requests-section .requests-table td:nth-child(6) {
   width: 20%;
 }
 
-/* 8. Status */
-.pending-requests-section .requests-table th:nth-child(8),
-.pending-requests-section .requests-table td:nth-child(8) {
+/* 7. Status */
+.pending-requests-section .requests-table th:nth-child(7),
+.pending-requests-section .requests-table td:nth-child(7) {
   width: 12%;
   text-align: left;
 }
 
-/* 9. Actions */
-.pending-requests-section .requests-table th:nth-child(9),
-.pending-requests-section .requests-table td:nth-child(9) {
+/* 8. Actions */
+.pending-requests-section .requests-table th:nth-child(8),
+.pending-requests-section .requests-table td:nth-child(8) {
   width: 8%;
   text-align: left;
 }
 
 
-/* --- Approved/Recent Requests (8 Columns) --- */
+/* --- Approved/Recent Requests (7 Columns) --- */
 /* Total = 100% */
-/* 1. ID */
+/* 1. Name (Flexible - fills space) */
 .approved-requests-section .requests-table th:nth-child(1),
 .approved-requests-section .requests-table td:nth-child(1) {
-  width: 5%;
-}
-
-/* 2. Name (Flexible - fills space) */
-.approved-requests-section .requests-table th:nth-child(2),
-.approved-requests-section .requests-table td:nth-child(2) {
   width: 18%;
 }
 
-/* 3. Applied Date */
-.approved-requests-section .requests-table th:nth-child(3),
-.approved-requests-section .requests-table td:nth-child(3) {
+/* 2. Applied Date */
+.approved-requests-section .requests-table th:nth-child(2),
+.approved-requests-section .requests-table td:nth-child(2) {
   width: 12%;
 }
 
-/* 4. Leave Date */
-.approved-requests-section .requests-table th:nth-child(4),
-.approved-requests-section .requests-table td:nth-child(4) {
+/* 3. Leave Date */
+.approved-requests-section .requests-table th:nth-child(3),
+.approved-requests-section .requests-table td:nth-child(3) {
   width: 22%;
 }
 
-/* 5. Leave Type */
-.approved-requests-section .requests-table th:nth-child(5),
-.approved-requests-section .requests-table td:nth-child(5) {
+/* 4. Leave Type */
+.approved-requests-section .requests-table th:nth-child(4),
+.approved-requests-section .requests-table td:nth-child(4) {
   width: 12%;
 }
 
-/* 6. Days */
-.approved-requests-section .requests-table th:nth-child(6),
-.approved-requests-section .requests-table td:nth-child(6) {
-  width: 6%;
+/* 5. Days */
+.approved-requests-section .requests-table th:nth-child(5),
+.approved-requests-section .requests-table td:nth-child(5) {
+  width: 11%;
   text-align: left;
 }
 
-/* 7. Status */
-.approved-requests-section .requests-table th:nth-child(7),
-.approved-requests-section .requests-table td:nth-child(7) {
+/* 6. Status */
+.approved-requests-section .requests-table th:nth-child(6),
+.approved-requests-section .requests-table td:nth-child(6) {
   width: 15%;
   text-align: left;
 }
 
-/* 8. Actions */
-.approved-requests-section .requests-table th:nth-child(8),
-.approved-requests-section .requests-table td:nth-child(8) {
+/* 7. Actions */
+.approved-requests-section .requests-table th:nth-child(7),
+.approved-requests-section .requests-table td:nth-child(7) {
   width: 10%;
   text-align: left;
 }

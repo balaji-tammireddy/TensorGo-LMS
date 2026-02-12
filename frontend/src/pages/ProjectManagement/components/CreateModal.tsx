@@ -50,6 +50,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
     const [managerSearch, setManagerSearch] = useState('');
     const nameInputRef = useRef<HTMLInputElement>(null);
 
+
     // Multi-select state removal
     // const [assigneeCandidates, setAssigneeCandidates] = useState<any[]>([]);
     // const [loadingCandidates, setLoadingCandidates] = useState(false);
