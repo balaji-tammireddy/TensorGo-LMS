@@ -140,7 +140,58 @@ const DashboardPage: React.FC = () => {
 
                 {/* Analytics Grid */}
                 <div className="analytics-grid">
-                    {/* Left: Weekly Timesheet Status */}
+                    {/* 1. Employees On Leave Today */}
+                    <div className="analytics-card">
+                        <h3 className="card-title">
+                            Absentees
+                            <span className="count-badge">{leavesToday.length}</span>
+                        </h3>
+                        <div className="leave-list-container">
+                            {isAnalyticsLoading ? (
+                                <div className="loading-shimmer"></div>
+                            ) : leavesToday.length > 0 ? (
+                                <div className="leave-list">
+                                    {leavesToday.map((leave: any) => (
+                                        <div key={leave.id} className="leave-item">
+                                            <div className="employee-info">
+                                                <div className="profile-img-container">
+                                                    {leave.profile_photo_url ? (
+                                                        <img src={leave.profile_photo_url} alt={leave.name} className="employee-img" />
+                                                    ) : (
+                                                        <div className="employee-initials">
+                                                            {leave.name.split(' ').map((n: string) => n[0]).join('')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="employee-details">
+                                                    <span className="emp-name">{leave.name}</span>
+                                                    <span className="emp-id">{leave.emp_id}</span>
+                                                </div>
+                                            </div>
+                                            <div className="leave-badge">
+                                                <span className={`badge ${leave.day_type}`}>
+                                                    {leave.day_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="no-data-msg" style={{ flexDirection: 'column', gap: '12px' }}>
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                        <path d="M9 16l2 2 4-4"></path>
+                                    </svg>
+                                    <span style={{ color: '#6b7280', fontSize: '14px', fontWeight: 500 }}>No employees on leave today</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 2. Previous Week Status */}
                     <div className="analytics-card">
                         <h3 className="card-title">
                             Previous Week Status
@@ -187,7 +238,7 @@ const DashboardPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Middle: Work Status Distribution */}
+                    {/* 3. Approved Work Status */}
                     <div className="analytics-card">
                         <h3 className="card-title">Approved Work Status</h3>
                         <div className="chart-content-wrapper">
@@ -228,54 +279,6 @@ const DashboardPage: React.FC = () => {
                                         ))}
                                     </div>
                                 </>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right: Employees On Leave Today */}
-                    <div className="analytics-card">
-                        <h3 className="card-title">Employees On Leave Today</h3>
-                        <div className="leave-list-container">
-                            {isAnalyticsLoading ? (
-                                <div className="loading-shimmer"></div>
-                            ) : leavesToday.length > 0 ? (
-                                <div className="leave-list">
-                                    {leavesToday.map((leave: any) => (
-                                        <div key={leave.id} className="leave-item">
-                                            <div className="employee-info">
-                                                <div className="profile-img-container">
-                                                    {leave.profile_photo_url ? (
-                                                        <img src={leave.profile_photo_url} alt={leave.name} className="employee-img" />
-                                                    ) : (
-                                                        <div className="employee-initials">
-                                                            {leave.name.split(' ').map((n: string) => n[0]).join('')}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="employee-details">
-                                                    <span className="emp-name">{leave.name}</span>
-                                                    <span className="emp-id">{leave.emp_id}</span>
-                                                </div>
-                                            </div>
-                                            <div className="leave-badge">
-                                                <span className={`badge ${leave.day_type}`}>
-                                                    {leave.day_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="no-data-msg" style={{ flexDirection: 'column', gap: '12px' }}>
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                                        <path d="M9 16l2 2 4-4"></path>
-                                    </svg>
-                                    <span style={{ color: '#6b7280', fontSize: '14px', fontWeight: 500 }}>No employees on leave today</span>
-                                </div>
                             )}
                         </div>
                     </div>
