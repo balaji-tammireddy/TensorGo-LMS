@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { pool } from '../database/db';
 import { logger } from './logger';
-import { sendPendingLeaveReminderEmail, sendBirthdayWishEmail, sendHolidayListReminderEmail, sendLeaveAllocationEmail } from './emailTemplates';
+import { sendPendingLeaveReminderEmail, sendBirthdayWishEmail, sendHolidayCalendarReminderEmail, sendLeaveAllocationEmail } from './emailTemplates';
 import { isLastWorkingDayOfMonth } from './leaveCredit';
 import { TimesheetService } from '../services/timesheet.service';
 
@@ -237,7 +237,7 @@ const checkAndSendHolidayListReminder = async () => {
     // 3. Send email to each HR
     for (const hr of hrResult.rows) {
       try {
-        await sendHolidayListReminderEmail(
+        await sendHolidayCalendarReminderEmail(
           hr.email,
           { recipientName: hr.name, nextYear },
           adminEmails.length > 0 ? adminEmails : undefined

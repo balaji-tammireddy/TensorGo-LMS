@@ -1346,16 +1346,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         // Send emails
         try {
-          const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
-          const previousManagerName = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
+          const { sendReportingManagerUpdateEmail } = await import('../utils/emailTemplates');
 
           for (const sub of subordinatesResult.rows) {
             try {
-              await sendReportingManagerChangeEmail(sub.email, {
+              await sendReportingManagerUpdateEmail(sub.email, {
                 employeeName: sub.name,
-                previousManagerName,
-                newManagerName: managerName,
-                newManagerEmpId: managerEmpId
+                managerName: managerName,
+                managerId: managerEmpId
               });
               logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassignment email sent to subordinate: ${sub.email}`);
             } catch (emailError) {
@@ -1386,12 +1384,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         [employeeId]
       );
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
-        const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
-        await sendReportingManagerChangeEmail(empResult.rows[0].email, {
+        const { sendReportingManagerUpdateEmail } = await import('../utils/emailTemplates');
+        await sendReportingManagerUpdateEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
-          previousManagerName: employeeCheck.rows[0].reporting_manager_name || 'N/A',
-          newManagerName: empResult.rows[0].reporting_manager_name || 'New Manager',
-          newManagerEmpId: empResult.rows[0].manager_emp_id || ''
+          managerName: empResult.rows[0].reporting_manager_name || 'New Manager',
+          managerId: empResult.rows[0].manager_emp_id || ''
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
@@ -1408,10 +1405,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
-        const { sendRoleChangeEmail } = await import('../utils/emailTemplates');
-        await sendRoleChangeEmail(empResult.rows[0].email, {
+        const { sendRoleUpdateEmail } = await import('../utils/emailTemplates');
+        const effectiveDate = formatDateLocal(new Date().toISOString());
+        await sendRoleUpdateEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newRole,
+          effectiveDate: effectiveDate || new Date().toDateString(),
           updatedBy: requesterName
         });
       }
@@ -1428,10 +1427,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
-        const { sendStatusChangeEmail } = await import('../utils/emailTemplates');
-        await sendStatusChangeEmail(empResult.rows[0].email, {
+        const { sendStatusUpdateEmail } = await import('../utils/emailTemplates');
+        const effectiveDate = formatDateLocal(new Date().toISOString());
+        await sendStatusUpdateEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newStatus,
+          effectiveDate: effectiveDate || new Date().toDateString(),
           updatedBy: requesterName
         });
       }

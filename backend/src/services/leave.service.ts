@@ -3,7 +3,7 @@ import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { deleteFromOVH } from '../utils/storage';
-import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail, sendLopToCasualConversionEmail } from '../utils/emailTemplates';
+import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail } from '../utils/emailTemplates';
 import { TimesheetService } from './timesheet.service';
 
 // Local date formatter to avoid timezone shifts
@@ -4456,37 +4456,14 @@ export const convertLeaveRequestLopToCasual = async (requestId: number, adminUse
     await client.query('COMMIT');
 
     // 9. Send notification email - Fire and forget
-    (async () => {
-      try {
-        const adminResult = await pool.query('SELECT first_name, emp_id, user_role as role FROM users WHERE id = $1', [adminUserId]);
-        const admin = adminResult.rows[0];
-
-        await sendLopToCasualConversionEmail(request.email, {
-          employeeName: `${request.first_name} ${request.last_name}`,
-          employeeEmpId: request.emp_id,
-          recipientName: `${request.first_name} ${request.last_name}`,
-          recipientRole: 'employee',
-          leaveType: 'Casual', // New type
-          startDate: formatDate(request.start_date),
-          startType: request.start_type,
-          endDate: formatDate(request.end_date),
-          endType: request.end_type,
-          noOfDays: noOfDays,
-          reason: request.reason,
-          converterName: admin.first_name,
-          converterEmpId: admin.emp_id,
-          converterRole: admin.role,
-          previousLopBalance,
-          newLopBalance,
-          previousCasualBalance,
-          newCasualBalance,
-          conversionDate: formatDate(new Date())
-        });
-        logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Notification email sent to ${request.email}`);
-      } catch (emailError: any) {
-        logger.error(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Failed to send notification email: ${emailError.message}`);
-      }
-    })();
+    // 9. Send notification email - Fire and forget
+    // (async () => {
+    //   try {
+    //     logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Notification email skipped as per requirement`);
+    //   } catch (emailError: any) {
+    //     logger.error(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Failed to send notification email: ${emailError.message}`);
+    //   }
+    // })();
 
     return {
       leaveRequestId: requestId,
