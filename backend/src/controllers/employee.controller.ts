@@ -125,13 +125,13 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
 
   try {
-    // Ensure only super_admin can delete
-    if (req.user?.role !== 'super_admin') {
+    // Ensure only super_admin and hr can delete
+    if (req.user?.role !== 'super_admin' && req.user?.role !== 'hr') {
       logger.warn(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
-          message: 'Only super admin can delete employees'
+          message: 'Only HR and super admin can delete employees'
         }
       });
     }

@@ -282,10 +282,10 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}, Requester: ${requesterRole || 'none'}`);
 
-  // Only super_admin can create another super_admin
-  if (employeeData.role === 'super_admin' && requesterRole !== 'super_admin') {
+  // HR and super_admin can create another super_admin
+  if (employeeData.role === 'super_admin' && requesterRole !== 'super_admin' && requesterRole !== 'hr') {
     logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to create super_admin`);
-    throw new Error('Only Super Admin can create Super Admin users');
+    throw new Error('Only HR and Super Admin can create Super Admin users');
   }
 
   // Mandatory fields check
@@ -1070,8 +1070,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Prevent HR from editing super_admin or other HR users (except role updates)
-  if (requesterRole === 'hr' && (employeeRole === 'super_admin' || employeeRole === 'hr') && !isOnlyRoleUpdate) {
+  // Prevent HR from editing other HR users (except role updates), but allow editing super_admin as requested
+  if (requesterRole === 'hr' && employeeRole === 'hr' && !isOnlyRoleUpdate) {
     if (isRoleBeingUpdated) {
       Object.keys(employeeData).forEach(key => {
         const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
@@ -1080,7 +1080,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
       });
     } else {
-      const targetName = employeeRole === 'super_admin' ? 'super admin' : (requesterId === employeeId ? 'their own' : 'other HR');
+      const targetName = requesterId === employeeId ? 'their own' : 'other HR';
       throw new Error(`HR cannot edit ${targetName} details`);
     }
   }
@@ -1264,10 +1264,10 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       continue;
     }
 
-    // Only super_admin can set/change someone to super_admin role
-    if (dbKey === 'user_role' && value === 'super_admin' && requesterRole !== 'super_admin') {
+    // HR and super_admin can set/change someone to super_admin role
+    if (dbKey === 'user_role' && value === 'super_admin' && requesterRole !== 'super_admin' && requesterRole !== 'hr') {
       logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to set super_admin role`);
-      throw new Error('Only Super Admin can assign the Super Admin role');
+      throw new Error('Only HR and Super Admin can assign the Super Admin role');
     }
 
     updates.push(`${dbKey} = $${paramCount}`);
