@@ -1112,17 +1112,17 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     allowedFields.push('user_role');
   }
 
-  // Only super_admin can update email, date_of_joining and emp_id
-  if (requesterRole === 'super_admin') {
+  // HR and super_admin can update email, date_of_joining and emp_id
+  if (requesterRole === 'super_admin' || requesterRole === 'hr') {
     allowedFields.push('email');
     allowedFields.push('date_of_joining');
     allowedFields.push('emp_id');
   } else {
-    // If not super_admin, forbid these fields ONLY if they are being changed
+    // If not super_admin or hr, forbid these fields ONLY if they are being changed
     // We compare with the existing database values
 
     if (employeeData.email && employeeData.email.trim().toLowerCase() !== employeeCheck.rows[0].email.toLowerCase()) {
-      throw new Error('Only Super Admin can update Official Email');
+      throw new Error('Only HR and Super Admin can update Official Email');
     }
 
     // Normalize dates for comparison (ignoring time)
@@ -1153,16 +1153,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
 
     if (newDOJ && existingDOJ && newDOJ !== existingDOJ) {
-      throw new Error(`Only Super Admin can update Date of Joining`);
+      throw new Error(`Only HR and Super Admin can update Date of Joining`);
     }
 
     if (employeeData.empId && employeeData.empId.trim().toUpperCase() !== employeeCheck.rows[0].emp_id) {
-      throw new Error('Only Super Admin can update Employee ID');
+      throw new Error('Only HR and Super Admin can update Employee ID');
     }
   }
 
   // Check if emp_id is being updated and validate uniqueness
-  if (employeeData.empId && requesterRole === 'super_admin') {
+  if (employeeData.empId && (requesterRole === 'super_admin' || requesterRole === 'hr')) {
     // employeeData.empId has already been cleaned of leading zeros earlier
     // Just apply uppercase normalization
     const empId = employeeData.empId.toString().trim().toUpperCase();
@@ -1178,7 +1178,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   // Check if email is being updated and validate uniqueness
-  if (employeeData.email && requesterRole === 'super_admin') {
+  if (employeeData.email && (requesterRole === 'super_admin' || requesterRole === 'hr')) {
     const emailCheck = await pool.query(
       'SELECT id FROM users WHERE email = $1 AND id != $2',
       [employeeData.email, employeeId]
@@ -1259,8 +1259,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       continue;
     }
 
-    // Employee ID cannot be changed once set, unless requester is super_admin
-    if (dbKey === 'emp_id' && requesterRole !== 'super_admin') {
+    // Employee ID cannot be changed once set, unless requester is super_admin or hr
+    if (dbKey === 'emp_id' && requesterRole !== 'super_admin' && requesterRole !== 'hr') {
       continue;
     }
 
@@ -1445,7 +1445,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const oldJoiningDate = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
   const newJoiningDate = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
 
-  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin' && finalRole !== 'super_admin') {
+  if (newJoiningDate && newJoiningDate !== oldJoiningDate && (requesterRole === 'super_admin' || requesterRole === 'hr') && finalRole !== 'super_admin') {
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
 
     // Update leave balances with recalculated credits
