@@ -809,8 +809,13 @@ export const getMyLeaveRequests = async (
       dates.sort((a, b) => b.date - a.date);
 
       if (dates[0].date > 0) {
-        approverName = dates[0].name;
-        approverRole = dates[0].role;
+        if (row.super_admin_approval_comment?.startsWith('Auto-approved')) {
+          approverName = 'Auto Approved';
+          approverRole = 'System';
+        } else {
+          approverName = dates[0].name;
+          approverRole = dates[0].role;
+        }
       }
 
       requests.push({
@@ -973,8 +978,13 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   dates.sort((a, b) => b.date - a.date);
 
   if (dates[0].date > 0) {
-    approverName = dates[0].name;
-    approverRole = dates[0].role;
+    if (row.super_admin_approval_comment?.startsWith('Auto-approved')) {
+      approverName = 'Auto Approved';
+      approverRole = 'System';
+    } else {
+      approverName = dates[0].name;
+      approverRole = dates[0].role;
+    }
   }
 
   // Get leave days for this request
@@ -4268,8 +4278,13 @@ export const getApprovedLeaves = async (
     dates.sort((a, b) => b.date - a.date);
 
     if (dates[0].date > 0) {
-      approverName = dates[0].name;
-      approverRole = dates[0].role;
+      if (row.super_admin_approval_comment?.startsWith('Auto-approved')) {
+        approverName = 'Auto Approved';
+        approverRole = 'System';
+      } else {
+        approverName = dates[0].name;
+        approverRole = dates[0].role;
+      }
     }
 
     return {

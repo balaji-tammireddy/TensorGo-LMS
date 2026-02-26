@@ -199,7 +199,7 @@ export const getAnalytics = async (req: AuthRequest, res: Response) => {
             FROM leave_days ld
             JOIN users u ON ld.employee_id = u.id
             JOIN leave_requests lr ON ld.leave_request_id = lr.id
-            WHERE ld.leave_date = CURRENT_DATE
+            WHERE ld.leave_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE
               AND lr.current_status = 'approved'
             ORDER BY u.first_name ASC
         `;

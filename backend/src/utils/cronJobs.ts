@@ -291,50 +291,42 @@ const autoApprovePastPendingLeaves = async () => {
     try {
       await client.query('BEGIN');
 
-      // 1. Find all pending leave requests where the end date is before today
-      // Using CURRENT_DATE ensures we compare with the start of today
       const pastPendingResult = await client.query(
-        `SELECT id, employee_id, leave_type 
+        `SELECT id, employee_id, leave_type, end_date
          FROM leave_requests 
-         WHERE current_status = 'pending' 
-           AND end_date < CURRENT_DATE`
+         WHERE current_status IN ('pending', 'partially_approved') 
+           AND end_date <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE`
       );
 
       const pastRequests = pastPendingResult.rows;
-      logger.info(`Found ${pastRequests.length} past pending leave requests for auto-approval`);
+      if (pastRequests.length > 0) {
+        logger.info(`Found ${pastRequests.length} pending leave requests to auto-approve (end_date <= today IST)`);
+      }
 
       if (pastRequests.length > 0) {
-        // Get a Super Admin ID to use as the system approver
-        const superAdminResult = await client.query(
-          "SELECT id FROM users WHERE user_role = 'super_admin' LIMIT 1"
-        );
-        const superAdminId = superAdminResult.rows[0]?.id;
-
-        if (!superAdminId) {
-          throw new Error('No Super Admin found in the database for auto-approval attribution');
-        }
-
         for (const request of pastRequests) {
+          logger.info(`Processing auto-approval for Request ID: ${request.id}, End Date: ${request.end_date}`);
           // 2. Update leave_requests header
           await client.query(
             `UPDATE leave_requests 
              SET current_status = 'approved',
                  super_admin_approval_status = 'approved',
                  super_admin_approval_date = CURRENT_TIMESTAMP,
-                 super_admin_approval_comment = 'Auto-approved: Leave date has passed',
-                 super_admin_approved_by = $1,
+                 super_admin_approval_comment = 'Auto-approved: Leave date has arrived or passed',
+                 super_admin_approved_by = NULL,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2`,
-            [superAdminId, request.id]
-          );
-
-          // 3. Update all associated leave_days
-          await client.query(
-            "UPDATE leave_days SET day_status = 'approved' WHERE leave_request_id = $1",
+             WHERE id = $1`,
             [request.id]
           );
 
-          logger.info(`✅ Auto-approved past pending leave request ID: ${request.id} for employee ID: ${request.employee_id}`);
+          // 3. Update all associated leave_days
+          // Only update days that are not already approved or rejected
+          await client.query(
+            "UPDATE leave_days SET day_status = 'approved' WHERE leave_request_id = $1 AND (day_status = 'pending' OR day_status IS NULL)",
+            [request.id]
+          );
+
+          logger.info(`✅ Auto-approved leave request ID: ${request.id} for employee ID: ${request.employee_id}`);
         }
       }
 
