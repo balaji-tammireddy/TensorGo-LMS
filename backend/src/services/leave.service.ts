@@ -674,10 +674,6 @@ export const applyLeave = async (
         const toEmail = chain.l1_email;
         const toName = chain.l1_name || 'Reporting Manager';
 
-        // CC list: Removed HR (L2) from CC list as per requirement
-        // The email should go only to the reporting manager
-        const ccEmails: string[] = [];
-
         if (toEmail) {
           const emailData = { ...baseEmailData, managerName: toName };
           if (isUrgent) {
@@ -1537,9 +1533,6 @@ export const updateLeaveRequest = async (
         };
 
         const toEmail = chain.l1_email;
-        // CC list: Removed HR (L2) from CC list as per requirement
-        const ccEmails: string[] = [];
-
         if (toEmail) {
           await sendLeaveApplicationEmail(toEmail, emailData, undefined);
         }

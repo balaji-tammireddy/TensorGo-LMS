@@ -1,6 +1,44 @@
 import { sendEmail } from './email';
 import { logger } from './logger';
 
+// URL for leave approval page
+const LEAVE_APPROVAL_URL = 'https://intra.tensorgo.com/leave-approval';
+
+/**
+ * Ensure leaves@tensorgo.com is in the CC list for leave-related emails
+ */
+const ensureLeavesCC = (cc?: string | string[]): string[] => {
+  const ccList = Array.isArray(cc) ? [...cc] : (cc ? [cc] : []);
+  if (!ccList.includes('leaves@tensorgo.com')) {
+    ccList.push('leaves@tensorgo.com');
+  }
+  logger.info(`[EMAIL] Ensuring leaves@tensorgo.com in CC. Final list: ${ccList.join(', ')}`);
+  return ccList;
+};
+
+/**
+ * Generate a professional button HTML for emails
+ */
+const generateButton = (url: string, label: string): string => {
+  return `
+    <div style="margin: 35px 0; text-align: center;">
+      <!--[if mso]>
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${url}" style="height:48px;v-text-anchor:middle;width:200px;" arcsize="10%" stroke="f" fillcolor="#1e3a8a">
+        <w:anchorlock/>
+        <center>
+      <![endif]-->
+      <a href="${url}" 
+         style="background-color: #1e3a8a; border-radius: 6px; color: #ffffff; display: inline-block; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; line-height: 48px; text-align: center; text-decoration: none; width: 220px; -webkit-text-size-adjust: none;">
+        ${label}
+      </a>
+      <!--[if mso]>
+        </center>
+      </v:roundrect>
+      <![endif]-->
+    </div>
+  `;
+};
+
 /**
  * Email template for leave application notification
  */
@@ -348,7 +386,9 @@ const generateLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData): str
       ${detailsTable}
     </div>
 
-    <p style="margin-top: 30px;">Please log in to the TensorGo Intranet to review and approve/reject this request at your earliest convenience.</p>
+    ${generateButton(LEAVE_APPROVAL_URL, 'Review Application')}
+
+    <p style="margin-top: 20px;">Please log in to the TensorGo Intranet to review and approve/reject this request at your earliest convenience.</p>
     <p>For any clarification, please contact the HR Team.</p>
 
     <p>Regards,<br/>TensorGo HR Team</p>
@@ -433,7 +473,7 @@ export const sendLeaveApplicationEmail = async (
 
   return await sendEmail({
     to: managerEmail,
-    cc,
+    cc: ensureLeavesCC(cc),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -690,7 +730,7 @@ export const sendLeaveStatusEmail = async (
 
   return await sendEmail({
     to: recipientEmail,
-    cc,
+    cc: ensureLeavesCC(cc),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -963,6 +1003,7 @@ export const sendLeaveAllocationEmail = async (
 
   return await sendEmail({
     to: employeeEmail,
+    cc: ensureLeavesCC(),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -986,6 +1027,7 @@ export const sendSuperAdminLeaveAllocationEmail = async (
 
   return await sendEmail({
     to: adminEmail,
+    cc: ensureLeavesCC(),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -1098,6 +1140,9 @@ const generatePendingLeaveReminderEmailHtml = (data: PendingLeaveReminderEmailDa
     <p>This is a reminder that there are leave requests pending your review and approval in the TensorGo Intranet.</p>
     <p>Timely action is important to ensure workforce planning and employee scheduling are not impacted.</p>
     <p style="margin-top: 20px;">Please log in to the portal to review and take the necessary action on the pending requests.</p>
+    
+    ${generateButton(LEAVE_APPROVAL_URL, 'Go to Leave Approvals')}
+    
     <p>If you require any assistance, please contact the HR team.</p>
     <p>Regards,<br/>TensorGo HR Team</p>
   `;
@@ -1142,6 +1187,7 @@ export const sendPendingLeaveReminderEmail = async (
 
   return await sendEmail({
     to: managerEmail,
+    cc: ensureLeavesCC(),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -1349,6 +1395,7 @@ export const sendLeaveCarryForwardEmail = async (
 
   return await sendEmail({
     to: employeeEmail,
+    cc: ensureLeavesCC(),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
@@ -1406,7 +1453,9 @@ const generateUrgentLeaveApplicationEmailHtml = (data: LeaveApplicationEmailData
       ${detailsTable}
     </div>
 
-    <p style="margin-top: 30px;">Kindly review and take the necessary action on priority via the TensorGo Intranet.</p>
+    ${generateButton(LEAVE_APPROVAL_URL, 'Review Application Now')}
+
+    <p style="margin-top: 20px;">Kindly review and take the necessary action on priority via the TensorGo Intranet.</p>
     <p>For any clarification or support, please contact the HR team.</p>
 
     <p>Regards,<br/>TensorGo HR Team</p>
@@ -1475,7 +1524,7 @@ This is an auto-generated email from the TensorGo Intranet. Please do not reply 
 
   return await sendEmail({
     to: managerEmail,
-    cc,
+    cc: ensureLeavesCC(cc),
     subject: emailSubject,
     html: emailHtml,
     text: emailText,
