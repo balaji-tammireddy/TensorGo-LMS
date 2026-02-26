@@ -1660,6 +1660,11 @@ export const addLeavesToEmployee = async (
     throw new Error('Leave count must be greater than 0');
   }
 
+  // Reason (comment) is mandatory
+  if (!comment || comment.trim().length === 0) {
+    throw new Error('A reason is mandatory when adding leaves');
+  }
+
   // Check roles for permission
   const [requesterResult, targetResult] = await Promise.all([
     pool.query('SELECT user_role as role FROM users WHERE id = $1', [updatedBy]),
@@ -1725,9 +1730,14 @@ export const addLeavesToEmployee = async (
       const currentBalance = parseFloat(balanceCheck.rows[0][balanceColumn] || '0');
       const newTotal = currentBalance + count;
 
-      // For LOP, check if it would exceed 10 (strict limit)
-      if (balanceColumn === 'lop_balance' && newTotal > 10) {
-        throw new Error(`Cannot add ${count} LOP leaves. Current LOP balance: ${currentBalance}, Maximum limit: 10. Total would be: ${newTotal}`);
+      // For LOP, check if it exceeds limits
+      if (balanceColumn === 'lop_balance') {
+        if (count > 30) {
+          throw new Error(`Cannot add ${count} LOP leaves at once. Maximum adding limit is 30.`);
+        }
+        if (newTotal > 40) {
+          throw new Error(`Cannot add ${count} LOP leaves. Current LOP balance: ${currentBalance}, Total would be ${newTotal}, which exceeds maximum total limit of 40.`);
+        }
       }
 
       // Check if total would exceed maximum limit (99 for casual/sick)

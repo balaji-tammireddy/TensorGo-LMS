@@ -211,7 +211,7 @@ export const addLeavesToEmployee = [
       }
 
       const employeeId = parseInt(req.params.id);
-      const { leaveType, count } = req.body;
+      const { leaveType, count, comment } = req.body;
 
       // Check if employee exists and get their role
       const employeeCheckResult = await pool.query('SELECT id, user_role as role FROM users WHERE id = $1', [employeeId]);
@@ -247,11 +247,12 @@ export const addLeavesToEmployee = [
         });
       }
 
-      if (parseFloat(count) > 12) {
+      const maxAddAtOnce = leaveType === 'lop' ? 30 : 12;
+      if (parseFloat(count) > maxAddAtOnce) {
         return res.status(400).json({
           error: {
             code: 'BAD_REQUEST',
-            message: 'Maximum 12 leaves can be added at once'
+            message: `Maximum ${maxAddAtOnce} leaves can be added at once`
           }
         });
       }
@@ -313,7 +314,7 @@ export const addLeavesToEmployee = [
         leaveType,
         parseFloat(count),
         req.user!.id,
-        undefined,
+        comment,
         documentUrl
       );
       logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Leaves added successfully - Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}`);

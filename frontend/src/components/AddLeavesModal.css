@@ -96,15 +96,23 @@
 }
 
 .form-group select,
-.form-group input {
+.form-group input,
+.form-group textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #dcdcdc;
   border-radius: 4px;
   font-size: 14px;
-  height: 42px;
+  height: auto;
+  min-height: 42px;
   transition: border-color 0.2s;
   box-sizing: border-box;
+  font-family: inherit;
+}
+
+.form-group input,
+.form-group select {
+  height: 42px;
 }
 
 /* Remove spinner from number input */

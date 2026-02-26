@@ -27,6 +27,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
 }) => {
   const [count, setCount] = useState<string>('');
   const [leaveType, setLeaveType] = useState<'casual' | 'lop'>('casual');
+  const [comment, setComment] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +49,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     if (!isOpen) {
       setCount('');
       setLeaveType('casual');
+      setComment('');
       setFile(null);
       setValidationError('');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -101,8 +103,8 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     const newTotal = currentBalance + countNum;
 
     // Maximum limit based on leave type
-    const maxLimit = leaveType === 'lop' ? 10 : 99;
-    const maxAddAtOnce = 12;
+    const maxLimit = leaveType === 'lop' ? 40 : 99;
+    const maxAddAtOnce = leaveType === 'lop' ? 30 : 12;
 
     if (countNum > maxAddAtOnce) {
       showWarning(`Maximum ${maxAddAtOnce} leaves can be added at once.`);
@@ -113,6 +115,12 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
       const errorMsg = `Limit exceeded. Max: ${maxLimit}.`;
       setValidationError(errorMsg);
       showWarning(errorMsg);
+      return;
+    }
+
+    if (!comment || comment.trim().length === 0) {
+      setValidationError('Please provide a reason.');
+      showWarning('Reason field is mandatory.');
       return;
     }
 
@@ -127,7 +135,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     const formData = new FormData();
     formData.append('leaveType', leaveType);
     formData.append('count', countNum.toString());
-
+    formData.append('comment', comment.trim());
     formData.append('document', file);
 
     // We also need employeeId, passing it might be handled by caller or here. 
@@ -150,15 +158,17 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
     }
 
     const countNum = parseFloat(value);
-    if (!isNaN(countNum) && countNum > 12) {
-      showWarning('Maximum 12 leaves can be added at once.');
+    const maxAddAtOnce = leaveType === 'lop' ? 30 : 12;
+
+    if (!isNaN(countNum) && countNum > maxAddAtOnce) {
+      showWarning(`Maximum ${maxAddAtOnce} leaves can be added at once.`);
       return;
     }
     setCount(value);
     setValidationError('');
 
     if (!isNaN(countNum) && countNum > 0 && balances) {
-      const maxLimit = leaveType === 'lop' ? 10 : 99;
+      const maxLimit = leaveType === 'lop' ? 40 : 99;
       if ((balances[leaveType] + countNum) > maxLimit) {
         setValidationError(`Total exceeds ${maxLimit}.`);
       }
@@ -166,8 +176,8 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
   };
 
   const handleClose = () => {
-    setCount('');
     setLeaveType('casual');
+    setComment('');
     setFile(null);
     onClose();
   };
@@ -244,7 +254,18 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
                 {validationError && !file && <div className="error-text">Document is required</div>}
               </div>
 
-              {/* Comment field removed */}
+              <div className="form-group">
+                <label htmlFor="reason">Reason <span className="required">*</span></label>
+                <textarea
+                  id="reason"
+                  rows={2}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Enter reason for adding leaves"
+                  disabled={isLoading || balancesLoading}
+                  required
+                />
+              </div>
 
               {validationError && <div className="error-summary" style={{ color: 'red', marginTop: '10px' }}>{validationError}</div>}
             </form>
@@ -258,7 +279,7 @@ const AddLeavesModal: React.FC<AddLeavesModalProps> = ({
             type="submit"
             form="add-leaves-form"
             className="submit-button"
-            disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !file}
+            disabled={isLoading || balancesLoading || !count || parseFloat(count) <= 0 || !comment.trim() || !file}
           >
             {isLoading ? 'Adding...' : 'Add Leaves'}
           </button>
