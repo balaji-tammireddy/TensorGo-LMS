@@ -90,7 +90,7 @@ const DashboardPage: React.FC = () => {
         }
     };
 
-    if (user?.role !== 'super_admin') {
+    if (user?.role !== 'super_admin' && user?.role !== 'hr') {
         return null;
     }
 

@@ -43,8 +43,8 @@ const Sidebar: React.FC = memo(() => {
 
     const routes: Array<{ path: string; icon: React.ReactNode; label: string }> = [];
 
-    // Dashboard - For Super Admin only
-    if (user.role === 'super_admin') {
+    // Dashboard - For Super Admin and HR
+    if (user.role === 'super_admin' || user.role === 'hr') {
       routes.push({ path: '/dashboard', icon: <FaChartPie />, label: 'Dashboard' });
     }
 

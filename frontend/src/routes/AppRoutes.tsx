@@ -144,7 +144,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute allowedRoles={['super_admin']}>
+            <ProtectedRoute allowedRoles={['super_admin', 'hr']}>
               <DashboardPage />
             </ProtectedRoute>
           }
