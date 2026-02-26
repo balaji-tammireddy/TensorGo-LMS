@@ -23,6 +23,10 @@ export interface TaskData {
   name: string;
   description?: string;
   due_date?: string;
+  start_date?: string;
+  end_date?: string;
+  time_spent?: number;
+  work_status?: string;
 }
 
 export interface ActivityData {
@@ -30,6 +34,9 @@ export interface ActivityData {
   custom_id?: string;
   name: string;
   description?: string;
+  date?: string;
+  time_spent?: number;
+  work_status?: string;
 }
 
 export class ProjectService {
@@ -680,9 +687,20 @@ export class ProjectService {
       }
 
       const res = await client.query(
-        `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
-        [data.module_id, customId, data.name, data.description || null, data.due_date || null, createdBy]
+        `INSERT INTO project_tasks (module_id, custom_id, name, description, due_date, start_date, end_date, time_spent, work_status, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10) RETURNING *`,
+        [
+          data.module_id,
+          customId,
+          data.name,
+          data.description || null,
+          data.due_date || null,
+          data.start_date || null,
+          data.end_date || null,
+          data.time_spent || null,
+          data.work_status || 'in_progress',
+          createdBy
+        ]
       );
       const task = res.rows[0];
 
@@ -695,6 +713,11 @@ export class ProjectService {
         await this.assignTaskAccess(task.id, finalAssignees, createdBy, client);
       }
 
+      // Sync with Timesheet
+      if (task.time_spent && task.start_date && createdBy) {
+        await this.syncTaskWithTimesheet(task.id, createdBy, client);
+      }
+
       await client.query('COMMIT');
       return task;
     } catch (e) {
@@ -702,6 +725,42 @@ export class ProjectService {
       throw e;
     } finally {
       client.release();
+    }
+  }
+
+  static async syncTaskWithTimesheet(taskId: number, userId: number, client: any) {
+    // 1. Get task data
+    const taskRes = await client.query(`
+      SELECT t.*, m.project_id 
+      FROM project_tasks t 
+      JOIN project_modules m ON t.module_id = m.id 
+      WHERE t.id = $1
+    `, [taskId]);
+
+    if (taskRes.rows.length === 0) return;
+    const task = taskRes.rows[0];
+
+    // 2. If time_spent and start_date are present, upsert into project_entries
+    if (task.time_spent && task.start_date) {
+      const entryRes = await client.query(
+        'SELECT id FROM project_entries WHERE task_id = $1 AND user_id = $2 AND activity_id IS NULL',
+        [taskId, userId]
+      );
+
+      if (entryRes.rows.length > 0) {
+        // Update
+        await client.query(`
+          UPDATE project_entries 
+          SET duration = $1, log_date = $2, description = $3, work_status = $4, updated_by = $5, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $6
+        `, [task.time_spent, task.start_date, task.description, task.work_status, userId, entryRes.rows[0].id]);
+      } else {
+        // Insert
+        await client.query(`
+          INSERT INTO project_entries (user_id, project_id, module_id, task_id, log_date, duration, description, work_status, created_by, updated_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+        `, [userId, task.project_id, task.module_id, taskId, task.start_date, task.time_spent, task.description, task.work_status, userId]);
+      }
     }
   }
 
@@ -729,9 +788,9 @@ export class ProjectService {
       }
 
       const res = await client.query(
-        `INSERT INTO project_activities (task_id, custom_id, name, description, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
-        [data.task_id, customId, data.name, data.description || null, createdBy]
+        `INSERT INTO project_activities (task_id, custom_id, name, description, date, time_spent, work_status, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING *`,
+        [data.task_id, customId, data.name, data.description || null, data.date || null, data.time_spent || null, data.work_status || 'in_progress', createdBy]
       );
       const activity = res.rows[0];
 
@@ -798,6 +857,10 @@ export class ProjectService {
       }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
       if (data.due_date !== undefined) { updates.push(`due_date = $${idx++}`); values.push(data.due_date); }
+      if (data.start_date !== undefined) { updates.push(`start_date = $${idx++}`); values.push(data.start_date); }
+      if (data.end_date !== undefined) { updates.push(`end_date = $${idx++}`); values.push(data.end_date); }
+      if (data.time_spent !== undefined) { updates.push(`time_spent = $${idx++}`); values.push(data.time_spent); }
+      if (data.work_status !== undefined) { updates.push(`work_status = $${idx++}`); values.push(data.work_status); }
 
       // Check for duplicate name within module
       if (data.name) {
@@ -857,6 +920,12 @@ export class ProjectService {
       }
 
       await client.query('COMMIT');
+
+      // Sync with Timesheet if needed
+      if ((data.time_spent !== undefined || data.start_date !== undefined) && userId) {
+        await this.syncTaskWithTimesheet(id, userId, pool);
+      }
+
       const res = await query('SELECT * FROM project_tasks WHERE id = $1', [id]);
       return res.rows[0];
     } catch (e) {
@@ -885,6 +954,9 @@ export class ProjectService {
         values.push(data.description.trim());
       }
       if (data.custom_id) { updates.push(`custom_id = $${idx++}`); values.push(data.custom_id); }
+      if (data.date !== undefined) { updates.push(`date = $${idx++}`); values.push(data.date || null); }
+      if (data.time_spent !== undefined) { updates.push(`time_spent = $${idx++}`); values.push(data.time_spent || null); }
+      if (data.work_status !== undefined) { updates.push(`work_status = $${idx++}`); values.push(data.work_status); }
 
       // Check for duplicate name within task
       if (data.name) {
@@ -1040,7 +1112,8 @@ export class ProjectService {
 
     let queryStr = `
       SELECT p.*, 
-             COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
+             u.first_name || ' ' || COALESCE(u.last_name, '') as manager_name,
+             u2.first_name || ' ' || COALESCE(u2.last_name, '') as created_by_name,
              (p.project_manager_id = $1) as is_pm,
              (
                EXISTS (SELECT 1 FROM module_access ma JOIN project_modules m ON ma.module_id = m.id WHERE m.project_id = p.id AND ma.user_id = $1)
@@ -1049,6 +1122,7 @@ export class ProjectService {
              ) as is_member
       FROM projects p 
       LEFT JOIN users u ON p.project_manager_id = u.id
+      LEFT JOIN users u2 ON p.created_by = u2.id
       WHERE p.id = $2
     `;
 
@@ -1083,10 +1157,12 @@ export class ProjectService {
     const res = await query(
       `SELECT p.*, 
               COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '') as manager_name,
+              u2.first_name || ' ' || COALESCE(u2.last_name, '') as created_by_name,
               (p.project_manager_id = $1) as is_pm,
               ${involvementSubquery}
        FROM projects p
        LEFT JOIN users u ON p.project_manager_id = u.id
+       LEFT JOIN users u2 ON p.created_by = u2.id
        ${filterClause}
        ORDER BY p.created_at DESC`,
       params
@@ -1126,16 +1202,18 @@ export class ProjectService {
 
     return query(`
       SELECT m.*, 
+             u.first_name || ' ' || COALESCE(u.last_name, '') as created_by_name,
              EXISTS (SELECT 1 FROM module_access ma WHERE ma.module_id = m.id AND ma.user_id = $2::integer) as is_assigned,
              ${assignedUsersSubquery}
       FROM project_modules m 
+      LEFT JOIN users u ON m.created_by = u.id
       WHERE m.project_id = $1::integer 
       ORDER BY m.custom_id`, [projectId, userId]
     );
   }
 
   static async getTasksForModule(moduleId: number, userId: number, role: string) {
-    const isGlobal = role === 'super_admin' || role === 'hr';
+    const isGlobal = role === 'super_admin' || role === 'hr' || role === 'manager';
 
     // 1. Get the parent project ID and PM ID
     const projectInfo = await query(`
@@ -1170,9 +1248,11 @@ export class ProjectService {
 
     return query(`
       SELECT t.*, 
+             u.first_name || ' ' || COALESCE(u.last_name, '') as created_by_name,
              EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $2::integer) as is_assigned,
              ${assignedUsersSubquery}
       FROM project_tasks t 
+      LEFT JOIN users u ON t.created_by = u.id
       WHERE t.module_id = $1::integer
       ORDER BY t.custom_id`,
       [moduleId, userId, project_manager_id]
@@ -1216,9 +1296,11 @@ export class ProjectService {
 
     return query(`
       SELECT a.*, 
+             u.first_name || ' ' || COALESCE(u.last_name, '') as created_by_name,
              EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = a.id AND aa.user_id = $2::integer) as is_assigned,
              ${assignedUsersSubquery}
       FROM project_activities a 
+      LEFT JOIN users u ON a.created_by = u.id
       WHERE a.task_id = $1::integer
       ORDER BY a.custom_id`,
       [taskId, userId, project_manager_id]
@@ -1542,7 +1624,7 @@ export class ProjectService {
 
   // --- 6. Permission Helpers ---
   static async canUserManageProject(userId: number, role: string, projectId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr' || role === 'manager') return true;
+    // Access strictly restricted to assigned Project Manager only. No global bypass.
 
     // Only the assigned Project Manager can manage project metadata
     const res = await query(
@@ -1553,8 +1635,7 @@ export class ProjectService {
   }
 
   static async canUserManageResources(userId: number, role: string, projectId: number): Promise<boolean> {
-    // Requirement 1 & 2: Super Admin, HR, or Manager can manage projects.
-    if (role === 'super_admin' || role === 'hr' || role === 'manager') return true;
+    // Access strictly restricted to assigned Project Manager only. No global bypass.
 
     const res = await query(`
       SELECT 1 FROM projects 
@@ -1566,7 +1647,7 @@ export class ProjectService {
   }
 
   static async canUserManageModule(userId: number, role: string, moduleId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr' || role === 'manager') return true;
+    // Access strictly restricted to PM or explicitly assigned users. No global bypass.
 
     const res = await query(`
       SELECT 1 FROM project_modules m JOIN projects p ON m.project_id = p.id
@@ -1579,7 +1660,7 @@ export class ProjectService {
   }
 
   static async canUserManageTask(userId: number, role: string, taskId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr' || role === 'manager') return true;
+    // Access strictly restricted to PM or task creator. No global bypass.
 
     const res = await query(`
       SELECT 1 FROM project_tasks t 
@@ -1587,15 +1668,14 @@ export class ProjectService {
       JOIN projects p ON m.project_id = p.id
       WHERE t.id = $2 AND (
         p.project_manager_id = $1 
-        OR EXISTS (SELECT 1 FROM module_access ma WHERE ma.module_id = m.id AND ma.user_id = $1)
-        OR EXISTS (SELECT 1 FROM task_access ta WHERE ta.task_id = t.id AND ta.user_id = $1)
+        OR t.created_by = $1
       ) AND p.status = 'active'
     `, [userId, taskId]);
     return res.rows.length > 0;
   }
 
   static async canUserManageActivity(userId: number, role: string, activityId: number): Promise<boolean> {
-    if (role === 'super_admin' || role === 'hr' || role === 'manager') return true;
+    // Access strictly restricted to PM or resource chain owners. No global bypass.
 
     const res = await query(`
       SELECT 1 FROM project_activities a 

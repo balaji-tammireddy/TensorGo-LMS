@@ -17,7 +17,7 @@ import {
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetEntry } from '../../services/timesheetService';
-import { projectService, Project, ProjectModule, ProjectTask, ProjectActivity } from '../../services/projectService';
+import { projectService, Project, ProjectModule, ProjectTask } from '../../services/projectService';
 import AppLayout from '../../components/layout/AppLayout';
 
 import { DatePicker } from '../../components/ui/date-picker';
@@ -43,6 +43,11 @@ export const TimesheetPage: React.FC = () => {
         return `${year}-${month}-${day}`;
     };
 
+    const getStatusLabel = (status?: string) => {
+        if (!status) return 'N/A';
+        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
         const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
@@ -56,15 +61,8 @@ export const TimesheetPage: React.FC = () => {
     // Date State
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-    const [isEditHighlight, setIsEditHighlight] = useState(false);
-    const [originalEntry, setOriginalEntry] = useState<TimesheetEntry | null>(null);
-
     // Data State
     const [entries, setEntries] = useState<TimesheetEntry[]>([]);
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [modules, setModules] = useState<ProjectModule[]>([]);
-    const [tasks, setTasks] = useState<ProjectTask[]>([]);
-    const [activities, setActivities] = useState<ProjectActivity[]>([]);
 
     const weekRange = useMemo(() => getWeekRange(currentDate), [currentDate]);
 
@@ -96,29 +94,12 @@ export const TimesheetPage: React.FC = () => {
         return entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
     }, [weekRange, entries]);
 
-    // Form State
-    const initialFormState = {
-        project_id: '',
-        module_id: '',
-        task_id: '',
-        activity_id: '',
-        duration: '',
-        work_status: 'in_progress',
-        description: ''
-    };
-    const [formData, setFormData] = useState(initialFormState);
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
     const [loading, setLoading] = useState(false);
-
-    // Helper to check if project is active
-    const isActiveProject = (projectId: number) => {
-        const proj = projects.find(p => p.id === projectId);
-        return proj ? proj.status === 'active' : true;
-    };
 
     // Initial Load
     useEffect(() => {
-        fetchProjects();
+        // Entries will be fetched by the next useEffect when weekRange is initialized
     }, []);
 
     // Fetch Entries when week changes
@@ -128,18 +109,6 @@ export const TimesheetPage: React.FC = () => {
         return () => controller.abort();
     }, [weekRange]);
 
-    const fetchProjects = async () => {
-        try {
-            const data = await projectService.getProjects();
-            // Strict Filtering for Timesheet: Only show projects where user is Active Member or Project Manager
-            setProjects(data.filter(p =>
-                p.status === 'active' && (p.is_member || p.is_pm)
-            ));
-        } catch (err) {
-            console.error(err);
-            showError('Failed to load projects');
-        }
-    };
 
     const fetchEntries = async (signal?: AbortSignal) => {
         try {
@@ -182,192 +151,11 @@ export const TimesheetPage: React.FC = () => {
     // Note: Removed auto-reset of selectedDate to allow selecting dates in previous weeks
     // The date picker and validation will handle invalid dates
 
-    // Cascading Dropdowns
-    const handleProjectChange = async (projectId: string) => {
-        setFormData({ ...formData, project_id: projectId, module_id: '', task_id: '', activity_id: '' });
-        setModules([]); setTasks([]); setActivities([]);
-        if (!projectId) return;
-
-        try {
-            const data = await projectService.getModules(parseInt(projectId));
-            // Strict Filtering: Only show modules user is assigned to
-            // Add safety check for user
-            if (!user) {
-                setModules([]);
-                return;
-            }
-            setModules(data.filter(m =>
-                m.status === 'active' &&
-                m.assigned_users?.some(u => u.id === user.id)
-            ));
-        } catch (err) { console.error(err); }
-    };
-
-    const handleModuleChange = async (moduleId: string) => {
-        setFormData({ ...formData, module_id: moduleId, task_id: '', activity_id: '' });
-        setTasks([]); setActivities([]);
-        if (!moduleId) return;
-
-        try {
-            const data = await projectService.getTasks(parseInt(moduleId));
-            // Strict Filtering: Only show tasks user is assigned to
-            if (!user) {
-                setTasks([]);
-                return;
-            }
-            setTasks(data.filter(t =>
-                t.status !== 'archived' &&
-                (t.is_assigned || t.assigned_users?.some(u => u.id === user.id))
-            ));
-        } catch (err) { console.error(err); }
-    };
-
-    const handleTaskChange = async (taskId: string) => {
-        setFormData({ ...formData, task_id: taskId, activity_id: '' });
-        setActivities([]);
-        if (!taskId) return;
-
-        try {
-            const data = await projectService.getActivities(parseInt(taskId));
-            // Strict Filtering: Only show activities user is assigned to
-            if (!user) {
-                setActivities([]);
-                return;
-            }
-            setActivities(data.filter(a =>
-                a.status !== 'archived' &&
-                a.assigned_users?.some(u => u.id === user.id)
-            ));
-        } catch (err) { console.error(err); }
-    };
 
     // Modal State
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
     const [isLeaveActionModalOpen, setIsLeaveActionModalOpen] = useState(false);
     const [leaveActionData, setLeaveActionData] = useState<{ entry: TimesheetEntry, action: 'half_day' | 'delete' } | null>(null);
 
-    // Form Submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        const today = formatDate(new Date());
-        if (selectedDate > today) {
-            showError("Cannot log time for future dates");
-            return;
-        }
-
-        // Block Sunday entries
-        const dateObj = new Date(selectedDate);
-        if (dateObj.getDay() === 0) {
-            showError("Sunday is a non-working day. Entries cannot be logged.");
-            return;
-        }
-
-        const dur = parseFloat(formData.duration);
-        if (isNaN(dur) || dur <= 0 || dur > 12) {
-            showError("Invalid duration (0.5 - 12 hours)");
-            return;
-        }
-
-        // Validate 0.5 increments
-        if (dur % 0.5 !== 0) {
-            showError("Hours must be in 0.5 increments (e.g. 1.0, 1.5, 2.0)");
-            return;
-        }
-
-        setLoading(true);
-        try {
-            await timesheetService.saveEntry({
-                id: editingId || undefined,
-                project_id: parseInt(formData.project_id),
-                module_id: parseInt(formData.module_id),
-                task_id: parseInt(formData.task_id),
-                activity_id: parseInt(formData.activity_id),
-                log_date: selectedDate,
-                duration: dur,
-                description: formData.description,
-                work_status: formData.work_status
-            });
-            showSuccess(editingId ? "Entry updated" : "Time logged successfully");
-            setFormData(initialFormState);
-            setEditingId(null);
-            setOriginalEntry(null);
-            fetchEntries();
-        } catch (err: any) {
-            showError(err.response?.data?.error || err.message || 'Failed to save entry');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = async (entry: TimesheetEntry) => {
-        if (entry.log_status !== 'draft' && entry.log_status !== 'rejected') {
-            showError("Cannot edit submitted logs");
-            return;
-        }
-
-        const eDate = new Date(entry.log_date);
-        const dateStr = formatDate(eDate);
-        setSelectedDate(dateStr);
-        setCurrentDate(eDate); // Ensure weekly view switches to the entry's week
-        setEditingId(entry.id!);
-
-        // Scroll to top smoothly as requested
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        // Trigger pulse animation
-        setIsEditHighlight(true);
-        setTimeout(() => setIsEditHighlight(false), 1500);
-
-        try {
-            // Fetch all dependent data in parallel for speed
-            const [mods, tsks, acts] = await Promise.all([
-                projectService.getModules(entry.project_id),
-                projectService.getTasks(entry.module_id),
-                projectService.getActivities(entry.task_id)
-            ]);
-
-            setModules(mods);
-            setTasks(tsks);
-            setActivities(acts);
-
-            setFormData({
-                project_id: String(entry.project_id),
-                module_id: String(entry.module_id),
-                task_id: String(entry.task_id),
-                activity_id: String(entry.activity_id),
-                duration: String(entry.duration),
-                work_status: entry.work_status,
-                description: entry.description
-            });
-            setOriginalEntry(entry);
-
-        } catch (e) {
-            console.error("Error populating edit form", e);
-            showError("Error loading entry details");
-        }
-    };
-
-    const confirmDelete = async () => {
-        if (!entryToDelete) return;
-
-        try {
-            await timesheetService.deleteEntry(entryToDelete);
-            showSuccess("Entry deleted successfully");
-            fetchEntries();
-        } catch (err: any) {
-            showError(err.response?.data?.error || err.message || "Failed to delete");
-        } finally {
-            setIsDeleteModalOpen(false);
-            setEntryToDelete(null);
-        }
-    };
-
-    const handleDeleteClick = (id: number) => {
-        setEntryToDelete(id);
-        setIsDeleteModalOpen(true);
-    };
 
     const handleLeaveActionClick = (entry: TimesheetEntry, action: 'half_day' | 'delete') => {
         setLeaveActionData({ entry, action });
@@ -437,36 +225,6 @@ export const TimesheetPage: React.FC = () => {
     };
 
 
-    // Validation for Form Completion
-    const isFormValid = useMemo(() => {
-        return (
-            formData.project_id !== '' &&
-            formData.module_id !== '' &&
-            formData.task_id !== '' &&
-            formData.activity_id !== '' &&
-            formData.duration !== '' &&
-            parseFloat(formData.duration) > 0 &&
-            formData.work_status !== '' &&
-            formData.description.trim() !== ''
-        );
-    }, [formData]);
-
-    const isFormChanged = useMemo(() => {
-        if (!editingId || !originalEntry) return true;
-        const eDate = new Date(originalEntry.log_date);
-        const originalDateStr = formatDate(eDate);
-
-        return (
-            formData.project_id !== String(originalEntry.project_id) ||
-            formData.module_id !== String(originalEntry.module_id) ||
-            formData.task_id !== String(originalEntry.task_id) ||
-            formData.activity_id !== String(originalEntry.activity_id) ||
-            formData.duration !== String(originalEntry.duration) ||
-            formData.work_status !== originalEntry.work_status ||
-            formData.description !== originalEntry.description ||
-            selectedDate !== originalDateStr
-        );
-    }, [formData, selectedDate, editingId, originalEntry]);
 
     // Dropdown Empty State Component
     const DropdownEmptyState = ({ message }: { message: string }) => (
@@ -578,372 +336,7 @@ export const TimesheetPage: React.FC = () => {
                 </div>
 
                 <div className="timesheet-layout">
-                    {/* Left Column: Form */}
-                    <div className="form-column">
-                        <div className={`log-form-card ${isEditHighlight ? 'edit-highlight' : ''}`}>
-                            <div className="form-title" style={{ justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Clock size={18} />
-                                    {editingId ? 'Edit Log Entry' : 'Log Time'}
-                                </div>
-                                {!isWeekEditable && !editingId && <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Locked</span>}
-                            </div>
-                            <fieldset disabled={
-                                (!isWeekEditable && !editingId) ||
-                                (isWeekLocked && !editingId) ||
-                                isDateBlocked(selectedDate).blocked // Always disable for blocked dates, even when editing
-                            } style={{ border: 'none', padding: 0, margin: 0 }}>
-                                {isWeekLocked && !editingId && !entries.some(e => e.log_status === 'rejected') && (
-                                    <div className="ts-form-locked-banner" style={{
-                                        fontSize: '12px',
-                                        color: '#b45309',
-                                        backgroundColor: '#fffbeb',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        border: '1px solid #fde68a',
-                                        marginBottom: '16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}>
-                                        <Clock size={14} />
-                                        This week's timesheet is already submitted or approved.
-                                    </div>
-                                )}
-                                {(() => {
-                                    const blockInfo = isDateBlocked(selectedDate);
-                                    return blockInfo.blocked && !editingId && (
-                                        <div className="ts-form-locked-banner" style={{
-                                            fontSize: '12px',
-                                            color: '#b91c1c',
-                                            backgroundColor: '#fee2e2',
-                                            padding: '8px 12px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #fecaca',
-                                            marginBottom: '16px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                        }}>
-                                            <Lock size={14} />
-                                            Cannot log time - {blockInfo.reason}
-                                        </div>
-                                    );
-                                })()}
-                                <form onSubmit={handleSubmit}>
-                                    {/* Date */}
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Date</label>
-                                        <DatePicker
-                                            value={selectedDate}
-                                            onChange={setSelectedDate}
-                                            disabledDates={(date) => date.getDay() === 0}
-                                            min={(() => {
-                                                // Calculate previous week Monday
-                                                const today = new Date();
-                                                const currentDay = today.getDay();
-                                                const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
-                                                const currentWeekMonday = new Date(today);
-                                                currentWeekMonday.setDate(diff);
-                                                const previousWeekMonday = new Date(currentWeekMonday);
-                                                previousWeekMonday.setDate(currentWeekMonday.getDate() - 7);
-                                                return previousWeekMonday.toISOString().split('T')[0];
-                                            })()}
-                                            max={new Date().toISOString().split('T')[0]} // Cannot log future
-                                        />
-                                    </div>
-
-                                    {/* Project Struct */}
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Project</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                    style={{
-                                                        width: '100%',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        fontSize: '15px',
-                                                        fontFamily: 'Poppins, sans-serif',
-                                                        border: '1px solid #e6e8f0',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: '#203050',
-                                                        height: 'auto',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {projects.find(p => String(p.id) === formData.project_id)?.name || 'Select Project'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {projects.map(p => (
-                                                    <DropdownMenuItem
-                                                        key={p.id}
-                                                        onClick={() => handleProjectChange(String(p.id))}
-                                                    >
-                                                        {p.name}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                                {projects.length === 0 && <DropdownEmptyState message="No projects available" />}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Module</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                    style={{
-                                                        width: '100%',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        fontSize: '15px',
-                                                        fontFamily: 'Poppins, sans-serif',
-                                                        border: '1px solid #e6e8f0',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: '#203050',
-                                                        height: 'auto',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {modules.find(m => String(m.id) === formData.module_id)?.name || 'Select Module'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {!formData.project_id ? (
-                                                    <DropdownEmptyState message="Please select a project first" />
-                                                ) : modules.length === 0 ? (
-                                                    <DropdownEmptyState message="No modules available for this project" />
-                                                ) : (
-                                                    modules.map(m => (
-                                                        <DropdownMenuItem
-                                                            key={m.id}
-                                                            onClick={() => handleModuleChange(String(m.id))}
-                                                        >
-                                                            {m.name}
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Task</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                    style={{
-                                                        width: '100%',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        fontSize: '15px',
-                                                        fontFamily: 'Poppins, sans-serif',
-                                                        border: '1px solid #e6e8f0',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: '#203050',
-                                                        height: 'auto',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {tasks.find(t => String(t.id) === formData.task_id)?.name || 'Select Task'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {!formData.module_id ? (
-                                                    <DropdownEmptyState message="Please select a module first" />
-                                                ) : tasks.length === 0 ? (
-                                                    <DropdownEmptyState message="No tasks available for this module" />
-                                                ) : (
-                                                    tasks.map(t => (
-                                                        <DropdownMenuItem
-                                                            key={t.id}
-                                                            onClick={() => handleTaskChange(String(t.id))}
-                                                        >
-                                                            {t.name}
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Activity</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                    style={{
-                                                        width: '100%',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        fontSize: '15px',
-                                                        fontFamily: 'Poppins, sans-serif',
-                                                        border: '1px solid #e6e8f0',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: '#203050',
-                                                        height: 'auto',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {activities.find(a => String(a.id) === formData.activity_id)?.name || 'Select Activity'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {!formData.task_id ? (
-                                                    <DropdownEmptyState message="Please select a task first" />
-                                                ) : activities.length === 0 ? (
-                                                    <DropdownEmptyState message="No activities available" />
-                                                ) : (
-                                                    activities.map(a => (
-                                                        <DropdownMenuItem
-                                                            key={a.id}
-                                                            onClick={() => setFormData({ ...formData, activity_id: String(a.id) })}
-                                                        >
-                                                            {a.name}
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Time Spent (Hrs)</label>
-                                        <input
-                                            type="number"
-                                            step="0.5"
-                                            min="0.5"
-                                            max="12"
-                                            className="ts-form-input"
-                                            value={formData.duration}
-                                            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                                            placeholder="e.g. 8.5"
-                                            onWheel={(e) => e.currentTarget.blur()}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Work Status</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                    style={{
-                                                        width: '100%',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        fontSize: '15px',
-                                                        fontFamily: 'Poppins, sans-serif',
-                                                        border: '1px solid #e6e8f0',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: '#203050',
-                                                        height: 'auto',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {formData.work_status === 'in_progress' ? 'In Progress' :
-                                                            formData.work_status === 'closed' ? 'Closed' :
-                                                                formData.work_status === 'differed' ? 'Differed' :
-                                                                    formData.work_status === 'review' ? 'Review' :
-                                                                        formData.work_status === 'testing' ? 'Testing' :
-                                                                            formData.work_status === 'fixed' ? 'Fixed' :
-                                                                                formData.work_status === 'not_applicable' ? 'Not Applicable' : 'Select Work Status'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {[
-                                                    { val: 'in_progress', label: 'In Progress' },
-                                                    { val: 'closed', label: 'Closed' },
-                                                    { val: 'differed', label: 'Differed' },
-                                                    { val: 'review', label: 'Review' },
-                                                    { val: 'testing', label: 'Testing' },
-                                                    { val: 'fixed', label: 'Fixed' },
-                                                    { val: 'not_applicable', label: 'Not Applicable' }
-                                                ].map(s => (
-                                                    <DropdownMenuItem
-                                                        key={s.val}
-                                                        onClick={() => setFormData({ ...formData, work_status: s.val })}
-                                                    >
-                                                        {s.label}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Description</label>
-                                        <textarea
-                                            className="ts-form-textarea"
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="form-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                        {editingId && (
-                                            <button
-                                                type="button"
-                                                className="ts-submit-btn"
-                                                style={{ backgroundColor: '#64748b', margin: 0 }}
-                                                onClick={() => {
-                                                    setEditingId(null);
-                                                    setOriginalEntry(null);
-                                                    setFormData(initialFormState);
-                                                }}
-                                            >
-                                                Cancel Edit
-                                            </button>
-                                        )}
-                                        <button type="submit" className="ts-submit-btn" style={{ margin: 0 }} disabled={loading || (!isWeekEditable && !editingId) || !isFormValid || (!!editingId && !isFormChanged)}>
-                                            <Save size={18} />
-                                            {editingId ? 'Update' : 'Log Time'}
-                                        </button>
-                                    </div>
-                                </form>
-                            </fieldset>
-                        </div>
-                    </div>
-
-                    {/* Right Column: List */}
+                    {/* List of entries */}
                     <div className="entries-list-card">
                         <div className="form-title">
                             <FileText size={18} />
@@ -983,7 +376,7 @@ export const TimesheetPage: React.FC = () => {
                                             transition: 'all 0.2s'
                                         }}
                                     >
-                                        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'capitalize' }}>
                                             {day.toLocaleDateString('en-US', { weekday: 'short' })}
                                         </span>
                                         <span style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px' }}>
@@ -1122,58 +515,29 @@ export const TimesheetPage: React.FC = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Only show actions if NOT System/Holiday and not approved/submitted (unless re-opening logic exists) */}
-                                                            {((!entry.is_system && !entry.project_name?.includes('System')) || (entry.module_name === 'Leave')) &&
+                                                            {/* Actions removed for manual tasks - use Workspace for logging */}
+                                                            {entry.module_name === 'Leave' && (entry.is_system || entry.project_name?.includes('System')) &&
                                                                 entry.log_status !== 'approved' &&
                                                                 entry.log_status !== 'submitted' && (
                                                                     <div className="entry-actions-sidebar">
-                                                                        {/* Existing actions for manual logs */}
-                                                                        {!entry.is_system && !entry.project_name?.includes('System') && (
-                                                                            <>
-                                                                                <button
-                                                                                    className="action-btn-styled edit"
-                                                                                    onClick={() => handleEdit(entry)}
-                                                                                    title="Edit"
-                                                                                    disabled={!isActiveProject(entry.project_id) && entry.project_id !== 0}
-                                                                                >
-                                                                                    <Edit2 size={16} />
-                                                                                </button>
-                                                                                {entry.log_status !== 'rejected' && (
-                                                                                    <button
-                                                                                        className="action-btn-styled delete"
-                                                                                        onClick={() => handleDeleteClick(entry.id!)}
-                                                                                        title="Delete"
-                                                                                        disabled={!!editingId}
-                                                                                    >
-                                                                                        <Trash2 size={16} />
-                                                                                    </button>
-                                                                                )}
-                                                                            </>
+                                                                        {parseFloat(String(entry.duration)) >= 8 && (
+                                                                            <button
+                                                                                className="action-btn-styled edit"
+                                                                                onClick={() => handleLeaveActionClick(entry, 'half_day')}
+                                                                                title="Change to Half Day"
+                                                                                disabled={loading}
+                                                                            >
+                                                                                <Repeat size={16} />
+                                                                            </button>
                                                                         )}
-
-                                                                        {/* Specific actions for System Leave logs */}
-                                                                        {entry.module_name === 'Leave' && (entry.is_system || entry.project_name?.includes('System')) && (
-                                                                            <>
-                                                                                {parseFloat(String(entry.duration)) >= 8 && (
-                                                                                    <button
-                                                                                        className="action-btn-styled edit"
-                                                                                        onClick={() => handleLeaveActionClick(entry, 'half_day')}
-                                                                                        title="Change to Half Day"
-                                                                                        disabled={loading}
-                                                                                    >
-                                                                                        <Repeat size={16} />
-                                                                                    </button>
-                                                                                )}
-                                                                                <button
-                                                                                    className="action-btn-styled delete"
-                                                                                    onClick={() => handleLeaveActionClick(entry, 'delete')}
-                                                                                    title="Delete Log"
-                                                                                    disabled={loading}
-                                                                                >
-                                                                                    <Trash2 size={16} />
-                                                                                </button>
-                                                                            </>
-                                                                        )}
+                                                                        <button
+                                                                            className="action-btn-styled delete"
+                                                                            onClick={() => handleLeaveActionClick(entry, 'delete')}
+                                                                            title="Delete Log"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
                                                                     </div>
                                                                 )}
                                                         </div>
@@ -1181,26 +545,79 @@ export const TimesheetPage: React.FC = () => {
                                                 })
                                             )}
                                         </div>
+
+                                        {/* Detailed Table View - Requested by User */}
+                                        <div className="timesheet-table-container" style={{ marginTop: '40px' }}>
+                                            <div className="form-title" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <FileText size={18} />
+                                                    Detailed Log Table
+                                                </span>
+                                                <span style={{ fontSize: '12px', fontWeight: 500, color: '#64748b', background: '#f1f5f9', borderRadius: '6px', padding: '4px 10px' }}>
+                                                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                </span>
+                                            </div>
+                                            <div className="ts-table-wrapper" style={{ overflowX: 'auto', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                                    <thead>
+                                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                                            {['Project', 'Module', 'Task', 'Description', 'Date', 'Time Spent', 'Status'].map(h => (
+                                                                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{h}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {entries.filter(e => {
+                                                            // Normalize log_date to YYYY-MM-DD for comparison
+                                                            const d = new Date(e.log_date);
+                                                            const normalized = isNaN(d.getTime())
+                                                                ? e.log_date
+                                                                : d.toISOString().split('T')[0];
+                                                            return normalized === selectedDate;
+                                                        }).length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', verticalAlign: 'middle' }}>No logs found for this date</td>
+                                                            </tr>
+                                                        ) : (
+                                                            entries.filter(e => {
+                                                                const d = new Date(e.log_date);
+                                                                const normalized = isNaN(d.getTime())
+                                                                    ? e.log_date
+                                                                    : d.toISOString().split('T')[0];
+                                                                return normalized === selectedDate;
+                                                            }).map(entry => {
+                                                                const cell: React.CSSProperties = { padding: '12px 16px', verticalAlign: 'top', textAlign: 'left', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: '13px' };
+                                                                return (
+                                                                    <tr key={entry.id} style={{ transition: 'background 0.2s' }}
+                                                                        onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                                                                        onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                                                                        <td style={{ ...cell, fontWeight: 500, color: '#1e293b' }}>{entry.project_name || 'System'}</td>
+                                                                        <td style={cell}>{entry.module_name || 'N/A'}</td>
+                                                                        <td style={cell}>
+                                                                            <span style={{ fontWeight: 500, color: '#1e293b' }}>{entry.task_name || 'N/A'}</span>
+                                                                        </td>
+                                                                        <td style={{ ...cell, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.description}>
+                                                                            {entry.description || '—'}
+                                                                        </td>
+                                                                        <td style={cell}>{entry.log_date}</td>
+                                                                        <td style={{ ...cell, fontWeight: 600, color: '#1e293b' }}>{parseFloat(String(entry.duration)).toFixed(1)} hrs</td>
+                                                                        <td style={cell}>
+                                                                            <span className={`ts-work-badge ts-work-${entry.work_status}`}>{getStatusLabel(entry.work_status)}</span>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
                     </div>
                 </div>
 
-                {/* Confirm Delete Modal */}
-                <Modal
-                    isOpen={isDeleteModalOpen}
-                    onClose={() => setIsDeleteModalOpen(false)}
-                    title="Confirm Deletion"
-                    footer={
-                        <>
-                            <button className="modal-btn secondary" onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn danger" onClick={confirmDelete}>Delete</button>
-                        </>
-                    }
-                >
-                    <p>Are you sure you want to delete this timesheet entry? This action cannot be undone.</p>
-                </Modal>
 
                 {/* Confirm Leave Action Modal */}
                 <Modal

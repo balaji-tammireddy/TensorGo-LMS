@@ -181,7 +181,7 @@ export const deleteModule = async (req: AuthRequest, res: Response) => {
 export const createTask = async (req: AuthRequest, res: Response) => {
     try {
         const { moduleId } = req.params;
-        const { custom_id, name, description, due_date, assignee_ids } = req.body;
+        const { custom_id, name, description, due_date, start_date, end_date, time_spent, work_status, assignee_ids } = req.body;
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -199,7 +199,11 @@ export const createTask = async (req: AuthRequest, res: Response) => {
             custom_id,
             name,
             description,
-            due_date
+            due_date,
+            start_date,
+            end_date,
+            time_spent,
+            work_status
         }, assignee_ids, userId);
 
         res.status(201).json(result);
@@ -212,58 +216,10 @@ export const createTask = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const createActivity = async (req: AuthRequest, res: Response) => {
-    try {
-        const { taskId } = req.params;
-        const { custom_id, name, description, assignee_ids } = req.body;
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        if (!name) {
-            return res.status(400).json({ error: 'Missing required fields: name' });
-        }
 
-        const canManage = await ProjectService.canUserManageTask(userId, req.user?.role || '', parseInt(taskId));
-        if (!canManage) {
-            return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, Manager, or users with access to the parent task can add activities.' });
-        }
 
-        const result = await ProjectService.createActivity({
-            task_id: parseInt(taskId),
-            custom_id,
-            name,
-            description
-        }, assignee_ids, userId);
 
-        res.status(201).json(result);
-    } catch (error: any) {
-        logger.error('[ACTIVITY] Create Error:', error);
-        if (error.message.includes('already exists')) {
-            return res.status(409).json({ error: error.message });
-        }
-        res.status(500).json({ error: error.message });
-    }
-};
-
-export const updateActivity = async (req: AuthRequest, res: Response) => {
-    try {
-        const { activityId } = req.params;
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-        const canManage = await ProjectService.canUserManageActivity(userId, req.user?.role || '', parseInt(activityId));
-        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Super Admin, HR, Manager, or users with access to the parent task can update activities.' });
-
-        const result = await ProjectService.updateActivity(parseInt(activityId), req.body, userId);
-        res.json(result);
-    } catch (error: any) {
-        logger.error('[ACTIVITY] Update Error:', error);
-        if (error.message.includes('already exists')) {
-            return res.status(409).json({ error: error.message });
-        }
-        res.status(500).json({ error: error.message });
-    }
-};
 
 export const updateTask = async (req: AuthRequest, res: Response) => {
     try {
@@ -296,21 +252,6 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
         res.json(result.rows);
     } catch (error: any) {
         logger.error('[TASK] Get Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-export const getActivities = async (req: AuthRequest, res: Response) => {
-    try {
-        const { taskId } = req.params;
-        const userId = req.user?.id;
-        const role = req.user?.role;
-        if (!userId || !role) return res.status(401).json({ error: 'Unauthorized' });
-
-        const result = await ProjectService.getActivitiesForTask(parseInt(taskId), userId, role);
-        res.json(result.rows);
-    } catch (error: any) {
-        logger.error('[ACTIVITY] Get Error:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -375,7 +316,7 @@ export const toggleAccess = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ error: 'Missing required parameters' });
         }
 
-        if (!['module', 'task', 'activity'].includes(level)) {
+        if (!['module', 'task'].includes(level)) {
             return res.status(400).json({ error: 'Invalid level' });
         }
 
@@ -390,8 +331,6 @@ export const toggleAccess = async (req: AuthRequest, res: Response) => {
             canManage = await ProjectService.canUserManageModule(requestedBy, role, parseInt(targetId));
         } else if (level === 'task') {
             canManage = await ProjectService.canUserManageTask(requestedBy, role, parseInt(targetId));
-        } else if (level === 'activity') {
-            canManage = await ProjectService.canUserManageActivity(requestedBy, role, parseInt(targetId));
         }
 
         if (!canManage) {
@@ -445,22 +384,7 @@ export const deleteTask = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const deleteActivity = async (req: AuthRequest, res: Response) => {
-    try {
-        const { activityId } = req.params;
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const canManage = await ProjectService.canUserManageActivity(userId, req.user?.role || '', parseInt(activityId));
-        if (!canManage) return res.status(403).json({ error: 'Access denied: Only the Project Manager can delete activities' });
-
-        const result = await ProjectService.deleteActivity(parseInt(activityId));
-        res.json(result);
-    } catch (error: any) {
-        logger.error('[ACTIVITY] Delete Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-};
 
 export const deleteProject = async (req: AuthRequest, res: Response) => {
     try {

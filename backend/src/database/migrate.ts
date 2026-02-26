@@ -468,7 +468,64 @@ async function migrate() {
       }
     }
 
+    // Run timesheet late resubmission columns migration (028)
+    try {
+      const lateResubmissionFile = readFileSync(
+        join(__dirname, 'migrations', '028_add_timesheet_late_resubmission_columns.sql'),
+        'utf-8'
+      );
+      await pool.query(lateResubmissionFile);
+      console.log('Timesheet late resubmission columns migration (028) completed');
+    } catch (lateResubmissionError: any) {
+      if (!lateResubmissionError.message.includes('already exists') && !lateResubmissionError.message.includes('duplicate')) {
+        console.warn('Timesheet late resubmission migration warning:', lateResubmissionError.message);
+      }
+    }
+
+    // Run add activity fields migration (029)
+    try {
+      const activityFieldsFile = readFileSync(
+        join(__dirname, 'migrations', '029_add_activity_fields.sql'),
+        'utf-8'
+      );
+      await pool.query(activityFieldsFile);
+      console.log('Add activity fields migration (029) completed');
+    } catch (activityFieldsError: any) {
+      if (!activityFieldsError.message.includes('already exists') && !activityFieldsError.message.includes('duplicate')) {
+        console.warn('Add activity fields migration warning:', activityFieldsError.message);
+      }
+    }
+
+    // Run remove activities and update tasks migration (030)
+    try {
+      const removeActivitiesFile = readFileSync(
+        join(__dirname, 'migrations', '030_remove_activities_and_update_tasks.sql'),
+        'utf-8'
+      );
+      await pool.query(removeActivitiesFile);
+      console.log('Remove activities and update tasks migration (030) completed');
+    } catch (removeActivitiesError: any) {
+      if (!removeActivitiesError.message.includes('already exists') && !removeActivitiesError.message.includes('duplicate')) {
+        console.warn('Remove activities migration warning:', removeActivitiesError.message);
+      }
+    }
+
+    // Run align work_status constraints migration (031)
+    try {
+      const alignWorkStatusFile = readFileSync(
+        join(__dirname, 'migrations', '031_align_work_status_constraints.sql'),
+        'utf-8'
+      );
+      await pool.query(alignWorkStatusFile);
+      console.log('Align work_status constraints migration (031) completed');
+    } catch (alignError: any) {
+      if (!alignError.message.includes('already exists') && !alignError.message.includes('duplicate')) {
+        console.warn('Align work_status constraints migration warning:', alignError.message);
+      }
+    }
+
     console.log('Default data inserted');
+
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);

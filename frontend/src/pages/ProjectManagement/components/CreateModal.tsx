@@ -12,12 +12,13 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '../../../components/ui/dropdown-menu';
+import { DatePicker } from '../../../components/ui/date-picker';
 import './CreateModal.css';
 
 interface CreateModalProps {
     isOpen: boolean;
     onClose: () => void;
-    type: 'project' | 'module' | 'task' | 'activity';
+    type: 'project' | 'module' | 'task';
     parentId?: number;
     onSuccess: (data?: any) => void;
     initialData?: any;
@@ -43,6 +44,10 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         description: '',
         project_manager_id: '',
         due_date: '',
+        start_date: '',
+        end_date: '',
+        time_spent: '',
+        work_status: 'in_progress',
         assignee_ids: [] as number[]
     });
     const [loading, setLoading] = useState(false);
@@ -75,9 +80,13 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 custom_id: initialData.custom_id || '',
                 name: initialData.name || '',
                 description: initialData.description || '',
-                project_manager_id: initialData.project_manager_id ? String(initialData.project_manager_id) : '',
-                due_date: initialData.due_date || '',
-                assignee_ids: [] // Removed handling
+                project_manager_id: initialData.project_manager_id != null ? String(initialData.project_manager_id) : '',
+                due_date: initialData.due_date ? initialData.due_date.split('T')[0] : '',
+                start_date: initialData.start_date ? initialData.start_date.split('T')[0] : '',
+                end_date: initialData.end_date ? initialData.end_date.split('T')[0] : '',
+                time_spent: initialData.time_spent != null ? String(initialData.time_spent) : '',
+                work_status: initialData.work_status || 'in_progress',
+                assignee_ids: []
             });
         } else {
             setFormData({
@@ -86,6 +95,10 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 description: '',
                 project_manager_id: (type === 'project' && user?.role !== 'super_admin') ? String(user?.id || '') : '',
                 due_date: '',
+                start_date: '',
+                end_date: '',
+                time_spent: '',
+                work_status: 'in_progress',
                 assignee_ids: []
             });
         }
@@ -122,15 +135,17 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     // Dirty Checking
     const isDirty = (() => {
-        if (!isEdit) return true; // Always allow create if valid (form validation handles the rest)
+        if (!isEdit) return true;
         if (!initialData) return false;
 
         const nameChanged = formData.name !== (initialData.name || '');
         const descChanged = formData.description !== (initialData.description || '');
-        // Check PM change only for project
         const pmChanged = type === 'project' && formData.project_manager_id !== String(initialData.project_manager_id || '');
+        const taskDatesChanged = type === 'task' && (formData.start_date !== (initialData.start_date || '') || formData.end_date !== (initialData.end_date || ''));
+        const timeSpentChanged = formData.time_spent !== (initialData.time_spent != null ? String(initialData.time_spent) : '');
+        const workStatusChanged = formData.work_status !== (initialData.work_status || 'in_progress');
 
-        return nameChanged || descChanged || pmChanged;
+        return nameChanged || descChanged || pmChanged || taskDatesChanged || timeSpentChanged || workStatusChanged;
     })();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -165,11 +180,11 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     const isManager = user?.role === 'manager';
                     const isPM = String(initialData.project_manager_id) === String(user?.id);
 
-                    // Requirement 3.1: SA, HR, and Manager can edit EVERYTHING.
-                    const canEditMetadata = isGlobalAdmin || isHR || isManager;
-                    const canEditDetails = canEditMetadata || isPM;
+                    // Access strictly restricted to assigned Project Manager only.
+                    const canManageMetadata = isPM;
+                    const canManageDetails = isPM;
 
-                    if (!canEditDetails) {
+                    if (!canManageDetails) {
                         throw new Error('You do not have permission to edit this project');
                     }
 
@@ -178,8 +193,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         description: payload.description,
                     };
 
-                    // Requirement 3.1: Status and Dates can be changed by SA, HR, Manager
-                    if (canEditMetadata) {
+                    // Requirement: Only the PM can change PM or End Date
+                    if (canManageMetadata) {
                         updateData.project_manager_id = parseInt(payload.project_manager_id);
                         if (payload.due_date) updateData.end_date = payload.due_date;
                     }
@@ -195,8 +210,8 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                 }
             } else if (type === 'module' && parentId) {
                 const payload = { ...basePayload };
-                // Requirement 2.1: SA, HR, Manager can manage modules. 
-                const isAuthorized = ['super_admin', 'hr', 'manager'].includes(user?.role || '') || projectManagerId === user?.id;
+                // Access strictly restricted to PM. No global bypass.
+                const isAuthorized = projectManagerId === user?.id;
                 if (!isAuthorized) throw new Error('You do not have permission to manage modules');
 
                 if (isEdit && initialData?.id) {
@@ -212,37 +227,29 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     });
                 }
             } else if (type === 'task' && parentId) {
-                const payload = { ...basePayload };
-                // Requirement 2.1 & 2.2: SA, HR, Manager, or users with parent access.
-                // We trust the backend to enforce parent access if not SA/HR/Manager.
-                const isAuthorized = ['super_admin', 'hr', 'manager'].includes(user?.role || '') || projectManagerId === user?.id || true;
-                if (!isAuthorized) throw new Error('You do not have permission to manage tasks');
+                const payload = {
+                    ...basePayload,
+                    start_date: formData.start_date || undefined,
+                    end_date: formData.end_date || undefined,
+                    time_spent: formData.time_spent ? parseFloat(formData.time_spent) : undefined,
+                    work_status: formData.work_status
+                };
 
                 if (isEdit && initialData?.id) {
-                    // Payload sanitization ensures due_date is undefined if empty, preventing 500 error
+                    // PERMISSION: Only creator or assigned Project Manager
+                    const isCreator = String(initialData?.created_by) === String(user?.id);
+                    const isPM = projectManagerId === user?.id;
+
+                    if (!isCreator && !isPM) {
+                        throw new Error('Access denied: Only the creator or the project manager can edit this task.');
+                    }
+
                     result = await projectService.updateTask(initialData.id, {
                         ...payload,
                         assigneeIds: undefined
                     });
                 } else {
                     result = await projectService.createTask(parentId, {
-                        ...payload,
-                        assigneeIds: undefined
-                    });
-                }
-            } else if (type === 'activity' && (parentId || initialData?.id)) {
-                const payload = { ...basePayload };
-                // Requirement 2.1 & 2.2: SA, HR, Manager, or users with parent access.
-                const isAuthorized = ['super_admin', 'hr', 'manager'].includes(user?.role || '') || projectManagerId === user?.id || true;
-                if (!isAuthorized) throw new Error('You do not have permission to manage activities');
-
-                if (isEdit && initialData?.id) {
-                    result = await projectService.updateActivity(initialData.id, {
-                        ...payload,
-                        assigneeIds: undefined
-                    });
-                } else {
-                    result = await projectService.createActivity(parentId!, {
                         ...payload,
                         assigneeIds: undefined
                     });
@@ -266,17 +273,17 @@ export const CreateModal: React.FC<CreateModalProps> = ({
             case 'project': return 'Create New Project';
             case 'module': return 'Add Module';
             case 'task': return 'Add Task';
-            case 'activity': return 'Add Activity';
             default: return 'Create';
         }
     };
 
-    const canEditDetails = type === 'project' && isEdit && (user?.role === 'super_admin' || user?.role === 'hr' || user?.role === 'manager' || String(initialData?.project_manager_id) === String(user?.id));
+    const canEditDetails = type === 'project' && isEdit && (String(initialData?.project_manager_id) === String(user?.id));
 
     // PM Selection & Metadata:
-    // Requirement 3.1: Enabled for Super Admin, HR, Manager even in edit mode.
-    const isManagerSelectDisabled = !['super_admin', 'hr', 'manager'].includes(user?.role || '');
-    const isMetadataDisabled = !['super_admin', 'hr', 'manager'].includes(user?.role || '');
+    // Strictly restricted to the Project Manager or during creation (SA/HR/Manager)
+    const canManageGlobal = ['super_admin', 'hr', 'manager'].includes(user?.role || '');
+    const isManagerSelectDisabled = isEdit ? String(initialData?.project_manager_id) !== String(user?.id) : !canManageGlobal;
+    const isMetadataDisabled = isEdit ? String(initialData?.project_manager_id) !== String(user?.id) : !canManageGlobal;
 
     // Character limits
     const NAME_LIMIT = 20;
@@ -284,12 +291,13 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     // Helper for Sentence Case (First letter capitalized)
     const toSentenceCase = (str: string) => {
-        if (!str) return str;
+        if (!str || typeof str !== 'string') return str || '';
         return str.charAt(0).toUpperCase() + str.slice(1);
     };
 
     // Helper for Title Case (kept for Name/other fields)
     const toTitleCase = (str: string) => {
+        if (!str || typeof str !== 'string') return str || '';
         return str.replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
@@ -312,15 +320,16 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
     const getSelectedManagerLabel = () => {
         if (formData.project_manager_id) {
-            if (user?.role !== 'super_admin' && formData.project_manager_id === String(user?.id)) {
-                return `${toTitleCase((user as any).name || 'Me')}${user?.empId ? ` (${user.empId})` : ''}`;
+            // Safe guard for user
+            if (user && user.role !== 'super_admin' && String(formData.project_manager_id) === String(user.id)) {
+                return `${toTitleCase(user.name || 'Me')}${user.empId ? ` (${user.empId})` : ''}`;
             }
-            const selected = managers.find(m => String(m.id) === formData.project_manager_id);
+            const selected = managers.find(m => String(m.id) === String(formData.project_manager_id));
             if (selected) {
                 return `${toTitleCase(selected.name)}${selected.empId ? ` (${selected.empId})` : ''}`;
             }
             // FALLBACK: If still loading, use initialData PM information
-            if (isEdit && type === 'project' && initialData && String(initialData.project_manager_id) === formData.project_manager_id) {
+            if (isEdit && type === 'project' && initialData && String(initialData.project_manager_id) === String(formData.project_manager_id)) {
                 return toTitleCase(initialData.manager_name || 'Project Manager');
             }
         }
@@ -342,7 +351,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                         {/* Name */}
                         <div className="form-group">
                             <label className="form-label">
-                                {type === 'project' ? 'Project Name' : 'Name'} <span className="text-danger">*</span>
+                                {type === 'project' ? 'Project Name' : type === 'task' ? 'Task' : 'Name'} <span className="text-danger">*</span>
                             </label>
                             <input
                                 ref={nameInputRef}
@@ -389,6 +398,113 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                                 {formData.description.length}/{DESC_LIMIT}
                             </div>
                         </div>
+
+                        {type === 'task' && (() => {
+                            const taskStatusOptions = [
+                                { value: 'not_started', label: 'Not Started', color: '#64748b', bg: '#f1f5f9' },
+                                { value: 'in_progress', label: 'In Progress', color: '#b45309', bg: '#fffbeb' },
+                                { value: 'completed', label: 'Completed', color: '#065f46', bg: '#d1fae5' },
+                                { value: 'on_hold', label: 'On Hold', color: '#92400e', bg: '#fef3c7' },
+                            ];
+                            const selectedStatus = taskStatusOptions.find(s => s.value === formData.work_status) || taskStatusOptions[0];
+                            return (
+                                <div className="form-grid-2">
+                                    {/* Date */}
+                                    <div className="form-group">
+                                        <label className="form-label">Date</label>
+                                        <DatePicker
+                                            value={formData.start_date}
+                                            onChange={date => setFormData({ ...formData, start_date: date, end_date: date })}
+                                            placeholder="dd-mm-yyyy"
+                                            max={new Date().toISOString().split('T')[0]}
+                                        />
+                                    </div>
+
+                                    {/* Hours */}
+                                    <div className="form-group">
+                                        <label className="form-label">Hours</label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            value={formData.time_spent}
+                                            min="0"
+                                            max="12"
+                                            step="0.25"
+                                            placeholder="0.00"
+                                            onKeyDown={e => {
+                                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                                                const cur = formData.time_spent.replace('.', '');
+                                                if (cur.replace(/\D/g, '').length >= 2 && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.'].includes(e.key) && !e.key.includes('Arrow')) {
+                                                    if (e.key !== '.' && !formData.time_spent.includes('.')) e.preventDefault();
+                                                }
+                                            }}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                const num = parseFloat(val);
+                                                if (val === '' || (num >= 0 && num <= 12)) {
+                                                    setFormData({ ...formData, time_spent: val });
+                                                }
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Task Status — styled DropdownMenu */}
+                                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                        <label className="form-label">
+                                            Task Status <span className="text-danger">*</span>
+                                        </label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className="custom-select-trigger"
+                                                >
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{
+                                                            display: 'inline-block',
+                                                            width: '10px', height: '10px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: selectedStatus.color,
+                                                            flexShrink: 0
+                                                        }} />
+                                                        {selectedStatus.label}
+                                                    </span>
+                                                    <ChevronDown size={16} className="text-gray-400" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                                align="start"
+                                                sideOffset={5}
+                                                style={{ width: '100%', minWidth: '280px', zIndex: 99999 }}
+                                            >
+                                                {taskStatusOptions.map((opt, i) => (
+                                                    <React.Fragment key={opt.value}>
+                                                        <DropdownMenuItem
+                                                            onClick={() => setFormData({ ...formData, work_status: opt.value })}
+                                                            style={{
+                                                                display: 'flex', alignItems: 'center', gap: '10px',
+                                                                padding: '9px 12px', cursor: 'pointer',
+                                                                fontWeight: formData.work_status === opt.value ? 600 : 400,
+                                                                backgroundColor: formData.work_status === opt.value ? opt.bg : 'transparent',
+                                                                color: formData.work_status === opt.value ? opt.color : '#374151',
+                                                                borderRadius: '6px', margin: '2px 4px'
+                                                            }}
+                                                        >
+                                                            <span style={{
+                                                                display: 'inline-block', width: '10px', height: '10px',
+                                                                borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0
+                                                            }} />
+                                                            {opt.label}
+                                                        </DropdownMenuItem>
+                                                        {i < taskStatusOptions.length - 1 && <DropdownMenuSeparator />}
+                                                    </React.Fragment>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Project Manager Selection */}
                         {type === 'project' && (
@@ -497,27 +613,28 @@ export const CreateModal: React.FC<CreateModalProps> = ({
 
 
 
-                    </div>
 
-                    <div className="modal-footer">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="btn btn-secondary"
-                            disabled={loading}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn btn-primary"
-                            disabled={loading || (isEdit && !isDirty)}
-                        >
-                            {loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update' : 'Create')}
-                        </button>
+                        <div className="modal-footer">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="btn btn-secondary"
+                                disabled={loading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                disabled={loading || (isEdit && !isDirty)}
+                            >
+                                {loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update' : 'Create')}
+                            </button>
+                        </div>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
+

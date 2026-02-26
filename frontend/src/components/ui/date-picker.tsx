@@ -39,7 +39,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(({
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    value ? new Date(value + 'T00:00:00') : undefined
+    value ? new Date(value.split('T')[0] + 'T00:00:00') : undefined
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,7 +108,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(({
 
   useEffect(() => {
     if (value) {
-      const date = new Date(value + 'T00:00:00');
+      const date = new Date(value.split('T')[0] + 'T00:00:00');
       setSelectedDate(date);
       const defaultFormat = 'dd-MM-yyyy';
       // Update input value formatting to use displayFormat if provided, otherwise fallback to existing logic.
@@ -148,8 +148,8 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(({
     }
   }, [isOpen, updatePopoverPosition]);
 
-  const minDate = min ? new Date(min + 'T00:00:00') : undefined;
-  const maxDate = max ? new Date(max + 'T00:00:00') : undefined;
+  const minDate = min ? new Date(min.split('T')[0] + 'T00:00:00') : undefined;
+  const maxDate = max ? new Date(max.split('T')[0] + 'T00:00:00') : undefined;
 
   const isDateDisabled = (date: Date) => {
     if (disabledDates && disabledDates(date)) return true;

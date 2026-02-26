@@ -27,7 +27,7 @@ router.get(
 router.put(
     '/:id',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee']),
     projectController.updateProject
 );
 
@@ -48,7 +48,7 @@ router.delete(
 router.post(
     '/:projectId/modules',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']), // Only PM/Admin can create modules
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee']), // PMs might be employees
     projectController.createModule
 );
 
@@ -61,14 +61,14 @@ router.get(
 router.put(
     '/modules/:moduleId',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee']),
     projectController.updateModule
 );
 
 router.delete(
     '/modules/:moduleId',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee']),
     projectController.deleteModule
 );
 
@@ -89,43 +89,15 @@ router.get(
 router.put(
     '/tasks/:taskId',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee', 'intern']),
     projectController.updateTask
 );
 
 router.delete(
     '/tasks/:taskId',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
-    projectController.deleteTask
-);
-
-// Activities
-router.post(
-    '/tasks/:taskId/activities',
-    authenticateToken,
     authorizeRole(['super_admin', 'hr', 'manager', 'employee', 'intern']),
-    projectController.createActivity
-);
-
-router.get(
-    '/tasks/:taskId/activities',
-    authenticateToken,
-    projectController.getActivities
-);
-
-router.put(
-    '/activities/:activityId',
-    authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
-    projectController.updateActivity
-);
-
-router.delete(
-    '/activities/:activityId',
-    authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
-    projectController.deleteActivity
+    projectController.deleteTask
 );
 
 // Access Control
@@ -138,14 +110,14 @@ router.get(
 router.delete(
     '/access',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee']),
     projectController.removeAccess
 );
 
 router.post(
     '/access/toggle',
     authenticateToken,
-    authorizeRole(['super_admin', 'hr', 'manager']),
+    authorizeRole(['super_admin', 'hr', 'manager', 'employee']),
     projectController.toggleAccess
 );
 

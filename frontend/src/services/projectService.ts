@@ -13,6 +13,7 @@ export interface Project {
     is_pm?: boolean;
     is_member?: boolean;
     manager_name?: string;
+    created_by_name?: string;
 }
 
 export interface ProjectModule {
@@ -23,6 +24,7 @@ export interface ProjectModule {
     description: string;
     status: string;
     assigned_users?: { id: number; name: string; initials: string; }[];
+    created_by_name?: string;
 }
 
 export interface ProjectTask {
@@ -33,19 +35,17 @@ export interface ProjectTask {
     description: string;
     status: string;
     due_date?: string;
+    start_date?: string;
+    end_date?: string;
+    time_spent?: number;
+    work_status?: string;
     is_assigned?: boolean;
     assigned_users?: { id: number; name: string; initials: string; }[];
+    created_by_name?: string;
+    created_by?: number;
 }
 
-export interface ProjectActivity {
-    id: number;
-    task_id: number;
-    custom_id: string;
-    name: string;
-    description: string;
-    status: string;
-    assigned_users?: { id: number; name: string; initials: string; }[];
-}
+
 
 export const projectService = {
     // Projects
@@ -113,31 +113,14 @@ export const projectService = {
         return response.data;
     },
 
-    // Activities
-    createActivity: async (taskId: number, data: any) => {
-        const response = await api.post(`/projects/tasks/${taskId}/activities`, data);
-        return response.data;
-    },
 
-    getActivities: async (taskId: number) => {
-        const response = await api.get<ProjectActivity[]>(`/projects/tasks/${taskId}/activities`);
-        return response.data;
-    },
-
-    updateActivity: async (activityId: number, data: any) => {
-        const response = await api.put(`/projects/activities/${activityId}`, data);
-        return response.data;
-    },
 
     deleteTask: async (taskId: number) => {
         const response = await api.delete(`/projects/tasks/${taskId}`);
         return response.data;
     },
 
-    deleteActivity: async (activityId: number) => {
-        const response = await api.delete(`/projects/activities/${activityId}`);
-        return response.data;
-    },
+
 
     // Access
     deleteAccess: (level: string, id: number, userId: number) =>
@@ -146,7 +129,7 @@ export const projectService = {
     getAccessList: (level: string, id: number) =>
         api.get<any[]>(`/projects/${id}/access-list?level=${level}`).then(res => res.data),
 
-    toggleAccess: async (level: 'module' | 'task' | 'activity', targetId: number, userId: number, action: 'add' | 'remove') => {
+    toggleAccess: async (level: 'module' | 'task', targetId: number, userId: number, action: 'add' | 'remove') => {
         const response = await api.post('/projects/access/toggle', { level, targetId, userId, action });
         return response.data;
     },

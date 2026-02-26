@@ -16,7 +16,8 @@
   background-color: white;
   border-radius: 12px;
   width: 100%;
-  max-width: 500px;
+  max-width: 480px;
+  /* Reduced from 500px */
   padding: 0;
   /* Removed global padding for full-width header/footer */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -41,8 +42,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
-  /* Added specific padding */
+  padding: 16px 20px;
+  /* Reduced padding */
   border-bottom: 1px solid #F3F4F6;
   margin-bottom: 0;
   /* Ensure top corners are rounded if header backgrounds are added */
@@ -75,12 +76,13 @@
 }
 
 .modal-body {
-  padding: 24px;
-  /* Padding for form content */
+  padding: 16px 20px;
+  /* Reduced padding */
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
+  /* Further reduced from 12px */
   position: relative;
 }
 
@@ -100,10 +102,12 @@
 .form-select,
 .form-textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
+  /* Reduced from 10px 12px */
   border: 1px solid #D1D5DB;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  /* Slightly smaller font */
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
   box-sizing: border-box;
@@ -119,10 +123,48 @@
 }
 
 .form-textarea {
-  min-height: 150px;
-  height: 150px;
+  min-height: 80px;
+  /* Significantly reduced height */
+  height: 80px;
   resize: none;
   overflow-y: auto;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  /* Reduced gap */
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Number input — hide spinners */
+.form-input[type="number"]::-webkit-inner-spin-button,
+.form-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Ensure custom-select-trigger matches form-input height */
+.custom-select-trigger {
+  min-height: 38px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr;
+  /* Adjusted for Date, Time, Status */
+  gap: 12px;
 }
 
 .char-counter {
@@ -148,8 +190,8 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 16px 24px;
-  /* Match header horizontal padding */
+  padding: 12px 20px;
+  /* Reduced padding */
   border-top: 1px solid #F3F4F6;
   margin-top: 0;
   /* Ensure bottom corners are rounded */

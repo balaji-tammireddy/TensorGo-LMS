@@ -8,7 +8,7 @@ export interface TimesheetReportEntry {
     project_name: string;
     module_name: string;
     task_name: string;
-    activity_name: string;
+
     duration: number;
     description: string;
     work_status: string;
@@ -21,7 +21,7 @@ export interface TimesheetReportFilters {
     projectName?: string;
     moduleName?: string;
     taskName?: string;
-    activityName?: string;
+
     startDate?: string;
     endDate?: string;
 }
@@ -153,7 +153,7 @@ export class PDFGenerator {
             { label: 'Project', value: filters.projectName },
             { label: 'Module', value: filters.moduleName },
             { label: 'Task', value: filters.taskName },
-            { label: 'Activity', value: filters.activityName },
+
             { label: 'Date Range', value: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : filters.startDate || filters.endDate }
         ].filter(f => f.value);
 
@@ -231,10 +231,9 @@ export class PDFGenerator {
             { label: 'Project', width: 85 },
             { label: 'Module', width: 85 },
             { label: 'Task', width: 80 },
-            { label: 'Activity', width: 80 },
             { label: 'Hours', width: 45 },
-            { label: 'Status', width: 60 },
-            { label: 'Description', width: 150 }
+            { label: 'Status', width: 70 },
+            { label: 'Description', width: 220 }
         ];
 
         // Table header
@@ -279,7 +278,6 @@ export class PDFGenerator {
                 entry.project_name,
                 entry.module_name,
                 entry.task_name,
-                entry.activity_name,
                 (entry.duration || 0).toFixed(1),
                 (entry.log_status || '').toUpperCase(),
                 entry.description

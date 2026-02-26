@@ -5,7 +5,7 @@ export interface TimesheetEntry {
     project_id: number;
     module_id: number;
     task_id: number;
-    activity_id: number;
+    activity_id?: number | null;
     log_date: string; // YYYY-MM-DD
     duration: number;
     description: string;

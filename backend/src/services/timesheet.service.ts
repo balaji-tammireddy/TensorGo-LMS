@@ -9,7 +9,7 @@ export interface TimesheetEntry {
     project_id: number;
     module_id: number;
     task_id: number;
-    activity_id: number;
+    activity_id?: number | null;
     log_date: string; // YYYY-MM-DD
     duration: number;
     description: string;
@@ -292,27 +292,24 @@ export class TimesheetService {
                 throw new Error(`Cannot log time on a holiday: ${holidayRes.rows[0].holiday_name}`);
             }
 
-            // Validation 7: STRICT Activity Access Check + PM Grace Period
+            // Validation 7: Module Access Check + PM Grace Period
             const accessCheckRes = await client.query(`
                 SELECT p.project_manager_id, 
-                       EXISTS (SELECT 1 FROM activity_access aa WHERE aa.activity_id = $1 AND aa.user_id = $2) as is_assigned
-                FROM project_activities a
-                JOIN project_tasks t ON a.task_id = t.id
-                JOIN project_modules m ON t.module_id = m.id
+                       EXISTS (SELECT 1 FROM module_access ma WHERE ma.module_id = $1 AND ma.user_id = $2) as is_assigned
+                FROM project_modules m
                 JOIN projects p ON m.project_id = p.id
-                WHERE a.id = $1
-            `, [entry.activity_id, userId]);
+                WHERE m.id = $1
+            `, [entry.module_id, userId]);
 
             if (accessCheckRes.rows.length === 0) {
-                throw new Error("Activity not found.");
+                throw new Error("Module not found.");
             }
 
             const { project_manager_id, is_assigned } = accessCheckRes.rows[0];
             const isCurrentPM = project_manager_id === userId;
 
             if (!isCurrentPM && !is_assigned) {
-                // Grace Period Heuristic: If the user had ANY logs in this project for the current week, 
-                // OR if they logged anything in the last 7 days, they are allowed to finish the current week.
+                // Grace Period Heuristic
                 const { start } = TimesheetService.getCurrentWeekRange();
                 const sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -327,9 +324,8 @@ export class TimesheetService {
                 const isWithinCurrentWeek = logDateOnly >= start;
 
                 if (!(graceCheckRes.rows.length > 0 && isWithinCurrentWeek)) {
-                    throw new Error("Access denied: You are not assigned to this activity and your grace period has expired.");
+                    throw new Error("Access denied: You are not assigned to this module and your grace period has expired.");
                 }
-                logger.info(`[Timesheet] Grace period access granted to user ${userId} for Project ${entry.project_id}`);
             }
 
             // Validation 8: Check for Full Day Leaves (Approved)
@@ -384,7 +380,7 @@ export class TimesheetService {
                     WHERE id=$10
                     RETURNING *
                 `, [
-                    entry.project_id, entry.module_id, entry.task_id, entry.activity_id,
+                    entry.project_id, entry.module_id, entry.task_id, entry.activity_id || null,
                     entry.log_date, entry.duration, entry.description, entry.work_status,
                     userId, entry.id
                 ]);
@@ -400,7 +396,7 @@ export class TimesheetService {
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', $10, $10)
                     RETURNING *
                 `, [
-                    userId, entry.project_id, entry.module_id, entry.task_id, entry.activity_id,
+                    userId, entry.project_id, entry.module_id, entry.task_id, entry.activity_id || null,
                     entry.log_date, entry.duration, entry.description, entry.work_status,
                     userId
                 ]);
@@ -443,67 +439,169 @@ export class TimesheetService {
     // --- APPROVAL MODULE ---
 
     static async getTeamStatus(approverId: number, role: string, startDateStr: string, endDateStr: string) {
-        // 1. Determine User Scope
-        let userFilter = '';
-        const params: any[] = [startDateStr, endDateStr];
-        let paramIdx = 3;
+        const client = await pool.connect();
+        try {
+            // 1. Determine User Scope
+            let userFilter = '';
+            const scopeParams: any[] = [];
+            let paramIdx = 1;
 
-        if (role === 'super_admin' || role === 'hr') {
-            // Can view all, but for "Team Status" specifically, we might want to return ALL employees?
-            // The requirement says: "HR and Super admin role users can see all users time sheets".
-            // So no extra filter on users table, other than active/non-admin.
-        } else {
-            // Manager: Direct reportees only
-            userFilter = `AND u.reporting_manager_id = $${paramIdx}`;
-            params.push(approverId);
+            if (!(role?.toLowerCase() === 'super_admin' || role?.toLowerCase() === 'hr' || role?.toLowerCase() === 'admin')) {
+                // Manager Scope: Direct reportees OR anyone in a project they manage
+                userFilter = `AND (u.reporting_manager_id = $${paramIdx} OR EXISTS (SELECT 1 FROM projects p JOIN project_members pm ON p.id = pm.project_id WHERE p.project_manager_id = $${paramIdx} AND pm.user_id = u.id))`;
+                scopeParams.push(approverId);
+                paramIdx++;
+            }
+
+            // 2. Fetch Users in Scope
+            const usersRes = await client.query(`
+                SELECT u.id, 
+                       u.first_name || ' ' || COALESCE(u.last_name, '') as name,
+                       u.emp_id, u.designation, u.reporting_manager_id
+                FROM users u
+                WHERE u.status = 'active' AND u.user_role != 'super_admin'
+                ${userFilter}
+                ORDER BY u.first_name ASC
+            `, scopeParams);
+
+            if (usersRes.rows.length === 0) return [];
+
+            const userIds = usersRes.rows.map(u => u.id);
+
+            // 3. Fetch ALL project entries for these users in one go
+            const entriesRes = await client.query(`
+                SELECT pe.user_id, pe.log_date, pe.duration::float, pe.log_status, pe.is_late, pe.is_resubmission,
+                       pm.name as module_name
+                FROM project_entries pe
+                JOIN project_modules pm ON pe.module_id = pm.id
+                WHERE pe.user_id = ANY($1) 
+                  AND pe.log_date >= $2 AND pe.log_date <= $3
+            `, [userIds, startDateStr, endDateStr]);
+
+            // 4. Fetch ALL approved leave requests for these users in one go
+            const leavesRes = await client.query(`
+                SELECT id, employee_id, start_date, end_date, start_type, end_type
+                FROM leave_requests
+                WHERE employee_id = ANY($1)
+                  AND current_status = 'approved'
+                  AND (start_date <= $3 AND end_date >= $2)
+            `, [userIds, startDateStr, endDateStr]);
+
+            // 5. Group data by user for processing
+            const entriesByUser = new Map<number, any[]>();
+            const leavesByUser = new Map<number, any[]>();
+
+            entriesRes.rows.forEach(e => {
+                const uid = e.user_id;
+                if (!entriesByUser.has(uid)) entriesByUser.set(uid, []);
+                entriesByUser.get(uid)!.push({
+                    ...e,
+                    log_date: TimesheetService.formatDate(e.log_date)
+                });
+            });
+
+            leavesRes.rows.forEach(l => {
+                const uid = l.employee_id;
+                if (!leavesByUser.has(uid)) leavesByUser.set(uid, []);
+                leavesByUser.get(uid)!.push(l);
+            });
+
+            // 6. Process each user using the same logic as getEntriesForWeek
+            return usersRes.rows.map(user => {
+                let userEntries = entriesByUser.get(user.id) || [];
+                const userLeaves = leavesByUser.get(user.id) || [];
+
+                // A. POST-FETCH CLEANUP: Remove "Leave" DB entries if "Holiday" DB entry exists on the same day.
+                const holidaysMap = new Set<string>();
+                userEntries.forEach(e => {
+                    if (e.module_name === 'Holiday') holidaysMap.add(e.log_date);
+                });
+                userEntries = userEntries.filter(e => {
+                    if (e.module_name === 'Leave' && holidaysMap.has(e.log_date)) return false;
+                    return true;
+                });
+
+                // B. Virtual Leave Injection (Same logic as getEntriesForWeek)
+                userLeaves.forEach(leave => {
+                    let d = new Date(leave.start_date);
+                    const end = new Date(leave.end_date);
+                    const rangeStart = new Date(startDateStr);
+                    const rangeEnd = new Date(endDateStr);
+
+                    while (d <= end) {
+                        if (d >= rangeStart && d <= rangeEnd) {
+                            const dateStr = TimesheetService.formatDate(d);
+                            // Avoid double counting
+                            const existingHoliday = userEntries.find(e => e.log_date === dateStr && e.module_name === 'Holiday');
+                            const existingLeave = userEntries.find(e => e.log_date === dateStr && e.module_name === 'Leave');
+
+                            if (!existingHoliday && !existingLeave) {
+                                let isHalfDay = false;
+                                const sType = leave.start_type?.toLowerCase();
+                                const eType = leave.end_type?.toLowerCase();
+                                if (dateStr === TimesheetService.formatDate(leave.start_date) && (sType === 'half' || sType === 'first_half' || sType === 'second_half')) isHalfDay = true;
+                                if (dateStr === TimesheetService.formatDate(leave.end_date) && (eType === 'half' || eType === 'first_half' || eType === 'second_half')) isHalfDay = true;
+
+                                userEntries.push({
+                                    log_date: dateStr,
+                                    duration: isHalfDay ? 4 : 8,
+                                    log_status: 'approved', // Virtual leaves are approved
+                                    module_name: 'Leave',
+                                    is_virtual: true
+                                });
+                            }
+                        }
+                        d.setDate(d.getDate() + 1);
+                    }
+                });
+
+                // C. Calculate Final Stats
+                let totalHours = 0;
+                let logCount = 0;
+                let approvedCount = 0;
+                let rejectedCount = 0;
+                let submittedCount = 0;
+                let draftCount = 0;
+                let isLate = false;
+                let isResubmission = false;
+
+                userEntries.forEach(e => {
+                    totalHours += e.duration;
+                    if (!e.is_virtual) {
+                        logCount++;
+                        if (e.log_status === 'approved') approvedCount++;
+                        else if (e.log_status === 'rejected') rejectedCount++;
+                        else if (e.log_status === 'submitted') submittedCount++;
+                        else if (e.log_status === 'draft') draftCount++;
+
+                        if (e.is_late) isLate = true;
+                        if (e.is_resubmission) isResubmission = true;
+                    }
+                });
+
+                // D. Determine Status
+                let status = 'draft';
+                if (rejectedCount > 0) status = 'rejected';
+                else if (logCount > 0 && approvedCount === logCount) status = 'approved';
+                else if (submittedCount > 0 && draftCount === 0) status = 'submitted';
+                else if (totalHours >= 40 && draftCount > 0) status = 'pending_submission';
+
+                return {
+                    id: user.id,
+                    name: user.name,
+                    emp_id: user.emp_id,
+                    designation: user.designation,
+                    reporting_manager_id: user.reporting_manager_id,
+                    total_hours: totalHours,
+                    status,
+                    is_late: isLate,
+                    is_resubmission: isResubmission
+                };
+            });
+
+        } finally {
+            client.release();
         }
-
-        const query = `
-            SELECT 
-                u.id, 
-                u.first_name || ' ' || COALESCE(u.last_name, '') as name,
-                u.emp_id,
-                u.designation,
-                u.reporting_manager_id,
-                COALESCE(SUM(pe.duration), 0)::float as total_hours,
-                COUNT(pe.id) as log_count,
-                COUNT(CASE WHEN pe.log_status = 'approved' THEN 1 END) as approved_count,
-                COUNT(CASE WHEN pe.log_status = 'rejected' THEN 1 END) as rejected_count,
-                COUNT(CASE WHEN pe.log_status = 'submitted' THEN 1 END) as submitted_count,
-                COUNT(CASE WHEN pe.log_status = 'draft' THEN 1 END) as draft_count,
-                BOOL_OR(pe.is_late) as is_late,
-                BOOL_OR(pe.is_resubmission) as is_resubmission
-            FROM users u
-            LEFT JOIN project_entries pe ON u.id = pe.user_id 
-                AND pe.log_date >= $1 AND pe.log_date <= $2
-            WHERE u.status = 'active' 
-              AND u.user_role != 'super_admin'
-              ${userFilter}
-            GROUP BY u.id, u.reporting_manager_id
-            ORDER BY u.first_name ASC
-        `;
-
-        const res = await pool.query(query, params);
-
-        return res.rows.map(row => {
-            let status = 'draft';
-            if (row.rejected_count > 0) status = 'rejected';
-            else if (row.log_count > 0 && row.approved_count === row.log_count) status = 'approved';
-            else if (row.submitted_count > 0 && row.draft_count === 0) status = 'submitted';
-            else if (row.total_hours >= 40 && row.draft_count > 0) status = 'pending_submission'; // Highlight readily submittable
-
-            return {
-                id: row.id,
-                name: row.name,
-                emp_id: row.emp_id,
-                designation: row.designation,
-                reporting_manager_id: row.reporting_manager_id,
-                total_hours: row.total_hours,
-                status, // 'draft', 'submitted', 'approved', 'rejected', 'pending_submission'
-                is_late: row.is_late || false,
-                is_resubmission: row.is_resubmission || false
-            };
-        });
     }
 
     static async approveTimesheet(approverId: number, targetUserId: number, startDateStr: string, endDateStr: string) {
@@ -695,16 +793,13 @@ export class TimesheetService {
                 // The requirement is "Past 1 week".
             }
 
-            // 2. Calculate Total Hours
-            const res = await client.query(`
-                SELECT COALESCE(SUM(duration), 0)::float as total
-                FROM project_entries
-                WHERE user_id = $1 AND log_date >= $2 AND log_date <= $3
-            `, [userId, startStr, endStr]);
+            // 2. Calculate Total Hours (Including Approved Leaves)
+            // Use getEntriesForWeek logic to ensure consistency
+            const entries = await TimesheetService.getEntriesForWeek(userId, startStr, endStr);
+            const total = entries.reduce((sum, e) => sum + e.duration, 0);
 
-            const total = parseFloat(res.rows[0].total);
             if (total < 40) {
-                throw new Error(`Cannot submit timesheet: Total hours (${total}) is less than 40.`);
+                throw new Error(`Cannot submit timesheet: Total hours (${total.toFixed(1)}) is less than 40. Please ensure all 40 hours are logged including leaves.`);
             }
 
             // 3. Update Status
@@ -721,38 +816,46 @@ export class TimesheetService {
             const isResubmission = rejectCheck.rows.length > 0;
 
             // Late Check: If submitting after Monday 00:00 AM of the week following the timesheet week
+            const todayNow = new Date();
             const nextMonday = new Date(endStr);
             nextMonday.setDate(nextMonday.getDate() + 1);
             nextMonday.setHours(0, 0, 0, 0);
-            const isLate = today > nextMonday;
+            const isLate = todayNow > nextMonday;
 
             // UPDATE 1: Auto-Approve System Entries (Leaves/Holidays)
+            // Fix: Use subquery for activity check to avoid missing entries with NULL activity_id
             await client.query(`
-                UPDATE project_entries pe
+                UPDATE project_entries
                 SET log_status = 'approved', 
                     updated_at = CURRENT_TIMESTAMP,
                     is_late = $4,
                     is_resubmission = $5
-                FROM project_activities pa
-                WHERE pe.activity_id = pa.id
-                  AND pe.user_id = $1 
-                  AND pe.log_date >= $2 AND pe.log_date <= $3
-                  AND pa.custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                WHERE user_id = $1 
+                  AND log_date >= $2 AND log_date <= $3
+                  AND activity_id IN (
+                      SELECT id FROM project_activities 
+                      WHERE custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                  )
             `, [userId, startStr, endStr, isLate, isResubmission]);
 
             // UPDATE 2: Submit Manual Entries (Waiting for Manager)
+            // Fix: Explicitly handle NULL activity_id to ensure manual logs are submitted
             await client.query(`
-                UPDATE project_entries pe
+                UPDATE project_entries
                 SET log_status = 'submitted', 
                     updated_at = CURRENT_TIMESTAMP,
                     is_late = $4,
                     is_resubmission = $5
-                FROM project_activities pa
-                WHERE pe.activity_id = pa.id
-                  AND pe.user_id = $1 
-                  AND pe.log_date >= $2 AND pe.log_date <= $3
-                  AND pa.custom_id NOT IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
-                  AND pe.log_status IN ('draft', 'rejected')
+                WHERE user_id = $1 
+                  AND log_date >= $2 AND log_date <= $3
+                  AND log_status IN ('draft', 'rejected')
+                  AND (
+                      activity_id IS NULL 
+                      OR activity_id NOT IN (
+                          SELECT id FROM project_activities 
+                          WHERE custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                      )
+                  )
             `, [userId, startStr, endStr, isLate, isResubmission]);
 
             await client.query('COMMIT');
@@ -950,71 +1053,77 @@ export class TimesheetService {
 
             await client.query('BEGIN');
 
-            const res = await client.query(`
-                SELECT u.id, u.email, u.first_name, u.reporting_manager_id, 
-                       mgr.email as manager_email, mgr.first_name as manager_name,
-                       COALESCE(SUM(pe.duration), 0) as total_hours
-                FROM users u
-                LEFT JOIN users mgr ON u.reporting_manager_id = mgr.id
-                LEFT JOIN project_entries pe ON u.id = pe.user_id 
-                    AND pe.log_date >= $1 AND pe.log_date <= $2
-                WHERE u.status = 'active' AND u.user_role != 'super_admin'
-                GROUP BY u.id, mgr.email, mgr.first_name
-            `, [startStr, endStr]);
-
             // Map to store summary data per manager: managerEmail -> { name, submissions: [], failures: [] }
             const managerSummaries = new Map<string, any>();
 
-            for (const u of res.rows) {
-                const hours = parseFloat(u.total_hours);
-                const employeeInfo = { name: u.first_name, hours };
+            // Use getTeamStatus with 'admin' role to get accurate hours/status for every user in scope
+            const teamData = await TimesheetService.getTeamStatus(0, 'admin', startStr, endStr);
+
+            for (const u of teamData) {
+                const hours = u.total_hours;
+                const employeeInfo = { name: u.name, hours };
+
+                // We need to fetch email and manager info which getTeamStatus doesn't return fully
+                // Let's optimize: fetch extra info once
+                const extraRes = await client.query(`
+                    SELECT u.email, mgr.email as manager_email, mgr.first_name as manager_name
+                    FROM users u
+                    LEFT JOIN users mgr ON u.reporting_manager_id = mgr.id
+                    WHERE u.id = $1
+                `, [u.id]);
+                const extra = extraRes.rows[0];
 
                 if (hours >= 40) {
                     // UPDATE 1: Auto-Approve System Entries (Holidays/Leaves)
                     await client.query(`
-                        UPDATE project_entries pe
+                        UPDATE project_entries
                         SET log_status = 'approved', updated_at = CURRENT_TIMESTAMP
-                        FROM project_activities pa
-                        WHERE pe.activity_id = pa.id
-                          AND pe.user_id = $1 
-                          AND pe.log_date >= $2 AND pe.log_date <= $3 
-                          AND pa.custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
-                          AND pe.log_status = 'draft'
+                        WHERE user_id = $1 
+                          AND log_date >= $2 AND log_date <= $3
+                          AND log_status = 'draft'
+                          AND activity_id IN (
+                              SELECT id FROM project_activities 
+                              WHERE custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                          )
                     `, [u.id, startStr, endStr]);
 
                     // UPDATE 2: Submit Manual Entries (Waiting for Manager)
                     await client.query(`
-                        UPDATE project_entries pe
+                        UPDATE project_entries
                         SET log_status = 'submitted', updated_at = CURRENT_TIMESTAMP
-                        FROM project_activities pa
-                        WHERE pe.activity_id = pa.id
-                          AND pe.user_id = $1 
-                          AND pe.log_date >= $2 AND pe.log_date <= $3 
-                          AND pa.custom_id NOT IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
-                          AND pe.log_status = 'draft'
+                        WHERE user_id = $1 
+                          AND log_date >= $2 AND log_date <= $3
+                          AND log_status = 'draft'
+                          AND (
+                              activity_id IS NULL 
+                              OR activity_id NOT IN (
+                                  SELECT id FROM project_activities 
+                                  WHERE custom_id IN ('SYS-ACT-HOLIDAY', 'SYS-ACT-LEAVE')
+                              )
+                          )
                     `, [u.id, startStr, endStr]);
 
                     logger.info(`[Timesheet] User ${u.id} Auto-Submitted (${hours} hrs)`);
 
-                    if (u.manager_email) {
-                        if (!managerSummaries.has(u.manager_email)) {
-                            managerSummaries.set(u.manager_email, { name: u.manager_name, submissions: [], failures: [] });
+                    if (extra?.manager_email) {
+                        if (!managerSummaries.has(extra.manager_email)) {
+                            managerSummaries.set(extra.manager_email, { name: extra.manager_name, submissions: [], failures: [] });
                         }
-                        managerSummaries.get(u.manager_email).submissions.push(employeeInfo);
+                        managerSummaries.get(extra.manager_email).submissions.push(employeeInfo);
                     }
-                } else {
-                    await sendTimesheetReminderEmail(u.email, {
-                        employeeName: u.first_name,
+                } else if (extra?.email) {
+                    await sendTimesheetReminderEmail(extra.email, {
+                        employeeName: u.name.split(' ')[0], // first name
                         reminderType: 'criteria_not_met',
                         hoursLogged: hours
                     });
                     logger.info(`[Timesheet] User ${u.id} Not Submitted (<40h). Warning sent.`);
 
-                    if (u.manager_email) {
-                        if (!managerSummaries.has(u.manager_email)) {
-                            managerSummaries.set(u.manager_email, { name: u.manager_name, submissions: [], failures: [] });
+                    if (extra?.manager_email) {
+                        if (!managerSummaries.has(extra.manager_email)) {
+                            managerSummaries.set(extra.manager_email, { name: extra.manager_name, submissions: [], failures: [] });
                         }
-                        managerSummaries.get(u.manager_email).failures.push(employeeInfo);
+                        managerSummaries.get(extra.manager_email).failures.push(employeeInfo);
                     }
                 }
             }
@@ -1297,8 +1406,19 @@ export class TimesheetService {
 
         const client = await pool.connect();
         try {
-            // Check Manager Link
-            const linkRes = await client.query('SELECT 1 FROM users WHERE id = $1 AND reporting_manager_id = $2', [targetUserId, approverId]);
+            // Check Reporting Manager Link OR Project Manager Link
+            const query = `
+                SELECT 1 FROM users u
+                WHERE u.id = $1 AND (
+                    u.reporting_manager_id = $2
+                    OR EXISTS (
+                        SELECT 1 FROM projects p 
+                        JOIN project_members pm ON p.id = pm.project_id 
+                        WHERE p.project_manager_id = $2 AND pm.user_id = u.id
+                    )
+                )
+            `;
+            const linkRes = await client.query(query, [targetUserId, approverId]);
             return linkRes.rows.length > 0;
         } finally {
             client.release();
@@ -1314,7 +1434,6 @@ export class TimesheetService {
                 p.name as project_name,
                 m.name as module_name,
                 t.name as task_name,
-                a.name as activity_name,
                 pe.duration::float,
                 pe.description,
                 pe.work_status,
@@ -1326,7 +1445,6 @@ export class TimesheetService {
             LEFT JOIN projects p ON pe.project_id = p.id
             LEFT JOIN project_modules m ON pe.module_id = m.id
             LEFT JOIN project_tasks t ON pe.task_id = t.id
-            LEFT JOIN project_activities a ON pe.activity_id = a.id
             WHERE pe.log_status IN ('approved', 'submitted')
         `;
         const params: any[] = [];
@@ -1339,7 +1457,7 @@ export class TimesheetService {
         // If module, task, activity are passed
         if (filters.moduleId) { query += ` AND pe.module_id = $${pIdx++}`; params.push(filters.moduleId); }
         if (filters.taskId) { query += ` AND pe.task_id = $${pIdx++}`; params.push(filters.taskId); }
-        if (filters.activityId) { query += ` AND pe.activity_id = $${pIdx++}`; params.push(filters.activityId); }
+
 
         // Scope Filter
         if (filters.managerScopeId) {

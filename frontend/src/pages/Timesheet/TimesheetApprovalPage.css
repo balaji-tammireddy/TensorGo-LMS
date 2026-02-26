@@ -6,16 +6,18 @@
 .employee-list-card {
     background: white;
     padding: 0;
-    /* Padding inside for list items handled by items */
     border-radius: 12px;
     border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    height: calc(100vh - 120px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    height: calc(100vh - 140px);
     overflow: hidden;
     position: sticky;
     top: 24px;
     display: flex;
     flex-direction: column;
+    flex: 0 0 280px;
+    /* Increased width for better readability */
+    min-width: 280px;
 }
 
 .employee-search-box {
@@ -260,9 +262,497 @@
     /* Ensure inner container fills full width */
 }
 
+/* Layout Overrides */
+.timesheet-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 24px;
+    align-items: start;
+    width: 100%;
+    min-width: 0;
+}
+
+
+
+.entries-list-card {
+    flex: 1;
+    min-width: 0;
+    /* CRITICAL: allows flex child to be smaller than content */
+    min-height: calc(100vh - 140px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Keep box constrained */
+}
+
+/* Animations */
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse-red {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-pulse-red {
+    animation: pulse-red 2s infinite ease-in-out;
+}
+
+/* Responseive */
+@media (max-width: 1024px) {
+    .timesheet-layout {
+        flex-direction: column !important;
+    }
+
+    .employee-list-card {
+        flex: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        position: static !important;
+    }
+}
+
+/* Table Filters */
+.ts-table-filter {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: #475569;
+    background: #f8fafc;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+}
+
+.ts-table-filter:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ts-table-filter::placeholder {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.ts-filter-row th {
+    padding: 8px 12px !important;
+    background: #fff !important;
+    border-bottom: 2px solid #f1f5f9 !important;
+    border-top: 1px solid #f1f5f9 !important;
+}
+
+/* Responsive filters */
+@media (max-width: 640px) {
+    .ts-table-filter {
+        min-width: 80px;
+    }
+}
+
+/* Filter Popover Styling */
+.ts-filter-popover {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    min-width: 170px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    overflow: hidden;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.ts-popover-item {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.ts-popover-item:hover {
+    background-color: #f8fafc;
+    color: #2563eb;
+}
+
+.ts-popover-item.active {
+    background-color: #f0f7ff;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.ts-popover-item:not(:last-child) {
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.ts-header-dropdown-trigger:hover {
+    background: #f8fafc;
+}
+
 /* Fix header alignment */
 .entry-header {
     width: 100%;
     display: flex;
     justify-content: space-between;
+}
+
+/* Detailed Table Refinement */
+/* Detailed Table Refinement - Spaced for Comfort */
+.ts-table-wrapper {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #eef2f6;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04);
+    width: 100%;
+    overflow-x: auto;
+    /* Enable horizontal scroll as requested */
+    margin-top: 8px;
+}
+
+.ts-detailed-table {
+    width: 100%;
+    min-width: 1100px;
+    /* Reduced from 1300px to tighten up the grid */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: auto;
+    font-size: 13.5px;
+}
+
+.ts-detailed-table thead th {
+    background: #ffffff !important;
+    color: #000000 !important;
+    /* Force black for headings */
+    font-weight: 500;
+    /* Standardize weight */
+    font-size: 11.5px;
+    text-transform: capitalize;
+    letter-spacing: 0.1em;
+    padding: 16px 12px;
+    text-align: left;
+    border-bottom: 2px solid #f8fafc;
+    white-space: nowrap;
+}
+
+.ts-detailed-table tbody td {
+    padding: 16px 12px;
+    vertical-align: top;
+    text-align: left;
+    border-bottom: 1px solid #f8fafc;
+    color: #000000 !important;
+    font-weight: 500;
+    /* Standardize weight to match headings */
+    text-transform: capitalize;
+    transition: all 0.2s;
+}
+
+.ts-table-row:hover {
+    background-color: #fcfdfe;
+}
+
+.ts-table-row:hover td {
+    color: #1e293b;
+}
+
+/* Column Distributions with Horizontal Room */
+.ts-col-project {
+    min-width: 160px;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+.ts-col-module {
+    min-width: 100px;
+    color: #000000 !important;
+    font-size: 12.5px;
+    font-weight: 500 !important;
+}
+
+.ts-col-task {
+    min-width: 100px;
+    color: #000000 !important;
+    font-size: 12.5px;
+    font-weight: 500 !important;
+}
+
+.ts-col-desc {
+    min-width: 200px;
+    line-height: 1.6;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+.ts-col-date {
+    min-width: 110px;
+    color: #000000 !important;
+    font-size: 13px;
+    font-weight: 500 !important;
+}
+
+
+.ts-col-time {
+    min-width: 100px;
+    color: #000000 !important;
+    text-align: left;
+    font-weight: 500 !important;
+}
+
+.ts-col-work {
+    min-width: 150px;
+    text-align: left;
+}
+
+.ts-col-status {
+    min-width: 170px;
+    text-align: left;
+}
+
+.ts-col-action {
+    min-width: 160px;
+    text-align: left;
+}
+
+
+
+/* Sophisticated Badges */
+.ts-work-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+    display: inline-block;
+}
+
+.ts-work-completed {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.ts-work-in_progress {
+    background: #fff7ed;
+    color: #d97706;
+}
+
+.ts-work-not_applicable {
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.ts-log-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: capitalize;
+    letter-spacing: 0.05em;
+    display: inline-block;
+    text-align: center;
+    width: fit-content;
+}
+
+.ts-log-approved {
+    background: #eff6ff !important;
+    color: #2563eb;
+    border: 1px solid #dbeafe !important;
+}
+
+.ts-log-submitted {
+    background: #fdf4ff !important;
+    color: #c026d3;
+    border: 1px solid #f5d0fe !important;
+}
+
+.ts-log-rejected {
+    background: #fef2f2 !important;
+    color: #dc2626;
+    border: 1px solid #fecaca !important;
+}
+
+.ts-log-draft {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.ts-action-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.ts-row-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.ts-rejection-mini {
+    font-size: 10px;
+    color: #dc2626;
+    background: #fff1f2;
+    border: 1px solid #ffe4e6;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-weight: 500;
+}
+
+
+.ts-table-row:last-child td {
+    border-bottom: none;
+}
+
+/* New Row Action Dropdown Styles */
+.ts-row-action-container {
+    position: relative;
+    display: inline-block;
+}
+
+.ts-action-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: capitalize;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.ts-action-trigger:hover,
+.ts-action-trigger.active {
+    background: #ffffff;
+    border-color: #2563eb;
+    color: #2563eb;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+}
+
+.ts-action-trigger.submitted {
+    background: #fdf4ff;
+    color: #c026d3;
+    border-color: #f5d0fe;
+}
+
+.ts-action-trigger.submitted:hover,
+.ts-action-trigger.submitted.active {
+    background: #ffffff;
+    border-color: #c026d3;
+    color: #c026d3;
+    box-shadow: 0 4px 6px -1px rgba(192, 38, 211, 0.1);
+}
+
+.ts-action-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 140px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    z-index: 1000;
+    overflow: hidden;
+    padding: 6px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.ts-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.ts-dropdown-item:hover {
+    background: #f8fafc;
+}
+
+.ts-dropdown-item.approve {
+    color: #16a34a;
+}
+
+.ts-dropdown-item.approve:hover {
+    background: #f0fdf4;
+}
+
+.ts-dropdown-item.reject {
+    color: #dc2626;
+}
+
+.ts-dropdown-item.reject:hover {
+    background: #fef2f2;
+}
+
+.ts-dropdown-item.edit {
+    color: #2563eb;
+}
+
+.ts-dropdown-item.edit:hover {
+    background: #eff6ff;
 }

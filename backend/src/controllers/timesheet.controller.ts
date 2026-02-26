@@ -79,8 +79,9 @@ export const getTeamStatus = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+        const roleLower = role?.toLowerCase();
         // Access: Manager, HR, Super Admin
-        if (role !== 'manager' && role !== 'hr' && role !== 'super_admin') {
+        if (roleLower !== 'manager' && roleLower !== 'hr' && roleLower !== 'super_admin' && roleLower !== 'admin') {
             return res.status(403).json({ error: 'Access denied' });
         }
 
@@ -111,21 +112,22 @@ export const getMemberWeeklyEntries = async (req: AuthRequest, res: Response) =>
 
         // --- Permissions ---
         // 1. Always allow viewing your own timesheet
-        const isSelf = approverId === targetUserId;
+        const isSelf = Number(approverId) === Number(targetUserId);
         if (isSelf) {
             const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
             return res.json(entries);
         }
 
         // 2. HR and Super Admin can view all users' timesheets
-        const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin';
+        const roleLower = approverRole?.toLowerCase();
+        const isHROrAdmin = roleLower === 'hr' || roleLower === 'super_admin' || roleLower === 'admin';
         if (isHROrAdmin) {
             const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
             return res.json(entries);
         }
 
         // 3. Managers: Check if they manage this user
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, targetUserId);
+        const isAllowed = await TimesheetService.isManagerOrAdmin(Number(approverId), Number(targetUserId));
         if (!isAllowed) {
             logger.warn(`[TimeSheet] Unauthorized view attempt by user ${approverId} for member ${targetUserId}`);
             return res.status(403).json({ error: 'You are not authorized to view this user\'s timesheet' });
@@ -162,8 +164,13 @@ export const approveTimesheet = async (req: AuthRequest, res: Response) => {
 
         if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, targetUserId);
-        if (!isAllowed) return res.status(403).json({ error: 'Not authorized to approve' });
+        const approverRole = req.user?.role?.toLowerCase();
+        const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin' || approverRole === 'admin';
+
+        if (!isHROrAdmin) {
+            const isAllowed = await TimesheetService.isManagerOrAdmin(Number(approverId), Number(targetUserId));
+            if (!isAllowed) return res.status(403).json({ error: 'Not authorized to approve' });
+        }
 
         await TimesheetService.approveTimesheet(approverId, targetUserId, start_date, end_date);
         res.json({ success: true, message: 'Approved successfully' });
@@ -232,11 +239,16 @@ export const rejectTimesheet = async (req: AuthRequest, res: Response) => {
         const approverId = req.user?.id;
         const { targetUserId, start_date, end_date, reason } = req.body;
 
-        if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!approverId || !targetUserId) return res.status(401).json({ error: 'Unauthorized' });
         if (!reason) return res.status(400).json({ error: 'Rejection reason is required' });
 
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, targetUserId);
-        if (!isAllowed) return res.status(403).json({ error: 'Not authorized to reject' });
+        const approverRole = req.user?.role?.toLowerCase();
+        const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin' || approverRole === 'admin';
+
+        if (!isHROrAdmin) {
+            const isAllowed = await TimesheetService.isManagerOrAdmin(Number(approverId), Number(targetUserId));
+            if (!isAllowed) return res.status(403).json({ error: 'Not authorized to reject' });
+        }
 
         await TimesheetService.rejectTimesheet(approverId, targetUserId, start_date, end_date, reason);
         res.json({ success: true, message: 'Rejected successfully' });
@@ -252,13 +264,14 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+        const roleLower = role?.toLowerCase();
         // Security: Block employees and interns from accessing reports
-        if (role === 'employee' || role === 'intern') {
-            logger.warn(`[TimeSheet Report] Unauthorized access attempt by user ${userId} (${role})`);
+        if (roleLower === 'employee' || roleLower === 'intern') {
+            logger.warn(`[TimeSheet Report] Unauthorized access attempt by user ${userId} (${roleLower})`);
             return res.status(403).json({ error: 'Access denied. Only Managers and HR/Admins can generate reports.' });
         }
 
-        const { projectId, moduleId, taskId, activityId, startDate, endDate, targetUserId } = req.query;
+        const { projectId, moduleId, taskId, startDate, endDate, targetUserId } = req.query;
 
         const filters: any = {
             startDate: startDate ? String(startDate) : undefined,
@@ -266,7 +279,6 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
             projectId: projectId ? parseInt(String(projectId)) : undefined,
             moduleId: moduleId ? parseInt(String(moduleId)) : undefined,
             taskId: taskId ? parseInt(String(taskId)) : undefined,
-            activityId: activityId ? parseInt(String(activityId)) : undefined,
             userId: targetUserId ? parseInt(String(targetUserId)) : undefined
         };
 
@@ -289,9 +301,10 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
     try {
         const { id: userId, role, name: userName } = req.user!;
 
+        const roleLower = role?.toLowerCase();
         // Security: Block employees and interns from accessing reports
-        if (role === 'employee' || role === 'intern' || role === 'manager') {
-            logger.warn(`[Timesheet PDF Report] Unauthorized access attempt by user ${userId} (${role})`);
+        if (roleLower === 'employee' || roleLower === 'intern' || roleLower === 'manager') {
+            logger.warn(`[Timesheet PDF Report] Unauthorized access attempt by user ${userId} (${roleLower})`);
             return res.status(403).json({ error: 'Access denied. Only HR/Admins can generate reports.' });
         }
 
@@ -305,7 +318,6 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
             projectId: queryParams.projectId ? parseInt(String(queryParams.projectId)) : undefined,
             moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
             taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
-            activityId: queryParams.activityId ? parseInt(String(queryParams.activityId)) : undefined,
             userId: queryParams.targetUserId ? parseInt(String(queryParams.targetUserId)) : undefined
         };
 
@@ -351,10 +363,7 @@ export const generatePDFReport = async (req: AuthRequest, res: Response) => {
             const taskRes = await pool.query('SELECT name FROM project_tasks WHERE id = $1', [filters.taskId]);
             if (taskRes.rows.length > 0) filterNames.taskName = taskRes.rows[0].name;
         }
-        if (filters.activityId) {
-            const actRes = await pool.query('SELECT name FROM project_activities WHERE id = $1', [filters.activityId]);
-            if (actRes.rows.length > 0) filterNames.activityName = actRes.rows[0].name;
-        }
+
 
         const { generateTimesheetPDF } = await import('../utils/pdfGenerator');
 
@@ -396,7 +405,6 @@ export const generateExcelReport = async (req: AuthRequest, res: Response) => {
             projectId: queryParams.projectId ? parseInt(String(queryParams.projectId)) : undefined,
             moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
             taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
-            activityId: queryParams.activityId ? parseInt(String(queryParams.activityId)) : undefined,
             userId: queryParams.targetUserId ? parseInt(String(queryParams.targetUserId)) : undefined
         };
 
@@ -435,10 +443,7 @@ export const generateExcelReport = async (req: AuthRequest, res: Response) => {
             const taskRes = await pool.query('SELECT name FROM project_tasks WHERE id = $1', [filters.taskId]);
             if (taskRes.rows.length > 0) filterNames.taskName = taskRes.rows[0].name;
         }
-        if (filters.activityId) {
-            const actRes = await pool.query('SELECT name FROM project_activities WHERE id = $1', [filters.activityId]);
-            if (actRes.rows.length > 0) filterNames.activityName = actRes.rows[0].name;
-        }
+
 
         const { generateTimesheetExcel } = await import('../utils/excelGenerator');
 

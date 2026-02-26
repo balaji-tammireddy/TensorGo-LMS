@@ -66,7 +66,9 @@ const LeaveApplyPage: React.FC = () => {
       ? format(addDays(new Date(), -1), 'yyyy-MM-dd') // allow past 1 day for sick leave
       : formData.leaveType === 'permission'
         ? format(addDays(new Date(), 1), 'yyyy-MM-dd') // Permission can only be applied from tomorrow
-        : todayStr; // LOP can be applied for today
+        : formData.leaveType === 'lop'
+          ? format(addDays(new Date(), -2), 'yyyy-MM-dd') // LOP can be applied for past two days
+          : todayStr;
 
   // For sick leave: max date is tomorrow (only allow tomorrow for future dates)
   const maxStartDate = formData.leaveType === 'sick'

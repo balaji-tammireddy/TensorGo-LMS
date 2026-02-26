@@ -42,7 +42,6 @@
     font-weight: 600;
     color: #1f2937;
     line-height: 1.4;
-    /* Prevent overflow */
     word-break: break-word;
     overflow-wrap: anywhere;
 }
@@ -94,7 +93,6 @@
 .ws-card-body {
     flex: 1;
     min-width: 0;
-    /* Enable text truncation in flex child */
 }
 
 .ws-card-desc {
@@ -107,7 +105,6 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    /* Prevent overflow */
     word-break: break-word;
     overflow-wrap: anywhere;
 }
@@ -151,13 +148,6 @@
     margin-left: 0;
 }
 
-.ws-avatar.more {
-    background: #f3f4f6;
-    color: #4b5563;
-    font-size: 9px;
-    border-color: white;
-}
-
 .ws-no-assignees {
     font-size: 11px;
     color: #9ca3af;
@@ -184,7 +174,6 @@
     color: #3B82F6;
 }
 
-/* Compact Mode */
 .ws-card.ws-card-compact {
     padding: 10px 12px;
     gap: 6px;
@@ -208,10 +197,6 @@
     width: 24px;
     height: 24px;
     font-size: 9px;
-}
-
-.ws-card-compact .ws-avatar.more {
-    font-size: 8px;
 }
 
 .ws-card-compact .ws-add-assignee-btn {
@@ -307,12 +292,11 @@
 
 .ws-item-icon {
     color: #9CA3AF;
-    opacity: 0;
+    opacity: 1;
     transition: opacity 0.2s;
 }
 
 .ws-dropdown-item:hover .ws-item-icon {
-    opacity: 1;
     color: #3B82F6;
 }
 
@@ -322,14 +306,12 @@
     color: #EF4444;
 }
 
-/* Ensure card with open dropdown stays on top */
 .ws-card.ws-card-dropdown-open {
     z-index: 1000 !important;
 }
 
 .ws-dropdown-item.assigned {
     background-color: #F0FDF4;
-    /* Light green background for assigned */
 }
 
 .ws-dropdown-item.assigned:hover {
@@ -338,26 +320,12 @@
 
 .ws-item-icon.add {
     color: #3B82F6;
-    /* Blue for add */
-    opacity: 1;
-    /* Always visible or maybe on hover? Let's keep hover logic but change color */
 }
 
 .ws-item-icon.remove {
     color: #EF4444;
-    /* Red for remove */
-    opacity: 1;
 }
 
-/* Override previous hover opacity for these icons if we want them always visible? 
-   Or keep the hover effect. The previous CSS had opacity: 0 -> 1 on hover.
-   Let's make them always visible for clarity in this new "Manage" mode, 
-   or at least visible if assigned.
-*/
-.ws-item-icon {
-    opacity: 1 !important;
-    /* Force visibility */
-}/* Empty State Styles */
 .ws-dropdown-empty-state {
     padding: 24px 16px;
     display: flex;
@@ -410,4 +378,70 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.activity-details {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #64748B;
+}
+
+.activity-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.activity-detail-item strong {
+    font-weight: 600;
+    color: #475569;
+}
+
+.activity-status-badge {
+    display: inline-flex;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 6px;
+    align-self: flex-start;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.activity-status-badge.not_started {
+    background-color: #F1F5F9;
+    color: #475569;
+}
+
+.activity-status-badge.in_progress {
+    background-color: #DBEAFE;
+    color: #1D4ED8;
+}
+
+.activity-status-badge.completed {
+    background-color: #DCFCE7;
+    color: #166534;
+}
+
+.activity-status-badge.on_hold {
+    background-color: #FEF3C7;
+    color: #92400E;
+}
+
+.ws-updated-by {
+    font-size: 11px;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ws-updated-by strong {
+    color: #64748B;
+    font-weight: 600;
 }

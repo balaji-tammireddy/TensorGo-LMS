@@ -3,7 +3,7 @@ import { X, FileDown, Loader2, ChevronDown, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { timesheetService } from '../../services/timesheetService';
-import { projectService, Project, ProjectModule, ProjectTask, ProjectActivity } from '../../services/projectService';
+import { projectService, Project, ProjectModule, ProjectTask } from '../../services/projectService';
 import { DatePicker } from '../../components/ui/date-picker';
 // import { Modal } from '../../components/ui/modal';
 import {
@@ -40,21 +40,20 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
     const [projects, setProjects] = useState<Project[]>([]);
     const [modules, setModules] = useState<ProjectModule[]>([]);
     const [tasks, setTasks] = useState<ProjectTask[]>([]);
-    const [activities, setActivities] = useState<ProjectActivity[]>([]);
+
 
     // Search states
     const [employeeSearch, setEmployeeSearch] = useState('');
     const [projectSearch, setProjectSearch] = useState('');
     const [moduleSearch, setModuleSearch] = useState('');
     const [taskSearch, setTaskSearch] = useState('');
-    const [activitySearch, setActivitySearch] = useState('');
+
 
     const [filters, setFilters] = useState({
         employeeId: '',
         projectId: '',
         moduleId: '',
         taskId: '',
-        activityId: '',
         startDate: '',
         endDate: ''
     });
@@ -105,10 +104,9 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
     };
 
     const handleProjectChange = async (projectId: string) => {
-        setFilters({ ...filters, projectId, moduleId: '', taskId: '', activityId: '' });
+        setFilters({ ...filters, projectId, moduleId: '', taskId: '' });
         setModules([]);
         setTasks([]);
-        setActivities([]);
 
         if (!projectId) return;
 
@@ -121,9 +119,8 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
     };
 
     const handleModuleChange = async (moduleId: string) => {
-        setFilters({ ...filters, moduleId, taskId: '', activityId: '' });
+        setFilters({ ...filters, moduleId, taskId: '' });
         setTasks([]);
-        setActivities([]);
 
         if (!moduleId) return;
 
@@ -136,17 +133,7 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
     };
 
     const handleTaskChange = async (taskId: string) => {
-        setFilters({ ...filters, taskId, activityId: '' });
-        setActivities([]);
-
-        if (!taskId) return;
-
-        try {
-            const data = await projectService.getActivities(parseInt(taskId));
-            setActivities(data.filter(a => a.status !== 'archived'));
-        } catch (error) {
-            console.error('Failed to fetch activities:', error);
-        }
+        setFilters({ ...filters, taskId });
     };
 
     const handleGeneratePDF = async () => {
@@ -167,7 +154,7 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
             if (filters.projectId) reportFilters.projectId = parseInt(filters.projectId);
             if (filters.moduleId) reportFilters.moduleId = parseInt(filters.moduleId);
             if (filters.taskId) reportFilters.taskId = parseInt(filters.taskId);
-            if (filters.activityId) reportFilters.activityId = parseInt(filters.activityId);
+
             if (filters.startDate) reportFilters.startDate = filters.startDate;
             if (filters.endDate) reportFilters.endDate = filters.endDate;
 
@@ -227,18 +214,15 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
             projectId: '',
             moduleId: '',
             taskId: '',
-            activityId: '',
             startDate: '',
             endDate: ''
         });
         setModules([]);
         setTasks([]);
-        setActivities([]);
         setEmployeeSearch('');
         setProjectSearch('');
         setModuleSearch('');
         setTaskSearch('');
-        setActivitySearch('');
     };
 
     // Helper to get employee display name - handle multiple field name formats
@@ -267,9 +251,7 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
         t.name.toLowerCase().includes(taskSearch.toLowerCase())
     );
 
-    const filteredActivities = activities.filter(a =>
-        a.name.toLowerCase().includes(activitySearch.toLowerCase())
-    );
+
 
     if (!isOpen) return null;
 
@@ -470,49 +452,7 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({ isOp
                             </div>
                         </div>
 
-                        {/* Row 3: Activity & Date Range */}
-                        <div className="grid-row">
-                            <div className="ts-form-group">
-                                <label className="ts-form-label">Activity</label>
-                                <DropdownMenu onOpenChange={(open) => !open && setActivitySearch('')}>
-                                    <DropdownMenuTrigger asChild disabled={!filters.taskId}>
-                                        <button className={`custom-select-trigger ${!filters.taskId ? 'disabled' : ''}`}>
-                                            <span className="selected-val">
-                                                {activities.find(a => String(a.id) === filters.activityId)?.name || 'All Activities'}
-                                            </span>
-                                            <ChevronDown size={16} className="text-gray-400" />
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="manager-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                        <div className="dropdown-search-wrapper">
-                                            <Search size={14} className="search-icon" />
-                                            <input
-                                                type="text"
-                                                placeholder="Search activities..."
-                                                value={activitySearch}
-                                                onChange={(e) => setActivitySearch(e.target.value)}
-                                                className="dropdown-search-input"
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        </div>
-                                        <div className="dropdown-items-scroll">
-                                            <DropdownMenuItem onClick={() => setFilters({ ...filters, activityId: '' })} className="manager-item">
-                                                All Activities
-                                            </DropdownMenuItem>
-                                            {filteredActivities.map(act => (
-                                                <DropdownMenuItem
-                                                    key={act.id}
-                                                    onClick={() => setFilters({ ...filters, activityId: String(act.id) })}
-                                                    className="manager-item"
-                                                >
-                                                    <span className="manager-name">{act.name}</span>
-                                                </DropdownMenuItem>
-                                            ))}
-                                        </div>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        </div>
+
 
                         <div className="grid-row">
                             <div className="ts-form-group">

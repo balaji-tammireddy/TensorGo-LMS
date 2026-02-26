@@ -14,6 +14,9 @@ interface WorkspaceCardProps {
     customId: string;
     name: string;
     description?: string;
+    date?: string;
+    timeSpent?: number;
+    workStatus?: string;
     assignedUsers?: AssignedUser[];
     isSelected?: boolean;
     onClick: () => void;
@@ -24,12 +27,18 @@ interface WorkspaceCardProps {
     isCompact?: boolean;
     availableUsers?: AssignedUser[];
     onAssignUser?: (userId: number) => void;
+    createdByName?: string;
+    startDate?: string;
+    endDate?: string;
 }
 
 export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     customId,
     name,
     description,
+    date,
+    timeSpent,
+    workStatus,
     assignedUsers = [],
     isSelected = false,
     onClick,
@@ -39,7 +48,10 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     isPM = false,
     isCompact = false,
     availableUsers = [],
-    onAssignUser
+    onAssignUser,
+    createdByName,
+    startDate,
+    endDate
 }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
@@ -61,6 +73,16 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isDropdownOpen]);
+
+    const getStatusLabel = (status?: string) => {
+        switch (status) {
+            case 'not_started': return 'Not Started';
+            case 'in_progress': return 'In Progress';
+            case 'completed': return 'Completed';
+            case 'on_hold': return 'On Hold';
+            default: return status;
+        }
+    };
 
     return (
         <>
@@ -124,6 +146,33 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                             {description.length > 30 ? description.slice(0, 30) + '...' : description}
                         </p>
                     ) : null}
+
+                    {(date || timeSpent || workStatus) && (
+                        <div className="activity-details">
+                            {startDate && endDate && new Date(startDate).toDateString() === new Date(endDate).toDateString() ? (
+                                <div className="activity-detail-item"><strong>Date:</strong> {new Date(startDate).toLocaleDateString()}</div>
+                            ) : (
+                                <>
+                                    {startDate && <div className="activity-detail-item"><strong>Start Date:</strong> {new Date(startDate).toLocaleDateString()}</div>}
+                                    {endDate && <div className="activity-detail-item"><strong>End Date:</strong> {new Date(endDate).toLocaleDateString()}</div>}
+                                </>
+                            )}
+                            {date && !startDate && <div className="activity-detail-item"><strong>Date:</strong> {new Date(date).toLocaleDateString()}</div>}
+                            {timeSpent && <div className="activity-detail-item"><strong>Time Spent:</strong> {timeSpent}h</div>}
+                            {workStatus && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div className={`activity-status-badge ${workStatus}`}>
+                                        {getStatusLabel(workStatus)}
+                                    </div>
+                                    {createdByName && (
+                                        <div className="ws-updated-by" style={{ fontSize: '10px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <strong>Created By:</strong> {createdByName}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="ws-card-divider" />
