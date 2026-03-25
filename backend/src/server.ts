@@ -46,13 +46,19 @@ app.use(
         return callback(null, true);
       }
 
-      // Check against configured frontend URL
-      const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
-      if (origin === allowedOrigin) {
+      // Check against configured frontend URLs
+      const allowedOrigins = [
+        process.env.FRONTEND_URL || 'http://localhost:3000',
+        'http://51.15.227.10:3000',
+        'http://intra.tensorgo.com',
+        'https://intra.tensorgo.com'
+      ];
+
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      logger.warn(`Blocked by CORS: Origin '${origin}' does not match allowed origin '${allowedOrigin}'`);
+      logger.warn(`Blocked by CORS: Origin '${origin}' not found in allowed origins: ${JSON.stringify(allowedOrigins)}`);
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
