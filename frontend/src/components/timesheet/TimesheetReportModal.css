@@ -1,0 +1,101 @@
+@import '../../pages/ProjectManagement/components/CreateModal.css';
+
+.report-modal-container {
+  max-width: 600px;
+}
+
+.report-modal-container .modal-body {
+  padding: 24px;
+}
+
+.report-modal-container .filter-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.report-modal-container .grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.report-modal-container .ts-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-modal-container .ts-form-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.report-modal-container .modal-footer {
+  display: flex;
+  justify-content: space-between !important;
+  align-items: center;
+  padding: 16px 24px;
+}
+
+.footer-left,
+.footer-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Custom button overrides for reports */
+.btn-excel {
+  background-color: #16a34a;
+  color: white;
+  border: 1px solid transparent;
+}
+
+.btn-excel:hover:not(:disabled) {
+  background-color: #15803d;
+}
+
+.btn-reset {
+  border-color: #E5E7EB;
+  color: #6B7280;
+}
+
+.btn-reset:hover {
+  color: #EF4444;
+  border-color: #FEE2E2;
+  background-color: #FEF2F2;
+}
+
+.report-modal-container .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .report-modal-container .grid-row {
+    grid-template-columns: 1fr;
+  }
+
+  .report-modal-container .modal-footer {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .footer-left,
+  .footer-right {
+    width: 100%;
+    justify-content: center;
+  }
+}

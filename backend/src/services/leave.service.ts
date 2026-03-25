@@ -3,7 +3,7 @@ import { calculateLeaveDays } from '../utils/dateCalculator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { deleteFromOVH } from '../utils/storage';
-import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail, sendLopToCasualConversionEmail } from '../utils/emailTemplates';
+import { sendLeaveApplicationEmail, sendLeaveStatusEmail, sendUrgentLeaveApplicationEmail } from '../utils/emailTemplates';
 import { TimesheetService } from './timesheet.service';
 
 // Local date formatter to avoid timezone shifts
@@ -53,8 +53,8 @@ export const getLeaveBalances = async (userId: number): Promise<any> => {
   if (result.rows.length === 0) {
     logger.info(`[LEAVE] [GET LEAVE BALANCES] No balance record found, initializing with defaults`);
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, 0, 0, 10)',
-      [userId]
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by) VALUES ($1, 0, 0, 10, $2, $2)',
+      [userId, userId]
     );
     balancesRaw = { casual: 0, sick: 0, lop: 10 };
   } else {
@@ -170,10 +170,16 @@ export const createHoliday = async (holidayDate: string, holidayName: string, re
 
     logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday created successfully - ID: ${result.rows[0].id}`);
 
-    // Hook: Log Holiday Immediately
-    TimesheetService.logHolidayForEveryone(holidayDate, trimmedName).catch(e => {
+    // Hook: Log Holiday Immediately - WAIT for completion
+    // This ensures DB entries are created BEFORE responding to client
+    // so the frontend sees holiday logs immediately without needing to reload
+    try {
+      await TimesheetService.logHolidayForEveryone(holidayDate, trimmedName);
+      logger.info(`[LEAVE] [CREATE HOLIDAY] Holiday logs created successfully for all users`);
+    } catch (e) {
       logger.error(`[LEAVE] Failed to log holiday to timesheets`, e);
-    });
+      // Don't fail the holiday creation if timesheet logging fails
+    }
 
     return {
       id: result.rows[0].id,
@@ -586,9 +592,9 @@ export const applyLeave = async (
       // Store RAW types in DB to preserve UI state (first_half vs second_half)
       // Constraint has been updated to allow these values.
       const leaveRequestResult = await client.query(
-        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
+        `INSERT INTO leave_requests (employee_id, leave_type, start_date, start_type, end_date, end_type, reason, no_of_days, time_for_permission_start, time_for_permission_end, doctor_note, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+        [userId, leaveData.leaveType, checkStartDateStr, leaveData.startType, checkEndDateStr, leaveData.endType, leaveData.reason, days, leaveData.timeForPermission?.start || null, leaveData.timeForPermission?.end || null, leaveData.doctorNote || null, userId, userId]
       );
       leaveRequestId = leaveRequestResult.rows[0].id;
 
@@ -668,21 +674,12 @@ export const applyLeave = async (
         const toEmail = chain.l1_email;
         const toName = chain.l1_name || 'Reporting Manager';
 
-        // CC list: Reporting HR (L2) only if employee/intern applied
-        const ccSet = new Set<string>();
-        if (chain.l2_email) ccSet.add(chain.l2_email);
-
-        // Remove 'To' email from CC if somehow duplicated
-        if (toEmail) ccSet.delete(toEmail);
-
-        const ccEmails = Array.from(ccSet);
-
         if (toEmail) {
           const emailData = { ...baseEmailData, managerName: toName };
           if (isUrgent) {
-            await sendUrgentLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+            await sendUrgentLeaveApplicationEmail(toEmail, emailData, undefined);
           } else {
-            await sendLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+            await sendLeaveApplicationEmail(toEmail, emailData, undefined);
           }
         } else {
           logger.warn(`No reporting manager (L1) found for user ${userId}. Email not sent.`);
@@ -812,8 +809,13 @@ export const getMyLeaveRequests = async (
       dates.sort((a, b) => b.date - a.date);
 
       if (dates[0].date > 0) {
-        approverName = dates[0].name;
-        approverRole = dates[0].role;
+        if (row.super_admin_approval_comment?.startsWith('Auto-approved')) {
+          approverName = 'Auto Approved';
+          approverRole = 'System';
+        } else {
+          approverName = dates[0].name;
+          approverRole = dates[0].role;
+        }
       }
 
       requests.push({
@@ -976,8 +978,13 @@ export const getLeaveRequestById = async (requestId: number, userId: number, use
   dates.sort((a, b) => b.date - a.date);
 
   if (dates[0].date > 0) {
-    approverName = dates[0].name;
-    approverRole = dates[0].role;
+    if (row.super_admin_approval_comment?.startsWith('Auto-approved')) {
+      approverName = 'Auto Approved';
+      approverRole = 'System';
+    } else {
+      approverName = dates[0].name;
+      approverRole = dates[0].role;
+    }
   }
 
   // Get leave days for this request
@@ -1457,11 +1464,12 @@ export const updateLeaveRequest = async (
     await client.query(
       `UPDATE leave_requests 
        SET leave_type = $1, start_date = $2, start_type = $3, end_date = $4, end_type = $5, 
-           reason = $6, time_for_permission_start = $7, time_for_permission_end = $8,
-           doctor_note = $9, updated_at = CURRENT_TIMESTAMP,
+           reason = $6, no_of_days = $7, time_for_permission_start = $8, time_for_permission_end = $9,
+           doctor_note = $10, updated_at = CURRENT_TIMESTAMP,
            current_status = 'pending',
-           manager_approval_status = 'pending', hr_approval_status = 'pending', super_admin_approval_status = 'pending'
-       WHERE id = $10`,
+           manager_approval_status = 'pending', hr_approval_status = 'pending', super_admin_approval_status = 'pending',
+           updated_by = $11
+       WHERE id = $12`,
       [
         leaveData.leaveType,
         startDateStr,
@@ -1469,10 +1477,12 @@ export const updateLeaveRequest = async (
         endDateStr,
         leaveData.endType,   // Pass RAW type to DB
         leaveData.reason,
+        days,                // New days count
         leaveData.timeForPermission?.start || null,
         leaveData.timeForPermission?.end || null,
         leaveData.doctorNote || null,
-        requestId
+        userId,              // updated_by
+        requestId            // WHERE condition
       ]
     );
 
@@ -1486,8 +1496,8 @@ export const updateLeaveRequest = async (
       const leaveDayDateStr = `${ldYear}-${ldMonth}-${ldDay}`;
 
       await client.query(
-        'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id) VALUES ($1, $2, $3, $4, $5)',
-        [requestId, leaveDayDateStr, day.type, leaveData.leaveType, userId]
+        'INSERT INTO leave_days (leave_request_id, leave_date, day_type, leave_type, employee_id, created_by, updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [requestId, leaveDayDateStr, day.type, leaveData.leaveType, userId, userId, userId]
       );
     }
 
@@ -1533,11 +1543,8 @@ export const updateLeaveRequest = async (
         };
 
         const toEmail = chain.l1_email;
-        const ccEmails: string[] = [];
-        if (chain.l2_email) ccEmails.push(chain.l2_email);
-
         if (toEmail) {
-          await sendLeaveApplicationEmail(toEmail, emailData, ccEmails.length > 0 ? ccEmails : undefined);
+          await sendLeaveApplicationEmail(toEmail, emailData, undefined);
         }
       } catch (e) {
         logger.error('Async email error in updateLeaveRequest:', e);
@@ -4271,8 +4278,13 @@ export const getApprovedLeaves = async (
     dates.sort((a, b) => b.date - a.date);
 
     if (dates[0].date > 0) {
-      approverName = dates[0].name;
-      approverRole = dates[0].role;
+      if (row.super_admin_approval_comment?.startsWith('Auto-approved')) {
+        approverName = 'Auto Approved';
+        approverRole = 'System';
+      } else {
+        approverName = dates[0].name;
+        approverRole = dates[0].role;
+      }
     }
 
     return {
@@ -4452,37 +4464,14 @@ export const convertLeaveRequestLopToCasual = async (requestId: number, adminUse
     await client.query('COMMIT');
 
     // 9. Send notification email - Fire and forget
-    (async () => {
-      try {
-        const adminResult = await pool.query('SELECT first_name, emp_id, user_role as role FROM users WHERE id = $1', [adminUserId]);
-        const admin = adminResult.rows[0];
-
-        await sendLopToCasualConversionEmail(request.email, {
-          employeeName: `${request.first_name} ${request.last_name}`,
-          employeeEmpId: request.emp_id,
-          recipientName: `${request.first_name} ${request.last_name}`,
-          recipientRole: 'employee',
-          leaveType: 'Casual', // New type
-          startDate: formatDate(request.start_date),
-          startType: request.start_type,
-          endDate: formatDate(request.end_date),
-          endType: request.end_type,
-          noOfDays: noOfDays,
-          reason: request.reason,
-          converterName: admin.first_name,
-          converterEmpId: admin.emp_id,
-          converterRole: admin.role,
-          previousLopBalance,
-          newLopBalance,
-          previousCasualBalance,
-          newCasualBalance,
-          conversionDate: formatDate(new Date())
-        });
-        logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Notification email sent to ${request.email}`);
-      } catch (emailError: any) {
-        logger.error(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Failed to send notification email: ${emailError.message}`);
-      }
-    })();
+    // 9. Send notification email - Fire and forget
+    // (async () => {
+    //   try {
+    //     logger.info(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Notification email skipped as per requirement`);
+    //   } catch (emailError: any) {
+    //     logger.error(`[SERVICE] [LEAVE] [CONVERT LOP TO CASUAL] Failed to send notification email: ${emailError.message}`);
+    //   }
+    // })();
 
     return {
       leaveRequestId: requestId,

@@ -1,5 +1,5 @@
 
-import { processDailyLeaveCredits } from '../utils/cronJobs';
+import { checkAndCreditMonthlyLeaves } from '../services/leaveCredit.service';
 import { pool } from '../database/db';
 
 const run = async () => {
@@ -7,7 +7,7 @@ const run = async () => {
     console.log('MANUAL TRIGGER: Daily Leave Credits Check');
     console.log('----------------------------------------');
     try {
-        await processDailyLeaveCredits();
+        await checkAndCreditMonthlyLeaves();
         console.log('----------------------------------------');
         console.log('SUCCESS: Process completed.');
         console.log('----------------------------------------');

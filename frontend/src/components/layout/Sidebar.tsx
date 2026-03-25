@@ -43,8 +43,8 @@ const Sidebar: React.FC = memo(() => {
 
     const routes: Array<{ path: string; icon: React.ReactNode; label: string }> = [];
 
-    // Dashboard - For Super Admin only
-    if (user.role === 'super_admin') {
+    // Dashboard - For Super Admin and HR
+    if (user.role === 'super_admin' || user.role === 'hr') {
       routes.push({ path: '/dashboard', icon: <FaChartPie />, label: 'Dashboard' });
     }
 
@@ -76,17 +76,17 @@ const Sidebar: React.FC = memo(() => {
     // View Policies - Available to all
     routes.push({ path: '/view-policies', icon: <FaBook />, label: 'View Policies' });
 
-    // Project Management - For all roles (employees/interns see their assigned projects)
+    // Project Management
     if (['manager', 'hr', 'super_admin', 'employee', 'intern'].includes(user.role)) {
       routes.push({ path: '/project-management', icon: <FaBriefcase />, label: 'Projects' });
     }
 
-    // Timesheet - For all except Super Admin
+    // Timesheet
     if (['manager', 'hr', 'employee', 'intern'].includes(user.role)) {
       routes.push({ path: '/timesheets', icon: <FaClock />, label: 'Timesheets' });
     }
 
-    // Timesheet Approval - For Managers, HR, Super Admin
+    // Timesheet Approval
     if (['manager', 'hr', 'super_admin'].includes(user.role)) {
       routes.push({ path: '/timesheet/approvals', icon: <FaClipboardCheck />, label: 'Timesheet Approvals' });
     }
@@ -112,13 +112,13 @@ const Sidebar: React.FC = memo(() => {
     <div className="sidebar">
       <div className="sidebar-nav">
         {availableRoutes.map((route) => (
-          <div
-            key={route.path}
-            className={`nav-item ${location.pathname === route.path || (route.path === '/project-management' && location.pathname.startsWith('/project-management/')) ? 'active' : ''}`}
-            onClick={() => navigate(route.path)}
-            title={route.label}
-          >
-            <span className="nav-icon">{route.icon}</span>
+          <div className="nav-item-wrapper" key={route.path} data-tooltip={route.label}>
+            <div
+              className={`nav-item ${location.pathname === route.path || (route.path === '/project-management' && location.pathname.startsWith('/project-management/')) ? 'active' : ''}`}
+              onClick={() => navigate(route.path)}
+            >
+              <span className="nav-icon">{route.icon}</span>
+            </div>
           </div>
         ))}
       </div>

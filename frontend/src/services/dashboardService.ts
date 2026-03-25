@@ -16,3 +16,8 @@ export const getUserDashboardDetails = async (userId: number) => {
     const response = await api.get(`/dashboard/user-details/${userId}`);
     return response.data.data;
 };
+
+export const getAnalytics = async () => {
+    const response = await api.get('/dashboard/analytics');
+    return response.data.data;
+};

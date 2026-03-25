@@ -101,30 +101,22 @@ async function migrate() {
 
     // Insert sample holidays (2025 calendar)
     await pool.query(`
-      INSERT INTO holidays (holiday_date, holiday_name, is_active)
+      INSERT INTO holidays (holiday_date, holiday_name, is_active, created_by, updated_by)
       VALUES 
-        ('2025-01-01', 'New Year Day', true),
-        ('2025-01-14', 'Sankranti', true),
-        ('2025-02-26', 'Maha Shivaratri', true),
-        ('2025-03-14', 'Holi', true),
-        ('2025-08-15', 'Independence Day', true),
-        ('2025-08-27', 'Ganesh Chaturthi', true),
-        ('2025-10-02', 'Dussera', true),
-        ('2025-10-20', 'Deepavali', true),
-        ('2025-10-21', 'Govardhan Puja', true),
-        ('2025-12-25', 'Christmas', true)
+        ('2025-01-01', 'New Year Day', true, 1, 1),
+        ('2025-01-14', 'Sankranti', true, 1, 1),
+        ('2025-02-26', 'Maha Shivaratri', true, 1, 1),
+        ('2025-03-14', 'Holi', true, 1, 1),
+        ('2025-08-15', 'Independence Day', true, 1, 1),
+        ('2025-08-27', 'Ganesh Chaturthi', true, 1, 1),
+        ('2025-10-02', 'Dussera', true, 1, 1),
+        ('2025-10-20', 'Deepavali', true, 1, 1),
+        ('2025-10-21', 'Govardhan Puja', true, 1, 1),
+        ('2025-12-25', 'Christmas', true, 1, 1)
       ON CONFLICT (holiday_date) DO NOTHING
     `);
 
-    // Update existing employees' casual and sick leave balances to 0 (remove defaults)
-    const updateResult = await pool.query(`
-      UPDATE leave_balances
-      SET casual_balance = 0,
-          sick_balance = 0,
-          last_updated = CURRENT_TIMESTAMP
-      WHERE casual_balance != 0 OR sick_balance != 0
-    `);
-    console.log(`Updated ${updateResult.rowCount} employee leave balance records (casual and sick set to 0)`);
+
 
     // Run password reset OTP migration
     try {
@@ -424,7 +416,116 @@ async function migrate() {
       console.warn('Timesheet module migration warning:', timesheetError.message);
     }
 
+    // Run NOT NULL audit columns migration (024)
+    try {
+      const auditNotNullFile = readFileSync(
+        join(__dirname, 'migrations', '024_add_not_null_audit_columns.sql'),
+        'utf-8'
+      );
+      await pool.query(auditNotNullFile);
+      console.log('NOT NULL audit columns migration (024) completed');
+    } catch (auditNotNullError: any) {
+      console.warn('NOT NULL audit columns migration warning:', auditNotNullError.message);
+    }
+
+    // Run fix projects updated_at migration (025)
+    try {
+      const fixProjectsFile = readFileSync(
+        join(__dirname, 'migrations', '025_fix_projects_updated_at.sql'),
+        'utf-8'
+      );
+      await pool.query(fixProjectsFile);
+      console.log('Fix projects.updated_at migration (025) completed');
+    } catch (fixProjectsError: any) {
+      console.warn('Fix projects migration warning:', fixProjectsError.message);
+    }
+
+    // Run add employee profile fields migration (026)
+    try {
+      const addProfileFieldsFile = readFileSync(
+        join(__dirname, 'migrations', '026_add_employee_profile_fields.sql'),
+        'utf-8'
+      );
+      await pool.query(addProfileFieldsFile);
+      console.log('Add employee profile fields migration (026) completed');
+    } catch (profileFieldsError: any) {
+      if (!profileFieldsError.message.includes('already exists') && !profileFieldsError.message.includes('duplicate')) {
+        console.warn('Add employee profile fields migration warning:', profileFieldsError.message);
+      }
+    }
+
+    // Run add personal email migration (027)
+    try {
+      const addPersonalEmailFile = readFileSync(
+        join(__dirname, 'migrations', '027_add_personal_email.sql'),
+        'utf-8'
+      );
+      await pool.query(addPersonalEmailFile);
+      console.log('Add personal email migration (027) completed');
+    } catch (personalEmailError: any) {
+      if (!personalEmailError.message.includes('already exists') && !personalEmailError.message.includes('duplicate')) {
+        console.warn('Add personal email migration warning:', personalEmailError.message);
+      }
+    }
+
+    // Run timesheet late resubmission columns migration (028)
+    try {
+      const lateResubmissionFile = readFileSync(
+        join(__dirname, 'migrations', '028_add_timesheet_late_resubmission_columns.sql'),
+        'utf-8'
+      );
+      await pool.query(lateResubmissionFile);
+      console.log('Timesheet late resubmission columns migration (028) completed');
+    } catch (lateResubmissionError: any) {
+      if (!lateResubmissionError.message.includes('already exists') && !lateResubmissionError.message.includes('duplicate')) {
+        console.warn('Timesheet late resubmission migration warning:', lateResubmissionError.message);
+      }
+    }
+
+    // Run add activity fields migration (029)
+    try {
+      const activityFieldsFile = readFileSync(
+        join(__dirname, 'migrations', '029_add_activity_fields.sql'),
+        'utf-8'
+      );
+      await pool.query(activityFieldsFile);
+      console.log('Add activity fields migration (029) completed');
+    } catch (activityFieldsError: any) {
+      if (!activityFieldsError.message.includes('already exists') && !activityFieldsError.message.includes('duplicate')) {
+        console.warn('Add activity fields migration warning:', activityFieldsError.message);
+      }
+    }
+
+    // Run remove activities and update tasks migration (030)
+    try {
+      const removeActivitiesFile = readFileSync(
+        join(__dirname, 'migrations', '030_remove_activities_and_update_tasks.sql'),
+        'utf-8'
+      );
+      await pool.query(removeActivitiesFile);
+      console.log('Remove activities and update tasks migration (030) completed');
+    } catch (removeActivitiesError: any) {
+      if (!removeActivitiesError.message.includes('already exists') && !removeActivitiesError.message.includes('duplicate')) {
+        console.warn('Remove activities migration warning:', removeActivitiesError.message);
+      }
+    }
+
+    // Run align work_status constraints migration (031)
+    try {
+      const alignWorkStatusFile = readFileSync(
+        join(__dirname, 'migrations', '031_align_work_status_constraints.sql'),
+        'utf-8'
+      );
+      await pool.query(alignWorkStatusFile);
+      console.log('Align work_status constraints migration (031) completed');
+    } catch (alignError: any) {
+      if (!alignError.message.includes('already exists') && !alignError.message.includes('duplicate')) {
+        console.warn('Align work_status constraints migration warning:', alignError.message);
+      }
+    }
+
     console.log('Default data inserted');
+
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);

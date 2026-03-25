@@ -1,10 +1,23 @@
 /* v1.0.1 - Corrected Holiday Date Logic & Premium Cards */
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Save, Trash2, Edit2, Clock, FileText, ChevronDown } from 'lucide-react';
+import {
+    Clock,
+    ChevronLeft,
+    ChevronRight,
+    Save,
+    FileText,
+    Edit2,
+    Trash2,
+    ChevronDown,
+    Lock,
+    Repeat,
+    AlertCircle
+} from 'lucide-react';
+
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetEntry } from '../../services/timesheetService';
-import { projectService, Project, ProjectModule, ProjectTask, ProjectActivity } from '../../services/projectService';
+import { projectService, Project, ProjectModule, ProjectTask } from '../../services/projectService';
 import AppLayout from '../../components/layout/AppLayout';
 
 import { DatePicker } from '../../components/ui/date-picker';
@@ -30,26 +43,26 @@ export const TimesheetPage: React.FC = () => {
         return `${year}-${month}-${day}`;
     };
 
+    const getStatusLabel = (status?: string) => {
+        if (!status) return 'N/A';
+        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
         const monday = new Date(date);
         monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 5); // Monday to Saturday
+        return { start: monday, end: saturday };
     };
 
     // Date State
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
-
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     // Data State
     const [entries, setEntries] = useState<TimesheetEntry[]>([]);
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [modules, setModules] = useState<ProjectModule[]>([]);
-    const [tasks, setTasks] = useState<ProjectTask[]>([]);
-    const [activities, setActivities] = useState<ProjectActivity[]>([]);
 
     const weekRange = useMemo(() => getWeekRange(currentDate), [currentDate]);
 
@@ -61,28 +74,32 @@ export const TimesheetPage: React.FC = () => {
         const viewWeekStart = new Date(weekRange.start);
         viewWeekStart.setHours(0, 0, 0, 0);
 
-        // Strict: Only Current Week (or future, effectively limited by max date)
-        // Previous weeks are locked for NEW logs.
-        return viewWeekStart.getTime() >= currentWeekStart.getTime();
+        const prevWeekStart = new Date(currentWeekStart);
+        prevWeekStart.setDate(currentWeekStart.getDate() - 7);
+
+        // Allow Current Week AND the immediately preceding week (Past 1 week)
+        return viewWeekStart.getTime() >= prevWeekStart.getTime();
     }, [weekRange]);
 
-    // Form State
-    const initialFormState = {
-        project_id: '',
-        module_id: '',
-        task_id: '',
-        activity_id: '',
-        duration: '',
-        work_status: 'in_progress',
-        description: ''
-    };
-    const [formData, setFormData] = useState(initialFormState);
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const isWeekLocked = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPastWeek = weekRange.end < today;
+
+        if (!isPastWeek) return false;
+
+        // Check if any entry for the week is submitted or approved
+        // This ensures if the user manually submitted, they can't add more logs
+        // unless it was rejected (in which case status = 'rejected')
+        return entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
+    }, [weekRange, entries]);
+
+    const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
     const [loading, setLoading] = useState(false);
 
     // Initial Load
     useEffect(() => {
-        fetchProjects();
+        // Entries will be fetched by the next useEffect when weekRange is initialized
     }, []);
 
     // Fetch Entries when week changes
@@ -92,18 +109,6 @@ export const TimesheetPage: React.FC = () => {
         return () => controller.abort();
     }, [weekRange]);
 
-    const fetchProjects = async () => {
-        try {
-            const data = await projectService.getProjects();
-            // Strict Filtering for Timesheet: Only show projects where user is Active Member or Project Manager
-            setProjects(data.filter(p =>
-                p.status === 'active' && (p.is_member || p.is_pm)
-            ));
-        } catch (err) {
-            console.error(err);
-            showError('Failed to load projects');
-        }
-    };
 
     const fetchEntries = async (signal?: AbortSignal) => {
         try {
@@ -135,7 +140,7 @@ export const TimesheetPage: React.FC = () => {
     const weekDays = useMemo(() => {
         const days = [];
         const { start } = weekRange;
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 6; i++) { // Only 6 days: Mon - Sat
             const d = new Date(start);
             d.setDate(start.getDate() + i);
             days.push(d);
@@ -143,183 +148,35 @@ export const TimesheetPage: React.FC = () => {
         return days;
     }, [weekRange]);
 
-    // Ensure selectedDate is within the current week view
-    useEffect(() => {
-        const startStr = formatDate(weekRange.start);
-        const endStr = formatDate(weekRange.end);
-        if (selectedDate < startStr || selectedDate > endStr) {
-            setSelectedDate(startStr);
-        }
-    }, [weekRange, selectedDate]);
+    // Note: Removed auto-reset of selectedDate to allow selecting dates in previous weeks
+    // The date picker and validation will handle invalid dates
 
-    // Cascading Dropdowns
-    const handleProjectChange = async (projectId: string) => {
-        setFormData({ ...formData, project_id: projectId, module_id: '', task_id: '', activity_id: '' });
-        setModules([]); setTasks([]); setActivities([]);
-        if (!projectId) return;
-
-        try {
-            const data = await projectService.getModules(parseInt(projectId));
-            // Strict Filtering: Only show modules user is assigned to
-            // Add safety check for user
-            if (!user) {
-                setModules([]);
-                return;
-            }
-            setModules(data.filter(m =>
-                m.status === 'active' &&
-                m.assigned_users?.some(u => u.id === user.id)
-            ));
-        } catch (err) { console.error(err); }
-    };
-
-    const handleModuleChange = async (moduleId: string) => {
-        setFormData({ ...formData, module_id: moduleId, task_id: '', activity_id: '' });
-        setTasks([]); setActivities([]);
-        if (!moduleId) return;
-
-        try {
-            const data = await projectService.getTasks(parseInt(moduleId));
-            // Strict Filtering: Only show tasks user is assigned to
-            if (!user) {
-                setTasks([]);
-                return;
-            }
-            setTasks(data.filter(t =>
-                t.status !== 'archived' &&
-                (t.is_assigned || t.assigned_users?.some(u => u.id === user.id))
-            ));
-        } catch (err) { console.error(err); }
-    };
-
-    const handleTaskChange = async (taskId: string) => {
-        setFormData({ ...formData, task_id: taskId, activity_id: '' });
-        setActivities([]);
-        if (!taskId) return;
-
-        try {
-            const data = await projectService.getActivities(parseInt(taskId));
-            // Strict Filtering: Only show activities user is assigned to
-            if (!user) {
-                setActivities([]);
-                return;
-            }
-            setActivities(data.filter(a =>
-                a.status !== 'archived' &&
-                a.assigned_users?.some(u => u.id === user.id)
-            ));
-        } catch (err) { console.error(err); }
-    };
 
     // Modal State
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+    const [isLeaveActionModalOpen, setIsLeaveActionModalOpen] = useState(false);
+    const [leaveActionData, setLeaveActionData] = useState<{ entry: TimesheetEntry, action: 'half_day' | 'delete' } | null>(null);
 
-    // Form Submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
 
-        const today = formatDate(new Date());
-        if (selectedDate > today) {
-            showError("Cannot log time for future dates");
-            return;
-        }
+    const handleLeaveActionClick = (entry: TimesheetEntry, action: 'half_day' | 'delete') => {
+        setLeaveActionData({ entry, action });
+        setIsLeaveActionModalOpen(true);
+    };
 
-        const dur = parseFloat(formData.duration);
-        if (isNaN(dur) || dur <= 0 || dur > 24) {
-            showError("Invalid duration (0.5 - 24 hours)");
-            return;
-        }
-
-        // Validate 0.5 increments
-        if (dur % 0.5 !== 0) {
-            showError("Hours must be in 0.5 increments (e.g. 1.0, 1.5, 2.0)");
-            return;
-        }
-
+    const confirmLeaveAction = async () => {
+        if (!leaveActionData) return;
+        const { entry, action } = leaveActionData;
         setLoading(true);
         try {
-            await timesheetService.saveEntry({
-                id: editingId || undefined,
-                project_id: parseInt(formData.project_id),
-                module_id: parseInt(formData.module_id),
-                task_id: parseInt(formData.task_id),
-                activity_id: parseInt(formData.activity_id),
-                log_date: selectedDate,
-                duration: dur,
-                description: formData.description,
-                work_status: formData.work_status
-            });
-            showSuccess(editingId ? "Entry updated" : "Time logged successfully");
-            setFormData(initialFormState);
-            setEditingId(null);
+            await timesheetService.updateLeaveLog(entry.id!, entry.log_date, action);
+            showSuccess(action === 'half_day' ? "Leave updated to half day" : "Leave log removed");
             fetchEntries();
         } catch (err: any) {
-            showError(err.message || 'Failed to save entry');
+            showError(err.response?.data?.error || err.message || "Action failed");
         } finally {
             setLoading(false);
+            setIsLeaveActionModalOpen(false);
+            setLeaveActionData(null);
         }
-    };
-
-    const handleEdit = async (entry: TimesheetEntry) => {
-        if (entry.log_status !== 'draft' && entry.log_status !== 'rejected') {
-            showError("Cannot edit submitted logs");
-            return;
-        }
-
-        const eDate = new Date(entry.log_date);
-        const dateStr = formatDate(eDate);
-        setSelectedDate(dateStr);
-        setCurrentDate(eDate); // Ensure weekly view switches to the entry's week
-        setEditingId(entry.id!);
-
-        try {
-            setFormData(prev => ({ ...prev, project_id: String(entry.project_id) }));
-            const mods = await projectService.getModules(entry.project_id);
-            setModules(mods);
-
-            setFormData(prev => ({ ...prev, module_id: String(entry.module_id) }));
-            const tsks = await projectService.getTasks(entry.module_id);
-            setTasks(tsks);
-
-            setFormData(prev => ({ ...prev, task_id: String(entry.task_id) }));
-            const acts = await projectService.getActivities(entry.task_id);
-            setActivities(acts);
-
-            setFormData({
-                project_id: String(entry.project_id),
-                module_id: String(entry.module_id),
-                task_id: String(entry.task_id),
-                activity_id: String(entry.activity_id),
-                duration: String(entry.duration),
-                work_status: entry.work_status,
-                description: entry.description
-            });
-
-        } catch (e) {
-            console.error("Error populating edit form", e);
-            showError("Error loading entry details");
-        }
-    };
-
-    const confirmDelete = async () => {
-        if (!entryToDelete) return;
-
-        try {
-            await timesheetService.deleteEntry(entryToDelete);
-            showSuccess("Entry deleted successfully");
-            fetchEntries();
-        } catch (err: any) {
-            showError(err.message || "Failed to delete");
-        } finally {
-            setIsDeleteModalOpen(false);
-            setEntryToDelete(null);
-        }
-    };
-
-    const handleDeleteClick = (id: number) => {
-        setEntryToDelete(id);
-        setIsDeleteModalOpen(true);
     };
 
     const changeWeek = (offset: number) => {
@@ -333,8 +190,38 @@ export const TimesheetPage: React.FC = () => {
         return entries.filter(e => {
             // Normalize log_date (which might be ISO string) to local YYYY-MM-DD
             const eDate = new Date(e.log_date);
-            return formatDate(eDate) === dateStr;
+            const local = new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate());
+            const compare = formatDate(local);
+            return compare === dateStr;
         });
+    };
+
+    // Check if date is blocked for logging (holidays or approved full-day leaves)
+    const isDateBlocked = (dateStr: string): { blocked: boolean; reason: string } => {
+        const dayEntries = getEntriesForDay(dateStr);
+
+        // Check for holidays (System + Holiday module)
+        const holiday = dayEntries.find(e =>
+            e.project_name?.includes('System') &&
+            e.module_name === 'Holiday'
+        );
+
+        if (holiday) {
+            return { blocked: true, reason: `Holiday - ${holiday.description || 'Day Off'}` };
+        }
+
+        // Check for approved full-day leaves (System + Leave module with 8+ hours)
+        const fullDayLeave = dayEntries.find(e =>
+            e.project_name?.includes('System') &&
+            e.module_name === 'Leave' &&
+            e.duration >= 8 // Full day = 8 hours
+        );
+
+        if (fullDayLeave) {
+            return { blocked: true, reason: `Full-Day Leave` };
+        }
+
+        return { blocked: false, reason: '' };
     };
 
 
@@ -365,10 +252,83 @@ export const TimesheetPage: React.FC = () => {
                             <span>{totalHours} hours logged this week</span>
                         </div>
 
+                        {/* Submit Button (Manual - Past Weeks) */}
+                        {(() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+
+                            // Calculate Monday 12 AM of the following week (Start of manual submission window)
+                            // This opens after the Sunday 11:59 PM auto-submission has run.
+                            const submissionStart = new Date(weekRange.end);
+                            submissionStart.setDate(submissionStart.getDate() + 2); // Sat + 2 = Monday
+                            submissionStart.setHours(0, 0, 0, 0);
+
+                            // Calculate Sunday 12 AM of the week after (End of submission window)
+                            const submissionEnd = new Date(submissionStart);
+                            submissionEnd.setDate(submissionStart.getDate() + 7); // Next Sunday
+                            submissionEnd.setHours(0, 0, 0, 0);
+
+                            // Only show if today is within the 1-week window (Monday to Sunday)
+                            if (today >= submissionStart && today < submissionEnd) {
+                                const th = parseFloat(String(totalHours));
+                                // Check if already submitted/approved
+                                const isSubmitted = entries.some(e => e.log_status === 'submitted' || e.log_status === 'approved');
+                                const hasRejected = entries.some(e => e.log_status === 'rejected');
+                                const hasDrafts = entries.some(e => e.log_status === 'draft' && !e.is_system);
+
+                                if (!isSubmitted || hasRejected || hasDrafts) {
+                                    return (
+                                        <Button
+                                            className="btn-primary"
+                                            style={{ height: '36px', gap: '8px', backgroundColor: hasRejected ? '#dc2626' : undefined }}
+                                            disabled={th < 40 || loading}
+                                            onClick={async () => {
+                                                if (th < 40) {
+                                                    showError('You need at least 40 hours to submit.');
+                                                    return;
+                                                }
+                                                try {
+                                                    setLoading(true);
+                                                    await timesheetService.submitTimesheet(
+                                                        formatDate(weekRange.start),
+                                                        formatDate(weekRange.end)
+                                                    );
+                                                    showSuccess('Timesheet submitted successfully');
+                                                    fetchEntries();
+                                                } catch (e: any) {
+                                                    showError(e.message || 'Submission failed');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            <Save size={16} />
+                                            {(hasRejected || (isSubmitted && hasDrafts)) ? 'Resubmit Timesheet' : 'Submit Timesheet'}
+                                        </Button>
+                                    )
+                                } else {
+                                    return (
+                                        <div className="logged-hours-badge success">
+                                            <span>Submitted</span>
+                                        </div>
+                                    )
+                                }
+                            }
+                            return null;
+                        })()}
+
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
                             <span className="current-week-display">
-                                {weekRange.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - {weekRange.end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {(() => {
+                                    const d1 = String(weekRange.start.getDate()).padStart(2, '0');
+                                    const m1 = String(weekRange.start.getMonth() + 1).padStart(2, '0');
+                                    const y1 = weekRange.start.getFullYear();
+                                    const d2 = String(weekRange.end.getDate()).padStart(2, '0');
+                                    const m2 = String(weekRange.end.getMonth() + 1).padStart(2, '0');
+                                    const y2 = weekRange.end.getFullYear();
+                                    return `${d1}-${m1}-${y1} - ${d2}-${m2}-${y2}`;
+                                })()}
                             </span>
                             <button className="nav-btn" onClick={() => changeWeek(1)}><ChevronRight size={20} /></button>
                         </div>
@@ -376,266 +336,7 @@ export const TimesheetPage: React.FC = () => {
                 </div>
 
                 <div className="timesheet-layout">
-                    {/* Left Column: Form */}
-                    <div className="form-column">
-                        <div className="log-form-card">
-                            <div className="form-title" style={{ justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Clock size={18} />
-                                    {editingId ? 'Edit Log Entry' : 'Log Time'}
-                                </div>
-                                {!isWeekEditable && !editingId && <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Locked</span>}
-                            </div>
-                            <fieldset disabled={!isWeekEditable && !editingId} style={{ border: 'none', padding: 0, margin: 0 }}>
-                                <form onSubmit={handleSubmit}>
-                                    {/* Date */}
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Date</label>
-                                        <DatePicker
-                                            value={selectedDate}
-                                            onChange={setSelectedDate}
-                                            max={new Date().toISOString().split('T')[0]} // Cannot log future
-                                        />
-                                    </div>
-
-                                    {/* Project Struct */}
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Project</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                    style={{
-                                                        width: '100%',
-                                                        justifyContent: 'space-between',
-                                                        padding: '12px 16px',
-                                                        fontSize: '15px',
-                                                        fontFamily: 'Poppins, sans-serif',
-                                                        border: '1px solid #e6e8f0',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: '#203050',
-                                                        height: 'auto',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    <span>
-                                                        {projects.find(p => String(p.id) === formData.project_id)?.name || 'Select Project'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {projects.map(p => (
-                                                    <DropdownMenuItem
-                                                        key={p.id}
-                                                        onClick={() => handleProjectChange(String(p.id))}
-                                                    >
-                                                        {p.name}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                                {projects.length === 0 && <DropdownEmptyState message="No projects available" />}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Module</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                >
-                                                    <span>
-                                                        {modules.find(m => String(m.id) === formData.module_id)?.name || 'Select Module'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {!formData.project_id ? (
-                                                    <DropdownEmptyState message="Please select a project first" />
-                                                ) : modules.length === 0 ? (
-                                                    <DropdownEmptyState message="No modules available for this project" />
-                                                ) : (
-                                                    modules.map(m => (
-                                                        <DropdownMenuItem
-                                                            key={m.id}
-                                                            onClick={() => handleModuleChange(String(m.id))}
-                                                        >
-                                                            {m.name}
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Task</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                >
-                                                    <span>
-                                                        {tasks.find(t => String(t.id) === formData.task_id)?.name || 'Select Task'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {!formData.module_id ? (
-                                                    <DropdownEmptyState message="Please select a module first" />
-                                                ) : tasks.length === 0 ? (
-                                                    <DropdownEmptyState message="No tasks available for this module" />
-                                                ) : (
-                                                    tasks.map(t => (
-                                                        <DropdownMenuItem
-                                                            key={t.id}
-                                                            onClick={() => handleTaskChange(String(t.id))}
-                                                        >
-                                                            {t.name}
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Activity</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                >
-                                                    <span>
-                                                        {activities.find(a => String(a.id) === formData.activity_id)?.name || 'Select Activity'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {!formData.task_id ? (
-                                                    <DropdownEmptyState message="Please select a task first" />
-                                                ) : activities.length === 0 ? (
-                                                    <DropdownEmptyState message="No activities available" />
-                                                ) : (
-                                                    activities.map(a => (
-                                                        <DropdownMenuItem
-                                                            key={a.id}
-                                                            onClick={() => setFormData({ ...formData, activity_id: String(a.id) })}
-                                                        >
-                                                            {a.name}
-                                                        </DropdownMenuItem>
-                                                    ))
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Time Spent (Hrs)</label>
-                                        <input
-                                            type="number"
-                                            step="0.5"
-                                            min="0.5"
-                                            max="24"
-                                            className="ts-form-input"
-                                            value={formData.duration}
-                                            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                                            placeholder="e.g. 4.0"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Work Status</label>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="ts-dropdown-trigger"
-                                                    type="button"
-                                                >
-                                                    <span>
-                                                        {formData.work_status === 'in_progress' ? 'In Progress' :
-                                                            formData.work_status === 'closed' ? 'Closed' :
-                                                                formData.work_status === 'differed' ? 'Differed' :
-                                                                    formData.work_status === 'review' ? 'Review' :
-                                                                        formData.work_status === 'testing' ? 'Testing' :
-                                                                            formData.work_status === 'fixed' ? 'Fixed' :
-                                                                                formData.work_status === 'not_applicable' ? 'Not Applicable' : 'Select Work Status'}
-                                                    </span>
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="ts-dropdown-content" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
-                                                {[
-                                                    { val: 'in_progress', label: 'In Progress' },
-                                                    { val: 'closed', label: 'Closed' },
-                                                    { val: 'differed', label: 'Differed' },
-                                                    { val: 'review', label: 'Review' },
-                                                    { val: 'testing', label: 'Testing' },
-                                                    { val: 'fixed', label: 'Fixed' },
-                                                    { val: 'not_applicable', label: 'Not Applicable' }
-                                                ].map(s => (
-                                                    <DropdownMenuItem
-                                                        key={s.val}
-                                                        onClick={() => setFormData({ ...formData, work_status: s.val })}
-                                                    >
-                                                        {s.label}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-
-                                    <div className="ts-form-group">
-                                        <label className="ts-form-label">Description</label>
-                                        <textarea
-                                            className="ts-form-textarea"
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            placeholder="Work description..."
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="form-actions">
-                                        {editingId && (
-                                            <button
-                                                type="button"
-                                                className="ts-submit-btn"
-                                                style={{ backgroundColor: '#64748b', marginBottom: '8px' }}
-                                                onClick={() => {
-                                                    setEditingId(null);
-                                                    setFormData(initialFormState);
-                                                }}
-                                            >
-                                                Cancel Edit
-                                            </button>
-                                        )}
-                                        <button type="submit" className="ts-submit-btn" disabled={loading || (!isWeekEditable && !editingId)}>
-                                            <Save size={18} />
-                                            {editingId ? 'Update' : 'Log Time'}
-                                        </button>
-                                    </div>
-                                </form>
-                            </fieldset>
-                        </div>
-                    </div>
-
-                    {/* Right Column: List */}
+                    {/* List of entries */}
                     <div className="entries-list-card">
                         <div className="form-title">
                             <FileText size={18} />
@@ -645,7 +346,7 @@ export const TimesheetPage: React.FC = () => {
                         {/* Week Days Navigation */}
                         <div className="week-days-nav" style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(7, 1fr)',
+                            gridTemplateColumns: 'repeat(6, 1fr)', // Updated to 6 columns
                             gap: '8px',
                             marginBottom: '20px',
                             padding: '10px 0'
@@ -675,7 +376,7 @@ export const TimesheetPage: React.FC = () => {
                                             transition: 'all 0.2s'
                                         }}
                                     >
-                                        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'capitalize' }}>
                                             {day.toLocaleDateString('en-US', { weekday: 'short' })}
                                         </span>
                                         <span style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px' }}>
@@ -684,12 +385,20 @@ export const TimesheetPage: React.FC = () => {
 
                                         {/* Status Dots */}
                                         <div style={{ display: 'flex', gap: '2px', marginTop: '4px' }}>
-                                            {isToday && (
-                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
-                                            )}
-                                            {dayLogCount > 0 && (
-                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
-                                            )}
+                                            {(() => {
+                                                const blockInfo = isDateBlocked(dStr);
+                                                if (blockInfo.blocked) {
+                                                    return <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#ef4444' }} title={blockInfo.reason} />;
+                                                }
+                                                return <>
+                                                    {isToday && (
+                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
+                                                    )}
+                                                    {dayLogCount > 0 && (
+                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
+                                                    )}
+                                                </>;
+                                            })()}
                                         </div>
                                     </button>
                                 );
@@ -705,13 +414,21 @@ export const TimesheetPage: React.FC = () => {
 
                                 return (
                                     <div key={dateStr} className="day-group" style={{ opacity: 0, animation: 'fadeIn 0.5s ease-out forwards' }}>
-                                        <div className="day-header">
-                                            <div className="day-title-group">
-                                                <span className="day-title">
-                                                    {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                        <div className="day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                            <div className="day-title-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span className="day-title" style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                                                    {day.toLocaleDateString('en-GB', { weekday: 'long' })}
+                                                </span>
+                                                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>
+                                                    {(() => {
+                                                        const d = String(day.getDate()).padStart(2, '0');
+                                                        const m = String(day.getMonth() + 1).padStart(2, '0');
+                                                        const y = day.getFullYear();
+                                                        return `${d}-${m}-${y}`;
+                                                    })()}
                                                 </span>
                                             </div>
-                                            <span className="day-total">{dayTotal.toFixed(2)} Hrs</span>
+                                            <span className="day-total" style={{ fontWeight: 600, color: '#475569' }}>{dayTotal.toFixed(2)} Hrs</span>
                                         </div>
 
                                         <div className="entries-grid" style={{ marginTop: '20px' }}>
@@ -726,9 +443,6 @@ export const TimesheetPage: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 dayEntries.map(entry => {
-                                                    const isEditable = !entry.project_name?.includes('System') && (
-                                                        entry.log_status === 'rejected' || (isWeekEditable && entry.log_status === 'draft')
-                                                    );
                                                     const formattedDesc = entry.description?.length > 100
                                                         ? entry.description.substring(0, 100) + '...'
                                                         : entry.description;
@@ -738,13 +452,33 @@ export const TimesheetPage: React.FC = () => {
                                                             <div className="entry-inner">
                                                                 <div className="entry-header">
                                                                     <div className="entry-path">
-                                                                        <strong>{entry.project_name}</strong>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.module_name}</span>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.task_name}</span>
-                                                                        <span className="path-sep">&gt;</span>
-                                                                        <span>{entry.activity_name}</span>
+                                                                        {entry.is_system || entry.project_name?.includes('System') ? (
+                                                                            <strong>System log</strong>
+                                                                        ) : entry.work_status === 'On Leave' || entry.project_name === 'Leave' ? (
+                                                                            <strong>On Leave</strong>
+                                                                        ) : (
+                                                                            <>
+                                                                                <strong>{entry.project_name}</strong>
+                                                                                {entry.module_name && entry.module_name !== entry.project_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.module_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {entry.task_name && entry.task_name !== entry.module_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.task_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {entry.activity_name && entry.activity_name !== entry.task_name && (
+                                                                                    <>
+                                                                                        <span className="path-sep">&gt;</span>
+                                                                                        <span>{entry.activity_name}</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                     <div className="duration-label">
                                                                         {parseFloat(String(entry.duration)).toFixed(2)} hrs
@@ -755,12 +489,14 @@ export const TimesheetPage: React.FC = () => {
                                                                     <h4 className="holiday-name" style={{ fontSize: '14px', margin: '4px 0' }}>{entry.description}</h4>
                                                                 )}
 
-                                                                <div className="description-text">
-                                                                    {formattedDesc || 'No description provided.'}
-                                                                </div>
+                                                                {!entry.project_name?.includes('System') && (
+                                                                    <div className="description-text">
+                                                                        {formattedDesc || 'No description provided.'}
+                                                                    </div>
+                                                                )}
 
                                                                 {entry.log_status === 'rejected' && entry.rejection_reason && (
-                                                                    <div style={{ marginTop: '8px', padding: '8px', background: '#fee2e2', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '13px', color: '#b91c1c' }}>
+                                                                    <div className="rejection-box">
                                                                         <strong>Rejection:</strong> {entry.rejection_reason}
                                                                     </div>
                                                                 )}
@@ -769,34 +505,112 @@ export const TimesheetPage: React.FC = () => {
                                                                     <div className="status-pill pill-progress">
                                                                         {entry.work_status.replace('_', ' ')}
                                                                     </div>
-                                                                    <div className={`status-pill pill-status status-${entry.log_status || 'draft'}`}>
-                                                                        {entry.log_status || 'draft'}
-                                                                    </div>
+                                                                    <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
+                                                                    {/* Show Lock Icon for System Entries */}
+                                                                    {entry.project_name?.includes('System') && (
+                                                                        <span className="status-pill info" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #e0f2fe' }}>
+                                                                            <Lock size={12} /> System
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
-                                                            <div className="entry-actions-sidebar">
-                                                                <button
-                                                                    className="action-btn-styled edit"
-                                                                    onClick={() => handleEdit(entry)}
-                                                                    disabled={!isEditable}
-                                                                    title={isEditable ? "Edit Entry" : "Status doesn't allow editing"}
-                                                                >
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button
-                                                                    className="action-btn-styled delete"
-                                                                    onClick={() => handleDeleteClick(entry.id!)}
-                                                                    disabled={!isEditable}
-                                                                    title={isEditable ? "Delete Entry" : "Status doesn't allow deleting"}
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
+                                                            {/* Actions removed for manual tasks - use Workspace for logging */}
+                                                            {entry.module_name === 'Leave' && (entry.is_system || entry.project_name?.includes('System')) &&
+                                                                entry.log_status !== 'approved' &&
+                                                                entry.log_status !== 'submitted' && (
+                                                                    <div className="entry-actions-sidebar">
+                                                                        {parseFloat(String(entry.duration)) >= 8 && (
+                                                                            <button
+                                                                                className="action-btn-styled edit"
+                                                                                onClick={() => handleLeaveActionClick(entry, 'half_day')}
+                                                                                title="Change to Half Day"
+                                                                                disabled={loading}
+                                                                            >
+                                                                                <Repeat size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                        <button
+                                                                            className="action-btn-styled delete"
+                                                                            onClick={() => handleLeaveActionClick(entry, 'delete')}
+                                                                            title="Delete Log"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
                                                         </div>
                                                     );
                                                 })
                                             )}
+                                        </div>
+
+                                        {/* Detailed Table View - Requested by User */}
+                                        <div className="timesheet-table-container" style={{ marginTop: '40px' }}>
+                                            <div className="form-title" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <FileText size={18} />
+                                                    Detailed Log Table
+                                                </span>
+                                                <span style={{ fontSize: '12px', fontWeight: 500, color: '#64748b', background: '#f1f5f9', borderRadius: '6px', padding: '4px 10px' }}>
+                                                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                </span>
+                                            </div>
+                                            <div className="ts-table-wrapper" style={{ overflowX: 'auto', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                                    <thead>
+                                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                                            {['Project', 'Module', 'Task', 'Description', 'Date', 'Time Spent', 'Status'].map(h => (
+                                                                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{h}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {entries.filter(e => {
+                                                            // Normalize log_date to YYYY-MM-DD for comparison
+                                                            const d = new Date(e.log_date);
+                                                            const normalized = isNaN(d.getTime())
+                                                                ? e.log_date
+                                                                : d.toISOString().split('T')[0];
+                                                            return normalized === selectedDate;
+                                                        }).length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', verticalAlign: 'middle' }}>No logs found for this date</td>
+                                                            </tr>
+                                                        ) : (
+                                                            entries.filter(e => {
+                                                                const d = new Date(e.log_date);
+                                                                const normalized = isNaN(d.getTime())
+                                                                    ? e.log_date
+                                                                    : d.toISOString().split('T')[0];
+                                                                return normalized === selectedDate;
+                                                            }).map(entry => {
+                                                                const cell: React.CSSProperties = { padding: '12px 16px', verticalAlign: 'top', textAlign: 'left', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: '13px' };
+                                                                return (
+                                                                    <tr key={entry.id} style={{ transition: 'background 0.2s' }}
+                                                                        onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                                                                        onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                                                                        <td style={{ ...cell, fontWeight: 500, color: '#1e293b' }}>{entry.project_name || 'System'}</td>
+                                                                        <td style={cell}>{entry.module_name || 'N/A'}</td>
+                                                                        <td style={cell}>
+                                                                            <span style={{ fontWeight: 500, color: '#1e293b' }}>{entry.task_name || 'N/A'}</span>
+                                                                        </td>
+                                                                        <td style={{ ...cell, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.description}>
+                                                                            {entry.description || '—'}
+                                                                        </td>
+                                                                        <td style={cell}>{entry.log_date}</td>
+                                                                        <td style={{ ...cell, fontWeight: 600, color: '#1e293b' }}>{parseFloat(String(entry.duration)).toFixed(1)} hrs</td>
+                                                                        <td style={cell}>
+                                                                            <span className={`ts-work-badge ts-work-${entry.work_status}`}>{getStatusLabel(entry.work_status)}</span>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -804,21 +618,38 @@ export const TimesheetPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Confirm Delete Modal */}
+
+                {/* Confirm Leave Action Modal */}
                 <Modal
-                    isOpen={isDeleteModalOpen}
-                    onClose={() => setIsDeleteModalOpen(false)}
-                    title="Confirm Deletion"
+                    isOpen={isLeaveActionModalOpen}
+                    onClose={() => setIsLeaveActionModalOpen(false)}
+                    title={leaveActionData?.action === 'half_day' ? "Confirm Half Day Change" : "Confirm Deletion"}
                     footer={
                         <>
-                            <button className="modal-btn secondary" onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn danger" onClick={confirmDelete}>Delete</button>
+                            <button className="modal-btn secondary" onClick={() => setIsLeaveActionModalOpen(false)}>Cancel</button>
+                            <button
+                                className={`modal-btn ${leaveActionData?.action === 'half_day' ? 'primary' : 'danger'}`}
+                                onClick={confirmLeaveAction}
+                                disabled={loading}
+                            >
+                                {loading ? 'Processing...' : (leaveActionData?.action === 'half_day' ? 'Change to Half Day' : 'Delete Log')}
+                            </button>
                         </>
                     }
                 >
-                    <p>Are you sure you want to delete this timesheet entry? This action cannot be undone.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <AlertCircle size={24} color={leaveActionData?.action === 'half_day' ? '#f59e0b' : '#ef4444'} />
+                        <p style={{ margin: 0, fontWeight: 500 }}>
+                            {leaveActionData?.action === 'half_day'
+                                ? "Are you sure you want to change this leave log to Half Day (4 hours)?"
+                                : "Are you sure you want to delete this leave log and reduce hours to 0?"}
+                        </p>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#64748b' }}>
+                        This will create a permanent override for this date. You can resubmit the timesheet after this change.
+                    </p>
                 </Modal>
-            </div >
-        </AppLayout >
+            </div>
+        </AppLayout>
     );
 };

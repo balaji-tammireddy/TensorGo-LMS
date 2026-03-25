@@ -30,7 +30,7 @@ const LoginPage: React.FC = () => {
   // If user is already authenticated, redirect to dashboard
   React.useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'super_admin') {
+      if (user.role === 'super_admin' || user.role === 'hr') {
         navigate('/dashboard');
       } else {
         navigate('/leave-apply');
@@ -61,7 +61,10 @@ const LoginPage: React.FC = () => {
       const trimmedPassword = password.trim();
 
       const loggedInUser = await login(trimmedEmail, trimmedPassword);
-      if (loggedInUser.role === 'super_admin') {
+
+      if (loggedInUser.mustChangePassword) {
+        navigate('/change-password');
+      } else if (loggedInUser.role === 'super_admin' || loggedInUser.role === 'hr') {
         navigate('/dashboard');
       } else {
         navigate('/leave-apply');

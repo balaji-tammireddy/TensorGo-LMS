@@ -1,21 +1,126 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
-import { Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
+import { WorkspaceCard } from './components/WorkspaceCard';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { DescriptionModal } from './components/DescriptionModal';
+import { Info, Plus, ChevronLeft, Edit, Layers, ClipboardList, ChevronDown } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { projectService } from '../../services/projectService';
 import * as employeeService from '../../services/employeeService';
 import { CreateModal } from './components/CreateModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { WorkspaceCard } from './components/WorkspaceCard';
-import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import './ProjectWorkspace.css';
+
+const StatusDropdown = React.memo(({
+    currentStatus,
+    canManageStatus,
+    onStatusChange
+}: {
+    currentStatus?: string;
+    canManageStatus: boolean;
+    onStatusChange: (status: string) => void;
+}) => {
+    if (!currentStatus) return null;
+
+    const statusOptions = [
+        { value: 'active', label: 'Active', color: '#FFFFFF', bg: '#10B981', border: '#10B981' },
+        { value: 'on_hold', label: 'On Hold', color: '#FFFFFF', bg: '#F59E0B', border: '#F59E0B' },
+        { value: 'completed', label: 'Completed', color: '#FFFFFF', bg: '#6366F1', border: '#6366F1' },
+        { value: 'archived', label: 'Archived', color: '#FFFFFF', bg: '#64748B', border: '#64748B' }
+    ];
+
+    const current = statusOptions.find(s => s.value === currentStatus) || statusOptions[0];
+
+    if (!canManageStatus) {
+        return (
+            <span
+                className="ws-status-badge"
+                style={{
+                    backgroundColor: current.bg,
+                    color: current.color,
+                    border: `2px solid ${current.border}`,
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    fontSize: '12px',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '85px'
+                }}
+            >
+                {current.label}
+            </span>
+        );
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    className="ws-status-badge"
+                    style={{
+                        backgroundColor: current.bg,
+                        color: current.color,
+                        border: `2px solid ${current.border}`,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        fontSize: '11px',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        transition: 'all 0.2s',
+                        minWidth: '85px',
+                        justifyContent: 'center'
+                    }}
+                >
+                    {current.label}
+                    <ChevronDown size={14} strokeWidth={2.5} />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                {statusOptions.map(option => (
+                    <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => onStatusChange(option.value)}
+                        className="status-dropdown-item"
+                        style={{
+                            color: '#374151',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            fontWeight: '500'
+                        }}
+                    >
+                        <span style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '3px',
+                            backgroundColor: option.bg,
+                            border: `2px solid ${option.border}`,
+                            flexShrink: 0
+                        }} />
+                        {option.label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+});
 
 export const ProjectWorkspace: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -23,67 +128,79 @@ export const ProjectWorkspace: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const queryClient = useQueryClient();
+    const { showSuccess, showError } = useToast();
 
-    const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then(res => res.employees));
+    const { data: allEmployees } = useQuery(['allEmployees'], () => employeeService.getEmployees(1, 1000).then((res: any) => res.employees));
 
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
     // Modal State
-    const [createType, setCreateType] = useState<'project' | 'module' | 'task' | 'activity' | null>(null);
+    const [createType, setCreateType] = useState<'project' | 'module' | 'task' | null>(null);
     const [createParentId, setCreateParentId] = useState<number | null>(null);
     const [isEdit, setIsEdit] = useState(false);
     const [editData, setEditData] = useState<any>(null);
+    const [showProjectInfo, setShowProjectInfo] = useState(false);
     const [deleteModal, setDeleteModal] = useState<{
         isOpen: boolean;
-        type: 'module' | 'task' | 'activity' | null;
+        type: 'module' | 'task' | null;
         id: number | null;
     }>({ isOpen: false, type: null, id: null });
 
-    // Fetch Project Details (Client-side find for now)
-    const { data: projects } = useQuery('projects', projectService.getProjects);
-    const project = projects?.find(p => p.id === projectId);
-
     // Queries
-    const { data: modules, refetch: refetchModules } = useQuery(
+    const { data: project, refetch: refetchProject } = useQuery(
+        ['project', projectId],
+        () => projectService.getProject(projectId),
+        { enabled: !!projectId }
+    );
+
+    const { data: projectMembers, refetch: refetchProjectMembers } = useQuery(
+        ['project-members', projectId],
+        () => projectService.getProjectMembers(projectId),
+        { enabled: !!projectId }
+    );
+
+    const {
+        data: modules,
+        refetch: refetchModules,
+        isLoading: modulesLoading,
+        isError: modulesError
+    } = useQuery(
         ['modules', projectId],
         () => projectService.getModules(projectId),
         { enabled: !!projectId }
     );
 
-    const { data: tasks, refetch: refetchTasks } = useQuery(
+    const {
+        data: tasks,
+        refetch: refetchTasks,
+        isLoading: tasksLoading,
+        isError: tasksError
+    } = useQuery(
         ['tasks', selectedModuleId],
         () => projectService.getTasks(selectedModuleId!),
         { enabled: !!selectedModuleId }
     );
 
-    // Activities Logic
-    const { data: activities, refetch: refetchActivities } = useQuery(
-        ['activities', selectedTaskId],
-        () => projectService.getActivities(selectedTaskId!),
-        { enabled: !!selectedTaskId }
-    );
+    // Permissions
+    const isProjectManager = !!project?.is_pm || (project?.project_manager_id !== undefined && String(project?.project_manager_id) === String(user?.id));
+    const isSuperAdmin = user?.role === 'super_admin';
+    const isHR = user?.role === 'hr';
+    const isGlobalManager = user?.role === 'manager';
+    const isProjectReadOnly = project?.status?.toLowerCase() !== 'active';
 
-    const { data: projectMembers } = useQuery(
-        ['projectMembers', projectId],
-        () => projectService.getAccessList('project', projectId),
-        { enabled: !!projectId }
-    );
+    // PM-level access strictly restricted to the assigned Project Manager
+    const isPM = isProjectManager;
 
-    // Permissions Logic
-    const isPM = !!project?.is_pm;
-    const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hr';
+    const canManageProject = isPM && !isProjectReadOnly;
+    const canManageResources = isPM && !isProjectReadOnly;
+    const canCreateModule = canManageResources;
 
-    // 1. Project-level: Super Admin or PM can edit/delete/status
-    const canManageProject = isSuperAdmin || isPM;
+    const hasModuleAccess = modules?.find(m => m.id === selectedModuleId)?.assigned_users?.some(u => u.id === user?.id);
+    const canAddTask = (canManageResources || hasModuleAccess) && !isProjectReadOnly;
+    const canManageStatus = isPM;
 
-    // 2. Module/Task/Activity Creation: ONLY PM can create these
-    const canCreateModule = isPM;
-    const canAddTask = isPM;
-    const canAddActivity = isPM;
-
-    const handleCreate = (type: 'module' | 'task' | 'activity', parentId: number) => {
-        // Validate permissions based on type
+    const handleCreate = (type: 'module' | 'task', parentId: number) => {
         if (type === 'module' && !canCreateModule) return;
         if (type === 'task' && !canAddTask) return;
 
@@ -92,388 +209,132 @@ export const ProjectWorkspace: React.FC = () => {
         setIsEdit(false);
     };
 
-    const handleEditProject = () => {
+    const handleEditProject = async () => {
         if (!canManageProject) return;
-        setCreateType('project');
-        setEditData(project);
+        const { data: freshProject } = await refetchProject();
+        setCreateType('project' as any);
+        setEditData(freshProject || project);
         setIsEdit(true);
     };
 
-    const handleEdit = (type: 'module' | 'task' | 'activity', data: any) => {
+    const handleEdit = (type: 'module' | 'task', data: any) => {
+        // PERMISSION: creator OR PM (Project-level or Global)
+        const isCreator = String(data?.created_by) === String(user?.id);
+        const canEdit = type === 'module'
+            ? (canManageResources || isCreator)
+            : (isCreator || isPM);
+
+        if (!canEdit) {
+            showError(`Access denied: Only the creator or an authorized manager can edit this ${type}.`);
+            return;
+        }
+
         setCreateType(type);
         setEditData(data);
         setIsEdit(true);
-        setCreateParentId(type === 'module' ? projectId : (type === 'task' ? selectedModuleId : selectedTaskId));
+        setCreateParentId(type === 'module' ? projectId : selectedModuleId);
     };
 
-    const handleDeleteModule = async (moduleId: number) => {
+    const handleDeleteModule = (moduleId: number) => {
         setDeleteModal({ isOpen: true, type: 'module', id: moduleId });
     };
 
-    const handleDeleteTask = async (taskId: number) => {
+    const handleDeleteTask = (taskId: number) => {
         setDeleteModal({ isOpen: true, type: 'task', id: taskId });
     };
 
-    const handleDeleteActivity = async (activityId: number) => {
-        setDeleteModal({ isOpen: true, type: 'activity', id: activityId });
-    };
-
     const confirmDelete = async () => {
-        if (!deleteModal.id || !deleteModal.type) return;
-
+        if (deleteModal.id === null || !deleteModal.type) return;
         const { type, id } = deleteModal;
-        setDeleteModal(prev => ({ ...prev, isOpen: false }));
+        setDeleteModal({ isOpen: false, type: null, id: null });
 
         try {
             if (type === 'module') {
-                // Optimistic Update
-                queryClient.setQueryData(['modules', projectId], (old: any[] | undefined) =>
-                    old ? old.filter((m: any) => m.id !== id) : []
-                );
+                await projectService.deleteModule(id);
+                showSuccess("Module deleted successfully");
                 if (selectedModuleId === id) {
                     setSelectedModuleId(null);
                     setSelectedTaskId(null);
                 }
-
-                await projectService.deleteModule(id);
                 refetchModules();
             } else if (type === 'task') {
-                // Optimistic Update
-                queryClient.setQueryData(['tasks', selectedModuleId], (old: any[] | undefined) =>
-                    old ? old.filter((t: any) => t.id !== id) : []
-                );
-                if (selectedTaskId === id) {
-                    setSelectedTaskId(null);
-                }
-
                 await projectService.deleteTask(id);
+                showSuccess("Task deleted successfully");
+                if (selectedTaskId === id) setSelectedTaskId(null);
                 refetchTasks();
-            } else if (type === 'activity') {
-                // Optimistic Update
-                queryClient.setQueryData(['activities', selectedTaskId], (old: any[] | undefined) =>
-                    old ? old.filter((a: any) => a.id !== id) : []
-                );
-
-                await projectService.deleteActivity(id);
-                refetchActivities();
             }
-        } catch (error) {
-            console.error(`Failed to delete ${type}:`, error);
-            if (type === 'module') refetchModules();
-            else if (type === 'task') refetchTasks();
-            else if (type === 'activity') refetchActivities();
+        } catch (error: any) {
+            showError(error.response?.data?.error || `Failed to delete ${type}`);
+        }
+    };
+
+    const handleCreateSuccess = () => {
+        if (createType === ('project' as any)) {
+            refetchProject();
+            refetchProjectMembers();
+            refetchModules();
+        } else if (createType === 'module') {
+            refetchModules();
+        } else if (createType === 'task') {
+            refetchTasks();
         }
     };
 
     const assignModuleUserMutation = useMutation(
-        ({ moduleId, userId, action }: { moduleId: number, userId: number, action: 'add' | 'remove' }) => {
-            return projectService.toggleAccess('module', moduleId, userId, action);
-        },
+        ({ moduleId, userId, action, userObj }: { moduleId: number, userId: number, action: 'add' | 'remove', userObj?: any }) =>
+            projectService.toggleAccess('module', moduleId, userId, action),
         {
-            onMutate: async ({ moduleId, userId, action }) => {
-                await queryClient.cancelQueries(['modules', projectId]);
-                const previousModules = queryClient.getQueryData<any[]>(['modules', projectId]);
-
-                queryClient.setQueryData(['modules', projectId], ((old: any[] | undefined): any[] => {
-                    if (!old) return [];
-                    return old.map(m => {
-                        if (String(m.id) !== String(moduleId)) return m;
-                        const targetId = String(userId);
-                        const isAssigned = action === 'remove'; // Use explicit action
-
-                        let newAssignedUsers = m.assigned_users || [];
-                        if (isAssigned) {
-                            newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
-
-                            // CASCADE REVOCATION (Optimistic)
-                            queryClient.setQueryData(['tasks', moduleId], ((oldTasks: any[] | undefined): any[] => {
-                                if (!oldTasks) return [];
-                                return oldTasks.map(t => {
-                                    const updatedAssigned = (t.assigned_users || []).filter((u: any) => String(u.id) !== targetId);
-
-                                    // Cascade to activities
-                                    queryClient.setQueryData(['activities', t.id], ((oldActs: any[] | undefined): any[] => {
-                                        if (!oldActs) return [];
-                                        return oldActs.map(a => ({
-                                            ...a,
-                                            assigned_users: (a.assigned_users || []).filter((u: any) => String(u.id) !== targetId)
-                                        }));
-                                    }) as any);
-
-                                    return { ...t, assigned_users: updatedAssigned };
-                                });
-                            }) as any);
-
-                        } else {
-                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
-                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
-                            if (candidate) {
-                                newAssignedUsers = [...newAssignedUsers, candidate];
-                            }
-                        }
-                        return { ...m, assigned_users: newAssignedUsers };
-                    });
-                }) as any);
-
-                return { previousModules };
-            },
-            onSuccess: (data, { moduleId }) => {
-                if (data.updatedUsers) {
-                    queryClient.setQueryData(['modules', projectId], ((old: any[] | undefined) => {
-                        if (!old) return [];
-                        return old.map(m => String(m.id) === String(moduleId) ? { ...m, assigned_users: data.updatedUsers } : m);
-                    }) as any);
-                }
-            },
-            onError: (_err, _newTodo, context: any) => {
-                if (context?.previousModules) {
-                    queryClient.setQueryData(['modules', projectId], context.previousModules);
-                }
-            },
-            onSettled: () => {
-                // Remove immediate invalidation to prevent snap-back deselection
-                // queryClient.invalidateQueries(['modules', projectId]);
-            }
+            onSuccess: () => refetchModules()
         }
     );
 
     const assignTaskUserMutation = useMutation(
-        ({ taskId, userId, action }: { taskId: number, userId: number, action: 'add' | 'remove' }) => {
-            return projectService.toggleAccess('task', taskId, userId, action);
-        },
+        ({ taskId, userId, action, userObj }: { taskId: number, userId: number, action: 'add' | 'remove', userObj?: any }) =>
+            projectService.toggleAccess('task', taskId, userId, action),
         {
-            onMutate: async ({ taskId, userId, action }) => {
-                await queryClient.cancelQueries(['tasks', selectedModuleId]);
-                const previousTasks = queryClient.getQueryData<any[]>(['tasks', selectedModuleId]);
-
-                queryClient.setQueryData(['tasks', selectedModuleId], ((old: any[] | undefined): any[] => {
-                    if (!old) return [];
-                    return old.map(t => {
-                        if (String(t.id) !== String(taskId)) return t;
-                        const targetId = String(userId);
-                        const isAssigned = action === 'remove';
-
-                        let newAssignedUsers = t.assigned_users || [];
-                        if (isAssigned) {
-                            newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
-
-                            // CASCADE REVOCATION (Optimistic)
-                            queryClient.setQueryData(['activities', taskId], ((oldActs: any[] | undefined): any[] => {
-                                if (!oldActs) return [];
-                                return oldActs.map(a => ({
-                                    ...a,
-                                    assigned_users: (a.assigned_users || []).filter((u: any) => String(u.id) !== targetId)
-                                }));
-                            }) as any);
-
-                        } else {
-                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
-                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
-                            if (candidate) {
-                                newAssignedUsers = [...newAssignedUsers, candidate];
-                            }
-                        }
-                        return { ...t, assigned_users: newAssignedUsers };
-                    });
-                }) as any);
-                return { previousTasks };
-            },
-            onSuccess: (data, { taskId }) => {
-                if (data.updatedUsers) {
-                    queryClient.setQueryData(['tasks', selectedModuleId], ((old: any[] | undefined) => {
-                        if (!old) return [];
-                        return old.map(t => String(t.id) === String(taskId) ? { ...t, assigned_users: data.updatedUsers } : t);
-                    }) as any);
-                }
-            },
-            onError: (_err, _newTodo, context: any) => {
-                if (context?.previousTasks) {
-                    queryClient.setQueryData(['tasks', selectedModuleId], context.previousTasks);
-                }
-            },
-            onSettled: () => {
-                // queryClient.invalidateQueries(['tasks', selectedModuleId]);
-            }
+            onSuccess: () => refetchTasks()
         }
     );
 
-    const assignActivityUserMutation = useMutation(
-        ({ activityId, userId, action }: { activityId: number, userId: number, action: 'add' | 'remove' }) => {
-            return projectService.toggleAccess('activity', activityId, userId, action);
-        },
-        {
-            onMutate: async ({ activityId, userId, action }) => {
-                await queryClient.cancelQueries(['activities', selectedTaskId]);
-                const previousActivities = queryClient.getQueryData<any[]>(['activities', selectedTaskId]);
-
-                queryClient.setQueryData(['activities', selectedTaskId], ((old: any[] | undefined): any[] => {
-                    if (!old) return [];
-                    return old.map(a => {
-                        if (String(a.id) !== String(activityId)) return a;
-                        const targetId = String(userId);
-                        const isAssigned = action === 'remove';
-
-                        let newAssignedUsers = a.assigned_users || [];
-                        if (isAssigned) {
-                            newAssignedUsers = newAssignedUsers.filter((u: any) => String(u.id) !== targetId);
-                        } else {
-                            const allEmps = queryClient.getQueryData<any[]>(['allEmployees']);
-                            const candidate = (allEmps || projectMembers)?.find((u: any) => String(u.id) === targetId);
-                            if (candidate) {
-                                newAssignedUsers = [...newAssignedUsers, candidate];
-                            }
-                        }
-                        return { ...a, assigned_users: newAssignedUsers };
-                    });
-                }) as any);
-                return { previousActivities };
-            },
-            onSuccess: (data, { activityId }) => {
-                if (data.updatedUsers) {
-                    queryClient.setQueryData(['activities', selectedTaskId], ((old: any[] | undefined) => {
-                        if (!old) return [];
-                        return old.map(a => String(a.id) === String(activityId) ? { ...a, assigned_users: data.updatedUsers } : a);
-                    }) as any);
-                }
-            },
-            onError: (_err, _newTodo, context: any) => {
-                if (context?.previousActivities) {
-                    queryClient.setQueryData(['activities', selectedTaskId], context.previousActivities);
-                }
-            },
-            onSettled: () => {
-                // queryClient.invalidateQueries(['activities', selectedTaskId]);
-            }
-        }
-    );
-
-
-    const handleCreateSuccess = () => {
-        if (createType === 'module') refetchModules();
-        if (createType === 'task') refetchTasks();
-        if (createType === 'activity') refetchActivities();
-    };
-
-    const canManageStatus = canManageProject;
-
-    // Optimistic Update Mutation
     const updateStatusMutation = useMutation(
         (newStatus: string) => projectService.updateProject(project!.id, { status: newStatus as any }),
         {
-            onMutate: async (newStatus) => {
-                await queryClient.cancelQueries('projects');
-                const previousProjects = queryClient.getQueryData<any[]>('projects');
-
-                if (previousProjects) {
-                    queryClient.setQueryData('projects', previousProjects.map(p =>
-                        p.id === project?.id ? { ...p, status: newStatus } : p
-                    ));
-                }
-                return { previousProjects };
-            },
-            onError: (err, _newStatus, context: any) => {
-                if (context?.previousProjects) {
-                    queryClient.setQueryData('projects', context.previousProjects);
-                }
-                console.error('Failed to update status', err);
-            },
-            onSettled: () => {
+            onSuccess: () => {
+                refetchProject();
                 queryClient.invalidateQueries('projects');
             }
         }
     );
 
-    const handleStatusChange = (newStatus: string) => {
+    const handleStatusChange = useCallback((newStatus: string) => {
         if (!project || !canManageStatus) return;
         updateStatusMutation.mutate(newStatus);
-    };
-
-    const StatusDropdown = ({ currentStatus }: { currentStatus?: string }) => {
-        if (!currentStatus) return null;
-
-        const statusOptions = [
-            { value: 'active', label: 'Active', color: '#10B981', bg: '#ECFDF5' },
-            { value: 'on_hold', label: 'On Hold', color: '#B45309', bg: '#FFFBEB' },
-            { value: 'completed', label: 'Completed', color: '#374151', bg: '#F3F4F6' },
-            { value: 'archived', label: 'Archived', color: '#EF4444', bg: '#FEF2F2' }
-        ];
-
-        const current = statusOptions.find(s => s.value === currentStatus) || statusOptions[0];
-
-        if (!canManageStatus) {
-            return (
-                <span className="ws-status-badge" style={{ backgroundColor: current.bg, color: current.color, border: `1px solid ${current.color}30` }}>
-                    {current.label}
-                </span>
-            );
-        }
-
-        return (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <button
-                        className="ws-status-badge"
-                        style={{
-                            backgroundColor: current.bg,
-                            color: current.color,
-                            border: `1px solid ${current.color}30`,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                        }}
-                    >
-                        {current.label}
-                        <ChevronDown size={14} strokeWidth={2.5} />
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    {statusOptions.map(option => (
-                        <DropdownMenuItem
-                            key={option.value}
-                            onClick={() => handleStatusChange(option.value)}
-                            className="status-dropdown-item"
-                            style={{ color: option.color }}
-                        >
-                            <span style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                backgroundColor: option.color,
-                                marginRight: '8px'
-                            }} />
-                            {option.label}
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
-        );
-    };
+    }, [project, canManageStatus, updateStatusMutation]);
 
     return (
         <AppLayout>
             <div className="workspace-container">
-                {/* Header */}
                 <div className="ws-header">
                     <div className="ws-header-left">
-                        <button onClick={() => navigate(-1)} className="btn-back">
+                        <button onClick={() => navigate('/project-management')} className="btn-back">
                             <ChevronLeft size={16} /> Back
                         </button>
                         <div className="ws-project-info">
                             <h1 className="ws-project-title">
                                 {project?.name || 'Loading...'}
+                                <button className="ws-project-info-btn" onClick={() => setShowProjectInfo(true)}>
+                                    <Info size={16} />
+                                </button>
                                 <span className="ws-project-id">ID: {project?.custom_id}</span>
                             </h1>
-                            <p className="ws-project-desc" title={project?.description}>
-                                {project?.description && project.description.length > 30
-                                    ? project.description.slice(0, 30) + '...'
-                                    : project?.description}
-                            </p>
                         </div>
                     </div>
                     <div className="ws-header-right">
-                        <StatusDropdown currentStatus={project?.status} />
-
+                        <StatusDropdown
+                            currentStatus={project?.status}
+                            canManageStatus={canManageStatus}
+                            onStatusChange={handleStatusChange}
+                        />
                         {canManageProject && (
                             <button className="btn-edit-project" onClick={handleEditProject}>
                                 <Edit size={14} /> Edit Project
@@ -482,26 +343,19 @@ export const ProjectWorkspace: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Columns Container */}
                 <div className="ws-columns-wrapper">
-
                     {/* Column 1: Modules */}
                     <div className="ws-column">
                         <div className="ws-column-header">
-                            <div className="ws-col-title">
-                                <Layers size={18} /> MODULES
-                            </div>
+                            <div className="ws-col-title"><Layers size={18} /> MODULES</div>
                             {canCreateModule && (
-                                <button
-                                    onClick={() => handleCreate('module', projectId)}
-                                    className="btn-col-add"
-                                >
+                                <button onClick={() => handleCreate('module', projectId)} className="btn-col-add">
                                     <Plus size={14} /> Add Module
                                 </button>
                             )}
                         </div>
                         <div className="ws-column-body">
-                            {modules?.map(module => (
+                            {modulesLoading ? <p>Loading...</p> : modules?.map(module => (
                                 <WorkspaceCard
                                     key={module.id}
                                     id={module.id}
@@ -513,209 +367,90 @@ export const ProjectWorkspace: React.FC = () => {
                                     onClick={() => { setSelectedModuleId(module.id); setSelectedTaskId(null); }}
                                     onEdit={() => handleEdit('module', module)}
                                     onDelete={() => handleDeleteModule(module.id)}
-                                    isPM={isPM}
+                                    isPM={canManageResources}
                                     isCompact={true}
-                                    // Pass ALL project members as candidates (Project Team)
-                                    availableUsers={(() => {
-                                        const candidates = projectMembers || [];
-                                        const current = module.assigned_users || [];
-                                        // Merge and unique by ID
-                                        const uniqueMap = new Map();
-                                        [...candidates, ...current].forEach(u => uniqueMap.set(String(u.id), u));
-                                        return Array.from(uniqueMap.values())
-                                            .map((pm: any) => ({
-                                                ...pm,
-                                                initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
-                                            }));
-                                    })()}
+                                    createdByName={module.created_by_name}
+                                    availableUsers={(allEmployees || projectMembers || [])
+                                        .filter((u: any) => String(u.id) !== String(project?.project_manager_id))
+                                        .map((u: any) => ({
+                                            ...u,
+                                            initials: u.initials || (u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
+                                        }))}
                                     onAssignUser={(userId) => {
                                         const isAssigned = (module.assigned_users || []).some((u: any) => String(u.id) === String(userId));
                                         assignModuleUserMutation.mutate({ moduleId: module.id, userId, action: isAssigned ? 'remove' : 'add' });
                                     }}
                                 />
                             ))}
-                            {modules?.length === 0 && (
-                                <div className="ws-empty-dashed">
-                                    <div className="dashed-icon"><Layers size={24} /></div>
-                                    <p className="dashed-title">
-                                        {(isPM || isSuperAdmin) ? "No Modules Found" : "No Modules Assigned"}
-                                    </p>
-                                    <p className="dashed-desc">
-                                        {(isPM || isSuperAdmin) ? "Create a module to start organizing tasks." : "You haven't been assigned to any modules in this project."}
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     </div>
 
                     {/* Column 2: Tasks */}
                     <div className="ws-column">
                         <div className="ws-column-header">
-                            <div className="ws-col-title">
-                                <ClipboardList size={18} /> TASKS
-                            </div>
+                            <div className="ws-col-title"><ClipboardList size={18} /> TASKS</div>
                             {selectedModuleId && canAddTask && (
-                                <button
-                                    onClick={() => handleCreate('task', selectedModuleId)}
-                                    className="btn-col-add"
-                                >
+                                <button onClick={() => handleCreate('task', selectedModuleId)} className="btn-col-add">
                                     <Plus size={14} /> Add Task
                                 </button>
                             )}
                         </div>
                         <div className="ws-column-body">
-                            {!selectedModuleId ? (
-                                <div className="ws-empty-dashed">
-                                    <div className="dashed-icon"><ClipboardList size={24} /></div>
-                                    <p className="dashed-title">No Tasks Found</p>
-                                    <p className="dashed-desc">Assign and track tasks within this module.</p>
-                                </div>
-                            ) : tasks?.length === 0 ? (
-                                <div className="ws-empty-dashed">
-                                    <div className="dashed-icon"><ClipboardList size={24} /></div>
-                                    <p className="dashed-title">
-                                        {(isPM || isSuperAdmin) ? "No Tasks Found" : "No Tasks Assigned"}
-                                    </p>
-                                    <p className="dashed-desc">
-                                        {(isPM || isSuperAdmin) ? "Assign and track tasks within this module." : "You haven't been assigned to any tasks in this module."}
-                                    </p>
-                                </div>
-                            ) : (
-                                tasks?.map(task => (
+                            {!selectedModuleId ? <p>Select a module</p> : tasksLoading ? <p>Loading...</p> : tasks?.map(task => {
+                                // PERMISSION: creator OR PM (Project-level or Global)
+                                const canEditTask = (String(task?.created_by) === String(user?.id) || isPM);
+
+                                return (
                                     <WorkspaceCard
                                         key={task.id}
                                         id={task.id}
                                         customId={task.custom_id}
                                         name={task.name}
                                         description={task.description}
+                                        startDate={task.start_date}
+                                        endDate={task.end_date}
+                                        timeSpent={task.time_spent}
+                                        workStatus={task.work_status}
                                         assignedUsers={task.assigned_users || []}
                                         isSelected={selectedTaskId === task.id}
                                         onClick={() => setSelectedTaskId(task.id)}
                                         onEdit={() => handleEdit('task', task)}
                                         onDelete={() => handleDeleteTask(task.id)}
-                                        isPM={isPM}
-                                        isCompact={true}
-                                        // Pass ALL module assignees as candidates
-                                        // Pass ALL module assignees + current task assignees
-                                        availableUsers={(() => {
-                                            const moduleMembers = modules?.find(m => String(m.id) === String(selectedModuleId))?.assigned_users || [];
-                                            const current = task.assigned_users || [];
-                                            const uniqueMap = new Map();
-                                            [...moduleMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
-                                            return Array.from(uniqueMap.values())
-                                                .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
-                                                .map((pm: any) => ({
-                                                    ...pm,
-                                                    initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
-                                                }));
-                                        })()}
-                                        onAssignUser={(userId) => {
-                                            const isAssigned = (task.assigned_users || []).some((u: any) => String(u.id) === String(userId));
-                                            assignTaskUserMutation.mutate({ taskId: task.id, userId, action: isAssigned ? 'remove' : 'add' });
-                                        }}
+                                        isPM={canEditTask}
+                                        isCompact={false}
+                                        createdByName={task.created_by_name}
                                     />
-                                ))
-                            )}
+                                );
+                            })}
                         </div>
                     </div>
-
-                    {/* Column 3: Activity */}
-                    <div className="ws-column">
-                        <div className="ws-column-header">
-                            <div className="ws-col-title">
-                                <Layers size={18} /> ACTIVITY
-                            </div>
-                            {selectedTaskId && canAddActivity && (
-                                <button
-                                    onClick={() => handleCreate('activity', selectedTaskId)}
-                                    className="btn-col-add"
-                                >
-                                    <Plus size={14} /> Add Activity
-                                </button>
-                            )}
-                        </div>
-                        <div className="ws-column-body compact-column-body">
-                            {!selectedTaskId ? (
-                                <div className="ws-empty-dashed">
-                                    <div className="dashed-icon"><ClipboardList size={24} /></div>
-                                    <p className="dashed-title">Select a Task</p>
-                                    <p className="dashed-desc">Choose a task to view its detailed activity trail.</p>
-                                </div>
-                            ) : activities?.length === 0 ? (
-                                <div className="ws-empty-dashed">
-                                    <div className="dashed-icon"><ClipboardList size={24} /></div>
-                                    <p className="dashed-title">
-                                        {(isPM || isSuperAdmin) ? "No Activities" : "No Activities Assigned"}
-                                    </p>
-                                    <p className="dashed-desc">
-                                        {(isPM || isSuperAdmin) ? "No activities found for this task." : "You haven't been assigned to any activities in this task."}
-                                    </p>
-
-                                </div>
-                            ) : (
-                                activities?.map(activity => {
-                                    const selectedTask = tasks?.find(t => String(t.id) === String(selectedTaskId));
-                                    // Pass ALL task members + current activity assignees
-                                    const availableUsers = (() => {
-                                        const taskMembers = selectedTask?.assigned_users || [];
-                                        const current = activity.assigned_users || [];
-                                        const uniqueMap = new Map();
-                                        [...taskMembers, ...current].forEach(u => uniqueMap.set(String(u.id), u));
-                                        return Array.from(uniqueMap.values())
-                                            .filter((u: any) => String(u.id) !== String(project?.project_manager_id)) // Exclude PM
-                                            .map((pm: any) => ({
-                                                ...pm,
-                                                initials: pm.initials || (pm.name ? pm.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : '??')
-                                            }));
-                                    })();
-
-                                    return (
-                                        <WorkspaceCard
-                                            key={activity.id}
-                                            id={activity.id}
-                                            customId={activity.custom_id}
-                                            name={activity.name}
-                                            description={activity.description}
-                                            assignedUsers={activity.assigned_users || []}
-                                            onClick={() => { }}
-                                            onEdit={() => handleEdit('activity', activity)}
-                                            onDelete={() => handleDeleteActivity(activity.id)}
-                                            onAssignUser={(userId) => {
-                                                const isAssigned = (activity.assigned_users || []).some((u: any) => String(u.id) === String(userId));
-                                                assignActivityUserMutation.mutate({ activityId: activity.id, userId, action: isAssigned ? 'remove' : 'add' });
-                                            }}
-                                            availableUsers={availableUsers}
-                                            isPM={isPM}
-                                            isCompact={true}
-                                        />
-                                    );
-                                })
-                            )}
-                        </div>
-                    </div>
-
                 </div>
 
-                {/* Shared Create Modal */}
                 <CreateModal
                     isOpen={!!createType}
                     onClose={() => { setCreateType(null); setCreateParentId(null); setIsEdit(false); setEditData(null); }}
                     type={createType || 'module'}
                     parentId={createParentId || undefined}
                     onSuccess={handleCreateSuccess}
-                    initialData={isEdit ? (editData || project) : undefined}
+                    initialData={isEdit ? editData : undefined}
                     isEdit={isEdit}
                     projectManagerId={project?.project_manager_id}
                 />
-
-
 
                 <DeleteConfirmModal
                     isOpen={deleteModal.isOpen}
                     onClose={() => setDeleteModal({ isOpen: false, type: null, id: null })}
                     onConfirm={confirmDelete}
                     title={`Delete ${deleteModal.type?.charAt(0).toUpperCase()}${deleteModal.type?.slice(1)}`}
-                    message={`Are you sure you want to delete this ${deleteModal.type}? This action cannot be undone and will delete all nested items.`}
+                    message={`Are you sure?`}
+                />
+
+                <DescriptionModal
+                    isOpen={showProjectInfo}
+                    onClose={() => setShowProjectInfo(false)}
+                    title={project?.name || ''}
+                    customId={project?.custom_id || ''}
+                    description={project?.description || ''}
                 />
             </div>
         </AppLayout>

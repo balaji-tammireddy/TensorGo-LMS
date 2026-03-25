@@ -25,8 +25,21 @@ export const validateRequest = (schema: ZodSchema) => {
         console.log(`[VALIDATE] ❌ Validation failed:`, error.errors);
         // Create a more user-friendly error message
         const errorMessages = error.errors.map(err => {
-          const field = err.path.join('.');
-          return `${field}: ${err.message}`;
+          // Filter out internal wrapper objects
+          const fieldPath = err.path
+            .filter(p => !['body', 'params', 'query', 'personalInfo', 'employmentInfo', 'documents', 'address', 'education'].includes(String(p)));
+
+          const field = fieldPath.join('.');
+
+          // If the message is a full sentence or known custom message, return it directly
+          if (['Invalid email address', 'Name is required', 'Phone number must be at most 10 digits', 'Only organization mail should be used'].includes(err.message)) {
+            return err.message;
+          }
+
+          // Humanize field name (camelCase to Title Case)
+          const humanField = field ? field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) : '';
+
+          return humanField ? `${humanField}: ${err.message}` : err.message;
         });
 
         return res.status(400).json({

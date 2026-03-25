@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Search, Download, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Search, Download, Clock, FileText, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetEntry } from '../../services/timesheetService';
 import AppLayout from '../../components/layout/AppLayout';
 import { Button } from '../../components/ui/button';
-import { Modal } from '../../components/ui/modal';
+
+import { TimesheetReportModal } from '../../components/timesheet/TimesheetReportModal';
 import './TimesheetApprovalPage.css';
 
 interface TeamMemberStatus {
@@ -13,8 +14,11 @@ interface TeamMemberStatus {
     name: string;
     emp_id: string;
     designation: string;
+    reporting_manager_id: number;
     total_hours: number;
     status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'pending_submission';
+    is_late: boolean;
+    is_resubmission: boolean;
 }
 
 export const TimesheetApprovalPage: React.FC = () => {
@@ -22,19 +26,15 @@ export const TimesheetApprovalPage: React.FC = () => {
     const { showSuccess, showError } = useToast();
 
     // -- Date Logic --
-    // Default to previous week (Managers only see past/submitted weeks)
+    // Default week logic:
+    // Before Sunday 9 PM -> Default to Previous Week
+    // After Sunday 9 PM -> Default to Current Week (just submitted)
     const [currentDate, setCurrentDate] = useState(() => {
-        const d = new Date();
+        const now = new Date();
+        const d = new Date(now);
+        // Strictly show previous week for approvals
         d.setDate(d.getDate() - 7);
         return d;
-    });
-    // Initialize selectedDate to today's string format
-    const [selectedDate, setSelectedDate] = useState(() => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
     });
 
     // Helpers
@@ -47,34 +47,15 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     const getWeekRange = (date: Date) => {
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Monday
         const monday = new Date(date);
         monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const saturday = new Date(monday);
+        saturday.setDate(monday.getDate() + 5); // Monday to Saturday
+        return { start: monday, end: saturday };
     };
 
     const weekRange = useMemo(() => getWeekRange(currentDate), [currentDate]);
-    const weekDays = useMemo(() => {
-        const days = [];
-        const { start } = weekRange;
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(start);
-            d.setDate(start.getDate() + i);
-            days.push(d);
-        }
-        return days;
-    }, [weekRange]);
-
-    // Ensure selectedDate is within the current week view
-    useEffect(() => {
-        const startStr = formatDate(weekRange.start);
-        const endStr = formatDate(weekRange.end);
-        if (selectedDate < startStr || selectedDate > endStr) {
-            setSelectedDate(startStr);
-        }
-    }, [weekRange, selectedDate]);
 
     // -- State --
     const [teamMembers, setTeamMembers] = useState<TeamMemberStatus[]>([]);
@@ -83,21 +64,99 @@ export const TimesheetApprovalPage: React.FC = () => {
 
     const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
     const [memberEntries, setMemberEntries] = useState<TimesheetEntry[]>([]);
-    const [loadingEntries, setLoadingEntries] = useState(false);
 
     // -- Actions State --
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [entryToReject, setEntryToReject] = useState<number | null>(null);
-    const [rejectDateStr, setRejectDateStr] = useState<string | null>(null); // For day-wise rejection
     const [rejectionReason, setRejectionReason] = useState('');
 
+    const [processingAction, setProcessingAction] = useState(false);
+    const [isLoadingEntries, setIsLoadingEntries] = useState(false);
+
     const [reportModalOpen, setReportModalOpen] = useState(false);
-    const [reportFilters, setReportFilters] = useState({
-        startDate: formatDate(weekRange.start),
-        endDate: formatDate(weekRange.end),
-        projectId: '',
-        moduleId: ''
+
+    // -- Table Filters & Sorting State --
+    const [globalTableSearch, setGlobalTableSearch] = useState('');
+    const [tableFilters, setTableFilters] = useState({
+        work_status: '',
+        log_status: ''
     });
+
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
+        key: 'log_date',
+        direction: 'asc'
+    });
+
+    const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+    const [activeActionMenu, setActiveActionMenu] = useState<number | null>(null);
+
+    const resetTableFilters = () => {
+        setGlobalTableSearch('');
+        setTableFilters({
+            work_status: '',
+            log_status: ''
+        });
+        setSortConfig({ key: 'log_date', direction: 'asc' });
+    };
+
+    const handleSort = (key: string) => {
+        if (key === 'Work Status' || key === 'Status / Action') {
+            setActiveDropdown(activeDropdown === key ? null : key);
+            return;
+        }
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    // Filtered & Sorted Entries Calculation
+    const processedEntries = useMemo(() => {
+        const filtered = memberEntries.filter(entry => {
+            // Global text search
+            const searchFields = [
+                entry.project_name || 'System',
+                entry.module_name || '—',
+                entry.task_name || '—',
+                entry.description || '—',
+                entry.log_date || '',
+                Number(entry.duration).toFixed(1) + 'h'
+            ].map(f => f.toLowerCase());
+
+            const searchStr = globalTableSearch.toLowerCase();
+            const matchesGlobal = !searchStr || searchFields.some(field => field.includes(searchStr));
+
+            // Status filters (dropdowns)
+            const matchesWork = !tableFilters.work_status || entry.work_status === tableFilters.work_status;
+            const matchesLog = !tableFilters.log_status || entry.log_status === tableFilters.log_status;
+
+            return matchesGlobal && matchesWork && matchesLog;
+        });
+
+        if (sortConfig.key && sortConfig.direction) {
+            filtered.sort((a: any, b: any) => {
+                let aVal, bVal;
+
+                switch (sortConfig.key) {
+                    case 'Project': aVal = a.project_name || 'System'; bVal = b.project_name || 'System'; break;
+                    case 'Module': aVal = a.module_name || ''; bVal = b.module_name || ''; break;
+                    case 'Task': aVal = a.task_name || ''; bVal = b.task_name || ''; break;
+                    case 'Date': aVal = a.log_date; bVal = b.log_date; break;
+                    case 'Time': aVal = Number(a.duration); bVal = Number(b.duration); break;
+                    case 'Work Status': aVal = a.work_status || ''; bVal = b.work_status || ''; break;
+                    case 'Status / Action': aVal = a.log_status || ''; bVal = b.log_status || ''; break;
+                    default: aVal = a[sortConfig.key]; bVal = b[sortConfig.key];
+                }
+
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [memberEntries, tableFilters, sortConfig, globalTableSearch]);
 
     // -- Effects --
     useEffect(() => {
@@ -107,8 +166,7 @@ export const TimesheetApprovalPage: React.FC = () => {
     useEffect(() => {
         if (selectedMemberId) {
             fetchMemberEntries(selectedMemberId);
-        } else {
-            setMemberEntries([]);
+            resetTableFilters();
         }
     }, [selectedMemberId, weekRange]);
 
@@ -123,6 +181,16 @@ export const TimesheetApprovalPage: React.FC = () => {
             ));
         }
     }, [searchQuery, teamMembers]);
+
+    // Close dropdowns on outside click
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setActiveDropdown(null);
+            setActiveActionMenu(null);
+        };
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
 
     // -- Fetchers --
     const fetchTeamStatus = async () => {
@@ -141,23 +209,42 @@ export const TimesheetApprovalPage: React.FC = () => {
     };
 
     const fetchMemberEntries = async (userId: number) => {
-        setLoadingEntries(true);
+        setMemberEntries([]); // Clear stale data first
+        setIsLoadingEntries(true);
         try {
             const startStr = formatDate(weekRange.start);
             const endStr = formatDate(weekRange.end);
             const data = await timesheetService.getMemberEntries(userId, startStr, endStr);
             setMemberEntries(data);
         } catch (err: any) {
-            showError('Failed to load user timesheet');
-            setSelectedMemberId(null); // Reset selection on error
+            console.error('[ApprovalPage] Fetch Member error:', err);
+            const status = err.response?.status;
+            if (status === 401) {
+                showError('Your session has expired. Please log in again.');
+            } else if (status === 403) {
+                showError('You are not authorized to view this user\'s timesheet.');
+            } else {
+                showError('Unable to load member timesheet. Please try again.');
+            }
+            // Keep the selection but clear entries to show empty/error state
+            setMemberEntries([]);
         } finally {
-            setLoadingEntries(false);
+            setIsLoadingEntries(false);
         }
     };
 
     // -- Handlers --
     const handleApproveWeek = async () => {
-        if (!selectedMemberId) return;
+        if (!selectedMemberId || processingAction) return;
+
+        // Optimistic Update
+        const previousEntries = [...memberEntries];
+        const previousMembers = [...teamMembers];
+
+        setMemberEntries(prev => prev.map(e => ({ ...e, log_status: 'approved' })));
+        setTeamMembers(prev => prev.map(m => m.id === selectedMemberId ? { ...m, status: 'approved' } : m));
+
+        setProcessingAction(true);
         try {
             const startStr = formatDate(weekRange.start);
             const endStr = formatDate(weekRange.end);
@@ -166,54 +253,60 @@ export const TimesheetApprovalPage: React.FC = () => {
             fetchTeamStatus();
             fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
-            showError(err.message || 'Failed to approve');
+            // Rollback on error
+            setMemberEntries(previousEntries);
+            setTeamMembers(previousMembers);
+            showError(err.response?.data?.error || err.message || 'Failed to approve');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
-    const handleApproveDay = async (dateStr: string) => {
-        if (!selectedMemberId) return;
+
+    // -- Per-entry actions --
+    const handleApproveEntry = async (entryId: number) => {
+        if (processingAction) return;
+        const prev = [...memberEntries];
+        setMemberEntries(p => p.map(e => e.id === entryId ? { ...e, log_status: 'approved' } : e));
+        setProcessingAction(true);
         try {
-            await timesheetService.approveTimesheet(selectedMemberId, dateStr, dateStr);
-            showSuccess(`Timesheet for ${dateStr} approved`);
+            await timesheetService.approveEntry(entryId);
+            showSuccess('Entry approved');
+            if (selectedMemberId) fetchMemberEntries(selectedMemberId);
             fetchTeamStatus();
-            fetchMemberEntries(selectedMemberId);
         } catch (err: any) {
-            showError(err.message || 'Failed to approve day');
+            setMemberEntries(prev);
+            showError(err.response?.data?.error || err.message || 'Failed to approve');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
-    const handleRejectDay = (dateStr: string) => {
-        setRejectDateStr(dateStr);
-        setEntryToReject(null);
-        setRejectionReason('');
-        setRejectModalOpen(true);
-    };
-
-    const handleRejectClick = (entryId: number) => {
+    const openRejectEntry = (entryId: number) => {
         setEntryToReject(entryId);
-        setRejectDateStr(null);
         setRejectionReason('');
         setRejectModalOpen(true);
     };
 
-    const confirmReject = async () => {
-        if ((!entryToReject && !rejectDateStr) || !rejectionReason.trim()) {
-            showError('Please provide a reason');
+    const confirmRejectEntry = async () => {
+        if (!entryToReject || !rejectionReason.trim() || processingAction) {
+            if (!rejectionReason.trim()) showError('Please provide a reason');
             return;
         }
+        const prev = [...memberEntries];
+        setMemberEntries(p => p.map(e => e.id === entryToReject ? { ...e, log_status: 'rejected', rejection_reason: rejectionReason } : e));
+        setProcessingAction(true);
         try {
-            if (entryToReject) {
-                await timesheetService.rejectEntry(entryToReject, rejectionReason);
-            } else if (rejectDateStr && selectedMemberId) {
-                await timesheetService.rejectTimesheet(selectedMemberId, rejectDateStr, rejectDateStr, rejectionReason);
-            }
-
-            showSuccess('Rejection processed');
+            await timesheetService.rejectEntry(entryToReject, rejectionReason);
+            showSuccess('Entry rejected');
             setRejectModalOpen(false);
             if (selectedMemberId) fetchMemberEntries(selectedMemberId);
             fetchTeamStatus();
         } catch (err: any) {
-            showError(err.message || 'Failed to reject');
+            setMemberEntries(prev);
+            showError(err.response?.data?.error || err.message || 'Failed to reject');
+        } finally {
+            setProcessingAction(false);
         }
     };
 
@@ -223,47 +316,10 @@ export const TimesheetApprovalPage: React.FC = () => {
         setCurrentDate(newDate);
     };
 
-    const handleDownloadReport = async () => {
-        try {
-            const data = await timesheetService.downloadReport(reportFilters);
-            // Convert JSON to CSV
-            if (!data || data.length === 0) {
-                showError('No data found for criteria');
-                return;
-            }
-
-            const headers = Object.keys(data[0]).join(',');
-            const rows = data.map((row: any) => Object.values(row).map(v => `"${v}"`).join(',')).join('\n');
-            const csvContent = `data:text/csv;charset=utf-8,${headers}\n${rows}`;
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `timesheet_report_${formatDate(new Date())}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            setReportModalOpen(false);
-            showSuccess('Report downloaded');
-        } catch (err) {
-            showError('Failed to generate report');
-        }
-    };
-
-
-
-
-
-    // -- Grouping --
-    const getEntriesForDay = (dateStr: string) => {
-        return memberEntries.filter(e => {
-            const eDate = new Date(e.log_date);
-            return formatDate(eDate) === dateStr;
-        });
-    };
 
     const selectedMember = teamMembers.find(m => m.id === selectedMemberId);
+    const isReportingManager = selectedMember && String(selectedMember.reporting_manager_id) === String(user?.id);
+    const canApprove = isReportingManager && selectedMemberId !== user?.id;
 
     return (
         <AppLayout>
@@ -274,33 +330,46 @@ export const TimesheetApprovalPage: React.FC = () => {
                     </div>
 
                     <div className="header-actions">
-                        <Button
-                            variant="outline"
-                            onClick={() => setReportModalOpen(true)}
-                            style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
-                        >
-                            <Download size={16} />
-                            Reports
-                        </Button>
+                        {['hr', 'super_admin'].includes(user?.role || '') && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setReportModalOpen(true)}
+                                style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                            >
+                                <Download size={16} />
+                                Reports
+                            </Button>
+                        )}
 
                         <div className="week-navigator">
                             <button className="nav-btn" onClick={() => changeWeek(-1)}><ChevronLeft size={20} /></button>
                             <span className="current-week-display">
-                                {weekRange.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - {weekRange.end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {(() => {
+                                    const d1 = String(weekRange.start.getDate()).padStart(2, '0');
+                                    const m1 = String(weekRange.start.getMonth() + 1).padStart(2, '0');
+                                    const y1 = weekRange.start.getFullYear();
+                                    const d2 = String(weekRange.end.getDate()).padStart(2, '0');
+                                    const m2 = String(weekRange.end.getMonth() + 1).padStart(2, '0');
+                                    const y2 = weekRange.end.getFullYear();
+                                    return `${d1}-${m1}-${y1} - ${d2}-${m2}-${y2}`;
+                                })()}
                             </span>
                             <button
                                 className="nav-btn"
                                 onClick={() => changeWeek(1)}
                                 disabled={(() => {
-                                    const nextWeekEnd = new Date(weekRange.end);
-                                    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-                                    return nextWeekEnd >= new Date();
+                                    const { start: todayWeekStart } = getWeekRange(new Date());
+                                    const { start: viewWeekStart } = getWeekRange(currentDate);
+
+                                    // Disable "Next" if current view is already the previous week
+                                    // (i.e., we don't want them to reach or see the current active week)
+                                    return viewWeekStart >= new Date(todayWeekStart.setDate(todayWeekStart.getDate() - 7));
                                 })()}
                                 style={{
                                     opacity: (() => {
-                                        const nextWeekEnd = new Date(weekRange.end);
-                                        nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-                                        return nextWeekEnd >= new Date();
+                                        const { start: todayWeekStart } = getWeekRange(new Date());
+                                        const { start: viewWeekStart } = getWeekRange(currentDate);
+                                        return viewWeekStart >= new Date(todayWeekStart.setDate(todayWeekStart.getDate() - 7));
                                     })() ? 0.3 : 1, cursor: 'pointer'
                                 }}
                             >
@@ -336,10 +405,6 @@ export const TimesheetApprovalPage: React.FC = () => {
                                         <span className="emp-name">{member.name}</span>
                                         <span className="emp-role">{member.designation}</span>
                                     </div>
-                                    <div className="emp-status">
-                                        <div className={`status-dot ${member.status}`} title={member.status} />
-                                        <span className="hours-pill">{member.total_hours.toFixed(1)}h</span>
-                                    </div>
                                 </div>
                             ))}
                             {filteredMembers.length === 0 && (
@@ -353,21 +418,8 @@ export const TimesheetApprovalPage: React.FC = () => {
                     {/* Right: Details */}
                     <div className="entries-list-card">
                         {!selectedMemberId ? (
-                            <div className="ts-empty-state" style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                height: '100%',
-                                color: '#94a3b8',
-                                animation: 'fadeIn 0.5s ease-out'
-                            }}>
-                                <style>
-                                    {`
-                                        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-                                    `}
-                                </style>
-                                <div style={{
+                            <div className="ts-empty-state animate-fadeIn" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <div className="animate-float" style={{
                                     width: '80px',
                                     height: '80px',
                                     background: '#f8fafc',
@@ -377,339 +429,344 @@ export const TimesheetApprovalPage: React.FC = () => {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     marginBottom: '24px',
-                                    animation: 'float 3s ease-in-out infinite'
+                                    margin: '0 auto 24px auto'
                                 }}>
                                     <Search size={32} style={{ color: '#cbd5e1' }} />
                                 </div>
                                 <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Select an Employee</h3>
-                                <p style={{ fontSize: '14px', maxWidth: '300px', textAlign: 'center', lineHeight: '1.5' }}>
+                                <p style={{ fontSize: '14px', maxWidth: '300px', textAlign: 'center', lineHeight: '1.5', margin: '0 auto' }}>
                                     Choose a team member from the list to view their timesheet, approve logs, or check submission status.
                                 </p>
                             </div>
                         ) : (
-                            <>
-                                <div style={{ paddingBottom: '20px', borderBottom: '1px solid #f1f5f9', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                            <div className="animate-fadeIn">
+                                {/* Header / Action Bar */}
+                                <div style={{
+                                    padding: '24px',
+                                    borderBottom: '1px solid #f1f5f9',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    background: '#fff',
+                                    borderRadius: '12px 12px 0 0',
+                                    overflow: 'hidden', // Extra safety
+                                    gap: '16px'
+                                }}>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        <h2 style={{
+                                            fontSize: '20px',
+                                            fontWeight: 700,
+                                            color: '#1e293b',
+                                            margin: 0,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}>
                                             {selectedMember?.name}
                                         </h2>
-                                        <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                            {selectedMember?.emp_id} • {selectedMember?.total_hours.toFixed(2)} Hrs Logged
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '13px', color: '#64748b' }}>{selectedMember?.emp_id}</span>
+                                            <span style={{ color: '#cbd5e1' }}>•</span>
+                                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563eb', whiteSpace: 'nowrap' }}>{selectedMember?.total_hours.toFixed(1)} Hrs Logged</span>
                                         </div>
                                     </div>
 
-                                    {/* Action Bar */}
-                                    {(() => {
-                                        if (selectedMemberId === user?.id) {
-                                            return <div className="logged-hours-badge warning">Self Approval Disabled</div>;
-                                        }
+                                    <div className="action-bar-badge-container" style={{ flexShrink: 0 }}>
+                                        {(() => {
+                                            if (selectedMemberId === user?.id) {
+                                                return <div className="logged-hours-badge warning">Self Approval Disabled</div>;
+                                            }
 
-                                        // Criteria Check (Past Weeks Only)
-                                        const isPastWeek = weekRange.end < new Date();
-                                        const totalHours = selectedMember?.total_hours || 0;
-                                        const criteriaMet = totalHours >= 40;
+                                            const totalHours = selectedMember?.total_hours || 0;
+                                            const criteriaMet = totalHours >= 40;
+                                            const hasActionable = memberEntries.some(e => e.log_status === 'submitted');
+                                            const isAllApproved = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'approved');
+                                            const isAllRejected = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'rejected');
+                                            const allReviewed = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'approved' || e.log_status === 'rejected');
 
-                                        if (isPastWeek && !criteriaMet) {
-                                            // Show nothing in action bar or show disabled state? 
-                                            // We show banner below instead.
-                                            return <div className="logged-hours-badge danger">Criteria Not Met</div>;
-                                        }
+                                            if (isLoadingEntries) return <div className="logged-hours-badge neutral"><Clock size={14} className="animate-spin" style={{ marginRight: 6 }} /> Loading...</div>;
+                                            if (memberEntries.length === 0) return <div className="logged-hours-badge neutral">No Logs</div>;
 
-                                        if (memberEntries.length === 0 && !loadingEntries) {
-                                            return <div className="logged-hours-badge neutral" style={{ background: '#f1f5f9', color: '#64748b' }}>No Logs</div>;
-                                        }
-
-                                        const hasPending = memberEntries.some(e => e.log_status !== 'approved');
-                                        if (hasPending) {
-                                            return (
-                                                <button className="bulk-approve-btn" onClick={handleApproveWeek}>
-                                                    <CheckCircle size={16} />
-                                                    Approve Week
-                                                </button>
-                                            );
-                                        } else if (memberEntries.length > 0) {
-                                            return (
-                                                <div className="logged-hours-badge success">
-                                                    <CheckCircle size={14} style={{ marginRight: 4 }} />
-                                                    Approved
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
+                                            if (criteriaMet) {
+                                                if (hasActionable) {
+                                                    return canApprove ? (
+                                                        <button className="bulk-approve-btn" onClick={handleApproveWeek} disabled={processingAction}>
+                                                            {processingAction ? <Clock size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                                            {processingAction ? 'Processing...' : 'Approve Week'}
+                                                        </button>
+                                                    ) : (
+                                                        <div className="logged-hours-badge info"><Clock size={14} style={{ marginRight: 4 }} /> Submitted</div>
+                                                    );
+                                                }
+                                                if (isAllApproved) return <div className="logged-hours-badge success"><CheckCircle size={14} style={{ marginRight: 4 }} /> Approved</div>;
+                                                if (isAllRejected) return <div className="logged-hours-badge danger"><XCircle size={14} style={{ marginRight: 4 }} /> Rejected</div>;
+                                                if (allReviewed) return <div className="logged-hours-badge info"><CheckCircle size={14} style={{ marginRight: 4 }} /> Reviewed</div>;
+                                                return <div className="logged-hours-badge warning" style={{ whiteSpace: 'nowrap' }}>Pending Resubmission</div>;
+                                            }
+                                            return <div className="logged-hours-badge danger" style={{ whiteSpace: 'nowrap' }}>Criteria Not Met</div>;
+                                        })()}
+                                    </div>
                                 </div>
 
-                                {/* Criteria Error Banner */}
+                                {/* Status Banner (Warning) */}
                                 {(() => {
-                                    const isPastWeek = weekRange.end < new Date();
                                     const totalHours = selectedMember?.total_hours || 0;
                                     const criteriaMet = totalHours >= 40;
+                                    const hasActionable = memberEntries.some(e => e.log_status === 'submitted');
+                                    const allReviewed = memberEntries.length > 0 && memberEntries.every(e => e.log_status === 'approved' || e.log_status === 'rejected');
 
-                                    // Only show if it's a past week AND criteria failed AND it's not the user themselves
-                                    if (isPastWeek && !criteriaMet && selectedMemberId !== user?.id) {
+                                    if (weekRange.end < new Date() && !criteriaMet && selectedMemberId !== user?.id && !hasActionable && !allReviewed) {
                                         return (
-                                            <div style={{
-                                                marginBottom: '20px',
-                                                padding: '16px',
-                                                borderRadius: '12px',
-                                                background: '#fef2f2',
-                                                border: '1px solid #fee2e2',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                color: '#b91c1c',
-                                                animation: 'fadeIn 0.5s ease-out'
-                                            }}>
-                                                <style>
-                                                    {`
-                                                        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-                                                        @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-                                                    `}
-                                                </style>
-                                                <div style={{ padding: '8px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', animation: 'pulse-red 2s infinite' }}>
-                                                    <XCircle size={24} color="#ef4444" />
+                                            <div className="animate-fadeIn" style={{ margin: '16px 24px 0', padding: '12px 16px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fee2e2', display: 'flex', alignItems: 'center', gap: '12px', color: '#b91c1c' }}>
+                                                <div className="animate-pulse-red" style={{ padding: '6px', background: '#fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                                                    <XCircle size={20} color="#ef4444" />
                                                 </div>
                                                 <div>
-                                                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 600 }}>Submission Criteria Not Met</h3>
-                                                    <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
-                                                        This user has logged fewer than 40 hours.
-                                                    </p>
+                                                    <h3 style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>Submission Criteria Not Met</h3>
+                                                    <p style={{ margin: 0, fontSize: '12px', opacity: 0.9 }}>User has logged only {totalHours.toFixed(1)}h (min 40h required).</p>
                                                 </div>
                                             </div>
-                                        )
+                                        );
                                     }
                                     return null;
                                 })()}
 
-                                {/* Week Days Navigation */}
-                                <div className="week-days-nav" style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(7, 1fr)',
-                                    gap: '8px',
-                                    marginBottom: '20px',
-                                    padding: '10px 0'
-                                }}>
-                                    {weekDays.map(day => {
-                                        const dStr = formatDate(day);
-                                        const isToday = dStr === formatDate(new Date());
-                                        const dayEntries = getEntriesForDay(dStr);
-                                        const hasLogs = dayEntries.length > 0;
-                                        const isSelected = dStr === selectedDate;
+                                {/* Log Table Section */}
+                                <div style={{ padding: '24px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>
+                                            <FileText size={18} />
+                                            Weekly Log Table
+                                        </span>
+                                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', background: '#f1f5f9', borderRadius: '6px', padding: '4px 8px' }}>
+                                            {formatDate(weekRange.start)} — {formatDate(weekRange.end)}
+                                        </span>
+                                    </div>
 
-                                        return (
-                                            <button
-                                                key={dStr}
-                                                onClick={() => setSelectedDate(dStr)}
-                                                className={`week-day-btn ${isSelected ? 'active' : ''}`}
-                                                style={{
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    alignItems: 'center',
-                                                    padding: '8px 4px',
-                                                    borderRadius: '8px',
-                                                    border: isSelected ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                                                    backgroundColor: isSelected ? '#eff6ff' : '#fff',
-                                                    color: isSelected ? '#1d4ed8' : '#64748b',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                            >
-                                                <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                                                    {day.toLocaleDateString('en-US', { weekday: 'short' })}
-                                                </span>
-                                                <span style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px' }}>
-                                                    {day.getDate()}
-                                                </span>
+                                    {/* Global Search Bar */}
+                                    <div style={{ marginBottom: '20px', position: 'relative', maxWidth: '180px' }}>
+                                        <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
+                                            <Search size={16} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Search"
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 16px 12px 42px',
+                                                borderRadius: '12px',
+                                                border: '1px solid #eef2f6',
+                                                background: '#fcfdfe',
+                                                fontSize: '14px',
+                                                color: '#1e293b',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                                                outline: 'none',
+                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                            }}
+                                            className="ts-global-search-input"
+                                            value={globalTableSearch}
+                                            onChange={e => setGlobalTableSearch(e.target.value)}
+                                        />
+                                    </div>
 
-                                                <div style={{ display: 'flex', gap: '2px', marginTop: '4px' }}>
-                                                    {isToday && (
-                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#3b82f6' }} title="Today" />
-                                                    )}
-                                                    {hasLogs && (
-                                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Has Logs" />
-                                                    )}
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                    <div className="ts-table-wrapper">
+                                        <table className="ts-detailed-table">
+                                            <thead>
+                                                <tr>
+                                                    {['Project', 'Module', 'Task', 'Description', 'Date', 'Time', 'Work Status', 'Status / Action'].map(h => {
+                                                        const isDropdown = h === 'Work Status' || h === 'Status / Action';
 
-                                <div className="entries-grid">
-                                    {weekDays
-                                        .filter(day => formatDate(day) === selectedDate)
-                                        .map(day => {
-                                            const dateStr = formatDate(day);
-                                            const dayEntries = getEntriesForDay(dateStr);
-                                            const dayTotal = dayEntries.reduce((sum, e) => sum + Number(e.duration), 0);
+                                                        // Map header to consistent CSS class
+                                                        let headerClass = '';
+                                                        if (h === 'Work Status') headerClass = 'ts-col-work';
+                                                        else if (h === 'Status / Action') headerClass = 'ts-col-status';
+                                                        else headerClass = `ts-col-${h.toLowerCase().split(' ')[0]}`;
 
-                                            // Always render the container for anchor linking, even if empty?
-                                            // Probably yes, or at least if we want the button to scroll somewhere.
-
-                                            return (
-                                                <div key={dateStr} id={`day-${dateStr}`} className="day-group">
-                                                    <div className="day-header">
-                                                        <div className="day-title-group">
-                                                            <span className="day-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                {day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
-
-                                                                {/* Day Actions */}
-                                                                {selectedMemberId !== user?.id && dayEntries.length > 0 && (
-                                                                    <div className="day-actions" style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
-                                                                        {/* Only show Approve/Reject if there are pending entries and NOT only system entries */}
-                                                                        {dayEntries.some(e => e.log_status !== 'approved' && !e.project_name?.includes('System')) && (
-                                                                            <>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleApproveDay(dateStr); }}
-                                                                                    title="Approve Day"
-                                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#10b981', padding: '4px' }}
-                                                                                >
-                                                                                    <CheckCircle size={20} />
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleRejectDay(dateStr); }}
-                                                                                    title="Reject Day"
-                                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
-                                                                                >
-                                                                                    <XCircle size={20} />
-                                                                                </button>
-                                                                            </>
-                                                                        )}
-
-                                                                        {/* Show Green Tick if all Approved or System */}
-                                                                        {dayEntries.every(e => e.log_status === 'approved' || e.project_name?.includes('System')) && (
-                                                                            <CheckCircle size={20} color="#10b981" fill="#ecfdf5" />
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                        <span className="day-total">{dayTotal.toFixed(2)} Hrs</span>
-                                                    </div>
-
-                                                    {dayEntries.length === 0 ? (
-                                                        <div className="ts-empty-state-card" style={{ padding: '40px 20px', textAlign: 'center', marginTop: '20px' }}>
-                                                            <div className="animation-container" style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto 16px' }}>
-                                                                <Clock className="floating-clock" size={48} style={{ color: '#cbd5e1', animation: 'float 3s ease-in-out infinite' }} />
-                                                                <div className="pulse-ring" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '100%', height: '100%', borderRadius: '50%', border: '2px solid #e2e8f0', animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite' }}></div>
-                                                            </div>
-                                                            <h3 style={{ fontSize: '16px', color: '#64748b', fontWeight: 500 }}>No entries logged for this week.</h3>
-                                                        </div>
-                                                    ) : (
-                                                        dayEntries.map(entry => (
-                                                            <div key={entry.id} className={`entry-item premium-card status-${entry.log_status} ${entry.project_name?.includes('System') ? 'holiday-card' : ''}`}>
-                                                                <div className="entry-inner">
-                                                                    <div className="entry-header">
-                                                                        <div className="entry-path">
-                                                                            <strong>{entry.project_name}</strong>
-                                                                            <span className="path-sep">&gt;</span>
-                                                                            <span>{entry.module_name}</span>
-                                                                            <span className="path-sep">&gt;</span>
-                                                                            <span>{entry.task_name}</span>
-                                                                        </div>
-                                                                        <span className="duration-label">{Number(entry.duration).toFixed(2)}h</span>
-                                                                    </div>
-                                                                    <div className="description-text">{entry.description}</div>
-                                                                    {entry.rejection_reason && (
-                                                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', background: '#fef2f2', padding: '4px 8px', borderRadius: '4px' }}>
-                                                                            <strong>Rejection Reason:</strong> {entry.rejection_reason}
-                                                                        </div>
+                                                        return (
+                                                            <th
+                                                                key={h}
+                                                                className={`${isDropdown ? 'ts-header-dropdown-trigger' : ''} ${headerClass}`}
+                                                                style={{
+                                                                    cursor: h === 'Description' ? 'default' : 'pointer',
+                                                                    userSelect: 'none',
+                                                                    position: 'relative',
+                                                                    textAlign: 'left' // Explicitly align heading text to left
+                                                                }}
+                                                                onClick={() => h !== 'Description' && handleSort(h)}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-start' }}>
+                                                                    {h}
+                                                                    {h !== 'Description' && (
+                                                                        <span style={{ color: (sortConfig.key === h || (isDropdown && activeDropdown === h)) ? '#2563eb' : '#cbd5e1' }}>
+                                                                            {isDropdown ? (
+                                                                                <ChevronDown size={12} />
+                                                                            ) : sortConfig.key === h ? (
+                                                                                sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                                                                            ) : (
+                                                                                <ChevronsUpDown size={12} />
+                                                                            )}
+                                                                        </span>
                                                                     )}
-                                                                    <div className="entry-footer">
-                                                                        <span className={`status-pill status-${entry.log_status}`}>{entry.log_status}</span>
-                                                                    </div>
                                                                 </div>
 
-                                                                {entry.log_status !== 'approved' && entry.log_status !== 'rejected' && !entry.project_name?.includes('System') && (
-                                                                    <div className="entry-actions-sidebar">
-                                                                        <button
-                                                                            className="action-btn-styled delete"
-                                                                            title="Reject"
-                                                                            onClick={() => {
-                                                                                if (entry.id) handleRejectClick(entry.id);
-                                                                            }}
-                                                                        >
-                                                                            <XCircle size={16} />
-                                                                        </button>
+                                                                {/* Custom Dropdown Popover */}
+                                                                {isDropdown && activeDropdown === h && (
+                                                                    <div className="ts-filter-popover" onClick={e => e.stopPropagation()}>
+                                                                        {h === 'Work Status' ? (
+                                                                            <>
+                                                                                <div className={`ts-popover-item ${tableFilters.work_status === '' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, work_status: '' }); setActiveDropdown(null); }}>All Work Status</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.work_status === 'in_progress' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, work_status: 'in_progress' }); setActiveDropdown(null); }}>In Progress</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.work_status === 'completed' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, work_status: 'completed' }); setActiveDropdown(null); }}>Completed</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.work_status === 'not_applicable' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, work_status: 'not_applicable' }); setActiveDropdown(null); }}>Not Applicable</div>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <div className={`ts-popover-item ${tableFilters.log_status === '' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, log_status: '' }); setActiveDropdown(null); }}>All Status</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.log_status === 'draft' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, log_status: 'draft' }); setActiveDropdown(null); }}>Draft</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.log_status === 'submitted' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, log_status: 'submitted' }); setActiveDropdown(null); }}>Submitted</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.log_status === 'approved' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, log_status: 'approved' }); setActiveDropdown(null); }}>Approved</div>
+                                                                                <div className={`ts-popover-item ${tableFilters.log_status === 'rejected' ? 'active' : ''}`} onClick={() => { setTableFilters({ ...tableFilters, log_status: 'rejected' }); setActiveDropdown(null); }}>Rejected</div>
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                 )}
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
+                                                            </th>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {processedEntries.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
+                                                            {memberEntries.length === 0 ? 'No log entries found for this week.' : 'No entries match your filters.'}
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    processedEntries.map(entry => (
+                                                        <tr key={entry.id} className="ts-table-row">
+                                                            <td className="ts-col-project">{entry.project_name || 'System'}</td>
+                                                            <td className="ts-col-module">{entry.module_name || '—'}</td>
+                                                            <td className="ts-col-task">{entry.task_name || '—'}</td>
+                                                            <td className="ts-col-desc" title={entry.description}>
+                                                                {entry.description || '—'}
+                                                            </td>
+                                                            <td className="ts-col-date">{entry.log_date}</td>
+                                                            <td className="ts-col-time">{Number(entry.duration).toFixed(1)}h</td>
+                                                            <td className="ts-col-work">
+                                                                <span className={`ts-work-badge ts-work-${entry.work_status}`}>
+                                                                    {entry.work_status?.replace(/_/g, ' ')}
+                                                                </span>
+                                                            </td>
+                                                            <td className="ts-col-action">
+                                                                <div className="ts-action-cell">
+                                                                    {(entry.log_status !== 'submitted' || !canApprove) && (
+                                                                        <span className={`ts-log-badge ts-log-${entry.log_status}`}>
+                                                                            {entry.log_status}
+                                                                        </span>
+                                                                    )}
+
+                                                                    {entry.log_status === 'rejected' && entry.rejection_reason && (
+                                                                        <span className="ts-rejection-mini">
+                                                                            ⚠ {entry.rejection_reason}
+                                                                        </span>
+                                                                    )}
+
+                                                                    {entry.log_status === 'submitted' && canApprove && (
+                                                                        <div
+                                                                            className="ts-row-action-container"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setActiveActionMenu(activeActionMenu === entry.id ? null : entry.id!);
+                                                                            }}
+                                                                        >
+                                                                            <button className={`ts-action-trigger submitted ${activeActionMenu === entry.id ? 'active' : ''}`}>
+                                                                                <span>Submitted</span>
+                                                                                <ChevronDown size={14} />
+                                                                            </button>
+
+                                                                            {activeActionMenu === entry.id && (
+                                                                                <div className="ts-action-dropdown animate-fadeIn">
+                                                                                    <div className="ts-dropdown-item approve" onClick={(e) => { e.stopPropagation(); handleApproveEntry(entry.id!); setActiveActionMenu(null); }}>
+                                                                                        <CheckCircle size={14} /> Approve
+                                                                                    </div>
+                                                                                    <div className="ts-dropdown-item reject" onClick={(e) => { e.stopPropagation(); openRejectEntry(entry.id!); setActiveActionMenu(null); }}>
+                                                                                        <XCircle size={14} /> Reject
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {/* Reject Modal */}
-                <Modal
-                    isOpen={rejectModalOpen}
-                    onClose={() => setRejectModalOpen(false)}
-                    title="Reject Entry"
-                    footer={
-                        <>
-                            <button className="modal-btn secondary" onClick={() => setRejectModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn danger" onClick={confirmReject}>Reject</button>
-                        </>
-                    }
-                >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '14px', fontWeight: 500 }}>Reason for Rejection</label>
-                        <textarea
-                            className="ts-form-textarea"
-                            style={{ minHeight: '80px' }}
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            placeholder="e.g. Invalid task allocation"
-                        />
-                    </div>
-                </Modal>
-
-                {/* Report Modal */}
-                <Modal
-                    isOpen={reportModalOpen}
-                    onClose={() => setReportModalOpen(false)}
-                    title="Download Report"
-                    footer={
-                        <>
-                            <button className="modal-btn secondary" onClick={() => setReportModalOpen(false)}>Cancel</button>
-                            <button className="modal-btn primary" onClick={handleDownloadReport}>Download CSV</button>
-                        </>
-                    }
-                >
-                    <div style={{ display: 'grid', gap: '16px' }}>
-                        <div className="ts-form-group">
-                            <label className="ts-form-label">Date Range</label>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <input
-                                    type="date"
-                                    className="ts-form-input"
-                                    value={reportFilters.startDate}
-                                    onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
-                                />
-                                <input
-                                    type="date"
-                                    className="ts-form-input"
-                                    value={reportFilters.endDate}
-                                    onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
-                                />
+                {/* Reject Entry Modal */}
+                {rejectModalOpen && (
+                    <div style={{
+                        position: 'fixed', inset: 0, zIndex: 1000,
+                        background: 'rgba(0,0,0,0.4)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <div style={{
+                            background: '#fff', borderRadius: '16px', padding: '28px',
+                            width: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+                        }}>
+                            <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>Reject Entry</h3>
+                            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#64748b' }}>Please provide a reason for rejection. The employee will be notified.</p>
+                            <textarea
+                                autoFocus
+                                placeholder="e.g. Description is insufficient..."
+                                value={rejectionReason}
+                                onChange={e => setRejectionReason(e.target.value)}
+                                style={{
+                                    width: '100%', minHeight: '90px', padding: '10px 12px',
+                                    border: '1px solid #e2e8f0', borderRadius: '8px',
+                                    fontSize: '13px', resize: 'vertical', boxSizing: 'border-box',
+                                    outline: 'none', fontFamily: 'inherit'
+                                }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                                <button
+                                    onClick={() => setRejectModalOpen(false)}
+                                    disabled={processingAction}
+                                    style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmRejectEntry}
+                                    disabled={processingAction || !rejectionReason.trim()}
+                                    style={{
+                                        padding: '8px 18px', borderRadius: '8px',
+                                        border: 'none', background: processingAction || !rejectionReason.trim() ? '#fca5a5' : '#ef4444',
+                                        color: '#fff', fontSize: '13px', fontWeight: 600, cursor: processingAction ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    {processingAction ? 'Rejecting...' : 'Confirm Reject'}
+                                </button>
                             </div>
                         </div>
-                        {/* Add project/module filtering inputs if needed. 
-                            The user requirement 8 says: "Manager: name of their reportees only... project, module... only if he is manager".
-                            For now keeping simplified to Date Range + implicit scope filter in backend.
-                        */}
-                        <p style={{ fontSize: '13px', color: '#64748b' }}>
-                            Report will include all timesheet entries for your reportees within the selected date range.
-                        </p>
                     </div>
-                </Modal>
+                )}
+
+
+                {/* PDF Report Modal */}
+                <TimesheetReportModal
+                    isOpen={reportModalOpen}
+                    onClose={() => setReportModalOpen(false)}
+                />
             </div>
-        </AppLayout >
+        </AppLayout>
     );
 };

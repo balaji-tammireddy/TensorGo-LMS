@@ -791,7 +791,6 @@ const LeaveApprovalPage: React.FC = () => {
               <table className="requests-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
                     <th>Name</th>
                     <th className="sortable-header" onClick={() => handlePendingSort('appliedDate')}>
                       <div className="header-sort-wrapper">
@@ -860,7 +859,7 @@ const LeaveApprovalPage: React.FC = () => {
                 <tbody>
                   {pendingLoading && !pendingData ? (
                     <tr>
-                      <td colSpan={10}>
+                      <td colSpan={9}>
                         <div className="skeleton-table">
                           <div className="skeleton-table-row"></div>
                           <div className="skeleton-table-row"></div>
@@ -870,7 +869,7 @@ const LeaveApprovalPage: React.FC = () => {
                     </tr>
                   ) : groupedPendingRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ padding: 0 }}>
+                      <td colSpan={9} style={{ padding: 0 }}>
                         <EmptyState
                           title="No Pending Requests"
                           description="There are no leave requests waiting for your approval."
@@ -893,7 +892,6 @@ const LeaveApprovalPage: React.FC = () => {
                           className={isUpdating ? 'updating-row' : ''}
                         >
 
-                          <td>{request.empId}</td>
                           <td>
                             {request.empName}
                           </td>
@@ -998,7 +996,6 @@ const LeaveApprovalPage: React.FC = () => {
               <table className="requests-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
                     <th>Name</th>
                     <th className="sortable-header" onClick={() => handleRecentSort('appliedDate')}>
                       <div className="header-sort-wrapper">
@@ -1054,7 +1051,6 @@ const LeaveApprovalPage: React.FC = () => {
                           className={isUpdating ? 'updating-row' : ''}
                         >
 
-                          <td>{request.empId}</td>
                           <td>
                             {request.empName}
                           </td>

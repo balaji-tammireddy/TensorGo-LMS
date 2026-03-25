@@ -9,22 +9,20 @@ const router = Router();
 
 // All routes require authentication and HR/Super Admin role
 router.use(authenticateToken);
-router.use(authorizeRole('hr', 'super_admin'));
-
-router.get('/', employeeController.getEmployees);
-router.get('/next-id', employeeController.getNextEmployeeId);
-router.get('/:id', employeeController.getEmployeeById);
-router.post('/', validateRequest(createEmployeeSchema), employeeController.createEmployee);
-router.put('/:id', validateRequest(updateEmployeeSchema), employeeController.updateEmployee);
+// Routes for employee management
+router.get('/', authorizeRole('hr', 'super_admin', 'manager'), employeeController.getEmployees);
+router.get('/next-id', authorizeRole('hr', 'super_admin'), employeeController.getNextEmployeeId);
+router.get('/:id', authorizeRole('hr', 'super_admin', 'manager'), employeeController.getEmployeeById);
+router.post('/', authorizeRole('hr', 'super_admin'), validateRequest(createEmployeeSchema), employeeController.createEmployee);
+router.put('/:id', authorizeRole('hr', 'super_admin'), validateRequest(updateEmployeeSchema), employeeController.updateEmployee);
 // Only super_admin can delete employees
 router.delete('/:id', authorizeRole('super_admin'), employeeController.deleteEmployee);
 // HR and Super Admin can add leaves to employees
-// Note: addLeavesToEmployee uses multer for file uploads, so validation is handled in the controller
-router.post('/:id/leaves', employeeController.addLeavesToEmployee);
+router.post('/:id/leaves', authorizeRole('hr', 'super_admin'), employeeController.addLeavesToEmployee);
 // HR and Super Admin can view employee leave balances
-router.get('/:id/leave-balances', employeeController.getEmployeeLeaveBalances);
+router.get('/:id/leave-balances', authorizeRole('hr', 'super_admin'), employeeController.getEmployeeLeaveBalances);
 // HR and Super Admin can send carryforward emails to all employees
-router.post('/send-carryforward-emails', employeeController.sendCarryForwardEmails);
+router.post('/send-carryforward-emails', authorizeRole('hr', 'super_admin'), employeeController.sendCarryForwardEmails);
 // HR and Super Admin can convert LOP leaves to casual leaves (only if LOP balance exists)
 
 

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { TimesheetService } from '../services/timesheet.service';
 import { logger } from '../utils/logger';
+import { pool } from '../database/db';
 
 export const saveEntry = async (req: AuthRequest, res: Response) => {
     try {
@@ -78,8 +79,9 @@ export const getTeamStatus = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+        const roleLower = role?.toLowerCase();
         // Access: Manager, HR, Super Admin
-        if (role !== 'manager' && role !== 'hr' && role !== 'super_admin') {
+        if (roleLower !== 'manager' && roleLower !== 'hr' && roleLower !== 'super_admin' && roleLower !== 'admin') {
             return res.status(403).json({ error: 'Access denied' });
         }
 
@@ -97,19 +99,60 @@ export const getTeamStatus = async (req: AuthRequest, res: Response) => {
 export const getMemberWeeklyEntries = async (req: AuthRequest, res: Response) => {
     try {
         const approverId = req.user?.id;
-        const { targetUserId } = req.params;
+        const approverRole = req.user?.role;
+        const { targetUserId: targetUserIdStr } = req.params;
         const { start_date, end_date } = req.query;
 
         if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
 
-        // Check Permissions
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, parseInt(targetUserId));
-        if (!isAllowed) return res.status(403).json({ error: 'You are not authorized to view this user\'s timesheet' });
+        const targetUserId = parseInt(targetUserIdStr);
+        if (isNaN(targetUserId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
 
-        const entries = await TimesheetService.getEntriesForWeek(parseInt(targetUserId), String(start_date), String(end_date));
+        // --- Permissions ---
+        // 1. Always allow viewing your own timesheet
+        const isSelf = Number(approverId) === Number(targetUserId);
+        if (isSelf) {
+            const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
+            return res.json(entries);
+        }
+
+        // 2. HR and Super Admin can view all users' timesheets
+        const roleLower = approverRole?.toLowerCase();
+        const isHROrAdmin = roleLower === 'hr' || roleLower === 'super_admin' || roleLower === 'admin';
+        if (isHROrAdmin) {
+            const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
+            return res.json(entries);
+        }
+
+        // 3. Managers: Check if they manage this user
+        const isAllowed = await TimesheetService.isManagerOrAdmin(Number(approverId), Number(targetUserId));
+        if (!isAllowed) {
+            logger.warn(`[TimeSheet] Unauthorized view attempt by user ${approverId} for member ${targetUserId}`);
+            return res.status(403).json({ error: 'You are not authorized to view this user\'s timesheet' });
+        }
+
+        const entries = await TimesheetService.getEntriesForWeek(targetUserId, String(start_date || ''), String(end_date || ''));
         res.json(entries);
     } catch (error: any) {
         logger.error('[TimeSheet] Member Entries Error:', error);
+        res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+};
+
+export const approveEntry = async (req: AuthRequest, res: Response) => {
+    try {
+        const approverId = req.user?.id;
+        const { entryId } = req.body;
+
+        if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!entryId) return res.status(400).json({ error: 'Entry ID is required' });
+
+        await TimesheetService.approveTimesheetEntry(approverId, entryId);
+        res.json({ success: true, message: 'Entry approved successfully' });
+    } catch (error: any) {
+        logger.error('[TimeSheet] Approve Entry Error:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -121,8 +164,13 @@ export const approveTimesheet = async (req: AuthRequest, res: Response) => {
 
         if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, targetUserId);
-        if (!isAllowed) return res.status(403).json({ error: 'Not authorized to approve' });
+        const approverRole = req.user?.role?.toLowerCase();
+        const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin' || approverRole === 'admin';
+
+        if (!isHROrAdmin) {
+            const isAllowed = await TimesheetService.isManagerOrAdmin(Number(approverId), Number(targetUserId));
+            if (!isAllowed) return res.status(403).json({ error: 'Not authorized to approve' });
+        }
 
         await TimesheetService.approveTimesheet(approverId, targetUserId, start_date, end_date);
         res.json({ success: true, message: 'Approved successfully' });
@@ -148,16 +196,59 @@ export const rejectEntry = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const updateLeaveLogAction = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { entryId, logDate, action } = req.body;
+        if (entryId === undefined || !logDate || !action) {
+            return res.status(400).json({ error: 'entryId, logDate, and action are required' });
+        }
+
+        if (action !== 'half_day' && action !== 'delete') {
+            return res.status(400).json({ error: 'Invalid action' });
+        }
+
+        const result = await TimesheetService.updateLeaveLog(userId, entryId, logDate, action);
+        res.json(result);
+    } catch (error: any) {
+        logger.error('[TimeSheet] Update Leave Log Action Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const manualSubmit = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { start_date, end_date } = req.body;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!start_date || !end_date) return res.status(400).json({ error: 'Date range required' });
+
+        await TimesheetService.manualSubmitTimesheet(userId, start_date, end_date);
+        res.json({ success: true, message: 'Timesheet submitted successfully' });
+    } catch (error: any) {
+        logger.error('[TimeSheet] Manual Submit Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const rejectTimesheet = async (req: AuthRequest, res: Response) => {
     try {
         const approverId = req.user?.id;
         const { targetUserId, start_date, end_date, reason } = req.body;
 
-        if (!approverId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!approverId || !targetUserId) return res.status(401).json({ error: 'Unauthorized' });
         if (!reason) return res.status(400).json({ error: 'Rejection reason is required' });
 
-        const isAllowed = await TimesheetService.isManagerOrAdmin(approverId, targetUserId);
-        if (!isAllowed) return res.status(403).json({ error: 'Not authorized to reject' });
+        const approverRole = req.user?.role?.toLowerCase();
+        const isHROrAdmin = approverRole === 'hr' || approverRole === 'super_admin' || approverRole === 'admin';
+
+        if (!isHROrAdmin) {
+            const isAllowed = await TimesheetService.isManagerOrAdmin(Number(approverId), Number(targetUserId));
+            if (!isAllowed) return res.status(403).json({ error: 'Not authorized to reject' });
+        }
 
         await TimesheetService.rejectTimesheet(approverId, targetUserId, start_date, end_date, reason);
         res.json({ success: true, message: 'Rejected successfully' });
@@ -173,13 +264,21 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const { projectId, moduleId, startDate, endDate, targetUserId } = req.query;
+        const roleLower = role?.toLowerCase();
+        // Security: Block employees and interns from accessing reports
+        if (roleLower === 'employee' || roleLower === 'intern') {
+            logger.warn(`[TimeSheet Report] Unauthorized access attempt by user ${userId} (${roleLower})`);
+            return res.status(403).json({ error: 'Access denied. Only Managers and HR/Admins can generate reports.' });
+        }
+
+        const { projectId, moduleId, taskId, startDate, endDate, targetUserId } = req.query;
 
         const filters: any = {
             startDate: startDate ? String(startDate) : undefined,
             endDate: endDate ? String(endDate) : undefined,
             projectId: projectId ? parseInt(String(projectId)) : undefined,
             moduleId: moduleId ? parseInt(String(moduleId)) : undefined,
+            taskId: taskId ? parseInt(String(taskId)) : undefined,
             userId: targetUserId ? parseInt(String(targetUserId)) : undefined
         };
 
@@ -194,6 +293,176 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         res.json(data);
     } catch (error: any) {
         logger.error('[TimeSheet] Report Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const generatePDFReport = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id: userId, role, name: userName } = req.user!;
+
+        const roleLower = role?.toLowerCase();
+        // Security: Block employees and interns from accessing reports
+        if (roleLower === 'employee' || roleLower === 'intern' || roleLower === 'manager') {
+            logger.warn(`[Timesheet PDF Report] Unauthorized access attempt by user ${userId} (${roleLower})`);
+            return res.status(403).json({ error: 'Access denied. Only HR/Admins can generate reports.' });
+        }
+
+        const queryParams = { ...req.query } as any;
+
+        logger.info(`[Timesheet Report] Generating PDF report. User: ${userId}, Role: ${role}, Filters: ${JSON.stringify(queryParams)}`);
+
+        const filters: any = {
+            startDate: queryParams.startDate ? String(queryParams.startDate) : undefined,
+            endDate: queryParams.endDate ? String(queryParams.endDate) : undefined,
+            projectId: queryParams.projectId ? parseInt(String(queryParams.projectId)) : undefined,
+            moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
+            taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
+            userId: queryParams.targetUserId ? parseInt(String(queryParams.targetUserId)) : undefined
+        };
+
+        // Scope enforcement
+        if (role !== 'super_admin' && role !== 'hr') {
+            // Managers see their reportees; Employees see themselves
+            filters.managerScopeId = userId;
+            logger.info(`[Timesheet Report] Applying visibility scope for user: ${userId} (${role})`);
+        }
+
+        const filterNames: any = {
+            startDate: filters.startDate,
+            endDate: filters.endDate
+        };
+
+        if (filters.userId) {
+            const userRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [filters.userId]);
+            if (userRes.rows.length === 0) {
+                logger.warn(`[Timesheet Report] Target user ${filters.userId} not found`);
+                return res.status(404).json({ error: 'Target user not found' });
+            }
+            filterNames.employeeName = `${userRes.rows[0].first_name} ${userRes.rows[0].last_name}`;
+            logger.info(`[Timesheet Report] Generating report for user: ${filterNames.employeeName}`);
+        }
+
+        const reportData = await TimesheetService.getReportData(filters);
+        logger.info(`[Timesheet Report] Data fetched. Rows: ${reportData.length}`);
+
+        if (reportData.length === 0) {
+            logger.warn('[Timesheet Report] No entries found for selected filters');
+            return res.status(400).json({ error: 'No entries found' });
+        }
+
+        if (filters.projectId) {
+            const projRes = await pool.query('SELECT name FROM projects WHERE id = $1', [filters.projectId]);
+            if (projRes.rows.length > 0) filterNames.projectName = projRes.rows[0].name;
+        }
+        if (filters.moduleId) {
+            const modRes = await pool.query('SELECT name FROM project_modules WHERE id = $1', [filters.moduleId]);
+            if (modRes.rows.length > 0) filterNames.moduleName = modRes.rows[0].name;
+        }
+        if (filters.taskId) {
+            const taskRes = await pool.query('SELECT name FROM project_tasks WHERE id = $1', [filters.taskId]);
+            if (taskRes.rows.length > 0) filterNames.taskName = taskRes.rows[0].name;
+        }
+
+
+        const { generateTimesheetPDF } = await import('../utils/pdfGenerator');
+
+        const pdfBuffer = await generateTimesheetPDF({
+            entries: reportData,
+            filters: filterNames,
+            generatedBy: userName || 'Manager',
+            generatedAt: new Date().toISOString()
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=timesheet-report-${new Date().toISOString().split('T')[0]}.pdf`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        res.send(pdfBuffer);
+        logger.info('[Timesheet Report] PDF report sent to client');
+
+    } catch (error: any) {
+        logger.error('[Timesheet Report] Controller Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+export const generateExcelReport = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id: userId, role, name: userName } = req.user!;
+
+        // Security: Block employees and interns from accessing reports
+        if (role === 'employee' || role === 'intern' || role === 'manager') {
+            logger.warn(`[Timesheet Excel Report] Unauthorized access attempt by user ${userId} (${role})`);
+            return res.status(403).json({ error: 'Access denied. Only HR/Admins can generate reports.' });
+        }
+
+        const queryParams = { ...req.query } as any;
+        logger.info(`[Timesheet Report] Generating Excel report. User: ${userId}, Role: ${role}, Filters: ${JSON.stringify(queryParams)}`);
+
+        const filters: any = {
+            startDate: queryParams.startDate ? String(queryParams.startDate) : undefined,
+            endDate: queryParams.endDate ? String(queryParams.endDate) : undefined,
+            projectId: queryParams.projectId ? parseInt(String(queryParams.projectId)) : undefined,
+            moduleId: queryParams.moduleId ? parseInt(String(queryParams.moduleId)) : undefined,
+            taskId: queryParams.taskId ? parseInt(String(queryParams.taskId)) : undefined,
+            userId: queryParams.targetUserId ? parseInt(String(queryParams.targetUserId)) : undefined
+        };
+
+        // Scope enforcement
+        if (role !== 'super_admin' && role !== 'hr') {
+            filters.managerScopeId = userId;
+        }
+
+        const filterNames: any = {
+            startDate: filters.startDate,
+            endDate: filters.endDate
+        };
+
+        if (filters.userId) {
+            const userRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [filters.userId]);
+            if (userRes.rows.length > 0) {
+                filterNames.employeeName = `${userRes.rows[0].first_name} ${userRes.rows[0].last_name}`;
+            }
+        }
+
+        const reportData = await TimesheetService.getReportData(filters);
+
+        if (reportData.length === 0) {
+            return res.status(400).json({ error: 'No entries found' });
+        }
+
+        if (filters.projectId) {
+            const projRes = await pool.query('SELECT name FROM projects WHERE id = $1', [filters.projectId]);
+            if (projRes.rows.length > 0) filterNames.projectName = projRes.rows[0].name;
+        }
+        if (filters.moduleId) {
+            const modRes = await pool.query('SELECT name FROM project_modules WHERE id = $1', [filters.moduleId]);
+            if (modRes.rows.length > 0) filterNames.moduleName = modRes.rows[0].name;
+        }
+        if (filters.taskId) {
+            const taskRes = await pool.query('SELECT name FROM project_tasks WHERE id = $1', [filters.taskId]);
+            if (taskRes.rows.length > 0) filterNames.taskName = taskRes.rows[0].name;
+        }
+
+
+        const { generateTimesheetExcel } = await import('../utils/excelGenerator');
+
+        const excelBuffer = await generateTimesheetExcel({
+            entries: reportData,
+            filters: filterNames,
+            generatedBy: userName || 'Manager',
+            generatedAt: new Date().toISOString()
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=timesheet-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+        res.setHeader('Content-Length', excelBuffer.length);
+
+        res.send(excelBuffer);
+        logger.info('[Timesheet Report] Excel report sent to client');
+
+    } catch (error: any) {
+        logger.error('[Timesheet Report] Excel Controller Error:', error);
         res.status(500).json({ error: error.message });
     }
 };

@@ -16,11 +16,14 @@ export interface Profile {
     emergencyContactName?: string;
     emergencyContactNo?: string;
     emergencyContactRelation?: string;
+    personalEmail?: string;
   };
   employmentInfo: {
     designation?: string;
     department?: string;
     dateOfJoining?: string;
+    uanNumber?: string;
+    totalExperience?: number;
   };
   documents: {
     aadharNumber?: string;

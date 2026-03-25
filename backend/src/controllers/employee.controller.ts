@@ -125,13 +125,13 @@ export const deleteEmployee = async (req: AuthRequest, res: Response) => {
   logger.info(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Employee ID: ${req.params.id}, User ID: ${req.user?.id || 'unknown'}, Role: ${req.user?.role || 'unknown'}`);
 
   try {
-    // Ensure only super_admin can delete
-    if (req.user?.role !== 'super_admin') {
+    // Ensure only super_admin and hr can delete
+    if (req.user?.role !== 'super_admin' && req.user?.role !== 'hr') {
       logger.warn(`[CONTROLLER] [EMPLOYEE] [DELETE EMPLOYEE] Unauthorized attempt - User ID: ${req.user?.id}, Role: ${req.user?.role}`);
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
-          message: 'Only super admin can delete employees'
+          message: 'Only HR and super admin can delete employees'
         }
       });
     }
@@ -211,7 +211,7 @@ export const addLeavesToEmployee = [
       }
 
       const employeeId = parseInt(req.params.id);
-      const { leaveType, count } = req.body;
+      const { leaveType, count, comment } = req.body;
 
       // Check if employee exists and get their role
       const employeeCheckResult = await pool.query('SELECT id, user_role as role FROM users WHERE id = $1', [employeeId]);
@@ -236,17 +236,7 @@ export const addLeavesToEmployee = [
         });
       }
 
-      // HR specific restrictions
-      if (req.user?.role === 'hr') {
-        if (employeeId === req.user.id) {
-          return res.status(403).json({
-            error: {
-              code: 'FORBIDDEN',
-              message: 'HR cannot add leaves to themselves'
-            }
-          });
-        }
-      }
+
 
       if (!leaveType || !count) {
         return res.status(400).json({
@@ -257,22 +247,23 @@ export const addLeavesToEmployee = [
         });
       }
 
-      if (parseFloat(count) > 12) {
+      const maxAddAtOnce = leaveType === 'lop' ? 30 : 12;
+      if (parseFloat(count) > maxAddAtOnce) {
         return res.status(400).json({
           error: {
             code: 'BAD_REQUEST',
-            message: 'Maximum 12 leaves can be added at once'
+            message: `Maximum ${maxAddAtOnce} leaves can be added at once`
           }
         });
       }
 
       // Implicitly handle form-data parsing quirks (sometimes strings)
       // Validate leaveType
-      if (leaveType !== 'casual') {
+      if (leaveType !== 'casual' && leaveType !== 'lop') {
         return res.status(400).json({
           error: {
             code: 'BAD_REQUEST',
-            message: 'Only casual leaves can be added manually'
+            message: 'Only casual and LOP leaves can be added manually'
           }
         });
       }
@@ -323,7 +314,7 @@ export const addLeavesToEmployee = [
         leaveType,
         parseFloat(count),
         req.user!.id,
-        undefined,
+        comment,
         documentUrl
       );
       logger.info(`[CONTROLLER] [EMPLOYEE] [ADD LEAVES] Leaves added successfully - Employee ID: ${employeeId}, Leave Type: ${leaveType}, Count: ${count}`);

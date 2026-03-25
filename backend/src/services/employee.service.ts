@@ -282,10 +282,10 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
   logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Employee ID: ${employeeData.empId}, Email: ${employeeData.email}, Name: ${employeeData.firstName} ${employeeData.lastName || ''}, Requester: ${requesterRole || 'none'}`);
 
-  // Only super_admin can create another super_admin
-  if (employeeData.role === 'super_admin' && requesterRole !== 'super_admin') {
+  // HR and super_admin can create another super_admin
+  if (employeeData.role === 'super_admin' && requesterRole !== 'super_admin' && requesterRole !== 'hr') {
     logger.warn(`[EMPLOYEE] [CREATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to create super_admin`);
-    throw new Error('Only Super Admin can create Super Admin users');
+    throw new Error('Only HR and Super Admin can create Super Admin users');
   }
 
   // Mandatory fields check
@@ -294,22 +294,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     { key: 'firstName', label: 'First Name' },
     { key: 'lastName', label: 'Last Name' },
     { key: 'email', label: 'Official Email' },
-    { key: 'contactNumber', label: 'Contact Number' },
-    { key: 'altContact', label: 'Alternate Contact Number' },
     { key: 'dateOfBirth', label: 'Date of Birth' },
-    { key: 'gender', label: 'Gender' },
-    { key: 'bloodGroup', label: 'Blood Group' },
-    { key: 'maritalStatus', label: 'Marital Status' },
-    { key: 'emergencyContactName', label: 'Emergency Contact Name' },
-    { key: 'emergencyContactNo', label: 'Emergency Contact Number' },
-    { key: 'emergencyContactRelation', label: 'Emergency Contact Relation' },
-    { key: 'designation', label: 'Designation' },
-    { key: 'department', label: 'Department' },
-    { key: 'dateOfJoining', label: 'Date of Joining' },
-    { key: 'aadharNumber', label: 'Aadhar Number' },
-    { key: 'panNumber', label: 'PAN Number' },
-    { key: 'currentAddress', label: 'Current Address' },
-    { key: 'permanentAddress', label: 'Permanent Address' }
+    { key: 'dateOfJoining', label: 'Date of Joining' }
   ];
 
   for (const field of mandatoryFields) {
@@ -355,9 +341,12 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   ];
 
   for (const field of phoneFields) {
-    const val = String(employeeData[field.key] || '').trim();
-    if (val.length !== 10 || !/^\d+$/.test(val)) {
-      throw new Error(`${field.label} must be exactly 10 digits`);
+    const rawVal = employeeData[field.key];
+    if (rawVal !== undefined && rawVal !== null && (typeof rawVal !== 'string' || rawVal.trim() !== '')) {
+      const val = String(rawVal).trim();
+      if (val.length !== 10 || !/^\d+$/.test(val)) {
+        throw new Error(`${field.label} must be exactly 10 digits`);
+      }
     }
   }
 
@@ -389,7 +378,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
     }
   }
 
-  // Education validation
+  // Education validation - making mandatory check optional based on user feedback
+  /*
   if (!employeeData.education || !Array.isArray(employeeData.education)) {
     throw new Error('Education details are required');
   }
@@ -398,17 +388,24 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   if (!eduLevels.includes('UG') || !eduLevels.includes('12th')) {
     throw new Error('UG and 12th education details are mandatory');
   }
+  */
 
-  const birthDate = new Date(employeeData.dateOfBirth);
-  const birthYear = birthDate.getFullYear();
+  const education = employeeData.education || [];
+  const birthDate = employeeData.dateOfBirth ? new Date(employeeData.dateOfBirth) : null;
+  const birthYear = birthDate ? birthDate.getFullYear() : null;
 
   const educationYears: Record<string, number> = {};
-  for (const edu of employeeData.education) {
-    const isMandatory = ['UG', '12th'].includes(edu.level);
-    const hasAnyField = edu.groupStream || edu.collegeUniversity || edu.year || edu.scorePercentage;
+  for (const edu of education) {
+    const hasAnyField = (edu.groupStream && edu.groupStream.trim() !== '') ||
+      (edu.collegeUniversity && edu.collegeUniversity.trim() !== '') ||
+      (edu.year && edu.year.toString().trim() !== '') ||
+      (edu.scorePercentage && edu.scorePercentage.toString().trim() !== '');
 
-    if (isMandatory || hasAnyField) {
-      if (!edu.groupStream || !edu.collegeUniversity || !edu.year || !edu.scorePercentage) {
+    if (hasAnyField) {
+      if (!edu.groupStream || !edu.groupStream.trim() ||
+        !edu.collegeUniversity || !edu.collegeUniversity.trim() ||
+        !edu.year || !edu.year.toString().trim() ||
+        !edu.scorePercentage || !edu.scorePercentage.toString().trim()) {
         throw new Error(`Please fill complete details for ${edu.level} education`);
       }
 
@@ -633,11 +630,11 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
       employeeData.gender || null,
       employeeData.bloodGroup || null,
       employeeData.maritalStatus || null,
-      toTitleCase(employeeData.emergencyContactName),
+      toTitleCase(employeeData.emergencyContactName) || null,
       employeeData.emergencyContactNo || null,
-      toTitleCase(employeeData.emergencyContactRelation),
-      toTitleCase(employeeData.designation),
-      toTitleCase(employeeData.department),
+      toTitleCase(employeeData.emergencyContactRelation) || null,
+      toTitleCase(employeeData.designation) || null,
+      toTitleCase(employeeData.department) || null,
       employeeData.dateOfJoining,
       employeeData.aadharNumber || null,
       (() => {
@@ -653,8 +650,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
         }
         return pan;
       })(),
-      toTitleCase(employeeData.currentAddress),
-      toTitleCase(employeeData.permanentAddress),
+      toTitleCase(employeeData.currentAddress) || null,
+      toTitleCase(employeeData.permanentAddress) || null,
       reportingManagerId,
       employeeData.status || 'active',
       requesterId || null,
@@ -674,8 +671,8 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
 
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Initializing leave balances - Casual: ${casualBalance}, Sick: ${sickBalance}, LOP: 10`);
     await pool.query(
-      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance) VALUES ($1, $2, $3, 10)',
-      [userId, casualBalance, sickBalance]
+      'INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by) VALUES ($1, $2, $3, 10, $4, $4)',
+      [userId, casualBalance, sickBalance, requesterId || userId]
     );
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Leave balances initialized successfully`);
   } else {
@@ -730,7 +727,7 @@ export const createEmployee = async (employeeData: any, requesterRole?: string, 
   // Send welcome email with credentials
   try {
     logger.info(`[EMPLOYEE] [CREATE EMPLOYEE] Preparing to send welcome email`);
-    const loginUrl = 'http://51.15.227.10:3000/login';
+    const loginUrl = 'https://intra.tensorgo.com/login';
     const temporaryPassword = finalPassword;
 
     await emailTemplates.sendNewEmployeeCredentialsEmail(employeeData.email, {
@@ -1073,8 +1070,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
   }
 
-  // Prevent HR from editing super_admin or other HR users (except role updates)
-  if (requesterRole === 'hr' && (employeeRole === 'super_admin' || employeeRole === 'hr') && !isOnlyRoleUpdate) {
+  // Prevent HR from editing other HR users (except role updates), but allow editing super_admin as requested
+  if (requesterRole === 'hr' && employeeRole === 'hr' && !isOnlyRoleUpdate) {
     if (isRoleBeingUpdated) {
       Object.keys(employeeData).forEach(key => {
         const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
@@ -1083,7 +1080,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         }
       });
     } else {
-      const targetName = employeeRole === 'super_admin' ? 'super admin' : (requesterId === employeeId ? 'their own' : 'other HR');
+      const targetName = requesterId === employeeId ? 'their own' : 'other HR';
       throw new Error(`HR cannot edit ${targetName} details`);
     }
   }
@@ -1115,17 +1112,17 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     allowedFields.push('user_role');
   }
 
-  // Only super_admin can update email, date_of_joining and emp_id
-  if (requesterRole === 'super_admin') {
+  // HR and super_admin can update email, date_of_joining and emp_id
+  if (requesterRole === 'super_admin' || requesterRole === 'hr') {
     allowedFields.push('email');
     allowedFields.push('date_of_joining');
     allowedFields.push('emp_id');
   } else {
-    // If not super_admin, forbid these fields ONLY if they are being changed
+    // If not super_admin or hr, forbid these fields ONLY if they are being changed
     // We compare with the existing database values
 
     if (employeeData.email && employeeData.email.trim().toLowerCase() !== employeeCheck.rows[0].email.toLowerCase()) {
-      throw new Error('Only Super Admin can update Official Email');
+      throw new Error('Only HR and Super Admin can update Official Email');
     }
 
     // Normalize dates for comparison (ignoring time)
@@ -1156,16 +1153,16 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     }
 
     if (newDOJ && existingDOJ && newDOJ !== existingDOJ) {
-      throw new Error(`Only Super Admin can update Date of Joining`);
+      throw new Error(`Only HR and Super Admin can update Date of Joining`);
     }
 
     if (employeeData.empId && employeeData.empId.trim().toUpperCase() !== employeeCheck.rows[0].emp_id) {
-      throw new Error('Only Super Admin can update Employee ID');
+      throw new Error('Only HR and Super Admin can update Employee ID');
     }
   }
 
   // Check if emp_id is being updated and validate uniqueness
-  if (employeeData.empId && requesterRole === 'super_admin') {
+  if (employeeData.empId && (requesterRole === 'super_admin' || requesterRole === 'hr')) {
     // employeeData.empId has already been cleaned of leading zeros earlier
     // Just apply uppercase normalization
     const empId = employeeData.empId.toString().trim().toUpperCase();
@@ -1181,7 +1178,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   }
 
   // Check if email is being updated and validate uniqueness
-  if (employeeData.email && requesterRole === 'super_admin') {
+  if (employeeData.email && (requesterRole === 'super_admin' || requesterRole === 'hr')) {
     const emailCheck = await pool.query(
       'SELECT id FROM users WHERE email = $1 AND id != $2',
       [employeeData.email, employeeId]
@@ -1262,15 +1259,15 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       continue;
     }
 
-    // Employee ID cannot be changed once set, unless requester is super_admin
-    if (dbKey === 'emp_id' && requesterRole !== 'super_admin') {
+    // Employee ID cannot be changed once set, unless requester is super_admin or hr
+    if (dbKey === 'emp_id' && requesterRole !== 'super_admin' && requesterRole !== 'hr') {
       continue;
     }
 
-    // Only super_admin can set/change someone to super_admin role
-    if (dbKey === 'user_role' && value === 'super_admin' && requesterRole !== 'super_admin') {
+    // HR and super_admin can set/change someone to super_admin role
+    if (dbKey === 'user_role' && value === 'super_admin' && requesterRole !== 'super_admin' && requesterRole !== 'hr') {
       logger.warn(`[EMPLOYEE] [UPDATE EMPLOYEE] Unauthorized attempt by ${requesterRole} to set super_admin role`);
-      throw new Error('Only Super Admin can assign the Super Admin role');
+      throw new Error('Only HR and Super Admin can assign the Super Admin role');
     }
 
     updates.push(`${dbKey} = $${paramCount}`);
@@ -1349,16 +1346,14 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
 
         // Send emails
         try {
-          const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
-          const previousManagerName = `${employeeCheck.rows[0].first_name} ${employeeCheck.rows[0].last_name || ''}`.trim();
+          const { sendReportingManagerUpdateEmail } = await import('../utils/emailTemplates');
 
           for (const sub of subordinatesResult.rows) {
             try {
-              await sendReportingManagerChangeEmail(sub.email, {
+              await sendReportingManagerUpdateEmail(sub.email, {
                 employeeName: sub.name,
-                previousManagerName,
-                newManagerName: managerName,
-                newManagerEmpId: managerEmpId
+                managerName: managerName,
+                managerId: managerEmpId
               });
               logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Reassignment email sent to subordinate: ${sub.email}`);
             } catch (emailError) {
@@ -1389,12 +1384,11 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
         [employeeId]
       );
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
-        const { sendReportingManagerChangeEmail } = await import('../utils/emailTemplates');
-        await sendReportingManagerChangeEmail(empResult.rows[0].email, {
+        const { sendReportingManagerUpdateEmail } = await import('../utils/emailTemplates');
+        await sendReportingManagerUpdateEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
-          previousManagerName: employeeCheck.rows[0].reporting_manager_name || 'N/A',
-          newManagerName: empResult.rows[0].reporting_manager_name || 'New Manager',
-          newManagerEmpId: empResult.rows[0].manager_emp_id || ''
+          managerName: empResult.rows[0].reporting_manager_name || 'New Manager',
+          managerId: empResult.rows[0].manager_emp_id || ''
         });
         logger.info(`[EMPLOYEE] [UPDATE EMPLOYEE] Manager change notification sent to employee: ${empResult.rows[0].email}`);
       }
@@ -1411,10 +1405,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
-        const { sendRoleChangeEmail } = await import('../utils/emailTemplates');
-        await sendRoleChangeEmail(empResult.rows[0].email, {
+        const { sendRoleUpdateEmail } = await import('../utils/emailTemplates');
+        const effectiveDate = formatDateLocal(new Date().toISOString());
+        await sendRoleUpdateEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newRole,
+          effectiveDate: effectiveDate || new Date().toDateString(),
           updatedBy: requesterName
         });
       }
@@ -1431,10 +1427,12 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
       const requesterName = requesterResult.rows[0]?.name || (requesterRole === 'super_admin' ? 'Super Admin' : 'HR');
 
       if (empResult.rows.length > 0 && empResult.rows[0].email) {
-        const { sendStatusChangeEmail } = await import('../utils/emailTemplates');
-        await sendStatusChangeEmail(empResult.rows[0].email, {
+        const { sendStatusUpdateEmail } = await import('../utils/emailTemplates');
+        const effectiveDate = formatDateLocal(new Date().toISOString());
+        await sendStatusUpdateEmail(empResult.rows[0].email, {
           employeeName: empResult.rows[0].name,
           newStatus,
+          effectiveDate: effectiveDate || new Date().toDateString(),
           updatedBy: requesterName
         });
       }
@@ -1447,7 +1445,7 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
   const oldJoiningDate = employeeCheck.rows[0].date_of_joining ? new Date(employeeCheck.rows[0].date_of_joining).toISOString().split('T')[0] : null;
   const newJoiningDate = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining).toISOString().split('T')[0] : null;
 
-  if (newJoiningDate && newJoiningDate !== oldJoiningDate && requesterRole === 'super_admin' && finalRole !== 'super_admin') {
+  if (newJoiningDate && newJoiningDate !== oldJoiningDate && (requesterRole === 'super_admin' || requesterRole === 'hr') && finalRole !== 'super_admin') {
     const allCredits = calculateAllLeaveCredits(employeeData.dateOfJoining);
 
     // Update leave balances with recalculated credits
@@ -1475,8 +1473,8 @@ export const updateEmployee = async (employeeId: number, employeeData: any, requ
     } else {
       // Create new balance record if it doesn't exist
       await pool.query(
-        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
-         VALUES ($1, $2, $3, 10, $4)`,
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by)
+         VALUES ($1, $2, $3, 10, $4, $4)`,
         [employeeId, casualBalance, sickBalance, requesterId]
       );
     }
@@ -1662,6 +1660,11 @@ export const addLeavesToEmployee = async (
     throw new Error('Leave count must be greater than 0');
   }
 
+  // Reason (comment) is mandatory
+  if (!comment || comment.trim().length === 0) {
+    throw new Error('A reason is mandatory when adding leaves');
+  }
+
   // Check roles for permission
   const [requesterResult, targetResult] = await Promise.all([
     pool.query('SELECT user_role as role FROM users WHERE id = $1', [updatedBy]),
@@ -1678,9 +1681,9 @@ export const addLeavesToEmployee = async (
   const requesterRole = requesterResult.rows[0].role;
   const targetRole = targetResult.rows[0].role;
 
-  // HR cannot add leaves for themselves, other HRs, or Super Admins
-  if (requesterRole === 'hr' && (targetRole === 'hr' || targetRole === 'super_admin')) {
-    throw new Error('HR cannot add leaves for themselves, other HR users, or Super Admins');
+  // HR cannot add leaves for Super Admins
+  if (requesterRole === 'hr' && targetRole === 'super_admin') {
+    throw new Error('HR cannot add leaves for Super Admins');
   }
 
   // Check if employee exists
@@ -1712,8 +1715,8 @@ export const addLeavesToEmployee = async (
       initialBalances[balanceColumn] = count;
 
       await client.query(
-        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, updated_by)
-         VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO leave_balances (employee_id, casual_balance, sick_balance, lop_balance, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $5)`,
         [
           employeeId,
           initialBalances.casual_balance,
@@ -1727,9 +1730,14 @@ export const addLeavesToEmployee = async (
       const currentBalance = parseFloat(balanceCheck.rows[0][balanceColumn] || '0');
       const newTotal = currentBalance + count;
 
-      // For LOP, check if it would exceed 10 (strict limit)
-      if (balanceColumn === 'lop_balance' && newTotal > 10) {
-        throw new Error(`Cannot add ${count} LOP leaves. Current LOP balance: ${currentBalance}, Maximum limit: 10. Total would be: ${newTotal}`);
+      // For LOP, check if it exceeds limits
+      if (balanceColumn === 'lop_balance') {
+        if (count > 30) {
+          throw new Error(`Cannot add ${count} LOP leaves at once. Maximum adding limit is 30.`);
+        }
+        if (newTotal > 40) {
+          throw new Error(`Cannot add ${count} LOP leaves. Current LOP balance: ${currentBalance}, Total would be ${newTotal}, which exceeds maximum total limit of 40.`);
+        }
       }
 
       // Check if total would exceed maximum limit (99 for casual/sick)
@@ -1768,8 +1776,7 @@ export const addLeavesToEmployee = async (
           ? parseFloat(balanceCheck.rows[0][balanceColumn] || '0')
           : 0;
         const newBalance = previousBalance + count;
-
-        await emailTemplates.sendLeaveAllocationEmail(employee.email, {
+        const emailData = {
           employeeName: employee.employee_name || 'Employee',
           employeeEmpId: employee.emp_id || '',
           leaveType: leaveType,
@@ -1781,12 +1788,30 @@ export const addLeavesToEmployee = async (
           allocationDate: formatDateLocal(new Date()) || '',
           comment: comment,
           documentUrl: documentUrl
-        });
+        };
+
+        // 1. Send notification to employee (the function now handles removing the documentUrl)
+        await emailTemplates.sendLeaveAllocationEmail(employee.email, emailData);
         logger.info(`✅ Leave allocation email sent to employee: ${employee.email}`);
+
+        // 2. Fetch all active Super Admins
+        const superAdminsResult = await pool.query(
+          "SELECT email FROM users WHERE user_role = 'super_admin' AND status = 'active'"
+        );
+
+        // 3. Send notification to all Super Admins (with documentUrl)
+        for (const admin of superAdminsResult.rows) {
+          try {
+            await emailTemplates.sendSuperAdminLeaveAllocationEmail(admin.email, emailData);
+            logger.info(`✅ Leave allocation alert sent to Super Admin: ${admin.email}`);
+          } catch (adminEmailError) {
+            logger.error(`❌ Error sending leave allocation email to Super Admin ${admin.email}:`, adminEmailError);
+          }
+        }
       }
     } catch (emailError: any) {
       // Log error but don't fail leave allocation
-      logger.error(`❌ Error sending leave allocation email:`, emailError);
+      logger.error(`❌ Error sending leave allocation emails:`, emailError);
     }
 
     return { message: `${count} ${leaveType} leave(s) added successfully` };

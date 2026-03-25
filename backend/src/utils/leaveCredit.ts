@@ -181,25 +181,56 @@ export function calculateAllLeaveCredits(joinDate: string | Date, checkDate: Dat
       }
     }
 
-    // Add anniversary credits if they occurred this year
-    // Use original join date for anniversary calculations
-    const threeYearAnniversary = new Date(originalJoinYear + 3, originalJoinMonth - 1, originalJoinDay);
-    if (year === originalJoinYear + 3 && threeYearAnniversary <= today && threeYearAnniversary >= systemStartDate) {
-      // Check if anniversary date is within this year and after system start
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year, 11, 31);
-      if (threeYearAnniversary >= yearStart && threeYearAnniversary <= yearEnd) {
-        yearCasual += 3; // 3-year anniversary bonus
-      }
-    }
+    // -- Anniversary Bonus Logic (New Recurring Policy) --
+    // Quarterly: Mar(3), Jun(6), Sep(9), Dec(12)
+    // Half-yearly: Jun(6), Dec(12)
 
-    const fiveYearAnniversary = new Date(originalJoinYear + 5, originalJoinMonth - 1, originalJoinDay);
-    if (year === originalJoinYear + 5 && fiveYearAnniversary <= today && fiveYearAnniversary >= systemStartDate) {
-      // Check if anniversary date is within this year and after system start
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year, 11, 31);
-      if (fiveYearAnniversary >= yearStart && fiveYearAnniversary <= yearEnd) {
-        yearCasual += 5; // 5-year anniversary bonus
+    // Process month by month to apply bonuses in specific months
+    for (let month = 1; month <= 12; month++) {
+      // Skip if this month hasn't been processed in the monthly credit loop above 
+      // OR if it's the current year and the month is in the future.
+      // However, the loop above (lines 135-182) handles monthly credits.
+      // Anniversary bonuses are added ON TOP of those credits in specific months.
+
+      // We need to know if the month 'month' in year 'year' has passed.
+      const isPastMonth = !isCurrentYear || (month < today.getMonth() + 1);
+      const isCurrentMonth = isCurrentYear && (month === today.getMonth() + 1);
+
+      if (isPastMonth || isCurrentMonth) {
+        // Special case for current month: check if it's the last working day
+        if (isCurrentMonth) {
+          const lastWorkingDay = getLastWorkingDayOfMonth(year, month);
+          if (today < lastWorkingDay) continue; // Not yet credited
+        }
+
+        // Calculate years of service at that point in time
+        // For simplicity, we check if they have completed X years by the end of that month
+        const endOfMonth = new Date(year, month, 0);
+        let yearsAtMonthEnd = endOfMonth.getFullYear() - originalJoinYear;
+        const mDiff = endOfMonth.getMonth() - (originalJoinMonth - 1);
+        const dDiff = endOfMonth.getDate() - originalJoinDay;
+        if (mDiff < 0 || (mDiff === 0 && dDiff < 0)) {
+          yearsAtMonthEnd--;
+        }
+
+        const isBonus3Month = [4, 8, 12].includes(month);
+        const isHalfYearEnd = [6, 12].includes(month);
+
+        // We need the bonus values from policy, but this utility (calculateAllLeaveCredits) 
+        // currently uses hardcoded defaults (3 and 5). 
+        // I will keep these defaults but use the new logic.
+        const bonus3 = 3;
+        const bonus5 = 5;
+
+        if (yearsAtMonthEnd >= 5) {
+          if (isHalfYearEnd) {
+            yearCasual += bonus5;
+          }
+        } else if (yearsAtMonthEnd >= 3) {
+          if (isBonus3Month) {
+            yearCasual += bonus3;
+          }
+        }
       }
     }
 
@@ -223,84 +254,3 @@ export function calculateAllLeaveCredits(joinDate: string | Date, checkDate: Dat
   return { casual, sick };
 }
 
-/**
- * Check if an employee has completed 3 years of service (anniversary date)
- * @param joinDate - Employee's date of joining (YYYY-MM-DD format or Date object)
- * @param checkDate - Date to check against (defaults to today)
- * @returns true if employee has completed exactly 3 years on the check date
- */
-export function hasCompleted3Years(joinDate: string | Date, checkDate: Date = new Date()): boolean {
-  const join = typeof joinDate === 'string' ? new Date(joinDate) : joinDate;
-  const check = checkDate;
-
-  // Calculate years of service
-  let years = check.getFullYear() - join.getFullYear();
-  const monthDiff = check.getMonth() - join.getMonth();
-  const dayDiff = check.getDate() - join.getDate();
-
-  // Adjust if anniversary hasn't occurred yet this year
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    years--;
-  }
-
-  // Check if exactly 3 years completed and today is the anniversary date
-  if (years === 3) {
-    // Check if today is the anniversary date (same month and day)
-    return check.getMonth() === join.getMonth() && check.getDate() === join.getDate();
-  }
-
-  return false;
-}
-
-/**
- * Check if an employee has completed 3 or more years of service
- * @param joinDate - Employee's date of joining (YYYY-MM-DD format or Date object)
- * @param checkDate - Date to check against (defaults to today)
- * @returns true if employee has completed 3 or more years
- */
-export function hasCompleted3OrMoreYears(joinDate: string | Date, checkDate: Date = new Date()): boolean {
-  const join = typeof joinDate === 'string' ? new Date(joinDate) : joinDate;
-  const check = checkDate;
-
-  // Calculate years of service
-  let years = check.getFullYear() - join.getFullYear();
-  const monthDiff = check.getMonth() - join.getMonth();
-  const dayDiff = check.getDate() - join.getDate();
-
-  // Adjust if anniversary hasn't occurred yet this year
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    years--;
-  }
-
-  return years >= 3;
-}
-
-
-/**
- * Check if an employee has completed 5 years of service (anniversary date)
- * @param joinDate - Employee's date of joining (YYYY-MM-DD format or Date object)
- * @param checkDate - Date to check against (defaults to today)
- * @returns true if employee has completed exactly 5 years on the check date
- */
-export function hasCompleted5Years(joinDate: string | Date, checkDate: Date = new Date()): boolean {
-  const join = typeof joinDate === 'string' ? new Date(joinDate) : joinDate;
-  const check = checkDate;
-
-  // Calculate years of service
-  let years = check.getFullYear() - join.getFullYear();
-  const monthDiff = check.getMonth() - join.getMonth();
-  const dayDiff = check.getDate() - join.getDate();
-
-  // Adjust if anniversary hasn't occurred yet this year
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    years--;
-  }
-
-  // Check if exactly 5 years completed and today is the anniversary date
-  if (years === 5) {
-    // Check if today is the anniversary date (same month and day)
-    return check.getMonth() === join.getMonth() && check.getDate() === join.getDate();
-  }
-
-  return false;
-}
